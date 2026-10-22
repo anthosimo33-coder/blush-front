@@ -141,7 +141,7 @@ describe("l’aperçu du banc, mis en écrans par l’appli", () => {
   });
 
   it("le mode sobre : le rapport doux de l’appli (ses libellés), sans chapitres", () => {
-    const verdict: Verdict = { ...VERDICT, alerte: "detresse", mode_sobre: true, emoji: null };
+    const verdict: Verdict = { ...VERDICT, alerte: "mineur", mode_sobre: true, emoji: null };
     const sobre = {
       intro: "On met les vannes de côté.",
       titre: "Ce qui se passe",
@@ -151,7 +151,7 @@ describe("l’aperçu du banc, mis en écrans par l’appli", () => {
       gestes: ["Parle à un ami"],
       brouillon: null,
     };
-    const { payload } = apercuDe(sorties({ verdict, rapport: Sortie05.parse({ ...RAPPORT, alerte: "detresse", mode_sobre: true, chapitres: null, sobre }) }));
+    const { payload } = apercuDe(sorties({ verdict, rapport: Sortie05.parse({ ...RAPPORT, alerte: "mineur", mode_sobre: true, chapitres: null, sobre }) }));
     expect(payload.report.chapters).toEqual([]);
     expect(payload.sober).toEqual(sobreAffiche({ sobre }));
     expect(payload.sober).toMatchObject({ title: "Ce qui se passe", steps: ["Parle à un ami"], draft: "" });

@@ -218,8 +218,8 @@ const MAIL_RECENT = sql`(
 
 /**
  * Le prochain pas, l’emoji et l’alerte du verdict de cette conv, ou null : pas de verdict, ou une alerte, quelle qu’elle
- * soit (rien ne part). Une alerte « danger » se vend dans l’appli (21 octobre 2026), mais aucun mail sur leur histoire
- * ne part : sa boîte mail peut être lue par l’autre (« son téléphone exigé ou fouillé », le socle des prompts).
+ * soit (rien ne part). Une alerte « danger » ou « détresse » se vend dans l’appli (21 et 22 octobre 2026), mais aucun
+ * mail sur leur histoire ne part : sa boîte mail peut être lue par l’autre (« son téléphone exigé ou fouillé », le socle des prompts).
  */
 async function verdictSansAlerte(storyId: string) {
   const v = await donneesVerdict(storyId);

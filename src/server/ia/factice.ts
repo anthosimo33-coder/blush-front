@@ -91,10 +91,14 @@ export function fournisseurFactice(req: RequeteFactice): SortieFactice {
   const demande = textes(req).at(-1)!;
   const tout = textes(req).join("\n");
   if (req.tache === "04-verdict" && tout.includes(FACTICE.refus)) return REFUS_FACTICE;
-  /* Une alerte qui met en mode sobre (la détresse) : pas d’emoji, pas de niveau, un pas pour soi (prompts/04-verdict.md, « La sécurité d’abord ») */
+  /*
+   * Une alerte qui met en mode sobre (la règle de l’âge) : pas d’emoji, pas de niveau, un pas pour soi. Le vrai modèle
+   * laisse alors le verdict vide (prompts/04-verdict.md, « La sécurité d’abord ») ; le factice le remplit, ce que l’écran
+   * sobre montre quand il en a un
+   */
   if (req.tache === "04-verdict" && tout.includes(FACTICE.alerte))
     return {
-      alerte: "detresse",
+      alerte: "mineur",
       mode_sobre: true,
       emoji: null,
       court: null,
@@ -113,7 +117,7 @@ export function fournisseurFactice(req: RequeteFactice): SortieFactice {
   /* Le rapport sobre : en un appel, sans chapitres (prompts/05-rapport.md, « Avec le mode sobre ») */
   if (req.tache === "05-rapport" && tout.includes(FACTICE.alerte))
     return {
-      alerte: "detresse",
+      alerte: "mineur",
       mode_sobre: true,
       decouvertes: [],
       these: "Ce que tu vis compte.",
