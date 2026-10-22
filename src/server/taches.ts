@@ -1,6 +1,5 @@
 import "server-only";
-import { and, eq, gte, inArray, lt, or, sql } from "drizzle-orm";
-import type { Echange } from "@prompts/lib/memoire";
+import { and, eq, gte, inArray, isNull, lt, lte, or, sql } from "drizzle-orm";
 import * as coffre from "./coffre";
 import { db, schema } from "./db";
 import type { Genre } from "./db/enums";
@@ -18,18 +17,12 @@ export const PERIME_S = 90;
 
 /**
  * Planifie une étape. Celles de la chaîne (verdict, rapport, vocal, mémoire) n’existent qu’une fois en attente ou en
- * cours par histoire (un index unique) : planifiée deux fois en même temps, c’est la même tâche qui revient.
- * `input` : l’échange d’une mise à jour de la mémoire (memoire_maj, la seule étape qui en a une), relu par entreeDe.
+ * cours par histoire (un index unique) : planifiée deux fois en même temps, c’est la même tâche qui revient. Une mise à
+ * jour de la mémoire (memoire_maj) ne passe pas par ici : ses échanges se regroupent (retenir, src/server/memoire-groupee.ts).
  */
-export async function planifier(storyId: string, kind: Genre, input?: Echange): Promise<string> {
-  /* Chiffrée une fois pour les deux essais */
-  const entree = input === undefined ? undefined : coffre.ecrire("tasks.input", input);
+export async function planifier(storyId: string, kind: Genre): Promise<string> {
   for (let essai = 0; essai < 2; essai++) {
-    const [t] = await db()
-      .insert(schema.tasks)
-      .values({ storyId, kind, ...(entree ? { input: entree } : {}) })
-      .onConflictDoNothing()
-      .returning({ id: schema.tasks.id });
+    const [t] = await db().insert(schema.tasks).values({ storyId, kind }).onConflictDoNothing().returning({ id: schema.tasks.id });
     if (t) return t.id;
     const [deja] = await db()
       .select({ id: schema.tasks.id })
@@ -70,6 +63,12 @@ export async function paiementRecu(storyId: string): Promise<number> {
   return lancees.length;
 }
 
+/**
+ * Une tâche en attente qu’on peut prendre : pas une mise à jour de la mémoire qui attend que le chat se calme (son heure,
+ * `pas_avant`, pas encore venue : src/server/memoire-groupee.ts).
+ */
+export const aPrendre = or(isNull(schema.tasks.pasAvant), lte(schema.tasks.pasAvant, sql`now()`));
+
 /* Une autre tâche de la même histoire tourne (son battement est frais) : la chaîne qui la tient enchaînera la suite */
 const autreEnCours = sql`not exists (select 1 from ${schema.tasks} as "autre" where "autre"."story_id" = ${schema.tasks.storyId} and "autre"."id" <> ${schema.tasks.id} and "autre"."status" = 'en_cours' and "autre"."heartbeat_at" >= now() - make_interval(secs => ${PERIME_S}))`;
 
@@ -86,7 +85,10 @@ export async function prendre(id: string): Promise<Tache | null> {
       and(
         eq(schema.tasks.id, id),
         lt(schema.tasks.attempts, ESSAIS_MAX),
-        or(eq(schema.tasks.status, "attente"), and(eq(schema.tasks.status, "en_cours"), lt(schema.tasks.heartbeatAt, sql`now() - make_interval(secs => ${PERIME_S})`))),
+        or(
+          and(eq(schema.tasks.status, "attente"), aPrendre),
+          and(eq(schema.tasks.status, "en_cours"), lt(schema.tasks.heartbeatAt, sql`now() - make_interval(secs => ${PERIME_S})`)),
+        ),
         autreEnCours,
       ),
     )
@@ -97,7 +99,7 @@ export async function prendre(id: string): Promise<Tache | null> {
 export const battre = (id: string) => db().update(schema.tasks).set({ heartbeatAt: new Date() }).where(eq(schema.tasks.id, id));
 
 /**
- * Une tâche finie. Son entrée (l’échange d’une mise à jour de la mémoire : ce qu’il a dit, ce qu’il a ajouté) est
+ * Une tâche finie. Son entrée (les échanges d’une mise à jour de la mémoire : ce qu’il a dit, ce qu’il a ajouté) est
  * effacée avec : la mémoire l’a retenue, rien ne la relira (S-34). Une tâche en échec garde la sienne, pour repartir.
  */
 export async function finir(id: string): Promise<void> {
@@ -151,7 +153,7 @@ export async function reprendre(storyId: string, genres: Genre[]): Promise<numbe
   return remises.length;
 }
 
-/** Les tâches d’une histoire à (re)lancer : en attente, ou abandonnées. */
+/** Les tâches d’une histoire à (re)lancer : en attente (sauf une mise à jour qui attend que le chat se calme), ou abandonnées. */
 export async function aRelancer(storyId: string): Promise<Tache[]> {
   return db()
     .select()
@@ -160,7 +162,10 @@ export async function aRelancer(storyId: string): Promise<Tache[]> {
       and(
         eq(schema.tasks.storyId, storyId),
         lt(schema.tasks.attempts, ESSAIS_MAX),
-        or(eq(schema.tasks.status, "attente"), and(eq(schema.tasks.status, "en_cours"), lt(schema.tasks.heartbeatAt, sql`now() - make_interval(secs => ${PERIME_S})`))),
+        or(
+          and(eq(schema.tasks.status, "attente"), aPrendre),
+          and(eq(schema.tasks.status, "en_cours"), lt(schema.tasks.heartbeatAt, sql`now() - make_interval(secs => ${PERIME_S})`)),
+        ),
       ),
     )
     .orderBy(schema.tasks.createdAt);
@@ -189,5 +194,5 @@ export async function etatDesTaches(storyId: string, genres: Genre[]): Promise<P
   return Object.fromEntries(lignes.map((t) => [t.kind, t]));
 }
 
-/** L’entrée d’une tâche (l’échange d’une mise à jour de la mémoire), ou null. */
+/** L’entrée d’une tâche (les échanges d’une mise à jour de la mémoire, dans l’ordre), ou null. */
 export const entreeDe = (t: Tache) => (t.input ? coffre.lire("tasks.input", t.input) : null);

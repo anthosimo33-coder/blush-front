@@ -2,7 +2,7 @@ import "server-only";
 import { eq, sql } from "drizzle-orm";
 import { chiffrer as chiffresDe, lire, rendre } from "@prompts/lib/conv";
 import { DEMANDE_PLAN, demandeMoitie, requeteMemoireCreation, requeteMemoireMaj, requeteRapport, requeteVerdict, requeteVocal } from "@prompts/lib/contextes";
-import { appliquerMaj, estFaite, rapportCourt, rendreNouveau } from "@prompts/lib/memoire";
+import { appliquerMaj, estFaite, rapportCourt, rendreNouveaux } from "@prompts/lib/memoire";
 import { preuvesChapitres, preuvesMaj, preuvesMemoire, preuvesPlan, preuvesRapport, preuvesVerdict, preuvesVocal } from "@prompts/lib/preuves";
 import { Etape05, Maj07, Sortie04, Sortie05, Sortie06, Sortie07, verdictNormalise, type Chapitre, type Plan, type Rapport, type Verdict } from "@prompts/lib/schemas";
 import { profil } from "@prompts/lib/style";
@@ -502,13 +502,14 @@ function banqueDuSecours(story: LigneComplete): { lignes: Map<string, string>; s
 }
 
 /**
- * Après un échange qui apporte du neuf : la mémoire se met à jour (ou dit « rien de neuf », le cas le plus fréquent).
- * Elle n’écrit que sur la mémoire qu’elle a lue : si la fiche a été corrigée entre-temps (la mise à jour prend 20 à
- * 60 s), elle recommence sur la nouvelle, pour ne rien effacer de ce que l’utilisateur vient d’écrire.
+ * Après des échanges qui apportent du neuf (retenus ensemble jusqu’à ce que le chat se calme : src/server/memoire-groupee.ts),
+ * ou un ajout à sa fiche : la mémoire se met à jour, en un seul appel pour tous (ou dit « rien de neuf », le cas le plus
+ * fréquent). Elle n’écrit que sur la mémoire qu’elle a lue : si la fiche a été corrigée entre-temps (la mise à jour prend
+ * 20 à 60 s), elle recommence sur la nouvelle, pour ne rien effacer de ce que l’utilisateur vient d’écrire.
  */
 async function memoireMaj(story: Ligne, t: Tache) {
-  const ech = entreeDe(t);
-  if (!ech) throw new ErreurTache("memoire_absente");
+  const echanges = entreeDe(t);
+  if (!echanges?.length) throw new ErreurTache("memoire_absente");
   const h = histoireDe(metaDe(story));
   /* Pas encore de mémoire (la vraie a échoué, et celle de secours n’a pas pu s’écrire à ce moment-là) : celle de secours d’abord */
   if (!(await donneesMemoire(story.id))) await garderUneMemoireDeSecours(story.id);
@@ -516,9 +517,9 @@ async function memoireMaj(story: Ligne, t: Tache) {
   const ecrite = await modifierMemoire(
     story.id,
     async (avant) => {
-      const nouveau = rendreNouveau(ech, h, avant.suivant);
+      const nouveau = rendreNouveaux(echanges, h, avant.suivant);
       const lignes = new Map([...avant.lignes, ...nouveau.lignes]);
-      const req = requeteMemoireMaj(h, aujourdhuiParis().t, avant.etat, lignes, nouveau.texte, editionsBornees(avant.editions));
+      const req = requeteMemoireMaj(h, aujourdhuiParis().t, avant.etat, lignes, nouveau.blocs, editionsBornees(avant.editions));
       /* La mise à jour ne renvoie que ce qui change ; le code l’applique à la mémoire */
       const maj = await appelVerifie(req, Maj07, {
         preuves: (m) => (m.rien_de_neuf ? [] : preuvesMaj(m)),

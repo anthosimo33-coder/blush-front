@@ -32,7 +32,7 @@ for (const ech of (JSON.parse(readFileSync(cheminDonne(fichierEchanges), "utf8")
   const nouveau = rendreNouveau(ech, h, suivant);
   suivant = nouveau.suivant;
   for (const [id, l] of nouveau.lignes) lignes.set(id, l);
-  const a = await appeler(requeteMemoireMaj(h, Date.parse(`${ech.date}T00:00:00Z`), etat, lignes, nouveau.texte), Maj07, { etiquette: "essai_memoire", partie: "mise à jour" });
+  const a = await appeler(requeteMemoireMaj(h, Date.parse(`${ech.date}T00:00:00Z`), etat, lignes, [nouveau.texte]), Maj07, { etiquette: "essai_memoire", partie: "mise à jour" });
   total += a.cout;
   const m = a.sortie;
   console.log(`\n${ech.date} · ${a.cout.toFixed(3)} $ · ${m?.rien_de_neuf ? "rien de neuf" : "mise à jour"}${ech.attendu ? `\n  attendu : ${ech.attendu}` : ""}`);

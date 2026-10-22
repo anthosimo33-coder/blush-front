@@ -76,7 +76,7 @@ const nouveau = rendreNouveau(
   0,
 );
 const pourMaj = new Map([...lignes, ...nouveau.lignes]);
-const maj = await appeler(requeteMemoireMaj(h, Date.parse(`${jour}T00:00:00Z`), etat, pourMaj, nouveau.texte), Maj07, { etiquette: "essai_ajouts", partie: "mise à jour" });
+const maj = await appeler(requeteMemoireMaj(h, Date.parse(`${jour}T00:00:00Z`), etat, pourMaj, [nouveau.texte]), Maj07, { etiquette: "essai_ajouts", partie: "mise à jour" });
 const m = maj.sortie;
 if (!m) throw new Error(`mise à jour illisible (${maj.stop})`);
 console.log(`\nmémoire · ${maj.cout.toFixed(3)} $ · ${m.rien_de_neuf ? "rien de neuf" : "mise à jour"}`);

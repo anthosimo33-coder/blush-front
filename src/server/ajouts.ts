@@ -1,5 +1,5 @@
 import "server-only";
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, or, sql } from "drizzle-orm";
 import { messagesDeLExport, messagesDesCaptures, numeroter, type Ajout } from "@prompts/lib/ajouts";
 import type { Message } from "@prompts/lib/conv";
 import { requeteCaptures, type Image } from "@prompts/lib/contextes";
@@ -12,9 +12,10 @@ import type { CodeErreur } from "@/types/erreurs-api";
 import * as coffre from "./coffre";
 import { ficheDe } from "./donnees";
 import { ErreurPublique } from "./erreurs";
-import { planifier } from "./taches";
+import { aPrendre } from "./taches";
 import { db, schema, uneLigne } from "./db";
 import { contexteDe, histoireDe, metaDe, type Ligne } from "./histoires";
+import { majQuiAttend, retenir, sansAttendre } from "./memoire-groupee";
 import { relancerApres } from "./pipeline";
 import type { DonneesMemoire } from "./stockage/types";
 import { exigerSortie } from "./ia/appel-verifie";
@@ -120,12 +121,13 @@ const profilLu = (a: Ajout) =>
 
 /**
  * Pour sa fiche : on répond tout de suite avec ce qui a été lu (son profil, le nombre de nouveaux messages), et la
- * mémoire se met à jour après la réponse (20 à 60 s ; attendre la gardait jusqu’à 2 min devant le chargement). La
- * fiche dit qu’une mise à jour tourne (`updating`) : l’écran la relit jusqu’à ce qu’elle ait fini (GET /api/fiche).
+ * mémoire se met à jour après la réponse (20 à 60 s ; attendre la gardait jusqu’à 2 min devant le chargement), sans
+ * attendre que le chat se calme : les échanges du chat qui attendaient partent avec (retenir). La fiche dit qu’une mise
+ * à jour tourne (`updating`) : l’écran la relit jusqu’à ce qu’elle ait fini (GET /api/fiche).
  */
 export async function ajouterALaFiche(story: Ligne, ajout: Ajout): Promise<FicheUpdate & { confirmed: [] }> {
   const echange: Echange = { date: aujourdhuiParis().iso, lignes: ajout.lignes, dit: "(il ajoute ça à sa fiche)" };
-  const [, fiche] = await Promise.all([planifier(story.id, "memoire_maj", echange), ficheDe(story)]);
+  const [, fiche] = await Promise.all([retenir(story.id, echange, { neuf: true, maintenant: true }), ficheDe(story)]);
   relancerApres(story.id);
   /*
    * `confirmed` (toujours vide, le front ne le lit plus) reste dans la réponse le temps d’une mise en production : un
@@ -135,29 +137,39 @@ export async function ajouterALaFiche(story: Ligne, ajout: Ajout): Promise<Fiche
 }
 
 /**
- * La mémoire s’écrit-elle : la première (après le rapport), ou une mise à jour (un ajout à sa fiche, un échange du
- * chat), en attente ou en cours ?
+ * La mémoire s’écrit-elle : la première (après le rapport), ou une mise à jour (un ajout à sa fiche, des échanges du
+ * chat), en attente ou en cours ? Pas une mise à jour qui attend que le chat se calme : elle ne s’écrit pas encore.
  */
 export async function majEnCours(storyId: string): Promise<boolean> {
   const [t] = await db()
     .select({ id: schema.tasks.id })
     .from(schema.tasks)
-    .where(and(eq(schema.tasks.storyId, storyId), inArray(schema.tasks.kind, ["memoire", "memoire_maj"]), inArray(schema.tasks.status, ["attente", "en_cours"])))
+    .where(
+      and(
+        eq(schema.tasks.storyId, storyId),
+        inArray(schema.tasks.kind, ["memoire", "memoire_maj"]),
+        or(and(eq(schema.tasks.status, "attente"), aPrendre), eq(schema.tasks.status, "en_cours")),
+      ),
+    )
     .limit(1);
   return !!t;
 }
 
 /**
  * Sa fiche, et si la mémoire s’écrit (`updating`, majEnCours : la première, ou une mise à jour) : l’écran la relit
- * toutes les 3 s jusqu’à ce qu’elle ait fini. Une mémoire restée en plan (l’instance arrêtée, ou plus le temps de la
- * commencer après le rapport ou la lecture des captures) repart après la réponse ; si une autre la tient,
- * executerChaine la laisse faire.
- * La même pour GET et PUT /api/fiche et pour la page rendue par le serveur (getFiche) : une fiche rendue à l’instant,
- * que l’écran ne relit pas au montage (Q63), dit déjà qu’une mise à jour tourne.
+ * toutes les 3 s jusqu’à ce qu’elle ait fini. Une mise à jour qui attendait que le chat se calme part d’abord
+ * (sansAttendre) : il regarde sa fiche, elle doit savoir ce qu’il vient de dire. Une mémoire restée en plan (l’instance
+ * arrêtée, ou plus le temps de la commencer après le rapport ou la lecture des captures) repart après la réponse ; si
+ * une autre la tient, executerChaine la laisse faire.
+ * La même pour GET et PUT /api/fiche et pour la page rendue par le serveur (getFicheEtMaj) : une fiche rendue à
+ * l’instant, que l’écran ne relit pas au montage (Q63), dit déjà qu’une mise à jour tourne. `page` : ce rendu-là. L’accueil
+ * le précharge en entier (le lien de son avatar), et rien ne distingue ce préchargement d’une visite : la page ne lance
+ * pas la mise à jour qui attend, elle dit seulement qu’elle vient (`updating`). L’écran se relit alors (GET /api/fiche),
+ * et c’est cette relecture, fiche ouverte pour de bon, qui la lance.
  */
-export async function ficheEtMaj(story: Ligne): Promise<Fiche> {
-  const [fiche, enCours] = await Promise.all([ficheDe(story), majEnCours(story.id)]);
-  if (!enCours) return fiche;
-  relancerApres(story.id);
-  return { ...fiche, updating: true };
+export async function ficheEtMaj(story: Ligne, { page = false }: { page?: boolean } = {}): Promise<Fiche> {
+  if (!page) await sansAttendre(story.id);
+  const [fiche, enCours, attend] = await Promise.all([ficheDe(story), majEnCours(story.id), page ? majQuiAttend(story.id) : false]);
+  if (enCours) relancerApres(story.id);
+  return enCours || attend ? { ...fiche, updating: true } : fiche;
 }

@@ -16,6 +16,7 @@ import { importer, metaDe, tropCourte, type LigneComplete } from "@/server/histo
 import { depuisFichier, ErreurImport } from "@/server/import";
 import { storyAffichee } from "@/server/conv-affichee";
 import { FACTICE } from "@/server/ia/factice-valeurs";
+import { sansAttendre } from "@/server/memoire-groupee";
 import { executerChaine, reparerLaChaine } from "@/server/pipeline";
 import type { DonneesVocal } from "@/server/stockage/types";
 import { planifier } from "@/server/taches";
@@ -131,26 +132,32 @@ describe("de l’import à la mémoire", () => {
     expect((await vocalPret(imp.id))?.audio).not.toBe(avant?.audio);
   });
 
-  it("le chat, sur la mémoire : des bulles avec leurs preuves, l’échange gardé, la mémoire mise à jour s’il y a du neuf", async () => {
+  it("le chat, sur la mémoire : des bulles avec leurs preuves, l’échange gardé, la mémoire mise à jour s’il y a du neuf, quand le chat se calme", async () => {
     const echanges = (await historique(imp.id)).echanges.length;
     const { reponse, majMemoire } = await repondre(await relire(), await memoire(), "on s’est vus hier, c’était trop bien");
     expect(reponse.kind).toBe("bubbles");
     expect(reponse.kind === "bubbles" && reponse.bubbles[0]!.messages?.length).toBe(1);
-    expect(majMemoire).toBe(true);
+    /* Du neuf : une mise à jour s’ouvre, mais attend que le chat se calme (la chaîne n’a rien à relancer) */
+    expect(majMemoire).toBe(false);
     const apres = (await historique(imp.id)).echanges;
     expect(apres).toHaveLength(echanges + 1);
     /* La réponse porte son échange (pour la partager en image), le même que dans l’historique */
     expect(reponse.echange).toBe(apres.at(-1)!.id);
+    const derniere = async () =>
+      (
+        await db()
+          .select()
+          .from(schema.tasks)
+          .where(and(eq(schema.tasks.storyId, imp.id), eq(schema.tasks.kind, "memoire_maj")))
+          .orderBy(desc(schema.tasks.createdAt))
+          .limit(1)
+      )[0]!;
     await executerChaine(imp.id);
-    const maj = (
-      await db()
-        .select()
-        .from(schema.tasks)
-        .where(and(eq(schema.tasks.storyId, imp.id), eq(schema.tasks.kind, "memoire_maj")))
-        .orderBy(desc(schema.tasks.createdAt))
-        .limit(1)
-    )[0]!;
-    expect(maj.status).toBe("fini");
+    expect(await derniere()).toMatchObject({ status: "attente", pasAvant: expect.any(Date) });
+    /* Son heure venue (ici, sans attendre), la chaîne la fait */
+    expect(await sansAttendre(imp.id)).toBe(true);
+    await executerChaine(imp.id);
+    expect((await derniere()).status).toBe("fini");
   });
 
   it("le chat en vocal : il envoie un vocal, elle répond en vocal (l’audio chiffré, à son adresse), sans changer de mode", async () => {
