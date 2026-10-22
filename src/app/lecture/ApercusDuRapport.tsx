@@ -1,7 +1,8 @@
 import type { CSSProperties, ReactNode } from "react";
-import { CHAPITRE_DE_L_AUTRE, CHAPITRE_DE_LA_BASCULE, titreDAttente } from "@/contenu/chapitres";
+import { CHAPITRE_DE_L_AUTRE, CHAPITRE_DE_LA_BASCULE } from "@/contenu/chapitres";
 import { NOTE_DES_AVIS, PAYWALL } from "@/contenu/paiement";
 import { cn } from "@/lib/cn";
+import type { Goal } from "@/types";
 import { BubbleLogo } from "@/components/brand/objects3d";
 import { Avatar } from "@/components/ui/Avatar";
 import { Icon } from "@/components/ui/icons";
@@ -21,7 +22,7 @@ const FOND_DU_VOCAL = "radial-gradient(70% 120% at 18% 110%, rgba(232,53,138,0.5
 /** L’onde du vocal : la hauteur de chaque trait, en pixels. */
 const ONDE = [6, 12, 18, 10, 22, 14, 8, 16, 20, 9, 13, 6, 11, 17, 7];
 
-export function ApercusDuRapport({ autre, messages, className }: { autre: string; messages: string; className?: string }) {
+export function ApercusDuRapport({ autre, il, objectif, messages, className }: { autre: string; il: boolean; objectif: Goal | undefined; messages: string; className?: string }) {
   const t = PAYWALL.apercus;
   return (
     <div className={cn("-mx-4 flex flex-col gap-3 lg:mx-0", className)}>
@@ -71,7 +72,7 @@ export function ApercusDuRapport({ autre, messages, className }: { autre: string
         </Ecran>
         <Ecran className="gap-1.5 bg-white shadow-card">
           <span className="text-micro font-black text-grey">{t.chapitre(CHAPITRE_DE_LA_BASCULE)}</span>
-          <span className="pr-6 text-legende font-black leading-[1.2] text-ink">{titreDAttente(CHAPITRE_DE_LA_BASCULE, autre)}</span>
+          <span className="pr-6 text-legende font-black leading-[1.2] text-ink">{PAYWALL.chapitre(CHAPITRE_DE_LA_BASCULE, autre, il, objectif)}</span>
           <span className="mt-auto flex flex-col gap-1.5">
             <span className="flex w-[80%] flex-col gap-1 self-start rounded-[12px_12px_12px_4px] bg-bubble-her px-2 py-1.5">
               <Ligne largeur="100%" />
@@ -91,7 +92,7 @@ export function ApercusDuRapport({ autre, messages, className }: { autre: string
             </Avatar>
             <span className="flex min-w-0 flex-col">
               <span className="text-micro font-black text-grey">{t.chapitre(CHAPITRE_DE_L_AUTRE)}</span>
-              <span className="truncate text-legende font-black leading-[1.2] text-ink">{titreDAttente(CHAPITRE_DE_L_AUTRE, autre)}</span>
+              <span className="line-clamp-2 text-legende font-black leading-[1.2] text-ink">{PAYWALL.chapitre(CHAPITRE_DE_L_AUTRE, autre, il, objectif)}</span>
             </span>
           </span>
           <span className="flex flex-col gap-1.5">

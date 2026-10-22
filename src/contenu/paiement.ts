@@ -1,6 +1,8 @@
 import { CEST_QUOI, PIECES } from "./bulles";
 import { CHAPITRES_OFFERTS, NB_CHAPITRES } from "./chapitres";
 import { CATALOGUE, enEuros, prixDe, RAPPORT_D_AVANCE } from "./offres";
+import { GUESS_LABELS } from "./parcours";
+import type { Goal, Guess, IndiceDuPaywall, MomentDuPaywall } from "@/types";
 
 /*
  * Les textes des écrans du paiement par Whop : le bas de l’aperçu gratuit (PiedGratuit), la feuille « Ta formule »,
@@ -58,6 +60,46 @@ export const PAYWALL = {
    * ligne sous le bouton.
    */
   formule: (autre: string) => `Ton rapport sur ${autre}`,
+  /**
+   * Ta question (une proposition du 22 octobre 2026) : ce que tu as dit vouloir savoir sur « Qui es-tu ? », redit avec
+   * son prénom ; dessous, ce que vos messages montrent déjà (les indices, comptés par le code), puis ta devinette face à
+   * ce que disent ses messages, flouté : la réponse est dans le rapport.
+   */
+  question: {
+    titre: "Ta question",
+    texte: (objectif: Goal, autre: string, il: boolean) => QUESTION_DE_L_OBJECTIF[objectif](autre, il),
+    deja: "Ce que vos messages montrent déjà",
+    indice: (i: IndiceDuPaywall, autre: string) => `${MOT_DE_L_INDICE[i.id]}\u00a0: ${autre} ${fois(i.elle)}, toi ${fois(i.toi)}`,
+    devinette: (d: Guess) => `Toi, tu dis ${GUESS_LABELS[d].quote}. Ses messages disent`,
+    cache: "la réponse, dans ton rapport",
+  },
+  /**
+   * Les chapitres en questions, sur le paywall (une proposition du 22 octobre 2026) : chacun dit la question à laquelle
+   * il répond, le 1er avec ta question de « Qui es-tu ? ». Le rapport payé garde ses titres ; chaque question est celle
+   * de son chapitre (le verdict, la bascule, votre histoire, ce qui coince, l’autre, toi, le duo et ses scores, le
+   * prochain pas).
+   */
+  chapitre: (n: number, autre: string, il: boolean, objectif?: Goal) => {
+    if (n === 1) return objectif ? VERDICT_DE_L_OBJECTIF[objectif](il) : `Est-ce qu’${il ? "il est intéressé" : "elle est intéressée"}\u00a0?`;
+    if (n === 5) return `${autre}, décrypté${il ? "" : "e"}`;
+    return CHAPITRES_EN_QUESTIONS[n] ?? "";
+  },
+  /**
+   * Les moments cachés (une proposition du 22 octobre 2026) : de vrais messages de leur conv, repérés par le code,
+   * floutés jusqu’au paiement.
+   */
+  moments: {
+    titre: "Ce que BLUSH a repéré dans votre conv",
+    sous: "De vrais messages de votre conv, débloqués avec ton rapport",
+    libelle: (id: MomentDuPaywall["id"], il: boolean) =>
+      id === "bascule"
+        ? `Ce qu’${il ? "il" : "elle"} t’a écrit le jour où ça a changé`
+        : id === "attente"
+          ? `Le message qu’${il ? "il" : "elle"} a mis le plus de temps à te répondre`
+          : "Son message le plus long",
+    mots: (n: number) => `${n}\u00a0mots`,
+    cache: "Message flouté, débloqué avec ton rapport",
+  },
   /** Sur téléphone, au-dessus des formules, quand les aperçus du rapport portent déjà son nom. */
   choisis: "Choisis ta formule",
   rapport: {
@@ -153,6 +195,47 @@ export const PAYWALL = {
   /** La barre du bas, sur téléphone, quand le bouton qui paie est sorti de l’écran : elle y ramène. */
   barre: "Débloquer",
   barreAller: "Aller au paiement",
+};
+
+/** « jamais », « 1 fois », « 6 fois » : un indice, d’un côté. */
+const fois = (n: number) => (n === 0 ? "jamais" : `${n}\u00a0fois`);
+
+/** Ce que dit un indice (PAYWALL.question.indice). */
+const MOT_DE_L_INDICE: Record<IndiceDuPaywall["id"], string> = {
+  manques: "«\u00a0tu me manques\u00a0»",
+  aime: "«\u00a0je t’aime\u00a0»",
+  voir: "Proposer de se voir",
+  coeurs: "Les cœurs",
+  nuit: "«\u00a0bonne nuit\u00a0»",
+  pardon: "«\u00a0désolé\u00a0»",
+};
+
+/** Ta question, d’après ce que tu veux savoir sur « Qui es-tu ? » (src/app/qui/QuiScreen.tsx, GOALS). */
+const QUESTION_DE_L_OBJECTIF: Record<Goal, (autre: string, il: boolean) => string> = {
+  reciproque: () => "Est-ce que c’est réciproque\u00a0?",
+  ensemble: (autre) => `Est-ce que ${autre} veut la même chose que toi\u00a0?`,
+  comprendre: (autre) => `Qu’est-ce qui se passe vraiment avec ${autre}\u00a0?`,
+  mieux: () => "Comment faire pour que ça aille mieux\u00a0?",
+  point: () => "Où vous en êtes, vraiment\u00a0?",
+};
+
+/** Le 1er chapitre, le verdict, dit comme ta question, en court (sur sa ligne de « Ce que tu débloques »). */
+const VERDICT_DE_L_OBJECTIF: Record<Goal, (il: boolean) => string> = {
+  reciproque: () => "Est-ce que c’est réciproque\u00a0?",
+  ensemble: (il) => `Est-ce qu’${il ? "il" : "elle"} veut la même chose\u00a0?`,
+  comprendre: () => "Ce qui se passe vraiment",
+  mieux: () => "Comment ça peut aller mieux",
+  point: () => "Où vous en êtes, vraiment",
+};
+
+/** Les autres chapitres en questions (le 5e, son prénom : PAYWALL.chapitre). */
+const CHAPITRES_EN_QUESTIONS: Record<number, string> = {
+  2: "Le jour où ça a changé",
+  3: "Comment vous en êtes là",
+  4: "Ce qui bloque entre vous",
+  6: "Ce que tu fais sans le voir",
+  7: "Qui fait le plus d’efforts\u00a0?",
+  8: "Quoi lui répondre maintenant",
 };
 
 /**

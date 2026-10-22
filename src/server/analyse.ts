@@ -104,7 +104,7 @@ function contexteDuCode(story: LigneComplete) {
     trouvailles: trouvailles(chiffres, h, lu.messages),
     accroche: genreDuHaut(apercuDuPaywall(chiffres, lu.messages)),
   };
-  return { rendu, chiffres, contexte, messages: lu.messages };
+  return { h, rendu, chiffres, contexte, messages: lu.messages };
 }
 
 /**
@@ -129,8 +129,8 @@ export async function ecrireLeContexte(storyId: string): Promise<void> {
 export async function apercuAvantPaiement(storyId: string): Promise<ApercuDuPaywall | null> {
   const [[story], { verdict }] = await Promise.all([db().select().from(schema.stories).where(eq(schema.stories.id, storyId)), etatDesTaches(storyId, ["verdict"])]);
   if (!story?.conv || verdict?.status !== "paiement") return null;
-  const { chiffres, messages } = contexteDuCode(story);
-  return apercuDuPaywall(chiffres, messages);
+  const { h, chiffres, messages } = contexteDuCode(story);
+  return apercuDuPaywall(chiffres, messages, h);
 }
 
 async function verdict(story: LigneComplete, t: Tache) {

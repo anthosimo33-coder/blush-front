@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState, type ReactNode, type Ref, type RefObject } from "react";
-import { NB_CHAPITRES, titreDAttente } from "@/contenu/chapitres";
+import { NB_CHAPITRES } from "@/contenu/chapitres";
 import { AVIS_DU_HAUT, TEMOIGNAGES, TESTIMONIALS } from "@/contenu/landing";
 import { CATALOGUE, enEuros, FORMULE_CHOISIE } from "@/contenu/offres";
 import { DANS_LA_FEUILLE, FEUILLE_FORMULE, MESSAGES_LUS, NOTE_DES_AVIS, OFFRE_SUITE, PAYWALL } from "@/contenu/paiement";
@@ -33,8 +33,9 @@ import { Icon } from "@/components/ui/icons";
 import { Tag } from "@/components/ui/messages";
 import { Toast } from "@/components/ui/surfaces";
 import { ApercusDuRapport } from "./ApercusDuRapport";
+import { MomentsCaches, TaQuestion } from "./IndicesDuPaywall";
 import { CarteDuHaut, PreuveDuHaut, TitreDuHaut } from "./HautDuPaywall";
-import type { ApercuDuPaywall, Formule, LotDeLaRoue, OffreId, Story, Testimonial } from "@/types";
+import type { ApercuDuPaywall, Formule, Goal, LotDeLaRoue, OffreId, Story, Testimonial } from "@/types";
 import type { RoueDuCompte } from "@/types/api";
 
 /*
@@ -139,9 +140,11 @@ export function Paywall({
               <Preuves className="max-lg:hidden" />
             </div>
             <PreuveDuHaut haut={haut} className="lg:hidden" />
-            <ApercusDuRapport autre={autre.name} messages={formatCount(story.totalMessages)} className="max-lg:mt-3" />
+            <TaQuestion apercu={apercu} autre={autre.name} il={!elle} className="max-lg:mt-1" />
+            <ApercusDuRapport autre={autre.name} il={!elle} objectif={apercu.question?.objectif} messages={formatCount(story.totalMessages)} className="max-lg:mt-3" />
+            <MomentsCaches moments={apercu.moments ?? []} il={!elle} className="hidden lg:flex" />
             <CarteDuHaut haut={haut} autre={autre.name} className="hidden lg:flex" />
-            <Sommaire autre={autre.name} className="hidden lg:flex" />
+            <Sommaire autre={autre.name} il={!elle} objectif={apercu.question?.objectif} className="hidden lg:flex" />
             <AvantApres elle={elle} className="hidden lg:flex" />
           </section>
           <Paiement
@@ -155,7 +158,8 @@ export function Paywall({
             {...(enUnGeste ? { enUnGeste } : {})}
           />
         </div>
-        <Sommaire autre={autre.name} className="mt-3 flex lg:hidden" />
+        <MomentsCaches moments={apercu.moments ?? []} il={!elle} className="mt-3 flex lg:hidden" />
+        <Sommaire autre={autre.name} il={!elle} objectif={apercu.question?.objectif} className="mt-3 flex lg:hidden" />
         <Temoignages items={enPremier(temoignages, AVIS_DU_HAUT[haut.genre])} />
         <AvantApres elle={elle} className="lg:hidden" />
         <Questions autre={autre.name} />
@@ -561,11 +565,11 @@ function enPremier(avis: Testimonial[], nom: string | undefined): Testimonial[] 
 }
 
 /**
- * Ce que tu débloques (une proposition du 22 octobre 2026, PAYWALL.sommaire) : le vocal, puis les chapitres, leurs
- * titres d’attente lisibles, leur texte flouté et un cadenas. Sous le paiement sur téléphone (le bouton qui paie reste
+ * Ce que tu débloques (une proposition du 22 octobre 2026, PAYWALL.sommaire) : le vocal, puis les chapitres, dits
+ * comme les questions auxquelles ils répondent (PAYWALL.chapitre), leur texte flouté et un cadenas. Sous le paiement sur téléphone (le bouton qui paie reste
  * dans le premier écran), sous la carte du haut sur ordinateur.
  */
-function Sommaire({ autre, className }: { autre: string; className: string }) {
+function Sommaire({ autre, il, objectif, className }: { autre: string; il: boolean; objectif: Goal | undefined; className: string }) {
   const t = PAYWALL.sommaire;
   const titre = useId();
   const ligne = (rond: ReactNode, texte: string, fin?: ReactNode, rondEnCouleur?: boolean) => (
@@ -573,7 +577,7 @@ function Sommaire({ autre, className }: { autre: string; className: string }) {
       <span className={cn("flex size-6 shrink-0 items-center justify-center rounded-full text-micro font-black", rondEnCouleur ? "bg-elle text-white" : "bg-paper text-soft")}>
         {rond}
       </span>
-      <span className="min-w-0 truncate text-note font-black text-ink">{texte}</span>
+      <span className="min-w-0 text-note font-black leading-[1.3] text-ink">{texte}</span>
       {/* Son texte, flouté : on devine qu’il est écrit, sans le lire */}
       <span aria-hidden="true" className="h-2 min-w-6 flex-1 rounded-full bg-[rgba(17,17,20,0.12)] blur-[2px]" />
       {fin}
@@ -595,7 +599,7 @@ function Sommaire({ autre, className }: { autre: string; className: string }) {
           <span className="shrink-0 text-legende font-black tabular-nums text-soft">{t.duree}</span>,
           true,
         )}
-        {Array.from({ length: NB_CHAPITRES }, (_, k) => ligne(k + 1, titreDAttente(k + 1, autre)))}
+        {Array.from({ length: NB_CHAPITRES }, (_, k) => ligne(k + 1, PAYWALL.chapitre(k + 1, autre, il, objectif)))}
       </ol>
     </section>
   );

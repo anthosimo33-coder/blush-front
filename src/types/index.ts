@@ -263,8 +263,32 @@ export type TendanceDuPaywall = {
   delai: { avant: number; apres: number } | null;
 };
 
-/** Ce que le haut du paywall montre d’une conv qui attend son paiement : les déséquilibres comptés, et la chute s’il y en a une. */
-export type ApercuDuPaywall = { signaux: SignalDuPaywall[]; tendance: TendanceDuPaywall | null };
+/**
+ * Un indice du paywall (une proposition du 22 octobre 2026) : un mot qu’ils s’écrivent, compté de chaque côté, en
+ * messages qui le contiennent (src/server/ecrans/indices.ts) : « tu me manques », lui 3 fois, toi jamais.
+ */
+export type IndiceDuPaywall = { id: "manques" | "aime" | "voir" | "coeurs" | "nuit" | "pardon"; toi: number; elle: number };
+
+/**
+ * Un moment caché du paywall (une proposition du 22 octobre 2026) : un vrai message de leur conv, repéré par le code et
+ * montré flouté (src/server/ecrans/indices.ts). `attente` : le tien qu’il a mis le plus de temps à te répondre (`valeur`
+ * en millisecondes) ; `long` : son message le plus long (`valeur` en mots) ; `bascule` : le sien du jour où ses messages
+ * ont chuté. `jour` : AAAA-MM-JJ.
+ */
+export type MomentDuPaywall = { id: "attente" | "long" | "bascule"; de: "toi" | "elle"; texte: string; jour: string; valeur?: number };
+
+/**
+ * Ce que le haut du paywall montre d’une conv qui attend son paiement : les déséquilibres comptés, et la chute s’il y en
+ * a une. Depuis le 22 octobre (une proposition) : ta question et ta devinette de « Qui es-tu ? », les indices et les
+ * moments cachés ; absents, le paywall s’en passe.
+ */
+export type ApercuDuPaywall = {
+  signaux: SignalDuPaywall[];
+  tendance: TendanceDuPaywall | null;
+  question?: { objectif: Goal; devinette: Guess } | null;
+  indices?: IndiceDuPaywall[];
+  moments?: MomentDuPaywall[];
+};
 
 export type ChapterBlock =
   | { kind: "essential"; text: string }
