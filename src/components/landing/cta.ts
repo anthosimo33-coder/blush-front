@@ -23,7 +23,15 @@ const UNE_AUTRE = { href: CTA, label: "Analyser une autre conv" } as const;
  */
 export function ctaDe(retour: Retour) {
   if (!retour || !("destination" in retour))
-    return { href: CTA, label: "Analyser ma conv", note: "Paiement unique · Ta\u00a0conv\u00a0reste\u00a0confidentielle", autre: null, header: "Commencer", prefetch: undefined, scroll: true };
+    return {
+      href: CTA,
+      label: "Analyser ma conv",
+      note: "Paiement unique · Ta\u00a0conv\u00a0reste\u00a0confidentielle",
+      autre: null,
+      header: "Commencer",
+      prefetch: undefined,
+      scroll: true,
+    };
   const href = retour.destination;
   return { href, label: "Retrouver ma conv", note: null, autre: UNE_AUTRE, header: "Ouvrir BLUSH", prefetch: href === "/app" ? true : undefined, scroll: href !== "/app" };
 }
