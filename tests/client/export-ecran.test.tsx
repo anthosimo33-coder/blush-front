@@ -5,6 +5,7 @@ import { CASE_IMPORT, texteCaseImport } from "@/contenu/consentements";
 import { uploadExport } from "@/services/api";
 import { readJourney, resetJourney, setJourney } from "@/state/journey";
 import { ErreurApi } from "@/types/erreurs-api";
+import { HISTOIRE } from "../aide/rapport-exemple";
 
 /*
  * L’écran de l’export (src/app/importer/export/ExportScreen.tsx) : l’accord de l’import, sans case (la ligne juste
@@ -23,7 +24,8 @@ const envoi = vi.mocked(uploadExport);
 beforeEach(() => {
   for (const f of Object.values(routeur)) f.mockReset();
   envoi.mockReset();
-  envoi.mockResolvedValue({ id: "s1", app: "whatsapp", mode: "export", fileName: "_chat.txt", label: "WhatsApp", period: "", messageCount: 2 });
+  const source = { id: "s1", app: "whatsapp", mode: "export", fileName: "_chat.txt", label: "WhatsApp", period: "", messageCount: 2 } as const;
+  envoi.mockResolvedValue({ source, story: { ...HISTOIRE, sources: [source] } });
   videos.whatsapp = null;
   videos.instagram = null;
 });

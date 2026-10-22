@@ -8,6 +8,8 @@
 /**
  * Le compte préparé avant la capture (galerie.spec.ts, `preparer`). Sans : aucun compte, aucune conv.
  * - brouillon : une conv importée (POST /api/import), sans email ni compte ;
+ * - brouillon-court : un export de 30 messages, gardé mais trop court pour la lecture ;
+ * - morceaux : une conv en trois morceaux (un export court, des captures, le même export en entier), sans compte ;
  * - code : un brouillon, et un code de connexion demandé pour l’email du parcours ;
  * - gratuit : un compte gratuit, sa conv lue (le verdict offert, comme avant le paywall du 16 octobre) ;
  * - gratuit-sans-titres : le même, son verdict gardé comme avant le 13 octobre, sans les titres des chapitres fermés ;
@@ -21,7 +23,7 @@
  * - tournage : un compte de BLUSH_ADMINS en mode tournage (le lien de sa conv de tournage ouvert ici), une prise commencée
  *   par l’export sans fichier ; tournage-lu : la même, sa lecture rejouée ;
  * - tournage-creatrice : le même lien, ouvert par une créatrice (un compte ordinaire), sans prise.
- * @typedef {"brouillon" | "code" | "gratuit" | "gratuit-sans-titres" | "lecture-en-cours" | "paywall" | "rapport" | "equipe" | "sobre" | "plusieurs" | "couple" | "tournage" | "tournage-lu" | "tournage-creatrice"} Compte
+ * @typedef {"brouillon" | "brouillon-court" | "morceaux" | "code" | "gratuit" | "gratuit-sans-titres" | "lecture-en-cours" | "paywall" | "rapport" | "equipe" | "sobre" | "plusieurs" | "couple" | "tournage" | "tournage-lu" | "tournage-creatrice"} Compte
  */
 
 /**
@@ -354,16 +356,49 @@ export const STATES = [
     note: "Zone d’ajout absente des maquettes (remplace les vignettes d’exemple).",
   },
   { id: "03b", section: "parcours", title: "Captures", state: "4 captures choisies", route: "/importer/captures?app=instagram", steps: pickCaptures, ref: "03-captures" },
-  { id: "04", section: "parcours", title: "Ta conv est ajoutée", route: "/importer/ok", compte: "brouillon", journey: EXPORT, ref: "04-conv-ajoutee" },
+  {
+    id: "04",
+    section: "parcours",
+    title: "Ta conv est ajoutée",
+    route: "/importer/ok",
+    compte: "brouillon",
+    journey: EXPORT,
+    ref: "04-conv-ajoutee",
+    note: "«\u00a0Il manque un bout de votre histoire\u00a0?\u00a0» ouvre la feuille «\u00a0Ajoute un morceau\u00a0» (maquette du 22 octobre, rangée «\u00a0Une conv en plusieurs morceaux\u00a0»).",
+  },
+  {
+    id: "04b",
+    section: "parcours",
+    title: "Ta conv est ajoutée",
+    state: "Encore trop courte",
+    route: "/importer/ok",
+    compte: "brouillon-court",
+    journey: { ...EXPORT, exportFileName: "WhatsApp Chat - Elias.zip" },
+    note: "Un export de 30 messages est gardé, pour qu’on lui ajoute le début\u00a0: ajouter un morceau devient le bouton, «\u00a0Continuer\u00a0» attend. Texte de l’encart absent de la maquette, à valider.",
+  },
+  {
+    id: "04c",
+    section: "parcours",
+    title: "Ajoute un morceau",
+    state: "La feuille",
+    route: "/importer/ok",
+    compte: "brouillon",
+    journey: EXPORT,
+    sheet: true,
+    steps: async (page) => {
+      await page.getByRole("button", { name: /Il manque un bout de votre histoire/ }).click();
+      await page.waitForTimeout(600);
+    },
+  },
   {
     id: "05",
     section: "parcours",
     title: "Votre histoire réunie",
     route: "/importer/histoire",
-    compte: "brouillon",
-    journey: { ...EXPORT, capturesAdded: true },
+    compte: "morceaux",
+    journey: { ...EXPORT, exportFileName: "WhatsApp Chat - Elias.zip", capturesAdded: true },
     ref: "05-histoire-reunie",
-    note: "En production, rien ne mène encore ici\u00a0: le serveur refuse d’ajouter des captures à un export (l’écran se montre donc avec la seule conv importée).",
+    note: "Un export court, des captures, puis le même export en entier\u00a0: rangés par date, les 30 messages en double retirés (src/server/morceaux.ts).",
   },
   { id: "06", section: "parcours", title: "Qui est qui", state: "Avant les choix", route: "/qui", compte: "brouillon", journey: EXPORT },
   { id: "06b", section: "parcours", title: "Qui est qui", state: "Choix faits", route: "/qui", compte: "brouillon", journey: J, ref: "06-qui-est-qui" },

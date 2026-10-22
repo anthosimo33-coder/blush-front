@@ -6,6 +6,7 @@ import { delai } from "@/lib/motion";
 import { useSonForce } from "@/lib/audio";
 import { play, useSoundsEnabled } from "@/lib/sound";
 import { formatCount } from "@/lib/format";
+import { nombreDApplis } from "@/lib/morceaux";
 import { FRAIS_DU_RENDU } from "@/lib/query";
 import { useRapport } from "@/lib/requetes";
 import type { ReportPayload } from "@/types/api";
@@ -491,7 +492,7 @@ export function VerdictReveal({ initial, story, rendu }: { initial: ReportPayloa
 /** Carte 1 : le nombre de messages défile jusqu’au vrai total, puis la durée, les applis, les vocaux. */
 function Numbers({ story, heading, step }: { story: Story; heading: RefObject<HTMLHeadingElement | null>; step: ReactNode }) {
   const shown = useCountUp(story.totalMessages, 1300, 350);
-  const apps = story.sources.length;
+  const apps = nombreDApplis(story);
   const facts = [story.durationLabel, `${apps} appli${apps > 1 ? "s" : ""}`, story.voiceCount ? `${story.voiceCount} voca${story.voiceCount > 1 ? "ux" : "l"}` : null].filter(
     Boolean,
   ) as string[];

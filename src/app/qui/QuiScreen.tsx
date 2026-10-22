@@ -51,7 +51,8 @@ const CHAMP_PRENOM =
 
 /* Écran 06 — Qui est qui, la devinette, ce que tu veux. */
 /**
- * `captures` : la conv vient de captures, où l’utilisateur n’est que « Moi » (à droite) : on lui demande son prénom.
+ * `captures` : la conv vient de captures (seules, sans export parmi ses morceaux), où l’utilisateur n’est que « Moi » (à
+ * droite) : on lui demande son prénom.
  * `connecte` : déjà un compte (une autre conv) : pas d’écran email, la lecture part d’ici.
  */
 export function QuiScreen({ people, captures = false, connecte = false }: { people: [Person, Person]; captures?: boolean; connecte?: boolean }) {
@@ -70,8 +71,8 @@ export function QuiScreen({ people, captures = false, connecte = false }: { peop
   const ready = quiComplet(j, { captures, sonPrenom });
   /* En passant à « On est ensemble » (ou l’inverse), un objectif qui n’existe plus de l’autre côté est décoché */
   const pickGuess = (guess: Guess) => set({ guess, goal: goalsFor(guess).some((g) => g.id === j.goal) ? j.goal : null });
-  /* Arrivé sans le parcours de cet onglet (importée dans un autre, puis ouverte par une connexion) : d’après la conv */
-  const back = j.capturesAdded ? "/importer/histoire" : j.exportFileName ? "/importer/ok" : captures ? "/importer/captures" : "/importer/ok";
+  /* La conv reçue (un export, des captures), ou l’histoire réunie de ses morceaux (que /importer/ok montre aussi) */
+  const back = j.capturesAdded ? "/importer/histoire" : "/importer/ok";
   /*
    * L’écran suivant, préparé pendant qu’on répond : l’email (statique, en entier). Pas /lecture (déjà connecté) : ses
    * gardes (layout.tsx) renvoient ici tant que la lecture n’est pas lancée, et le préchargement garderait ce renvoi, que

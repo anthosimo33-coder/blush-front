@@ -121,7 +121,7 @@ test("les captures sans compte : le laissez-passer, puis la lecture", async ({ p
   const reponse = await reponseAuGeste(page, { chemin: "/api/captures", timeout: LECTURE_DES_CAPTURES }, () => page.getByRole("button", { name: "Continuer" }).click());
   expect(reponse.status()).toBe(200);
   expect(appels).toEqual(["/api/captcha", "/api/captures"]);
-  await expect(page.getByRole("heading", { level: 1, name: "Qui es-tu dans cette conv ?" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "C’est bon, on a votre conv." })).toBeVisible();
 });
 
 test("le script de Cloudflare bloqué (une extension, un réseau d’entreprise) : sans compte, le message tout de suite ; connecté, l’import part sans attendre", async ({

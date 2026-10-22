@@ -27,6 +27,7 @@ import { Lead, ScreenTitle } from "@/components/shell/Screen";
 import { setJourney, useJourney } from "@/state/journey";
 import { EXPORTS, type AppKind } from "@/types";
 import { ErreurApi } from "@/types/erreurs-api";
+import { messagePasAvecElle } from "../autre-conv";
 import { BarreLecture, CarteEnregistrement, CaseAjout, CommentFilmer, Dropzone, TEXTES_GRILLE, VignetteCapture, type Shot } from "./parts";
 
 /* Les applis lues par captures côté serveur (les autres passent par « autre ») */
@@ -63,9 +64,9 @@ const texteLecture = (n: number) => (n > 1 ? `BLUSH lit tes ${n} captures…` : 
  * Écran 03 — Captures : sélection, puis l’ordre se règle en glissant (BLUSH retrie aussi par date). Ou un enregistrement
  * d’écran : le téléphone en tire les écrans de la conv (la vidéo ne part pas), puis BLUSH les lit. Pour iMessage (pas
  * d’export possible), l’enregistrement est le chemin principal.
- * `addMode` (?mode=ajout, des captures ajoutées à un export, puis /importer/histoire) est en sommeil : aucun écran n’y
- * mène plus, sauf /importer/histoire, qu’on n’atteint que par lui, et le serveur refuse ces captures (api/captures).
- * Il reste pour la fusion d’un export et de captures, décidée pour plus tard.
+ * Une première conv passe ensuite par l’écran de la conv reçue (/importer/ok), d’où l’on peut lui ajouter un morceau.
+ * `addMode` (?mode=ajout) : des captures, ou un enregistrement, ajoutées à la conv qu’on importe (un morceau de plus,
+ * src/server/morceaux.ts), puis l’histoire réunie (/importer/histoire). Pas un import de plus pour le tunnel d’/admin.
  */
 export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode: boolean }) {
   const router = useRouter();
@@ -85,8 +86,9 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
   const monte = useMonte();
   /* L’accord de l’import : la ligne au-dessus du bouton le dit, « Continuer » le donne (refusé par le serveur, plus rien ne part) */
   const accord = useAccord();
-  /* Le tunnel d’/admin : une appli choisie (cet écran), puis les captures, l’envoi raté ou réussi (src/lib/jalons.ts) */
-  useJalon("appli");
+  /* Le tunnel d’/admin : une appli choisie (cet écran), puis les captures, l’envoi raté ou réussi (src/lib/jalons.ts) ; pas un morceau ajouté */
+  useJalon(addMode ? null : "appli");
+  const jalon = (j: Parameters<typeof marquerJalon>[0]) => !addMode && marquerJalon(j);
   const captureApp = app ?? journey.app ?? "instagram";
   const enregistrement = captureApp === "imessage";
   const all = useRef<Shot[]>([]);
@@ -116,7 +118,7 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
   const echec = (code: ErreurParcours) => router.replace(`/importer/captures?app=${captureApp}${addMode ? "&mode=ajout" : ""}&erreur=${code}`, { scroll: false });
 
   const handle = (picked: File[], video: boolean) => {
-    if (picked.length) marquerJalon("fichier");
+    if (picked.length) jalon("fichier");
     /* Un enregistrement garde son fichier en aperçu (la balise vidéo le lit) ; une capture attend sa vignette */
     const added: Shot[] = picked.map((file, i) => ({ id: `${Date.now()}-${i}-${file.name}`, file, url: video ? apercus.creer(file) : null }));
     /* Un enregistrement remplace tout ; des captures après un enregistrement le remplacent aussi */
@@ -127,8 +129,6 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
     toutes.slice(next.length).forEach((s) => apercus.liberer(s.url));
     setTrop(!video && toutes.length > CAPTURES_MAX);
     setSouci(null);
-    /* L’enregistrement sert à la première importation (pas encore pour compléter une conv) */
-    if (video && addMode) return echec("capture");
     setItems(next);
     if (!video) {
       const gardees = added.filter((s) => next.includes(s));
@@ -179,16 +179,19 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
     const enregistre = video ? items[0] : undefined;
     try {
       const r = enregistre
-        ? await uploadRecording(enregistre.file, APPLIS_CAPTURES.includes(captureApp) ? captureApp : "autre", CASE_IMPORT.version, setAvance)
+        ? await uploadRecording(enregistre.file, APPLIS_CAPTURES.includes(captureApp) ? captureApp : "autre", CASE_IMPORT.version, setAvance, { ajout: addMode })
         : await uploadScreenshots(
             items.map((s) => s.file),
             { app: captureApp, mode: addMode ? "add" : "first", consentement: CASE_IMPORT.version, onAvance: setAvance },
           );
       if (!monte.current) return;
-      /* Une première conv de captures prend la place de l’export de cet onglet : le code reçu par email attendra ton prénom (vientDeCaptures) */
-      setJourney({ ...(addMode ? { capturesAdded: true } : { app: captureApp, exportFileName: null }), me: "p0" });
+      /*
+       * Une première conv de captures prend la place de l’export de cet onglet : le code reçu par email attendra ton prénom
+       * (vientDeCaptures). Un morceau ajouté : « Qui es-tu ? » suit la conv réunie (sur des captures seules, toi y est connu)
+       */
+      setJourney(addMode ? { capturesAdded: true, me: r.story.me ?? null } : { app: captureApp, exportFileName: null, me: "p0" });
       setResult({ count: items.length, messages: r.messagesRead, video });
-      marquerJalon("importee");
+      jalon("importee");
       router.push(next);
     } catch (e) {
       if (!monte.current) return;
@@ -198,7 +201,7 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
       setAvance(null);
       /* Le serveur n’a pas reconnu l’accord (BLUSH a changé de texte depuis l’ouverture de l’onglet) : la page est à recharger, les captures restent là */
       if (codeDe(e) === "consentement") return accord.perimer();
-      marquerJalon("envoi_rate");
+      jalon("envoi_rate");
       /*
        * La conv elle-même (trop courte, de groupe), la vidéo, ou des captures où rien ne se lit : son écran d’erreur, comme
        * sur l’export. Rien ne se lit, c’est « capture », ou « fichier » quand le serveur refuse les images ou ne sait pas
@@ -210,12 +213,14 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
       const code = codeDe(e);
       const parcours = erreurDeParcours("captures", e) ?? (code === "capture" || code === "fichier" ? "capture" : null);
       if (parcours) return echec(parcours);
+      /* Un morceau avec quelqu’un d’autre : on le dit en la nommant */
+      if (code === "autre_conv") return void messagePasAvecElle().then((m) => monte.current && setSouci(m));
       setSouci(messageErreur("captures", e));
     }
   };
 
   const back = addMode ? "/importer/ok" : "/commencer";
-  const next = addMode ? "/importer/histoire" : "/qui";
+  const next = addMode ? "/importer/histoire" : "/importer/ok";
   /* L’extraction d’un enregistrement est chargée à la demande : on la charge dès qu’on ouvre le choix de la vidéo */
   const choisirEnregistrement = () => {
     prechargerVideo();

@@ -6,6 +6,7 @@ import { join } from "node:path";
 import type { ReactNode } from "react";
 import { LIGNES_D_ECOUTE } from "@/contenu/aide";
 import { formatCount, NBSP } from "@/lib/format";
+import { nombreDApplis } from "@/lib/morceaux";
 import { moiEtAutre, titreDuo } from "@/lib/participants";
 import { IlOuElle } from "@/lib/pronom";
 import type { ReportPayload } from "@/types/api";
@@ -575,7 +576,7 @@ function PageDeGarde({ payload, story, moi, le, site, bulle, emoji }: RapportEnP
   const [l, h] = [595.28 - 2 * FEUILLE.marge, 841.89 - 2 * FEUILLE.marge];
   const chiffres = [
     { valeur: formatCount(story.totalMessages), nom: "messages" },
-    { valeur: String(story.sources.length), nom: story.sources.length === 1 ? "appli" : "applis" },
+    { valeur: String(nombreDApplis(story)), nom: nombreDApplis(story) === 1 ? "appli" : "applis" },
     { valeur: String(story.voiceCount), nom: story.voiceCount === 1 ? "vocal" : "vocaux" },
     { valeur: debloque ? report.readingTime.full : report.readingTime.free, nom: "de lecture" },
   ];

@@ -26,6 +26,7 @@ import type {
   Pronom,
   QuestionAnswer,
   Source,
+  Story,
 } from "@/types";
 /* Des types seulement (tests/unit/contrat.test.ts le vérifie) : les schémas du contrat, et zod avec eux, restent au serveur */
 import type {
@@ -309,10 +310,13 @@ export async function uploadExport(
   consentement: string,
   choisir?: (convs: ConvInstagram[]) => Promise<string | null>,
   onAvance?: (part: number) => void,
-): Promise<Source> {
+  { ajout = false }: { ajout?: boolean } = {},
+): Promise<Routes["POST /api/import"]["reponse"]> {
   const passe = laissezPasser();
   const fd = new FormData();
   fd.append("consentement", consentement);
+  /* Un morceau de plus pour la conv qu’on importe (src/server/morceaux.ts), pas une nouvelle conv */
+  if (ajout) fd.append("mode", "ajout");
   const { analyserExport } = await pExport();
   let pret: Awaited<ReturnType<typeof analyserExport>>;
   try {
@@ -328,7 +332,7 @@ export async function uploadExport(
     fd.append("export", await pret.paquetDe(id), "export.json.gz");
   }
   await passe;
-  return (await appel("POST /api/import", { corps: fd })).source;
+  return appel("POST /api/import", { corps: fd });
 }
 
 /**
@@ -345,6 +349,9 @@ export async function importerLaConvDuTournage(app: ExportApp, consentement: str
   return (await appel("POST /api/import", { corps: fd })).source;
 }
 
+/** La conv qu’on importe (GET /api/histoire, celle du parcours) : ses participants et ses morceaux. */
+export const lireLHistoire = () => appel("GET /api/histoire");
+
 /**
  * Les captures, réduites dans le navigateur, puis lues par BLUSH (une seule fois, pour toutes). `onAvance` ne dit
  * que la reprise, si le réseau coupe pendant la lecture. `consentement` : la version de la case de l’import cochée.
@@ -352,7 +359,7 @@ export async function importerLaConvDuTournage(app: ExportApp, consentement: str
 export async function uploadScreenshots(
   files: File[],
   opts: { app: AppKind; mode: "first" | "add"; consentement: string; onAvance?: (a: AvanceVideo) => void },
-): Promise<{ source: Source; messagesRead: number }> {
+): Promise<{ source: Source; messagesRead: number; story: Story }> {
   const passe = laissezPasser();
   const fd = new FormData();
   try {
@@ -377,7 +384,13 @@ export async function uploadScreenshots(
  * ne part pas), BLUSH les lit par lots (cinq à la fois), puis les lectures sont rassemblées en une histoire brouillon,
  * comme des captures. `consentement` : la version de la case de l’import cochée, envoyée avec chaque lot et avec leur fin.
  */
-export async function uploadRecording(file: File, app: AppKind, consentement: string, onAvance?: (a: AvanceVideo) => void): Promise<{ source: Source; messagesRead: number }> {
+export async function uploadRecording(
+  file: File,
+  app: AppKind,
+  consentement: string,
+  onAvance?: (a: AvanceVideo) => void,
+  { ajout = false }: { ajout?: boolean } = {},
+): Promise<{ source: Source; messagesRead: number; story: Story }> {
   const passe = laissezPasser();
   const { imagesDeLaVideo, lotsDe, VideoIllisible } = await pVideo();
   let images: Blob[];
@@ -431,7 +444,7 @@ export async function uploadRecording(file: File, app: AppKind, consentement: st
   };
   await Promise.all(Array.from({ length: Math.min(LECTEURS, lots.length) }, lecteur));
   /* La clé : un nouvel essai après une coupure retrouve l’histoire déjà créée au lieu d’en faire une seconde */
-  const corps = { app, lots: lus, cle: cleEnvoi(), consentement };
+  const corps = { app, lots: lus, cle: cleEnvoi(), consentement, ...(ajout ? { mode: "ajout" as const } : {}) };
   return avecReprise(
     () => appel("POST /api/captures/video", { corps }),
     () => onAvance?.({ etape: "reprise" }),

@@ -1,11 +1,11 @@
 import { AppliCaptures } from "@/server/appli-captures";
 import { humainRefuse } from "@/server/captcha";
-import { cleEnvoi, imagesDe, LectureRefusee, lecturePermise, lireCaptures, uneSeuleLecture } from "@/server/captures";
+import { cleEnvoi, imagesDe, LectureRefusee, lecturePermise, lireCaptures, uneSeuleLecture, unSeulAjout } from "@/server/captures";
 import { compterImportVenuDuPartage } from "@/server/compteurs";
-import { poserBrouillon } from "@/server/cookies";
+import { lireBrouillon, poserBrouillon } from "@/server/cookies";
 import { erreur, repondre, route } from "@/server/http";
 import { storyEtSource } from "@/server/conv-affichee";
-import { importerCaptures } from "@/server/histoires";
+import { ajouterDesCaptures, importerCaptures, morceauDejaAjoute } from "@/server/histoires";
 import { consentementImport } from "@/server/juridique";
 import { LIMITES } from "@/server/limites";
 import { garde, sousLaLimiteDeLIp } from "@/server/requete";
@@ -26,6 +26,9 @@ const Appli = AppliCaptures;
  * la lecture déjà faite (src/server/captures.ts, uneSeuleLecture). Sans la case de l’import cochée : 422 `consentement`
  * (src/server/juridique.ts). La lecture refusée (LectureRefusee), rien de lisible
  * (ErreurCaptures), un import refusé : leur code ; le modèle : refus ou panne (l’enveloppe `route`, src/server/http.ts).
+ * `mode=add` : un morceau de plus pour la conv qu’on importe (src/server/morceaux.ts), lu puis ajouté à son brouillon,
+ * une seule fois par envoi (unSeulAjout). Sans brouillon où l’ajouter (ni en mode tournage) : 404 `aucune` ; des
+ * captures avec quelqu’un d’autre : 422 `autre_conv` ; rien de nouveau : 422 `rien_de_neuf` ; un morceau de trop : 429 `trop`.
  */
 async function traiter(req: Request) {
   const g = await garde(req, { session: "aucune" });
@@ -33,8 +36,11 @@ async function traiter(req: Request) {
   const fd = await req.formData().catch(() => null);
   const fichiers = (fd?.getAll("captures") ?? []).filter((f): f is File => f instanceof File);
   const appli = Appli.safeParse(fd?.get("app"));
-  if (fd?.get("mode") === "add") return erreur("capture");
   const app = appli.success ? appli.data : "autre";
+  /* Un morceau de plus : le brouillon où l’ajouter, d’abord (rien n’est lu sans lui) */
+  const ajout = fd?.get("mode") === "add";
+  const brouillon = ajout ? await lireBrouillon() : null;
+  if (ajout && !brouillon) return erreur("aucune");
   const images = await imagesDe(fichiers);
   /* L’accord de l’import (les conditions, et que BLUSH lise toute la conv) : sans lui, rien n’est lu ni compté */
   const consentement = consentementImport(fd?.get("consentement"));
@@ -53,7 +59,25 @@ async function traiter(req: Request) {
   const tournage = await tournageDuNavigateur();
   /* Son lien arrêté (ou une créatrice sans son lien) : le modèle ne lit rien, qu’elle rouvre le nouveau */
   if (!tournage && (await lecturePayeeRefusee(await utilisateurDeSession(await lireSession())))) return erreur("tournage");
-  const lu = await uneSeuleLecture(cleEnvoi(fd?.get("cle")), async (secret) => {
+  const cle = cleEnvoi(fd?.get("cle"));
+  if (brouillon) {
+    /* Pas de morceau en mode tournage : sa conv n’est pas lue, rien à réunir */
+    if (tournage) return erreur("aucune");
+    const lu = await unSeulAjout(
+      cle,
+      brouillon,
+      async () => {
+        const permis = await lecturePermise("captures");
+        if (permis !== "ok") throw new LectureRefusee(permis);
+        const t = await lireCaptures(images, app);
+        return { ...(await ajouterDesCaptures(brouillon, { appli: app, t, cle })), secret: brouillon, messages: t.messages };
+      },
+      () => (cle ? morceauDejaAjoute(brouillon, cle) : Promise.resolve(null)),
+    );
+    const { story, source } = storyEtSource(lu.id, lu.meta);
+    return repondre("POST /api/captures", { source, messagesRead: lu.messages, story });
+  }
+  const lu = await uneSeuleLecture(cle, async (secret) => {
     if (tournage) return brouillonDeTournage(tournage, { appli: app, captures: images.length, secret, consentement });
     /* Le modèle va lire : la bêta et les plafonds d’abord (après la vérification de l’envoi, qu’un envoi invalide ne compte pas) */
     const permis = await lecturePermise("captures");

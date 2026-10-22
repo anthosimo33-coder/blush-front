@@ -24,7 +24,8 @@ import { Sheet } from "@/components/ui/surfaces";
 import { ParcoursScreen } from "@/components/shell/ParcoursScreen";
 import { ScreenTitle } from "@/components/shell/Screen";
 import { setJourney } from "@/state/journey";
-import { APPLIS, type ExportApp } from "@/types";
+import { APPLIS, type ExportApp, type Story } from "@/types";
+import { messagePasAvecElle } from "../autre-conv";
 import { ChoixConv } from "./ChoixConv";
 import type { ConvInstagram } from "@/services/preparer-export";
 
@@ -38,8 +39,10 @@ const LECTURE_DU_TOURNAGE_MS = 1600;
  * `tournage` : le mode tournage (src/server/tournage.ts, la variante ./tournage/page.tsx). Le même écran, mais le bouton
  * n’ouvre pas le choix d’un fichier : la créatrice n’a rien à chercher, le serveur prend la conv de son lien, et le bouton
  * dit « Je lis ton export · N % » le temps d’une courte lecture, comme un vrai import. Rien d’autre ne le montre.
+ * `ajout` (?mode=ajout) : un autre export de leur conv, un morceau de plus (src/server/morceaux.ts), puis l’histoire
+ * réunie. Pas un import de plus pour le tunnel d’/admin (ni jalons, ni nouvelle conv dans l’onglet).
  */
-export function ExportScreen({ initialApp, tournage = false }: { initialApp: ExportApp; tournage?: boolean }) {
+export function ExportScreen({ initialApp, tournage = false, ajout = false }: { initialApp: ExportApp; tournage?: boolean; ajout?: boolean }) {
   const router = useRouter();
   const device = useDevice();
   const picker = useFilePicker();
@@ -57,8 +60,11 @@ export function ExportScreen({ initialApp, tournage = false }: { initialApp: Exp
   /* Un export Instagram complet : la feuille « Quelle conv ? », qui répond à l’envoi en cours (null : on a renoncé) */
   const [choix, setChoix] = useState<{ convs: ConvInstagram[]; repondre: (id: string | null) => void } | null>(null);
   const choisir = (convs: ConvInstagram[]) => new Promise<string | null>((repondre) => setChoix({ convs, repondre }));
-  /* Le tunnel d’/admin : une appli choisie (cet écran), puis le fichier, l’envoi raté ou réussi (src/lib/jalons.ts) */
-  useJalon("appli");
+  /* Le tunnel d’/admin : une appli choisie (cet écran), puis le fichier, l’envoi raté ou réussi (src/lib/jalons.ts) ; pas un morceau ajouté */
+  useJalon(ajout ? null : "appli");
+  const jalon = (j: Parameters<typeof marquerJalon>[0]) => !ajout && marquerJalon(j);
+  /* L’adresse de cet écran, son appli et son mode */
+  const ici = (a: ExportApp) => `/importer/export?app=${a}${ajout ? "&mode=ajout" : ""}` as const;
   const fermerChoix = (id: string | null) => {
     choix?.repondre(id);
     setChoix(null);
@@ -76,8 +82,18 @@ export function ExportScreen({ initialApp, tournage = false }: { initialApp: Exp
      * rapport à l’envers
      */
     setJourney({ exportApp: app, app, exportFileName: fichier, capturesAdded: false, me: null });
-    marquerJalon("importee");
+    jalon("importee");
     router.push("/importer/ok");
+  };
+
+  /*
+   * Un morceau ajouté : l’histoire réunie. « Qui es-tu ? » suit la conv réunie : un export y donne les deux noms, on
+   * choisit le sien (toi se redemande), et son nom de fichier dit à l’onglet que la conv n’est plus faite que de
+   * captures (vientDeCaptures, src/state/parcours.ts)
+   */
+  const ajoute = (story: Story, fichier: string) => {
+    setJourney({ capturesAdded: true, exportFileName: fichier, me: story.me ?? null });
+    router.push("/importer/histoire");
   };
 
   /* L’envoi raté : le fichier lui-même a son écran d’erreur (ErreurDeParcours, ?erreur=) ; le reste (réseau, limite), un message ici, et on réessaie */
@@ -89,13 +105,15 @@ export function ExportScreen({ initialApp, tournage = false }: { initialApp: Exp
     if (codeDe(e) === "annule") return;
     /* Le serveur n’a pas reconnu l’accord (BLUSH a changé de texte depuis l’ouverture de l’onglet) : la page est à recharger */
     if (codeDe(e) === "consentement") return accord.perimer();
-    marquerJalon("envoi_rate");
+    jalon("envoi_rate");
     /* Un fichier illisible, une conv de groupe, trop courte : l’écran d’erreur prévu */
     const parcours = erreurDeParcours("export", e);
     if (parcours) {
-      router.replace(`/importer/export?app=${app}&erreur=${parcours}`, { scroll: false });
+      router.replace(`${ici(app)}&erreur=${parcours}`, { scroll: false });
       return;
     }
+    /* Un morceau avec quelqu’un d’autre : on le dit en la nommant */
+    if (codeDe(e) === "autre_conv") return void messagePasAvecElle().then((m) => monte.current && setSouci(m));
     setSouci(messageErreur("export", e));
   };
 
@@ -126,24 +144,26 @@ export function ExportScreen({ initialApp, tournage = false }: { initialApp: Exp
     if (!file) return;
     /* L’accord refusé par le serveur pendant que le choix du fichier était ouvert : rien ne repart avant la page rechargée */
     if (!accord.exiger()) return;
-    marquerJalon("fichier");
+    jalon("fichier");
     setBusy(true);
     setSouci(null);
     setAvance(null);
-    let source;
+    let recu;
     try {
       /* L’avancée ne compte plus une fois les convs proposées : la feuille « Quelle conv ? » prend le relais */
-      source = await uploadExport(file, CASE_IMPORT.version, choisir, (p) => monte.current && setAvance(p < 1 ? p : null));
+      recu = await uploadExport(file, CASE_IMPORT.version, choisir, (p) => monte.current && setAvance(p < 1 ? p : null), { ajout });
     } catch (e) {
       return surEchec(e);
     }
-    if (monte.current) suite(source.fileName ?? file.name);
+    if (!monte.current) return;
+    if (ajout) ajoute(recu.story, recu.source.fileName ?? file.name);
+    else suite(recu.source.fileName ?? file.name);
   };
 
   return (
     <ParcoursScreen
       step={1}
-      back="/commencer"
+      back={ajout ? "/importer/ok" : "/commencer"}
       contentGap={24}
       head={<ScreenTitle>Exporte votre conv.</ScreenTitle>}
       footer={
@@ -183,7 +203,7 @@ export function ExportScreen({ initialApp, tournage = false }: { initialApp: Exp
         onChange={(v) => {
           setApp(v);
           setJourney({ app: v, exportApp: v });
-          router.replace(`/importer/export?app=${v}`, { scroll: false });
+          router.replace(ici(v), { scroll: false });
         }}
         options={[
           { value: "whatsapp", label: "WhatsApp" },

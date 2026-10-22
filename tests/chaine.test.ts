@@ -12,7 +12,7 @@ import { historique } from "@/server/historique";
 import { chiffrer, dechiffrer, dechiffrerOctets } from "@/server/chiffrement";
 import { db, schema } from "@/server/db";
 import { memoireDe } from "@/server/donnees";
-import { importer, metaDe, type LigneComplete } from "@/server/histoires";
+import { importer, metaDe, tropCourte, type LigneComplete } from "@/server/histoires";
 import { depuisFichier, ErreurImport } from "@/server/import";
 import { storyAffichee } from "@/server/conv-affichee";
 import { FACTICE } from "@/server/ia/factice-valeurs";
@@ -28,9 +28,10 @@ import { accordDeTest, compteDeTest, convImportee, debloquerLaConv, histoireLue,
 const vocalPret = async (storyId: string) => (await vocalLu(storyId))?.pret ?? null;
 
 describe("import", () => {
-  it("refuse une conv de groupe et une conv trop courte", async () => {
+  it("refuse une conv de groupe ; garde une conv trop courte, qui attend un morceau de plus avant sa lecture", async () => {
     await expect(importer(await depuisFichier(convDeTest("90-groupe.txt")), accordDeTest())).rejects.toMatchObject({ code: "groupe" } satisfies Partial<ErreurImport>);
-    await expect(importer(await depuisFichier(convDeTest("91-trop-courte.txt")), accordDeTest())).rejects.toMatchObject({ code: "courte" });
+    const courte = await convImportee("91-trop-courte.txt");
+    expect(tropCourte(courte.meta)).toBe(true);
   });
 });
 

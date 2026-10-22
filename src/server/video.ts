@@ -10,8 +10,8 @@ import type { Captures } from "@prompts/lib/schemas";
 type Msg = Captures["blocs"][number]["messages"][number];
 type Ligne = { repere: Captures["blocs"][number]["repere"]; m: Msg };
 
-/** Le texte d’un message, sans accents, ponctuation ni espaces : deux lectures du même écran ne diffèrent que par là. */
-const norm = (t: string) =>
+/** Le texte d’un message, sans accents, ponctuation ni espaces : deux lectures du même écran ne diffèrent que par là (morceaux.ts compare ainsi deux morceaux). */
+export const norm = (t: string) =>
   t
     .toLowerCase()
     .normalize("NFD")

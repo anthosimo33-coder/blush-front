@@ -182,8 +182,11 @@ test("captures seules, jusqu’au rapport : BLUSH les lit, « Qui es-tu ? » dem
   });
 
   await test.step("qui es-tu : pas de choix entre deux personnes, mais le prénom (on est à droite des captures, face à Elias)", async () => {
-    /* Pas d’écran « C’est bon, on a votre conv. » : les captures mènent droit à « Qui es-tu ? », une fois lues */
-    await expect(page).toHaveURL(/\/qui$/, { timeout: LECTURE_DES_CAPTURES });
+    /* Une fois lues, « C’est bon, on a votre conv. » (d’où l’on pourrait ajouter un morceau), puis « Qui es-tu ? » */
+    await expect(page).toHaveURL(/\/importer\/ok$/, { timeout: LECTURE_DES_CAPTURES });
+    await expect(page.getByText("3 captures", { exact: true })).toBeVisible();
+    await page.getByRole("link", { name: "Continuer" }).click();
+    await expect(page).toHaveURL(/\/qui$/);
     await expect(page.getByRole("heading", { level: 1, name: "Qui es-tu dans cette conv\u00a0?" })).toBeVisible();
     await expect(page.getByRole("radiogroup", { name: "Qui es-tu dans cette conv\u00a0?" })).toHaveCount(0);
     const prenom = page.getByLabel("Ton prénom (dans votre conv avec Elias, tu es à droite)");

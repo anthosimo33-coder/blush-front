@@ -152,6 +152,27 @@ export async function uneSeuleLecture(cle: string | null, lire: (secret: string)
   return lecture;
 }
 
+/**
+ * Des captures (ou un enregistrement) ajoutées une seule fois par envoi au brouillon `brouillon`, un morceau de plus
+ * (src/server/morceaux.ts) : comme uneSeuleLecture, un nouvel essai rejoint l’ajout en cours sur cette instance, ou
+ * retrouve le morceau déjà ajouté sous la clé de l’envoi (`deja`, sur n’importe quelle instance), sans rappeler le modèle.
+ */
+export async function unSeulAjout(cle: string | null, brouillon: string, ajouter: () => Promise<Brouillon>, deja: () => Promise<Brouillon | null>): Promise<Brouillon> {
+  if (!cle) return ajouter();
+  const k = empreinte(`ajout:${brouillon}:${cle}`);
+  const maintenant = Date.now();
+  for (const [c, r] of RECENTES) if (r.jusqua < maintenant) RECENTES.delete(c);
+  const enCours = RECENTES.get(k);
+  if (enCours) return enCours.lecture;
+  /* Posé avant toute attente : deux essais arrivés ensemble n’ajoutent pas deux fois */
+  const lecture = (async () => (await deja()) ?? ajouter())().catch((e: unknown) => {
+    RECENTES.delete(k);
+    throw e;
+  });
+  RECENTES.set(k, { lecture, jusqua: maintenant + GARDE_MS });
+  return lecture;
+}
+
 async function dejaCree(secret: string): Promise<Brouillon | null> {
   const ligne = await brouillonDe(secret);
   return ligne ? { id: ligne.id, meta: metaDe(ligne), secret, messages: ligne.messageCount } : null;

@@ -4,7 +4,7 @@ import { lancerApresPaiement, relancerApres } from "@/server/pipeline";
 import { effacerBrouillon, lireBrouillon, poserChoisie } from "@/server/cookies";
 import { progression, relancer } from "@/server/donnees";
 import { erreur, lireCorps, repondre, route } from "@/server/http";
-import { definirQui, metaDe, quiRempli, rattacherBrouillon } from "@/server/histoires";
+import { definirQui, metaDe, quiRempli, rattacherBrouillon, tropCourte } from "@/server/histoires";
 import { LIMITES } from "@/server/limites";
 import { garde, lecture, rendreAuCompte, sousLaLimiteDeLIp, sousLaLimiteDuCompte } from "@/server/requete";
 import { attendreLePaiement, etatDesTaches, planifier } from "@/server/taches";
@@ -21,7 +21,8 @@ export const maxDuration = 300;
  * part. Relancer ne refait rien de ce qui est fait.
  * Avec les réponses de « Qui es-tu ? » (depuis /qui, ou le code reçu par email), c’est la conv en train d’être importée :
  * déjà connecté, elle rejoint ici le compte, et devient la conv ouverte. Sans (l’écran de lecture), c’est la conv qu’on
- * suit : un brouillon laissé en plan ne prend pas sa place.
+ * suit : un brouillon laissé en plan ne prend pas sa place. Une conv encore trop courte (tropCourte, un premier morceau
+ * gardé pour qu’on lui ajoute le début) ne part pas : 422 `courte`.
  */
 export const POST = route("POST /api/analyse", async (req: Request) => {
   /* L’origine d’abord, comme partout : une requête venue d’un autre site n’est même pas lue */
@@ -49,6 +50,8 @@ export const POST = route("POST /api/analyse", async (req: Request) => {
     const tournage = verdict ? null : story.tournageId ? await tournageDe(story.tournageId) : await tournageDuNavigateur();
     /* Rien à lire : un brouillon de tournage dont la conv de tournage a été effacée depuis n’a pas de conv brute */
     if (!tournage && !verdict && !story.aConv) return erreur("aucune");
+    /* Une conv encore trop courte (un premier morceau, qui attend le début) : rien ne part tant qu’on n’en a pas ajouté */
+    if (!tournage && !verdict && tropCourte(metaDe(story))) return erreur("courte");
     /* Le lien de tournage arrêté (ou une créatrice sans son lien) : jamais une vraie lecture, qu’elle rouvre le nouveau */
     if (!tournage && !verdict && (await lecturePayeeRefusee(utilisateur))) return erreur("tournage");
     if (tournage) {

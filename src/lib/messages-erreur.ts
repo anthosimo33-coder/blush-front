@@ -56,6 +56,20 @@ const CAPTCHA = "On n’a pas pu vérifier que tu n’es pas un robot. Réessaie
 const TOURNAGE_ARRETE =
   "Ce lien de tournage a été arrêté. Rouvre le nouveau lien de ta mission sur ce téléphone, puis recommence la prise. Tu ne filmes pas\u00a0? Quitte le mode tournage dans «\u00a0Mon compte\u00a0».";
 
+/*
+ * Un morceau ajouté à la conv qu’on importe (une conv en plusieurs morceaux, src/server/morceaux.ts), que le serveur
+ * n’ajoute pas : rien de nouveau dedans, ou la conv (son brouillon) qui n’est plus là. Avec quelqu’un d’autre :
+ * pasLaMemePersonne, qui la nomme. TODO(produit): textes nouveaux, absents de la maquette.
+ */
+const AJOUT_D_UN_MORCEAU = {
+  rien_de_neuf: "BLUSH a déjà tous ces messages\u00a0: rien de nouveau dans ce morceau.",
+  aucune: "Ta conv n’est plus là\u00a0: recommence depuis le début.",
+  autre_conv: "Ce morceau n’est pas avec la même personne.",
+} as const;
+
+/** Un morceau ajouté avec quelqu’un d’autre (« autre_conv ») : la personne de la conv, par son prénom quand on sait qui c’est. */
+export const pasLaMemePersonne = (prenom: string | null) => (prenom ? `Ce morceau n’est pas avec ${prenom}.` : AJOUT_D_UN_MORCEAU.autre_conv);
+
 const MESSAGES = {
   /* L’envoi du code de connexion : /email, /connexion, et « Renvoyer » sur l’écran du code */
   code: {
@@ -80,6 +94,7 @@ const MESSAGES = {
     /* Le budget d’octets du jour, de son adresse ou de tous (S-02) : il repart à minuit, ou 24 h après le premier import de l’adresse. TODO(produit): texte nouveau */
     trop_jour: "Beaucoup de convs importées aujourd’hui. Réessaie demain.",
     captcha: CAPTCHA,
+    ...AJOUT_D_UN_MORCEAU,
     defaut: "Ta conv n’a pas pu partir. Vérifie ta connexion et réessaie.",
   },
   /* L’import de captures ou d’un enregistrement d’écran (la conv elle-même a son écran : erreurDeParcours) */
@@ -91,6 +106,7 @@ const MESSAGES = {
     /* Un refus de l’IA : réessayer n’y changerait rien */
     refus: "BLUSH ne peut pas lire ces captures. Essaie avec d’autres.",
     captcha: `${CAPTCHA} Tes captures restent là.`,
+    ...AJOUT_D_UN_MORCEAU,
     defaut: "Ta conv n’a pas pu partir. Vérifie ta connexion et réessaie.",
   },
   /* « Lancer la lecture », sur « Qui es-tu ? » */
@@ -98,6 +114,8 @@ const MESSAGES = {
     trop: "Tu as lancé beaucoup de lectures aujourd’hui. Réessaie demain.",
     /* Le mode tournage arrêté (src/server/tournage.ts). TODO(produit): texte nouveau, à valider */
     tournage: TOURNAGE_ARRETE,
+    /* Une conv gardée trop courte, qui attend un morceau (l’écran de la conv reçue le dit d’abord). TODO(produit): texte nouveau */
+    courte: "Votre conv est encore trop courte pour une lecture juste. Ajoute un morceau de votre histoire.",
     defaut: "La lecture n’a pas pu partir. Réessaie dans un instant.",
   },
   /* « Relancer l’écriture » du rapport */

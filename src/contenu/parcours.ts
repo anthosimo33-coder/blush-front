@@ -1,6 +1,31 @@
-import type { ExportApp, Guess } from "@/types";
+import type { Route } from "next";
+import type { AppKind, ExportApp, Guess } from "@/types";
 
-/* Les textes du parcours : « Qui es-tu ? », les étapes de l’export, celles de la lecture. */
+/* Les textes du parcours : les applis de l’import, « Qui es-tu ? », les étapes de l’export, celles de la lecture. */
+
+/** Une tuile d’appli de l’import : son appli, ce qu’elle dit, et l’écran où elle mène. */
+export type TuileImport = { app: AppKind; title: string; subtitle: string; href: Route };
+
+/*
+ * Écran 01 — Vous vous parlez où ? (pas de Snapchat). Les mêmes quatre tuiles servent à ajouter un morceau à la conv
+ * (tuilesDAjout) : la feuille « Ajoute un morceau » de l’écran de la conv reçue et de l’histoire réunie.
+ */
+export const TUILES_IMPORT: readonly TuileImport[] = [
+  { app: "whatsapp", title: "WhatsApp", subtitle: "Export en 1 minute", href: "/importer/export?app=whatsapp" },
+  /* iMessage ne s’exporte pas : on filme son écran (ou des captures) */
+  { app: "imessage", title: "iMessage", subtitle: "Enregistrement de l’écran", href: "/importer/captures?app=imessage" },
+  /* Instagram passe par son export (la lecture des captures arrive ensuite) */
+  { app: "instagram", title: "Instagram", subtitle: "Export de tes messages", href: "/importer/export?app=instagram" },
+  /*
+   * Des captures ou une vidéo de l’écran, de n’importe quelle appli : Hinge et Tinder y passent, et qui n’a pas d’export
+   * Instagram ou WhatsApp aussi (à la place des tuiles Hinge et « Autre appli », 22 octobre)
+   */
+  { app: "autre", title: "Captures ou vidéo", subtitle: "Hinge, Tinder… toutes les applis", href: "/importer/captures?app=autre" },
+];
+
+/** Les tuiles de la feuille « Ajoute un morceau » : les mêmes, vers les mêmes écrans, en mode ajout (`mode=ajout`). */
+export const tuilesDAjout = (): TuileImport[] =>
+  TUILES_IMPORT.map((t) => ({ ...t, ...(t.app === "whatsapp" ? { subtitle: "Un autre export" } : {}), href: `${t.href}&mode=ajout` as Route }));
 
 export const GUESS_LABELS: Record<Guess, { tile: string; quote: string }> = {
   parle: { tile: "On se parle", quote: "«\u00a0on se parle\u00a0»" },

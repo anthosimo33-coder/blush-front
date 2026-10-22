@@ -237,11 +237,11 @@ test("le parcours d’un nouveau venu : une conv refusée, l’import, qui es-tu
   test.slow();
   const email = await emailFixe("parcours");
 
-  await test.step("une conv trop courte : l’écran d’erreur de l’import", async () => {
+  await test.step("une conv trop courte : gardée, l’écran de la conv reçue fait ajouter un morceau", async () => {
     await ouvrirExportWhatsApp(page);
     await choisirFichier(page, exportWhatsApp(testInfo, { n: 49, format: "txt" }).chemin);
-    await expect(page.getByRole("alertdialog", { name: "Votre conv est encore trop courte." })).toBeVisible();
-    await capturer(page, "import-erreur-courte");
+    await expect(page.getByRole("button", { name: "Ajouter un morceau" })).toBeVisible();
+    await capturer(page, "import-ok-courte");
   });
 
   await test.step("la conv importée", async () => {

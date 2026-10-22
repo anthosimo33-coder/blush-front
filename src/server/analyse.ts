@@ -32,6 +32,7 @@ import { env } from "./env";
 import { mailRapport } from "./mail-rapport";
 import { aPrisPremium, noterLEnvoi, personnesDe } from "./sequences";
 import type { Etape } from "./pipeline";
+import { lectureReunie } from "./morceaux";
 import { memoireDeSecours, remplacerLeSecours } from "./secours";
 import { editionsBornees, lignesGardees, type Contexte, type DonneesMemoire, type DonneesRapport } from "./stockage/types";
 import { entreeDe, etatDesTaches, type Tache } from "./taches";
@@ -56,8 +57,11 @@ function relire(story: LigneComplete) {
    * d’un essai à l’autre, et pour le verdict, le rapport et la mémoire.
    */
   const h = { ...histoireDe(meta), aujourdhui: aujourdhuiParis(story.createdAt).iso };
-  /* Comme à l’import : un message collé d’un autre reste du texte */
-  const lu = lire(conv, h, { autresEnTexte: true });
+  /*
+   * Comme à l’import : un message collé d’un autre reste du texte. Plusieurs morceaux : réunis, « Moi » des captures
+   * étant celui qui importe (src/server/morceaux.ts)
+   */
+  const lu = typeof conv === "string" ? lire(conv, h, { autresEnTexte: true }) : lectureReunie(conv, h, { k: meta.moi ?? 0, connu: true });
   return { meta, h, lu, rendu: rendre(h, lu) };
 }
 

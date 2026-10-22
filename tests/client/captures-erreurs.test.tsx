@@ -5,6 +5,7 @@ import { CASE_IMPORT } from "@/contenu/consentements";
 import { SOUFFLE } from "@/lib/messages-erreur";
 import { prechargerVideo, uploadScreenshots } from "@/services/api";
 import { ErreurApi, type CodeApi } from "@/types/erreurs-api";
+import { HISTOIRE } from "../aide/rapport-exemple";
 
 /*
  * L’écran des captures (src/app/importer/captures/CapturesScreen.tsx) quand la lecture échoue. Seuls les codes du
@@ -93,7 +94,8 @@ describe("l’import de captures en échec", () => {
   });
 
   it("aucune case à cocher : la ligne de l’accord, juste au-dessus du bouton, et « Continuer » envoie avec sa version", async () => {
-    envoi.mockResolvedValue({ source: { id: "s1", app: "hinge", mode: "captures", screenshotCount: 1, label: "Hinge", period: "", messageCount: 2 }, messagesRead: 2 });
+    const source = { id: "s1", app: "hinge", mode: "captures", screenshotCount: 1, label: "Hinge", period: "", messageCount: 2 } as const;
+    envoi.mockResolvedValue({ source, messagesRead: 2, story: { ...HISTOIRE, sources: [source] } });
     render(<CapturesScreen app="hinge" addMode={false} />);
     expect(screen.queryByRole("checkbox")).toBeNull();
     const ligne = screen.getByText((_, el) => el?.tagName === "P" && el.textContent === "En continuant, tu acceptes les conditions et que BLUSH lise toute ta conv.");

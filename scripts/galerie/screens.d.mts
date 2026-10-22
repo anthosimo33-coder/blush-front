@@ -10,6 +10,8 @@ import type { Page } from "@playwright/test";
 /** Le compte préparé avant la capture (galerie.spec.ts, `preparer`) : voir screens.mjs. Sans : aucun compte, aucune conv. */
 export type Compte =
   | "brouillon"
+  | "brouillon-court"
+  | "morceaux"
   | "code"
   | "gratuit"
   | "gratuit-sans-titres"
