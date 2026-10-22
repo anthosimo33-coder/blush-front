@@ -4,8 +4,8 @@ import { useEffect, useId, useRef, useState, type ReactNode, type Ref, type RefO
 import { NB_CHAPITRES, titreDAttente } from "@/contenu/chapitres";
 import { AVIS_DU_HAUT, TEMOIGNAGES, TESTIMONIALS } from "@/contenu/landing";
 import { CATALOGUE, enEuros, FORMULE_CHOISIE } from "@/contenu/offres";
-import { DANS_LA_FEUILLE, FEUILLE_FORMULE, MESSAGES_LUS, NOTE_DES_AVIS, OFFRE_SUITE, PAYWALL, SITUATION_DU_HAUT } from "@/contenu/paiement";
-import { hautDuPaywall, type GenreDuHaut } from "@/contenu/haut-du-paywall";
+import { DANS_LA_FEUILLE, FEUILLE_FORMULE, MESSAGES_LUS, NOTE_DES_AVIS, OFFRE_SUITE, PAYWALL } from "@/contenu/paiement";
+import { hautDuPaywall } from "@/contenu/haut-du-paywall";
 import { bullesDuLot, DUREE_DU_CADEAU_MS, GAINS, lotSAppliqueA, prixAvecLot } from "@/contenu/roue";
 import { cn } from "@/lib/cn";
 import { useMomentVenu } from "@/lib/hooks";
@@ -26,7 +26,7 @@ import { OffreAvantDePartir, restant } from "@/components/paiement/OffreAvantDeP
 import { MentionRenonciation, useAccord } from "@/components/juridique/cases";
 import { FeuilleDeLaRoue } from "@/components/roue/FeuilleDeLaRoue";
 import { CarteTemoignage } from "@/components/temoignages/CarteTemoignage";
-import { Avatar, AvatarPair } from "@/components/ui/Avatar";
+import { AvatarPair } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
 import { RadioGroup } from "@/components/ui/controls";
 import { Icon } from "@/components/ui/icons";
@@ -142,7 +142,7 @@ export function Paywall({
             <ApercusDuRapport autre={autre.name} />
             <CarteDuHaut haut={haut} autre={autre.name} className="hidden lg:flex" />
             <Sommaire autre={autre.name} className="hidden lg:flex" />
-            <AvantApres autre={autre.name} elle={elle} genre={haut.genre} className="hidden lg:flex" />
+            <AvantApres elle={elle} className="hidden lg:flex" />
           </section>
           <Paiement
             ref={paiement}
@@ -157,7 +157,7 @@ export function Paywall({
         </div>
         <Sommaire autre={autre.name} className="mt-3 flex lg:hidden" />
         <Temoignages items={enPremier(temoignages, AVIS_DU_HAUT[haut.genre])} />
-        <AvantApres autre={autre.name} elle={elle} genre={haut.genre} className="flex lg:hidden" />
+        <AvantApres elle={elle} className="lg:hidden" />
         <Questions autre={autre.name} />
         {/* Sur ordinateur, la carte du paiement n’est plus à l’écran en bas : un dernier bouton y ramène (sur téléphone, la barre du bas) */}
         <div className="mx-auto hidden w-full max-w-[420px] pt-2 lg:block">
@@ -598,80 +598,25 @@ function Sommaire({ autre, className }: { autre: string; className: string }) {
   );
 }
 
-/**
- * L’avant / après, à choisir (une proposition du 22 octobre 2026, comme « Votre morphologie » des boutiques) : quatre
- * situations (PAYWALL.avantApres), celle qui ressemble au titre du haut choisie d’avance (SITUATION_DU_HAUT). Pour
- * chacune : son dernier message, puis côte à côte la réponse sans BLUSH et avec, et ce qui suit. Des messages inventés,
- * marqués « exemple ».
- */
-function AvantApres({ autre, elle, genre, className }: { autre: string; elle: boolean; genre: GenreDuHaut; className: string }) {
+/** L’avant / après (un message inventé, marqué « exemple ») : la réponse sans BLUSH, puis avec. */
+function AvantApres({ elle, className }: { elle: boolean; className?: string }) {
   const t = PAYWALL.avantApres;
-  const situations = t.situations(elle);
-  const [choisie, setChoisie] = useState(SITUATION_DU_HAUT[genre]);
-  const s = situations.find((x) => x.id === choisie) ?? situations[0]!;
-  const titre = useId();
-  /* Sur téléphone, la rangée des situations défile : elle s’ouvre sur celle choisie d’avance, sans faire bouger la page */
-  const rangee = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const el = rangee.current;
-    const bouton = el?.querySelector<HTMLElement>('[aria-pressed="true"]');
-    if (el && bouton) el.scrollLeft = Math.max(0, bouton.offsetLeft - el.offsetLeft - 16);
-  }, []);
   return (
-    <div className={cn("flex-col gap-3 rounded-[22px] bg-white p-4 shadow-card lg:p-5", className)}>
+    <div className={cn("flex-col gap-3 rounded-[22px] bg-white p-4 shadow-card lg:p-5", className ?? "flex")}>
       <div className="flex items-center justify-between gap-3">
-        <span id={titre} className="text-detail font-black">
-          {t.titre}
-        </span>
+        <span className="text-detail font-black">{t.titre(elle)}</span>
         <span className="text-micro font-extrabold text-muted">{t.exemple}</span>
       </div>
-      <div
-        ref={rangee}
-        role="group"
-        aria-labelledby={titre}
-        className="-mx-4 flex gap-2 overflow-x-auto px-4 [scrollbar-width:none] lg:mx-0 lg:flex-wrap lg:px-0 [&::-webkit-scrollbar]:hidden"
-      >
-        {situations.map((x) => (
-          <button
-            key={x.id}
-            type="button"
-            aria-pressed={x.id === s.id}
-            onClick={() => setChoisie(x.id)}
-            className={cn(
-              "shrink-0 whitespace-nowrap rounded-full px-3.5 py-2 text-legende font-black transition-colors",
-              x.id === s.id ? "bg-ink text-white" : "bg-paper text-soft shadow-[inset_0_0_0_1px_rgba(17,17,20,0.08)]",
-            )}
-          >
-            {x.choix}
-          </button>
-        ))}
-      </div>
-      {/* Son dernier message (ou le tien, resté en vu), puis les deux réponses côte à côte : ce qu’on y gagne se lit d’un coup d’œil */}
-      <div aria-live="polite" className="flex flex-col gap-3">
-        {s.message.de === "elle" ? (
-          <span className="flex max-w-[85%] items-end gap-2 self-start">
-            <Avatar tone="elle" size={26} fontSize={12}>
-              {autre.charAt(0).toUpperCase()}
-            </Avatar>
-            <span className="rounded-[16px] rounded-bl-[5px] bg-bubble-her px-3 py-2 font-message text-note">{s.message.texte}</span>
-          </span>
-        ) : (
-          <span className="flex flex-col items-end gap-1 self-end">
-            <span className="rounded-[16px] rounded-br-[5px] bg-bubble-me px-3 py-2 font-message text-note text-white">{s.message.texte}</span>
-            {s.message.legende && <span className="text-micro font-extrabold text-grey">{s.message.legende}</span>}
-          </span>
-        )}
-        <div className="grid grid-cols-2 gap-2 lg:gap-3.5">
-          <div className="flex flex-col gap-2 rounded-[16px] bg-paper p-3 lg:p-3.5">
-            <span className="text-micro font-black text-grey">{t.sans}</span>
-            <span className="self-end rounded-[16px] rounded-br-[5px] bg-segment px-3 py-2 font-message text-note">{s.sans}</span>
-            <span className="mt-auto text-legende font-extrabold leading-[1.35] text-muted">{s.sansSuite}</span>
-          </div>
-          <div className="flex flex-col gap-2 rounded-[16px] bg-[#FFF0F6] p-3 shadow-[inset_0_0_0_1.5px_#FFB3D4] lg:p-3.5">
-            <span className="text-micro font-black text-elle-ink">{t.avec}</span>
-            <span className="self-end rounded-[16px] rounded-br-[5px] bg-bubble-me px-3 py-2 font-message text-note text-white">{s.avec}</span>
-            <span className="mt-auto text-legende font-extrabold leading-[1.35] text-elle-ink">{s.avecSuite}</span>
-          </div>
+      <div className="flex flex-col gap-2 lg:grid lg:grid-cols-2 lg:gap-3.5">
+        <div className="flex items-center gap-2.5 lg:flex-col lg:items-stretch lg:rounded-[16px] lg:bg-paper lg:p-3.5">
+          <span className="w-[74px] shrink-0 text-micro font-black text-grey lg:w-auto">{t.sans}</span>
+          <span className="flex-1 rounded-[16px] rounded-br-[5px] bg-segment px-3 py-2 font-message text-note lg:flex-none lg:self-end">{t.sansReponse}</span>
+          <span className="hidden text-legende font-extrabold text-muted lg:block">{t.sansSuite(elle)}</span>
+        </div>
+        <div className="flex items-center gap-2.5 lg:flex-col lg:items-stretch lg:rounded-[16px] lg:bg-[#FFF0F6] lg:p-3.5 lg:shadow-[inset_0_0_0_1.5px_#FFB3D4]">
+          <span className="w-[74px] shrink-0 text-micro font-black text-elle-ink lg:w-auto">{t.avec}</span>
+          <span className="flex-1 rounded-[16px] rounded-br-[5px] bg-bubble-me px-3 py-2 font-message text-note text-white lg:flex-none lg:self-end">{t.avecReponse}</span>
+          <span className="hidden text-legende font-extrabold text-elle-ink lg:block">{t.avecSuite(elle)}</span>
         </div>
       </div>
     </div>
