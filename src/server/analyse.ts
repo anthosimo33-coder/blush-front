@@ -15,7 +15,7 @@ import { db, schema } from "./db";
 import type { DetailEcriture, Genre } from "./db/enums";
 import { donneesMemoire, donneesVerdict, ligneRapport, modifierMemoire } from "./depot";
 import { compterLeHaut } from "./compteurs";
-import { contexteDe, convDe, histoireDe, metaDe, type Ligne, type LigneComplete } from "./histoires";
+import { contexteDe, convDe, histoireDe, metaDe, provenancesDe, type Ligne, type LigneComplete } from "./histoires";
 import { messagesAffiches } from "./ecrans/messages";
 import { apercuDuPaywall } from "./ecrans/haut-du-paywall";
 import { chapitresAffiches, lectureDe, scores, sobreAffiche } from "./ecrans/rapport";
@@ -59,10 +59,10 @@ function relire(story: LigneComplete) {
   const h = { ...histoireDe(meta), aujourdhui: aujourdhuiParis(story.createdAt).iso };
   /*
    * Comme à l’import : un message collé d’un autre reste du texte. Plusieurs morceaux : réunis, « Moi » des captures
-   * étant celui qui importe (src/server/morceaux.ts)
+   * étant celui qui importe (src/server/morceaux.ts), et le modèle lit d’où vient chacun (provenancesDe)
    */
   const lu = typeof conv === "string" ? lire(conv, h, { autresEnTexte: true }) : lectureReunie(conv, h, { k: meta.moi ?? 0, connu: true });
-  return { meta, h, lu, rendu: rendre(h, lu) };
+  return { meta, h, lu, rendu: rendre(h, lu, { morceaux: provenancesDe(meta) }) };
 }
 
 /* ———— Les étapes ———— */
