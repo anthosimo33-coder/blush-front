@@ -6,7 +6,7 @@ import { appliquerMaj, estFaite, rapportCourt, rendreNouveaux } from "@prompts/l
 import { preuvesChapitres, preuvesMaj, preuvesMemoire, preuvesPlan, preuvesRapport, preuvesVerdict, preuvesVocal } from "@prompts/lib/preuves";
 import { Etape05, Maj07, Sortie04, Sortie05, Sortie06, Sortie07, verdictNormalise, type Chapitre, type Plan, type Rapport, type Verdict } from "@prompts/lib/schemas";
 import { profil } from "@prompts/lib/style";
-import { imposerTitres, titresDuVerdict } from "@prompts/lib/titres";
+import { alerteSobre, enAlerteSobre, imposerTitres, titresDuVerdict } from "@prompts/lib/titres";
 import { genreDuHaut } from "@/contenu/haut-du-paywall";
 import type { ApercuDuPaywall, Message, ScoreRow } from "@/types";
 import { avanceChapitres, avanceMoitie, avancePlan, avanceVerdict, CHAPITRES_PAR_MOITIE, chapitresFinis } from "./avancement";
@@ -382,7 +382,8 @@ const choisir = (lignes: Map<string, string>, ids: string[]) => new Map(ids.flat
 
 /**
  * Le vocal du rapport : le script (prompt 06, sur le verdict et le plan ou le rapport en court, jamais la conv entière),
- * puis la voix (src/server/vocal.ts). Aucun vocal quand il y a une alerte. Le budget de la voix (S-13) est regardé
+ * puis la voix (src/server/vocal.ts). Aucun vocal en alerte sobre (la règle de l’âge, ou un rapport doux gardé) :
+ * « danger » et « détresse » ont le leur depuis le 22 octobre 2026. Le budget de la voix (S-13) est regardé
  * avant d’écrire le script, qui se paie : s’il ne laisse pas dire un vocal entier, ou s’il se ferme entre-temps, l’étape
  * s’arrête sur « voix_budget » (elle repart après minuit, src/server/pipeline.ts). Une autre erreur de la voix garde
  * son code (« voix_429 »…).
@@ -391,11 +392,11 @@ async function vocal(
   story: Ligne,
   { verdict, rapport, lignes, sobre }: { verdict: Verdict; rapport: { plan: Plan } | { court: string }; lignes: Map<string, string>; sobre: boolean },
 ) {
-  if (!voixDisponible() || verdict.alerte || (await vocalAJour(story.id))) return;
+  if (!voixDisponible() || enAlerteSobre(verdict) || (await vocalAJour(story.id))) return;
   if (await voixBloquee(story.id, "rapport")) throw new ErreurTache("voix_budget");
   const req = requeteVocal({ h: histoireDe(metaDe(story)), aujourdhui: aujourdhuiParis().t, verdict, rapport, messages: [...lignes.values()] });
   const script = await appelVerifie(req, Sortie06, { preuves: preuvesVocal, lignes, storyId: story.id, etiquette: "vocal" });
-  if (script.alerte) return;
+  if (alerteSobre(script.alerte)) return;
   try {
     await enregistrerVocal(story, script, lignes, sobre);
   } catch (e) {

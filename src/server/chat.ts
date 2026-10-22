@@ -8,6 +8,7 @@ import { parIdentifiant } from "@prompts/lib/ligne";
 import type { Echange } from "@prompts/lib/memoire";
 import { introuvables, preuvesChat } from "@prompts/lib/preuves";
 import { Sortie10, type ReponseChat } from "@prompts/lib/schemas";
+import { alerteSobre } from "@prompts/lib/titres";
 import { ondeDe, texteDit } from "@/lib/vocal";
 import type { BlushAnswer, EvenementChat, Message } from "@/types";
 import { coutDe, garderVerrouillee, soldeDe } from "./bulles";
@@ -132,8 +133,11 @@ export type Reglement = {
   regler: (cout: number) => Promise<BlushAnswer["bulles"]>;
 };
 
-/** Une réponse qui peut partir en vocal : la voix est là, la réponse a son texte dit, et pas d’alerte (les ressources d’aide restent écrites). */
-const vocalPossible = (r: ReponseChat) => voixDisponible() && !!r.dit?.length && !r.alerte;
+/**
+ * Une réponse qui peut partir en vocal : la voix est là, la réponse a son texte dit, et pas d’alerte de la règle de l’âge
+ * (« danger » et « détresse » partent en vocal comme les autres depuis le 22 octobre 2026).
+ */
+const vocalPossible = (r: ReponseChat) => voixDisponible() && !!r.dit?.length && !alerteSobre(r.alerte);
 
 /**
  * La réponse dite en vocal, par la voix de l’A/B test du compte : l’audio est gardé chiffré, la réponse garde son
@@ -181,7 +185,7 @@ function bullesAuFil(lignes: Map<string, string>, messages: Map<string, Message>
     /* Le lecteur ne rend une chaîne qu’une fois finie : `alerte` est là quand elle est lue en entier */
     const p = partialParse(ecrit) as { alerte?: unknown; lecture?: unknown; a_envoyer?: unknown } | null;
     if (!p || typeof p !== "object" || !("alerte" in p)) return;
-    if (vocal && p.alerte === null) return void (arret = true);
+    if (vocal && !alerteSobre(p.alerte as ReponseChat["alerte"])) return void (arret = true);
     const lecture = Array.isArray(p.lecture) ? (p.lecture as { texte?: unknown; preuves?: unknown }[]) : [];
     /* Les champs suivent l’ordre du schéma : `a_envoyer` commencé, la lecture est close */
     const finies = "a_envoyer" in p ? lecture.length : lecture.length - 1;
@@ -386,7 +390,7 @@ export async function repondre(
           prenom: h.autre.prenom,
           moment: sortie.moment,
           prenomAutre: sortie.prenom_autre,
-          alerte,
+          alerte: alerte && alerteSobre(sortie.alerte),
           verrouillee,
           solde,
           ajout: nouvelles.length > 0,

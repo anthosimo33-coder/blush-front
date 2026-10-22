@@ -2,7 +2,7 @@ import { CHAPITRES_PAYANTS, estOffert, titreDAttente } from "@/contenu/chapitres
 import type { EcritureRapport, EtatChapitre, ReportPayload } from "@/types/api";
 import type { Chapter, Echec, VocalRapport } from "@/types";
 import type { Plan as PlanDuRapport, Verdict } from "@prompts/lib/schemas";
-import { titresDuVerdict } from "@prompts/lib/titres";
+import { enAlerteSobre, titresDuVerdict } from "@prompts/lib/titres";
 import { avanceChapitres, CHAPITRES_PAR_MOITIE, DUREES_MS, ECRITURE_MAX, PART_DU_PLAN, RYTHME_FIABLE } from "../avancement";
 import { echecDe } from "../erreurs";
 import { verdictAffiche } from "../ecrans/rapport";
@@ -105,14 +105,14 @@ function ecritureDe(taches: EtatTaches, titreFerme: (n: number) => string, prets
 
 /**
  * Le vocal du rapport : prêt, en train de s’enregistrer (sa tâche attend ou tourne, ou le rapport s’écrit encore), ou
- * rien (pas de voix configurée, une alerte, un échec). Un rapport écrit avant le vocal reçoit le sien à son ouverture,
+ * rien (pas de voix configurée, une alerte sobre, un échec). Un rapport écrit avant le vocal reçoit le sien à son ouverture,
  * et un vocal d’une ancienne version du script se refait, une fois (si ça échoue, l’ancien reste) : la réparation
  * (ouvrirLeRapport, src/server/donnees.ts) a déjà planifié sa tâche, qui attend. La même règle que la chaîne
  * (vocalTente, src/server/chaine.ts).
  */
 function vocalAffiche(v: VocalLu, verdict: Verdict, taches: EtatTaches, voix: boolean): VocalRapport | undefined {
   if (v?.aJour) return v.pret;
-  if (!voix || verdict.alerte) return v?.pret;
+  if (!voix || enAlerteSobre(verdict)) return v?.pret;
   /* La dernière tâche « vocal » : celle qui tourne, ou la dernière tentative */
   const { vocal: t } = taches;
   if (enMarche(t)) return { etat: "en_cours" };

@@ -57,7 +57,7 @@ export type SituationDeVente = {
   prenomAutre: string | null;
   /** Le prénom que le modèle a donné est celui de l’autre personne de cette conv : il parle d’elle (un rapport refait). */
   memePersonne: boolean;
-  /** Cette réponse est sortie en alerte (danger, détresse, mineur) : il va mal, rien de spontané. */
+  /** Cette réponse est sortie en alerte de la règle de l’âge : rien de spontané. « Danger » et « détresse » suivent la règle de tous (le moment du modèle). */
   alerte: boolean;
   /** Sa conv est en mode sobre (le rapport doux) : rien ne s’y vend. */
   sobre: boolean;
