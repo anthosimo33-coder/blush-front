@@ -22,6 +22,10 @@ export const LANDING_CONVS: LandingConv[] = [
     confidence: "sur",
     proofs: 9,
     next: "Choisis le bar, et propose-lui un soir précis.",
+    chiffres: [
+      { valeur: "4 sur 5", texte: "des convs, c’est elle qui les lance depuis le 12\u00a0févr.", cote: "elle" },
+      { valeur: "6 fois", texte: "elle a parlé de se revoir depuis le 3\u00a0mars", cote: "elle" },
+    ],
   },
   {
     id: "coeur",
@@ -35,6 +39,10 @@ export const LANDING_CONVS: LandingConv[] = [
     confidence: "sur",
     proofs: 11,
     next: "Propose-lui une soirée rien qu’à vous deux, avec un jour précis.",
+    chiffres: [
+      { valeur: "5 fois", texte: "«\u00a0c’est pas grave\u00a0» depuis le 14\u00a0févr.", cote: "elle" },
+      { valeur: "−40\u00a0%", texte: "de messages par jour depuis le 14\u00a0févr.", cote: "elle" },
+    ],
   },
   {
     id: "theo",
@@ -47,6 +55,10 @@ export const LANDING_CONVS: LandingConv[] = [
     confidence: "sur",
     proofs: 6,
     next: "Dis oui, et confirme l’heure.",
+    chiffres: [
+      { valeur: "6\u00a0min", texte: "pour te répondre, en moyenne", cote: "elle" },
+      { valeur: "12\u00a0févr.", texte: "il propose un soir et une heure", cote: "elle" },
+    ],
   },
   {
     id: "ines",
@@ -60,6 +72,10 @@ export const LANDING_CONVS: LandingConv[] = [
     confidence: "probable",
     proofs: 5,
     next: "Propose-lui un vrai rendez-vous, sans parler de «\u00a0nous\u00a0».",
+    chiffres: [
+      { valeur: "6 sur 7", texte: "de ses messages arrivent après 23\u00a0h", cote: "elle" },
+      { valeur: "28\u00a0janv.", texte: "la seule fois où elle parle de «\u00a0nous\u00a0»", cote: "elle" },
+    ],
   },
   {
     id: "nathan",
@@ -72,6 +88,10 @@ export const LANDING_CONVS: LandingConv[] = [
     confidence: "sur",
     proofs: 11,
     next: "Arrête de relancer. Laisse-lui la place de revenir vers toi.",
+    chiffres: [
+      { valeur: "−60\u00a0%", texte: "de longueur pour ses messages depuis le 26\u00a0févr.", cote: "elle" },
+      { valeur: "9 sur 10", texte: "des relances viennent de toi depuis le 26\u00a0févr.", cote: "toi" },
+    ],
   },
   {
     id: "camille",
@@ -84,6 +104,10 @@ export const LANDING_CONVS: LandingConv[] = [
     confidence: "sur",
     proofs: 4,
     next: "Propose-lui le resto dont elle t’a parlé.",
+    chiffres: [
+      { valeur: "11\u00a0h\u00a020", texte: "le lendemain du date, elle t’écrit la première", cote: "elle" },
+      { valeur: "3", texte: "propositions de sa part depuis le 9\u00a0mars", cote: "elle" },
+    ],
   },
 
   /* ———— Rangée 2 ———— */
@@ -99,6 +123,10 @@ export const LANDING_CONVS: LandingConv[] = [
     confidence: "probable",
     proofs: 3,
     next: "Dis oui, et glisse-lui que t’es libre jeudi soir. Laisse-le fixer le reste.",
+    chiffres: [
+      { valeur: "3 fois", texte: "il propose un verre… «\u00a0si t’as le temps\u00a0»", cote: "elle" },
+      { valeur: "4\u00a0avr.", texte: "son premier «\u00a0on devrait se faire un verre\u00a0»", cote: "elle" },
+    ],
   },
   {
     id: "cheri",
@@ -112,6 +140,10 @@ export const LANDING_CONVS: LandingConv[] = [
     confidence: "sur",
     proofs: 8,
     next: "Réponds avec une date et une destination.",
+    chiffres: [
+      { valeur: "7 fois", texte: "il parle de projets à deux depuis janvier", cote: "elle" },
+      { valeur: "4\u00a0min", texte: "pour te répondre, comme au début", cote: "elle" },
+    ],
   },
   {
     id: "margaux",
@@ -125,6 +157,10 @@ export const LANDING_CONVS: LandingConv[] = [
     confidence: "probable",
     proofs: 4,
     next: "Fais une seule proposition claire. Puis laisse-la revenir vers toi.",
+    chiffres: [
+      { valeur: "2\u00a0jours", texte: "pour te répondre depuis le 16\u00a0févr.", cote: "elle" },
+      { valeur: "0", texte: "question de sa part depuis votre date", cote: "elle" },
+    ],
   },
   {
     id: "jules",
@@ -137,6 +173,10 @@ export const LANDING_CONVS: LandingConv[] = [
     confidence: "sur",
     proofs: 8,
     next: "Renvoie-lui la balle sur le même ton. Le verre, c’est à lui de le proposer.",
+    chiffres: [
+      { valeur: "5\u00a0min", texte: "pour te répondre, même tard le soir", cote: "elle" },
+      { valeur: "15\u00a0mars", texte: "son premier message ouvertement dragueur", cote: "elle" },
+    ],
   },
   {
     id: "chloe",
@@ -149,6 +189,10 @@ export const LANDING_CONVS: LandingConv[] = [
     confidence: "sur",
     proofs: 7,
     next: "Dis oui, et propose d’y aller ensemble.",
+    chiffres: [
+      { valeur: "4 fois", texte: "elle propose de vous voir depuis le 1er\u00a0mars", cote: "elle" },
+      { valeur: "21\u00a0mars", texte: "elle te demande si tu viens à l’anniv", cote: "elle" },
+    ],
   },
   {
     id: "yanis",
@@ -162,6 +206,10 @@ export const LANDING_CONVS: LandingConv[] = [
     confidence: "probable",
     proofs: 3,
     next: "Glisse-lui que t’es libre jeudi, et laisse-le proposer.",
+    chiffres: [
+      { valeur: "3", texte: "«\u00a0on verra\u00a0» depuis le 23\u00a0févr.", cote: "elle" },
+      { valeur: "0", texte: "proposition de sa part en deux semaines", cote: "elle" },
+    ],
   },
 
   /* ———— Rangée 3 ———— */
@@ -177,6 +225,10 @@ export const LANDING_CONVS: LandingConv[] = [
     confidence: "sur",
     proofs: 10,
     next: "Dis-lui ce que tu ressens, en face.",
+    chiffres: [
+      { valeur: "23\u00a0févr.", texte: "elle parle de toi à sa coloc", cote: "elle" },
+      { valeur: "2\u00a0min", texte: "pour te répondre, le soir", cote: "elle" },
+    ],
   },
   {
     id: "maxime",
@@ -189,6 +241,10 @@ export const LANDING_CONVS: LandingConv[] = [
     confidence: "sur",
     proofs: 5,
     next: "Monte, et apporte de quoi boire.",
+    chiffres: [
+      { valeur: "5", texte: "prétextes pour te voir depuis janvier", cote: "elle" },
+      { valeur: "2\u00a0févr.", texte: "les crêpes «\u00a0il va en rester\u00a0»", cote: "elle" },
+    ],
   },
   {
     id: "julien",
@@ -202,6 +258,10 @@ export const LANDING_CONVS: LandingConv[] = [
     confidence: "probable",
     proofs: 6,
     next: "Envoie-lui un message qui n’a rien à voir avec l’organisation.",
+    chiffres: [
+      { valeur: "8 sur 10", texte: "de vos messages parlent d’organisation", cote: "pareil" },
+      { valeur: "19\u00a0janv.", texte: "son dernier «\u00a0tu me manques\u00a0»", cote: "elle" },
+    ],
   },
   {
     id: "alice",
@@ -215,6 +275,10 @@ export const LANDING_CONVS: LandingConv[] = [
     confidence: "probable",
     proofs: 4,
     next: "Propose-lui quelque chose de précis, une seule fois. Sa réponse te dira tout.",
+    chiffres: [
+      { valeur: "14\u00a0h", texte: "pour te répondre, en moyenne", cote: "elle" },
+      { valeur: "11\u00a0mars", texte: "elle reparle de samedi, trois jours après", cote: "elle" },
+    ],
   },
   {
     id: "lucas",
@@ -227,6 +291,10 @@ export const LANDING_CONVS: LandingConv[] = [
     confidence: "sur",
     proofs: 12,
     next: "Pose-lui la question\u00a0: «\u00a0on\u00a0est\u00a0quoi,\u00a0nous\u00a0?\u00a0»",
+    chiffres: [
+      { valeur: "1er\u00a0mars", texte: "il parle de te présenter à ses parents", cote: "elle" },
+      { valeur: "9 sur 10", texte: "de vos soirées, c’est lui qui les propose", cote: "elle" },
+    ],
   },
   {
     id: "zoe",
@@ -240,6 +308,10 @@ export const LANDING_CONVS: LandingConv[] = [
     confidence: "sur",
     proofs: 6,
     next: "Like son message, et passe à autre chose. Si elle revient, ce sera pour de vrai.",
+    chiffres: [
+      { valeur: "9\u00a0h", texte: "pour te répondre, contre 10 min en janvier", cote: "elle" },
+      { valeur: "0", texte: "question de sa part depuis le 20\u00a0févr.", cote: "elle" },
+    ],
   },
 ];
 
