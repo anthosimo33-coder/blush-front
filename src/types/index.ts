@@ -433,16 +433,22 @@ export type BlushAnswer = {
 };
 
 /**
- * Une offre posée dans le chat, payée sans le quitter (en un geste, la carte gardée ; sinon la feuille du paiement) :
+ * Une offre posée dans le chat, payée sans le quitter (en un geste, la carte gardée ; sinon la feuille du paiement).
+ * Le chat n’est ouvert qu’avec un rapport payé (ou un rapport doux, offert) : tout s’y vend à quelqu’un qui a déjà payé.
  * - `rapport` : le rapport de cette conv, pas encore débloqué ; il s’écrit sur place une fois payé ;
- * - `bulles` : plus de bulles, et la réponse prête (`reponse`, `envoi`) se lit dès la recharge ;
+ * - `bulles` : plus de bulles. `solde` : ce qu’il lui en reste ; à zéro, la réponse prête (`reponse`, `envoi`) attend,
+ *   floutée, et se lit dès la recharge ;
+ * - `premium` : Premium pour qui a pris le rapport seul, `bulles` en plus pour `centimes` (au lieu de `barre`), une fois ;
+ * - `a_jour` : le rapport de la même personne, réécrit avec ce qu’il a ajouté depuis (`nouveaux` messages, `depuis`) ;
  * - `autre` : une conv avec quelqu’un d’autre (`prenom`), importée d’abord, payée en un geste à la fin de sa lecture ;
  * - `reimport` : le rapport complet d’un ancien rapport doux, payé tout de suite, ouvert dès que la conv est réimportée.
  * `titres` : les chapitres fermés qu’il débloque (ceux du verdict).
  */
 export type OffreDuChat =
   | { genre: "rapport"; offre: OffreId; centimes: number; chapitres: number; titres: string[] }
-  | { genre: "bulles"; packs: { offre: OffreId; bulles: number; centimes: number }[]; reponse: string[]; envoi: string[] }
+  | { genre: "bulles"; solde: number; packs: { offre: OffreId; bulles: number; centimes: number }[]; reponse: string[]; envoi: string[] }
+  | { genre: "premium"; offre: OffreId; centimes: number; barre: number; bulles: number }
+  | { genre: "a_jour"; offre: OffreId; centimes: number; barre: number; nouveaux: number; depuis: string; prenom: string }
   | { genre: "autre"; prenom: string }
   | { genre: "reimport"; offre: OffreId; centimes: number; barre: number; prenom: string };
 

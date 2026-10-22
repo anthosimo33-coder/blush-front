@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, type ReactNode, type Ref, type RefObject }
 import { NB_CHAPITRES } from "@/contenu/chapitres";
 import { TEMOIGNAGES, TESTIMONIALS } from "@/contenu/landing";
 import { CATALOGUE, enEuros, FORMULE_CHOISIE } from "@/contenu/offres";
-import { FEUILLE_FORMULE, MESSAGES_LUS, NOTE_DES_AVIS, OFFRE_SUITE, PAYWALL } from "@/contenu/paiement";
+import { DANS_LA_FEUILLE, FEUILLE_FORMULE, MESSAGES_LUS, NOTE_DES_AVIS, OFFRE_SUITE, PAYWALL } from "@/contenu/paiement";
 import { hautDuPaywall } from "@/contenu/haut-du-paywall";
 import { bullesDuLot, DUREE_DU_CADEAU_MS, GAINS, lotSAppliqueA, prixAvecLot } from "@/contenu/roue";
 import { cn } from "@/lib/cn";
@@ -23,9 +23,11 @@ import { PetitBillet } from "@/components/paiement/Billet";
 import { DebloquerAvecLAvance } from "@/components/paiement/FeuilleFormule";
 import { PayerDansLaFeuille } from "@/components/paiement/integre/PayerDansLaFeuille";
 import { OffreAvantDePartir, restant } from "@/components/paiement/OffreAvantDePartir";
+import { MentionRenonciation, useAccord } from "@/components/juridique/cases";
 import { FeuilleDeLaRoue } from "@/components/roue/FeuilleDeLaRoue";
 import { CarteTemoignage } from "@/components/temoignages/CarteTemoignage";
 import { AvatarPair } from "@/components/ui/Avatar";
+import { Button } from "@/components/ui/Button";
 import { RadioGroup } from "@/components/ui/controls";
 import { Icon } from "@/components/ui/icons";
 import { Tag } from "@/components/ui/messages";
@@ -70,12 +72,18 @@ export function Paywall({
   apercu,
   temoignages = TESTIMONIALS,
   offreDirecte = false,
+  enUnGeste,
 }: {
   story: Story;
   apercu: ApercuDuPaywall;
   temoignages?: Testimonial[];
   /** Arrivé par le mail J+6 de S1 (`/lecture?paywall=1&offre=1`) : la one time offer, rouverte, se demande tout de suite. */
   offreDirecte?: boolean;
+  /**
+   * Payé en un geste avec la carte gardée (une proposition du 22 octobre 2026 : un client qui lit la conv d’une autre
+   * personne, venu du chat ; seul l’aperçu de l’équipe le donne, /apercu/achat/paywall).
+   */
+  enUnGeste?: EnUnGeste;
 }) {
   const { moi, autre } = moiEtAutre(story);
   const elle = autre.pronoun !== "il";
@@ -138,6 +146,7 @@ export function Paywall({
             autre={autre.name}
             elle={elle}
             surEnRoute={setEnRoute}
+            {...(enUnGeste ? { enUnGeste } : {})}
           />
         </div>
         <Temoignages items={temoignages} />
@@ -203,6 +212,49 @@ function Preuves() {
 
 type Choix = Formule | "avance";
 
+/** Payer en un geste avec la carte gardée : la carte, et le paiement (l’aperçu de l’équipe le simule). */
+type EnUnGeste = { carte: { marque: string; fin: string }; payer: (offre: OffreId) => Promise<"paye" | "carte" | "souci"> };
+
+/** Le bouton qui paie en un geste, la carte gardée dessous, puis « C’est payé » (une proposition du 22 octobre 2026). */
+function PayerEnUnGeste({ geste, offre, libelle, surPaye }: { geste: EnUnGeste; offre: OffreId; libelle: string; surPaye: (paye: boolean) => void }) {
+  const accord = useAccord();
+  const [etat, setEtat] = useState<"pret" | "occupe" | "paye" | "carte" | "souci">("pret");
+  if (etat === "paye")
+    return (
+      <p role="status" className="m-0 flex items-center justify-center gap-2.5 py-3 text-carte font-black text-vrai-ink">
+        <span className="flex size-8 items-center justify-center rounded-full bg-vrai">
+          <Icon name="check" size={17} stroke={3} className="text-white" />
+        </span>
+        {DANS_LA_FEUILLE.paye.titre} {DANS_LA_FEUILLE.paye.rapport}
+      </p>
+    );
+  return (
+    <span className="flex flex-col gap-2">
+      {(etat === "carte" || etat === "souci") && <p className="m-0 text-center text-legende font-extrabold text-danger">{DANS_LA_FEUILLE.carteRefusee}</p>}
+      <Button
+        loading={etat === "occupe"}
+        loadingLabel="Paiement en cours"
+        arrow
+        onClick={() =>
+          void (async () => {
+            setEtat("occupe");
+            const r = await geste.payer(offre);
+            setEtat(r);
+            if (r === "paye") surPaye(true);
+          })()
+        }
+      >
+        {libelle}
+      </Button>
+      <span className="flex items-center justify-center gap-1.5 text-legende font-extrabold text-soft">
+        <Icon name="lock" size={14} stroke={2.6} className="shrink-0" />
+        {geste.carte.marque} •••• {geste.carte.fin} · un geste, c’est payé
+      </span>
+      <MentionRenonciation quoi="rapport" etat={accord} />
+    </span>
+  );
+}
+
 /**
  * Le paiement (la maquette « La formule · après », 17 octobre) : « Ton rapport sur Léa », les deux formules (Premium
  * choisie d’avance, ses réponses offertes à 0 €, le lot de la roue ; « Le plus choisi » seulement quand c’est vrai), ou ce que le compte a d’avance (le rapport d’avance, le −50 % gardé), puis le bouton qui
@@ -218,6 +270,7 @@ function Paiement({
   autre,
   elle,
   surEnRoute,
+  enUnGeste,
 }: {
   ref: Ref<HTMLElement>;
   lot: LotDeLaRoue | null;
@@ -226,6 +279,7 @@ function Paiement({
   autre: string;
   elle: boolean;
   surEnRoute: (enRoute: boolean) => void;
+  enUnGeste?: EnUnGeste;
 }) {
   useAuPaiement(true);
   const avoirs = useFeuilleDuPaiement().data;
@@ -311,6 +365,8 @@ function Paiement({
       <div className="flex flex-col gap-1">
         {choisie === "avance" ? (
           <DebloquerAvecLAvance suite="/lecture" deja={relire} />
+        ) : enUnGeste ? (
+          <PayerEnUnGeste geste={enUnGeste} offre={offre} libelle={FEUILLE_FORMULE.payer(enEuros(prix.centimes))} surPaye={setPaye} />
         ) : (
           <PayerDansLaFeuille
             offre={offre}

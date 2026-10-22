@@ -47,20 +47,48 @@ const DEJA: EchangeScript[] = [
   },
 ];
 
-/** Ce qu’il tape, et ce que BLUSH répond, dans chaque parcours. */
-const SCENES: Record<Parcours, { tape: string; reponse: BlushAnswer; solde: number }> = {
-  demande: {
-    tape: "je peux avoir le rapport en entier ?",
-    solde: 6,
-    reponse: { kind: "bubbles", bubbles: [{ text: "oui, et il vaut le coup" }, { text: "le chapitre 4 dit pourquoi elle hésite" }], offre: RAPPORT },
-  },
-  moment: {
-    tape: "pourquoi elle répond plus lentement depuis mardi ?",
-    solde: 6,
+const PACKS = (["pack30", "pack80", "pack200"] as const).map((o) => ({ offre: o, bulles: CATALOGUE[o].bulles, centimes: CATALOGUE[o].centimes }));
+
+/** Ce que coûte la réponse, et ce qu’il reste : le compteur de l’en-tête le suit, comme dans l’appli. */
+const cout = (depensees: number, restantes: number) => ({ bulles: { depensees, restantes } });
+
+/**
+ * Ce qu’il envoie (`tape` : un message ; sans, des captures), son solde à l’ouverture, et ce que BLUSH répond, dans
+ * chaque parcours. Le chat n’est ouvert qu’avec un rapport payé : tout ici se vend à quelqu’un qui a déjà payé.
+ */
+const SCENES: Record<Parcours, { tape?: string; reponse: BlushAnswer; solde: number }> = {
+  autre: {
+    tape: "y a aussi Léa qui m’écrit depuis lundi, tu regardes ?",
+    solde: 14,
     reponse: {
       kind: "bubbles",
-      bubbles: [{ text: "elle a pas moins envie, elle a peur d’aller trop vite" }, { text: "le détail, c’est tout le chapitre 4" }],
-      offre: RAPPORT,
+      bubbles: [{ text: "attends, t’as une deuxième conv et tu me dis rien 👀" }, { text: "envoie-la, je te dis si c’est du sérieux" }],
+      offre: { genre: "autre", prenom: "Léa" },
+      ...cout(1, 13),
+    },
+  },
+  meme: {
+    solde: 14,
+    reponse: {
+      kind: "bubbles",
+      bubbles: [
+        { text: "ok là c’est elle qui revient vers toi" },
+        { text: "« t’es dispo samedi ? », elle a jamais été aussi claire" },
+        { text: "ton rapport date du 2 octobre, il a raté tout ça" },
+      ],
+      offre: { genre: "a_jour", offre: "second", centimes: CATALOGUE.second.centimes, barre: CATALOGUE.rapport.centimes, nouveaux: 48, depuis: "le 2 octobre", prenom: "Sophie" },
+      ...cout(3, 11),
+    },
+  },
+  peu: {
+    tape: "je lui propose quoi pour samedi ?",
+    solde: 2,
+    reponse: {
+      kind: "bubbles",
+      bubbles: [{ text: "un truc simple : le marché, puis un café" }, { text: "et envoie-moi sa réponse en capture, je te dis quoi dire" }],
+      send: ["samedi matin, marché puis café ?"],
+      offre: { genre: "bulles", solde: 1, packs: PACKS, reponse: [], envoi: [] },
+      ...cout(1, 1),
     },
   },
   bulles: {
@@ -71,19 +99,37 @@ const SCENES: Record<Parcours, { tape: string; reponse: BlushAnswer; solde: numb
       bubbles: [{ text: "j’ai ta réponse, mais t’as plus de bulles" }],
       offre: {
         genre: "bulles",
-        packs: (["pack30", "pack80", "pack200"] as const).map((o) => ({ offre: o, bulles: CATALOGUE[o].bulles, centimes: CATALOGUE[o].centimes })),
-        reponse: ["« jsp », c’est pas un non", "elle attend un vrai plan, avec un jour"],
-        envoi: ["samedi 15h, le café en face de chez toi ?"],
+        solde: 0,
+        packs: PACKS,
+        reponse: ["« jsp », c’est pas un non", "elle attend un vrai plan, avec un jour"],
+        envoi: ["samedi 15h, le café en face de chez toi ?"],
       },
     },
   },
-  autre: {
-    tape: "y a aussi Léa qui m’écrit depuis lundi, tu regardes ?",
-    solde: 6,
+  refus: {
+    tape: "elle m’a répondu « jsp », je lui dis quoi ?",
+    solde: 0,
     reponse: {
       kind: "bubbles",
-      bubbles: [{ text: "grave, envoie-la moi" }, { text: "on la lit à part, chaque conv a son rapport" }],
-      offre: { genre: "autre", prenom: "Léa" },
+      bubbles: [{ text: "j’ai ta réponse, mais t’as plus de bulles" }],
+      offre: {
+        genre: "bulles",
+        solde: 0,
+        packs: PACKS,
+        reponse: ["« jsp », c’est pas un non", "elle attend un vrai plan, avec un jour"],
+        envoi: ["samedi 15h, le café en face de chez toi ?"],
+      },
+    },
+  },
+  premium: {
+    tape: "et là elle me dit « on verra », je réponds quoi ?",
+    solde: 3,
+    reponse: {
+      kind: "bubbles",
+      bubbles: [{ text: "« on verra », c’est la balle dans ton camp" }, { text: "toi tu parles beaucoup, et tes bulles fondent vite" }],
+      send: ["ok, je te propose samedi alors"],
+      offre: { genre: "premium", offre: "premium_ajout", centimes: CATALOGUE.premium_ajout.centimes, barre: CATALOGUE.pack80.centimes, bulles: CATALOGUE.premium_ajout.bulles },
+      ...cout(1, 2),
     },
   },
   reimport: {
@@ -93,9 +139,10 @@ const SCENES: Record<Parcours, { tape: string; reponse: BlushAnswer; solde: numb
       kind: "bubbles",
       bubbles: [{ text: "ok, c’est ton choix et je te suis" }, { text: "tu paies là, il s’ouvre dès que tu réimportes ta conv" }],
       offre: { genre: "reimport", offre: "second", centimes: CATALOGUE.second.centimes, barre: CATALOGUE.rapport.centimes, prenom: "Sophie" },
+      ...cout(1, 60),
     },
   },
-  refus: {
+  demande: {
     tape: "je peux avoir le rapport en entier ?",
     solde: 6,
     reponse: { kind: "bubbles", bubbles: [{ text: "oui, et il vaut le coup" }, { text: "le chapitre 4 dit pourquoi elle hésite" }], offre: RAPPORT },
@@ -120,12 +167,12 @@ export function ApercuAchat({ parcours }: { parcours: Parcours }) {
             ok(parcours === "refus" && essais === 1 ? "carte" : "paye");
           }, PAIEMENT_MS),
         ),
-      surRecharge: (bulles) => setQueryData("account", { ...compte.compte, bulles: compte.compte.bulles + bulles - 1 }),
+      surBulles: (bulles) => setQueryData("account", { ...compte.compte, bulles: Math.max(0, scene.reponse.bulles?.restantes ?? compte.compte.bulles) + bulles }),
     };
-  }, [parcours, compte]);
+  }, [parcours, compte, scene]);
   return (
     <CompteRendu value={compte}>
-      <HomeScreen key={parcours} contact={CONTACT} script={DEJA} quick={[]} envoyer={envoyer} achat={achat} dire={scene.tape} />
+      <HomeScreen key={parcours} contact={CONTACT} script={DEJA} quick={[]} envoyer={envoyer} achat={achat} {...(scene.tape ? { dire: scene.tape } : {})} />
     </CompteRendu>
   );
 }

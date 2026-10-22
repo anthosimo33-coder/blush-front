@@ -1,8 +1,9 @@
 "use client";
 
-import { createContext, use, useEffect, useState } from "react";
+import { createContext, use, useEffect, useRef, useState, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import { enEuros } from "@/contenu/offres";
+import { OFFRE_PREMIUM_AJOUT } from "@/contenu/paiement";
 import { Perle } from "@/components/bulles/perles";
 import { MentionRenonciation, useAccord } from "@/components/juridique/cases";
 import { Button, ButtonLink } from "@/components/ui/Button";
@@ -23,8 +24,8 @@ export type CarteGardee = { marque: string; fin: string };
 export type AchatDuChat = {
   carte: CarteGardee | null;
   payer: (offre: OffreId) => Promise<"paye" | "carte" | "souci">;
-  /** Une recharge payée : ses bulles, pour le compteur. */
-  surRecharge?: (bulles: number) => void;
+  /** Des bulles payées (une recharge, Premium) : combien, pour le compteur. */
+  surBulles?: (bulles: number) => void;
 };
 
 /** Le paiement du chat. Sans lui (l’appli d’aujourd’hui), aucune carte d’achat ne se pose. */
@@ -32,8 +33,11 @@ export const AchatDuChatContext = createContext<AchatDuChat | null>(null);
 
 type Etape = "proposee" | "occupee" | "payee" | "prete";
 
-/** Le temps que met le rapport à s’écrire, dans l’aperçu (le vrai suit la chaîne). */
+/** Le temps que met un rapport à s’écrire, dans l’aperçu (le vrai suit la chaîne). */
 const ECRITURE_MS = 5200;
+
+/** La largeur d’une carte : celle d’une bulle de BLUSH, moins ce qui l’entoure sur un petit écran. */
+const LARGEUR = "flex w-[min(286px,calc(100vw-128px))] flex-col gap-3";
 
 /** La ligne de la carte gardée, sous le bouton : un geste, et c’est payé. */
 function UnGeste({ carte, apres = false }: { carte: CarteGardee; apres?: boolean }) {
@@ -76,71 +80,127 @@ function EnTete({ titre, droite }: { titre: string; droite?: string }) {
   );
 }
 
+/** Le prix, et celui d’avant barré. */
+function Prix({ centimes, barre, note }: { centimes: number; barre?: number; note?: string }) {
+  return (
+    <span className="flex items-baseline gap-2">
+      <span className="text-titre-3 font-black tabular-nums">{enEuros(centimes)}</span>
+      {barre !== undefined && <span className="text-detail font-extrabold text-grey line-through">{enEuros(barre)}</span>}
+      {note && <span className="text-legende font-bold text-soft">{note}</span>}
+    </span>
+  );
+}
+
+/** Le bouton qui paie, la ligne de la carte gardée, et la mention de la renonciation. */
+function Payer({
+  libelle,
+  etape,
+  refus,
+  payer,
+  quoi,
+  carte,
+}: {
+  libelle: string;
+  etape: Etape;
+  refus: "carte" | "souci" | null;
+  payer: () => void;
+  quoi: "rapport" | "bulles" | null;
+  carte: CarteGardee | null;
+}) {
+  const accord = useAccord();
+  return (
+    <>
+      {refus && <Refus refus={refus} />}
+      <Button size="md" loading={etape === "occupee"} loadingLabel="Paiement en cours" onClick={payer}>
+        {libelle}
+      </Button>
+      {carte && <UnGeste carte={carte} />}
+      {quoi && <MentionRenonciation quoi={quoi} etat={accord} />}
+    </>
+  );
+}
+
 /** Payer une offre : en un geste avec la carte gardée ; sans elle, la feuille du paiement (ici, l’aperçu le simule). */
 function usePayer(achat: AchatDuChat, offre: OffreId, surPaye?: () => void) {
   const [etape, setEtape] = useState<Etape>("proposee");
   const [refus, setRefus] = useState<"carte" | "souci" | null>(null);
-  const payer = async () => {
-    setRefus(null);
-    setEtape("occupee");
-    const r = await achat.payer(offre);
-    if (r !== "paye") {
-      setRefus(r);
-      setEtape("proposee");
-      return;
-    }
-    setEtape("payee");
-    surPaye?.();
-  };
+  const payer = () =>
+    void (async () => {
+      setRefus(null);
+      setEtape("occupee");
+      const r = await achat.payer(offre);
+      if (r !== "paye") {
+        setRefus(r);
+        setEtape("proposee");
+        return;
+      }
+      setEtape("payee");
+      surPaye?.();
+    })();
   return { etape, setEtape, refus, payer };
 }
 
-/** Le rapport de cette conv : les chapitres fermés qu’il ouvre, payé en un geste, puis il s’écrit et s’ouvre sur place. */
-function OffreRapport({ offre, achat }: { offre: Extract<OffreDuChat, { genre: "rapport" }>; achat: AchatDuChat }) {
-  const accord = useAccord();
-  const { etape, setEtape, refus, payer } = usePayer(achat, offre.offre);
+/** Un rapport qui s’écrit sur place après le paiement : sa jauge, puis le bouton qui l’ouvre. */
+function Ecriture({ paye, chapitres, libelle, ouvrir, fini }: { paye: string; chapitres: number; libelle: string; ouvrir: string; fini: () => void }) {
   const [progres, setProgres] = useState(0);
+  /* La fin, lue au moment où elle arrive : la jauge ne repart pas à chaque rendu */
+  const finRef = useRef(fini);
+  finRef.current = fini;
   useEffect(() => {
-    if (etape !== "payee") return;
     const debut = Date.now();
     const t = setInterval(() => {
       const p = Math.min(1, (Date.now() - debut) / ECRITURE_MS);
       setProgres(p);
       if (p >= 1) {
         clearInterval(t);
-        setEtape("prete");
+        finRef.current();
       }
     }, 80);
     return () => clearInterval(t);
-  }, [etape, setEtape]);
-  if (etape === "payee" || etape === "prete") {
-    const chapitre = Math.min(offre.chapitres, 1 + Math.floor(progres * offre.chapitres));
-    return (
-      <span className="flex w-[min(286px,calc(100vw-128px))] flex-col gap-3">
-        <Paye texte={`Payé · ${enEuros(offre.centimes)}${achat.carte ? ` · ${achat.carte.marque} •••• ${achat.carte.fin}` : ""}`} />
-        {etape === "payee" ? (
-          <span className="flex flex-col gap-2" role="status">
-            <span className="flex items-baseline justify-between">
-              <span className="text-detail font-black">Je l’écris</span>
-              <span className="text-micro font-extrabold tabular-nums text-grey">
-                chapitre {chapitre} sur {offre.chapitres}
-              </span>
-            </span>
-            <span className="h-2 overflow-hidden rounded-full bg-track">
-              <span className="block h-2 rounded-full [background:var(--rose-blush)] transition-[width] duration-200" style={{ width: `${Math.round(progres * 100)}%` }} />
-            </span>
-            <span className="text-legende font-bold text-soft">Tu peux continuer à m’écrire en attendant.</span>
-          </span>
-        ) : (
-          <ButtonLink href="/rapport" size="md" arrow>
-            Ouvrir mon rapport
-          </ButtonLink>
-        )}
-      </span>
-    );
-  }
+  }, []);
+  const chapitre = Math.min(chapitres, 1 + Math.floor(progres * chapitres));
   return (
-    <span className="flex w-[min(286px,calc(100vw-128px))] flex-col gap-3">
+    <span className={LARGEUR}>
+      <Paye texte={paye} />
+      {progres < 1 ? (
+        <span className="flex flex-col gap-2" role="status">
+          <span className="flex items-baseline justify-between">
+            <span className="text-detail font-black">{libelle}</span>
+            <span className="text-micro font-extrabold tabular-nums text-grey">
+              chapitre {chapitre} sur {chapitres}
+            </span>
+          </span>
+          <span className="h-2 overflow-hidden rounded-full bg-track">
+            <span className="block h-2 rounded-full [background:var(--rose-blush)] transition-[width] duration-200" style={{ width: `${Math.round(progres * 100)}%` }} />
+          </span>
+          <span className="text-legende font-bold text-soft">Tu peux continuer à m’écrire en attendant.</span>
+        </span>
+      ) : (
+        <ButtonLink href="/rapport" size="md" arrow>
+          {ouvrir}
+        </ButtonLink>
+      )}
+    </span>
+  );
+}
+
+const avecCarte = (achat: AchatDuChat) => (achat.carte ? ` · ${achat.carte.marque} •••• ${achat.carte.fin}` : "");
+
+/** Le rapport de cette conv : les chapitres fermés qu’il ouvre, payé en un geste, puis il s’écrit et s’ouvre sur place. */
+function OffreRapport({ offre, achat }: { offre: Extract<OffreDuChat, { genre: "rapport" }>; achat: AchatDuChat }) {
+  const { etape, setEtape, refus, payer } = usePayer(achat, offre.offre);
+  if (etape === "payee" || etape === "prete")
+    return (
+      <Ecriture
+        paye={`Payé · ${enEuros(offre.centimes)}${avecCarte(achat)}`}
+        chapitres={offre.chapitres}
+        libelle="Je l’écris"
+        ouvrir="Ouvrir mon rapport"
+        fini={() => setEtape("prete")}
+      />
+    );
+  return (
+    <span className={LARGEUR}>
       <EnTete titre="Ton rapport complet" droite={`${offre.chapitres} chapitres`} />
       <span className="flex flex-col gap-2">
         {offre.titres.map((t) => (
@@ -150,70 +210,115 @@ function OffreRapport({ offre, achat }: { offre: Extract<OffreDuChat, { genre: "
           </span>
         ))}
       </span>
-      {refus && <Refus refus={refus} />}
-      <Button size="md" loading={etape === "occupee"} loadingLabel="Paiement en cours" onClick={() => void payer()}>
-        Débloquer · {enEuros(offre.centimes)}
-      </Button>
-      {achat.carte && <UnGeste carte={achat.carte} />}
-      <MentionRenonciation quoi="rapport" etat={accord} />
+      <Payer libelle={`Débloquer · ${enEuros(offre.centimes)}`} etape={etape} refus={refus} payer={payer} quoi="rapport" carte={achat.carte} />
     </span>
   );
 }
 
-/** À zéro bulle : la réponse prête, floutée, et la recharge juste dessous ; rechargé, la réponse se lit à sa place. */
-function OffreBulles({ offre, achat }: { offre: Extract<OffreDuChat, { genre: "bulles" }>; achat: AchatDuChat }) {
-  const accord = useAccord();
-  const [choisi, setChoisi] = useState(0);
-  const pack = offre.packs[choisi]!;
-  const { etape, refus, payer } = usePayer(achat, pack.offre, () => achat.surRecharge?.(pack.bulles));
+/** Le rapport de la même personne, remis à jour avec ce qu’il vient d’ajouter : payé en un geste, réécrit sur place. */
+function OffreAJour({ offre, achat }: { offre: Extract<OffreDuChat, { genre: "a_jour" }>; achat: AchatDuChat }) {
+  const { etape, setEtape, refus, payer } = usePayer(achat, offre.offre);
   if (etape === "payee" || etape === "prete")
     return (
-      <span className="flex w-[min(286px,calc(100vw-128px))] flex-col gap-3">
-        <Paye texte={`+${pack.bulles} bulles · ta réponse est là`} />
-        {offre.reponse.map((t) => (
-          <span key={t} className="text-corps font-bold leading-[1.4]">
-            {t}
-          </span>
-        ))}
-        {offre.envoi.length > 0 && (
-          <span className="flex flex-col items-end gap-1.5">
-            <span className="self-start text-micro font-black text-vrai-ink">Ta meilleure réponse</span>
-            {offre.envoi.map((t) => (
-              <span key={t} className="rounded-[18px] rounded-br-[6px] bg-toi-ink px-3.5 py-2 font-message text-detail font-bold leading-[1.35] text-white">
-                {t}
-              </span>
-            ))}
-            <button
-              type="button"
-              className="lift lift-sm mt-1 inline-flex h-9 items-center gap-1.5 self-start rounded-full bg-white px-3.5 text-legende font-black text-ink shadow-soft"
-            >
-              <Icon name="copy" size={14} stroke={2.4} />
-              Copier
-            </button>
-          </span>
-        )}
+      <Ecriture
+        paye={`Payé · ${enEuros(offre.centimes)}${avecCarte(achat)}`}
+        chapitres={8}
+        libelle="Je le réécris avec la suite"
+        ouvrir="Ouvrir mon rapport à jour"
+        fini={() => setEtape("prete")}
+      />
+    );
+  return (
+    <span className={LARGEUR}>
+      <EnTete titre="Ton rapport à jour" droite="8 chapitres" />
+      <span className="flex items-center gap-3">
+        <span className="flex size-11 shrink-0 flex-col items-center justify-center rounded-[14px] bg-plaque">
+          <span className="text-carte font-black leading-none tabular-nums">{offre.nouveaux}</span>
+          <span className="text-[10px] font-black text-grey">msg</span>
+        </span>
+        <span className="text-detail font-black leading-[1.3]">
+          {offre.nouveaux} nouveaux messages avec {offre.prenom} depuis {offre.depuis}. Ton rapport ne les a pas lus.
+        </span>
+      </span>
+      <Prix centimes={offre.centimes} barre={offre.barre} note="la mise à jour" />
+      <Payer libelle={`Le remettre à jour · ${enEuros(offre.centimes)}`} etape={etape} refus={refus} payer={payer} quoi="rapport" carte={achat.carte} />
+    </span>
+  );
+}
+
+/** La réponse prête, floutée : ce qui se lira dès la recharge (la forme de la réponse à envoyer, jamais son texte). */
+function ReponseFloutee() {
+  return (
+    <span className="relative flex min-h-12 flex-col items-end gap-[3px] overflow-hidden rounded-[18px] py-1 pr-1">
+      {[30, 22].map((n) => (
+        <span
+          key={n}
+          aria-hidden="true"
+          className="select-none rounded-[18px] rounded-br-[6px] bg-toi-ink px-3.5 py-2 font-message text-detail font-bold leading-[1.35] text-white blur-[6px]"
+        >
+          {"x".repeat(n)}
+        </span>
+      ))}
+      <span className="absolute inset-0 flex items-center justify-center">
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-ink px-3 py-1.5 text-legende font-black text-white shadow-card">
+          <Icon name="lock" size={13} stroke={2.6} className="text-white" />
+          Ta réponse est prête
+        </span>
+      </span>
+    </span>
+  );
+}
+
+/** La réponse qui se lit une fois rechargé : la lecture de BLUSH, puis la réponse à envoyer, à copier. */
+function ReponseLue({ reponse, envoi }: { reponse: string[]; envoi: string[] }) {
+  return (
+    <>
+      {reponse.map((t) => (
+        <span key={t} className="text-corps font-bold leading-[1.4]">
+          {t}
+        </span>
+      ))}
+      {envoi.length > 0 && (
+        <span className="flex flex-col items-end gap-1.5">
+          <span className="self-start text-micro font-black text-vrai-ink">Ta meilleure réponse</span>
+          {envoi.map((t) => (
+            <span key={t} className="rounded-[18px] rounded-br-[6px] bg-toi-ink px-3.5 py-2 font-message text-detail font-bold leading-[1.35] text-white">
+              {t}
+            </span>
+          ))}
+          <button
+            type="button"
+            className="lift lift-sm mt-1 inline-flex h-9 items-center gap-1.5 self-start rounded-full bg-white px-3.5 text-legende font-black text-ink shadow-soft"
+          >
+            <Icon name="copy" size={14} stroke={2.4} />
+            Copier
+          </button>
+        </span>
+      )}
+    </>
+  );
+}
+
+/**
+ * Les bulles : à zéro, la réponse prête attend, floutée, et la recharge est juste dessous ; rechargé, elle se lit à sa
+ * place. Avec encore quelques bulles, la recharge se propose sans rien bloquer.
+ */
+function OffreBulles({ offre, achat }: { offre: Extract<OffreDuChat, { genre: "bulles" }>; achat: AchatDuChat }) {
+  const [choisi, setChoisi] = useState(0);
+  const pack = offre.packs[choisi]!;
+  const bloque = offre.solde <= 0;
+  const { etape, refus, payer } = usePayer(achat, pack.offre, () => achat.surBulles?.(pack.bulles));
+  if (etape === "payee" || etape === "prete")
+    return (
+      <span className={LARGEUR}>
+        <Paye texte={bloque ? `+${pack.bulles} bulles · ta réponse est là` : `+${pack.bulles} bulles · il t’en reste ${offre.solde + pack.bulles}`} />
+        {bloque && <ReponseLue reponse={offre.reponse} envoi={offre.envoi} />}
       </span>
     );
   return (
-    <span className="flex w-[min(286px,calc(100vw-128px))] flex-col gap-3">
-      <span className="relative flex min-h-12 flex-col items-end gap-[3px] overflow-hidden rounded-[18px] py-1 pr-1">
-        {[30, 22].map((n) => (
-          <span
-            key={n}
-            aria-hidden="true"
-            className="select-none rounded-[18px] rounded-br-[6px] bg-toi-ink px-3.5 py-2 font-message text-detail font-bold leading-[1.35] text-white blur-[6px]"
-          >
-            {"x".repeat(n)}
-          </span>
-        ))}
-        <span className="absolute inset-0 flex items-center justify-center">
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-ink px-3 py-1.5 text-legende font-black text-white shadow-card">
-            <Icon name="lock" size={13} stroke={2.6} className="text-white" />
-            Ta réponse est prête
-          </span>
-        </span>
-      </span>
-      <EnTete titre="Recharge et lis-la" />
+    <span className={LARGEUR}>
+      {bloque && <ReponseFloutee />}
+      <EnTete titre={bloque ? "Recharge et lis-la" : `Il t’en reste ${offre.solde}`} droite={bloque ? undefined : "1 bulle = 1 réponse"} />
       <span role="radiogroup" aria-label="Combien de bulles" className="grid grid-cols-3 gap-2">
         {offre.packs.map((p, i) => (
           <button
@@ -235,12 +340,32 @@ function OffreBulles({ offre, achat }: { offre: Extract<OffreDuChat, { genre: "b
           </button>
         ))}
       </span>
-      {refus && <Refus refus={refus} />}
-      <Button size="md" loading={etape === "occupee"} loadingLabel="Paiement en cours" onClick={() => void payer()}>
-        Recharger · {enEuros(pack.centimes)}
-      </Button>
-      {achat.carte && <UnGeste carte={achat.carte} />}
-      <MentionRenonciation quoi="bulles" etat={accord} />
+      <Payer libelle={`Recharger · ${enEuros(pack.centimes)}`} etape={etape} refus={refus} payer={payer} quoi="bulles" carte={achat.carte} />
+    </span>
+  );
+}
+
+/** Premium pour qui a pris le rapport seul : ses bulles en plus, une seule fois, payées en un geste. */
+function OffrePremium({ offre, achat }: { offre: Extract<OffreDuChat, { genre: "premium" }>; achat: AchatDuChat }) {
+  const { etape, refus, payer } = usePayer(achat, offre.offre, () => achat.surBulles?.(offre.bulles));
+  if (etape === "payee" || etape === "prete")
+    return (
+      <span className={LARGEUR}>
+        <Paye texte={`+${offre.bulles} bulles · te voilà en Premium`} />
+      </span>
+    );
+  return (
+    <span className={LARGEUR}>
+      <EnTete titre={OFFRE_PREMIUM_AJOUT.badge} />
+      <span className="text-accent font-black leading-[1.25]">{OFFRE_PREMIUM_AJOUT.titre}.</span>
+      <span className="flex items-center gap-3 rounded-[16px] bg-plaque px-3.5 py-3">
+        <span className="flex shrink-0 items-center gap-1 whitespace-nowrap text-titre-3 font-black">
+          <Perle taille={18} />
+          {OFFRE_PREMIUM_AJOUT.plus}
+        </span>
+        <span className="text-legende font-bold leading-[1.35] text-soft">{OFFRE_PREMIUM_AJOUT.texte}</span>
+      </span>
+      <Payer libelle={OFFRE_PREMIUM_AJOUT.prendre} etape={etape} refus={refus} payer={payer} quoi="bulles" carte={achat.carte} />
     </span>
   );
 }
@@ -248,7 +373,7 @@ function OffreBulles({ offre, achat }: { offre: Extract<OffreDuChat, { genre: "b
 /** Quelqu’un d’autre : sa conv s’importe d’abord (une conv à elle, dans « Tes convs »), et se paie en un geste à la fin de sa lecture. */
 function OffreAutre({ offre, achat }: { offre: Extract<OffreDuChat, { genre: "autre" }>; achat: AchatDuChat }) {
   return (
-    <span className="flex w-[min(286px,calc(100vw-128px))] flex-col gap-3">
+    <span className={LARGEUR}>
       <EnTete titre="Une autre conv" droite="1 min pour l’exporter" />
       <span className="flex items-center gap-3">
         <span className="flex size-11 shrink-0 items-center justify-center rounded-full [background:var(--rose-blush)] text-carte font-black text-white">
@@ -272,7 +397,7 @@ function OffreReimport({ offre, achat }: { offre: Extract<OffreDuChat, { genre: 
   const { etape, refus, payer } = usePayer(achat, offre.offre);
   if (etape === "payee" || etape === "prete")
     return (
-      <span className="flex w-[min(286px,calc(100vw-128px))] flex-col gap-3">
+      <span className={LARGEUR}>
         <Paye texte={`Payé · ${enEuros(offre.centimes)} · il s’ouvre dès ta réimport`} />
         <span className="text-legende font-bold leading-[1.4] text-soft">Ton rapport t’attend : il s’écrit dès que ta conv avec {offre.prenom} est là.</span>
         <ButtonLink href="/commencer" size="md" arrow>
@@ -281,32 +406,28 @@ function OffreReimport({ offre, achat }: { offre: Extract<OffreDuChat, { genre: 
       </span>
     );
   return (
-    <span className="flex w-[min(286px,calc(100vw-128px))] flex-col gap-3">
+    <span className={LARGEUR}>
       <EnTete titre="Ton rapport complet" droite="8 chapitres" />
       <span className="text-accent font-black leading-[1.25]">Payé maintenant, il s’ouvre dès que tu réimportes ta conv.</span>
-      <span className="flex items-baseline gap-2">
-        <span className="text-titre-3 font-black tabular-nums">{enEuros(offre.centimes)}</span>
-        <span className="text-detail font-extrabold text-grey line-through">{enEuros(offre.barre)}</span>
-        <span className="text-legende font-bold text-soft">ton 2e rapport</span>
-      </span>
-      {refus && <Refus refus={refus} />}
-      <Button size="md" loading={etape === "occupee"} loadingLabel="Paiement en cours" onClick={() => void payer()}>
-        Débloquer · {enEuros(offre.centimes)}
-      </Button>
-      {achat.carte && <UnGeste carte={achat.carte} />}
+      <Prix centimes={offre.centimes} barre={offre.barre} note="ton 2e rapport" />
+      <Payer libelle={`Débloquer · ${enEuros(offre.centimes)}`} etape={etape} refus={refus} payer={payer} quoi={null} carte={achat.carte} />
     </span>
   );
 }
 
 /** La carte d’achat sous la réponse de BLUSH : rien sans le paiement du chat (AchatDuChatContext). */
-export function OffreDuChatCarte({ offre }: { offre: OffreDuChat }) {
+export function OffreDuChatCarte({ offre }: { offre: OffreDuChat }): ReactNode {
   const achat = use(AchatDuChatContext);
   if (!achat) return null;
   switch (offre.genre) {
     case "rapport":
       return <OffreRapport offre={offre} achat={achat} />;
+    case "a_jour":
+      return <OffreAJour offre={offre} achat={achat} />;
     case "bulles":
       return <OffreBulles offre={offre} achat={achat} />;
+    case "premium":
+      return <OffrePremium offre={offre} achat={achat} />;
     case "autre":
       return <OffreAutre offre={offre} achat={achat} />;
     case "reimport":
