@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { setQueryData } from "@/lib/query";
 import { CATALOGUE } from "@/contenu/offres";
 import { CompteRendu } from "@/components/shell/compte-de-la-page";
-import type { BlushAnswer, OffreDuChat } from "@/types";
+import type { BlushAnswer } from "@/types";
 import type { Account } from "@/types/api";
 import { HomeScreen } from "../../app/HomeScreen";
 import type { AchatDuChat } from "../../app/accueil/achat";
@@ -35,19 +35,16 @@ const CONTACT: HomeContact = {
   period: "2 mars → 21 oct.",
 };
 
-const TITRES = ["Le 9 mai, quand tout a basculé", "Sophie, et son « on verra »", "Toi, qui relances toujours"];
-
-const RAPPORT: OffreDuChat = { genre: "rapport", offre: "rapport", centimes: CATALOGUE.rapport.centimes, chapitres: 8, titres: TITRES };
+/** La réponse prête, à zéro bulle : ce que la recharge ouvre. */
+const PRETE = { reponse: ["«\u00a0jsp\u00a0», c’est pas un non", "elle attend un vrai plan, avec un jour"], envoi: ["samedi 15h, le café en face de chez toi\u00a0?"] };
 
 /** L’échange déjà là quand l’écran s’ouvre : la conv a une histoire. */
 const DEJA: EchangeScript[] = [
   {
-    mine: "elle m’a mis un vu, je relance ?",
+    mine: "elle m’a mis un vu, je relance\u00a0?",
     answer: { kind: "bubbles", bubbles: [{ text: "relance pas ce soir" }, { text: "son exam est jeudi, laisse-la souffler" }] },
   },
 ];
-
-const PACKS = (["pack30", "pack80", "pack200"] as const).map((o) => ({ offre: o, bulles: CATALOGUE[o].bulles, centimes: CATALOGUE[o].centimes }));
 
 /** Ce que coûte la réponse, et ce qu’il reste : le compteur de l’en-tête le suit, comme dans l’appli. */
 const cout = (depensees: number, restantes: number) => ({ bulles: { depensees, restantes } });
@@ -58,7 +55,7 @@ const cout = (depensees: number, restantes: number) => ({ bulles: { depensees, r
  */
 const SCENES: Record<Parcours, { tape?: string; reponse: BlushAnswer; solde: number }> = {
   autre: {
-    tape: "y a aussi Léa qui m’écrit depuis lundi, tu regardes ?",
+    tape: "y a aussi Léa qui m’écrit depuis lundi, tu regardes\u00a0?",
     solde: 14,
     reponse: {
       kind: "bubbles",
@@ -73,62 +70,49 @@ const SCENES: Record<Parcours, { tape?: string; reponse: BlushAnswer; solde: num
       kind: "bubbles",
       bubbles: [
         { text: "ok là c’est elle qui revient vers toi" },
-        { text: "« t’es dispo samedi ? », elle a jamais été aussi claire" },
-        { text: "ton rapport date du 2 octobre, il a raté tout ça" },
+        { text: "«\u00a0t’es dispo samedi\u00a0?\u00a0», elle a jamais été aussi claire" },
+        { text: "ton rapport date d’avant tout ça" },
       ],
-      offre: { genre: "a_jour", offre: "second", centimes: CATALOGUE.second.centimes, barre: CATALOGUE.rapport.centimes, nouveaux: 48, depuis: "le 2 octobre", prenom: "Sophie" },
+      offre: { genre: "a_jour", prenom: "Sophie", depuis: "2 octobre" },
       ...cout(3, 11),
     },
   },
   peu: {
-    tape: "je lui propose quoi pour samedi ?",
+    tape: "il m’en reste 2, je recharge comment\u00a0?",
     solde: 2,
     reponse: {
       kind: "bubbles",
-      bubbles: [{ text: "un truc simple : le marché, puis un café" }, { text: "et envoie-moi sa réponse en capture, je te dis quoi dire" }],
-      send: ["samedi matin, marché puis café ?"],
-      offre: { genre: "bulles", solde: 1, packs: PACKS, reponse: [], envoi: [] },
+      bubbles: [{ text: "juste en dessous, un geste et c’est fait" }, { text: "et après tu m’envoies sa réponse en capture" }],
+      offre: { genre: "bulles", solde: 1, enUnGeste: true },
       ...cout(1, 1),
     },
   },
   bulles: {
-    tape: "elle m’a répondu « jsp », je lui dis quoi ?",
+    tape: "elle m’a répondu «\u00a0jsp\u00a0», je lui dis quoi\u00a0?",
     solde: 0,
     reponse: {
       kind: "bubbles",
       bubbles: [{ text: "j’ai ta réponse, mais t’as plus de bulles" }],
-      offre: {
-        genre: "bulles",
-        solde: 0,
-        packs: PACKS,
-        reponse: ["« jsp », c’est pas un non", "elle attend un vrai plan, avec un jour"],
-        envoi: ["samedi 15h, le café en face de chez toi ?"],
-      },
+      offre: { genre: "bulles", solde: 0, enUnGeste: true, reponse: PRETE.reponse, envoi: PRETE.envoi },
     },
   },
   refus: {
-    tape: "elle m’a répondu « jsp », je lui dis quoi ?",
+    tape: "elle m’a répondu «\u00a0jsp\u00a0», je lui dis quoi\u00a0?",
     solde: 0,
     reponse: {
       kind: "bubbles",
       bubbles: [{ text: "j’ai ta réponse, mais t’as plus de bulles" }],
-      offre: {
-        genre: "bulles",
-        solde: 0,
-        packs: PACKS,
-        reponse: ["« jsp », c’est pas un non", "elle attend un vrai plan, avec un jour"],
-        envoi: ["samedi 15h, le café en face de chez toi ?"],
-      },
+      offre: { genre: "bulles", solde: 0, enUnGeste: true, reponse: PRETE.reponse, envoi: PRETE.envoi },
     },
   },
   premium: {
-    tape: "et là elle me dit « on verra », je réponds quoi ?",
+    tape: "et là elle me dit «\u00a0on verra\u00a0», je réponds quoi\u00a0?",
     solde: 3,
     reponse: {
       kind: "bubbles",
-      bubbles: [{ text: "« on verra », c’est la balle dans ton camp" }, { text: "toi tu parles beaucoup, et tes bulles fondent vite" }],
+      bubbles: [{ text: "«\u00a0on verra\u00a0», c’est la balle dans ton camp" }, { text: "toi tu parles beaucoup, et tes bulles fondent vite" }],
       send: ["ok, je te propose samedi alors"],
-      offre: { genre: "premium", offre: "premium_ajout", centimes: CATALOGUE.premium_ajout.centimes, barre: CATALOGUE.pack80.centimes, bulles: CATALOGUE.premium_ajout.bulles },
+      offre: { genre: "premium", enUnGeste: true },
       ...cout(1, 2),
     },
   },
@@ -137,15 +121,20 @@ const SCENES: Record<Parcours, { tape?: string; reponse: BlushAnswer; solde: num
     solde: 61,
     reponse: {
       kind: "bubbles",
-      bubbles: [{ text: "ok, c’est ton choix et je te suis" }, { text: "tu paies là, il s’ouvre dès que tu réimportes ta conv" }],
-      offre: { genre: "reimport", offre: "second", centimes: CATALOGUE.second.centimes, barre: CATALOGUE.rapport.centimes, prenom: "Sophie" },
+      bubbles: [{ text: "ok, c’est ton choix et je te suis" }, { text: "réimporte ta conv, cette fois t’as tout" }],
+      offre: { genre: "reimport", prenom: "Sophie" },
       ...cout(1, 60),
     },
   },
   demande: {
-    tape: "je peux avoir le rapport en entier ?",
+    tape: "je reprends des bulles, t’as quoi\u00a0?",
     solde: 6,
-    reponse: { kind: "bubbles", bubbles: [{ text: "oui, et il vaut le coup" }, { text: "le chapitre 4 dit pourquoi elle hésite" }], offre: RAPPORT },
+    reponse: {
+      kind: "bubbles",
+      bubbles: [{ text: "le pack du milieu, c’est le bon plan" }, { text: "et t’as un bonus à ta première recharge" }],
+      offre: { genre: "bulles", solde: 5, enUnGeste: true },
+      ...cout(1, 5),
+    },
   },
 };
 
@@ -159,15 +148,19 @@ export function ApercuAchat({ parcours }: { parcours: Parcours }) {
   const achat = useMemo<AchatDuChat>(() => {
     let essais = 0;
     return {
-      carte: { marque: "Visa", fin: "4242" },
-      payer: () =>
+      payer: (offre) =>
         new Promise((ok) =>
           setTimeout(() => {
             essais++;
-            ok(parcours === "refus" && essais === 1 ? "carte" : "paye");
+            if (parcours === "refus" && essais === 1) return ok("carte");
+            /* Le compteur de l’en-tête prend les bulles payées, comme dans l’appli */
+            setQueryData("account", { ...compte.compte, bulles: Math.max(0, scene.reponse.bulles?.restantes ?? compte.compte.bulles) + CATALOGUE[offre].bulles });
+            ok("paye");
           }, PAIEMENT_MS),
         ),
-      surBulles: (bulles) => setQueryData("account", { ...compte.compte, bulles: Math.max(0, scene.reponse.bulles?.restantes ?? compte.compte.bulles) + bulles }),
+      recharger: () => {},
+      noter: () => {},
+      premiereRecharge: async () => parcours === "demande",
     };
   }, [parcours, compte, scene]);
   return (

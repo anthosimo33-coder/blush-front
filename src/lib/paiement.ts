@@ -4,7 +4,7 @@ import type { Route } from "next";
 import { useEffect } from "react";
 import { CATALOGUE } from "@/contenu/offres";
 import { commencerPaiement, etatDuPaiement } from "@/services/api";
-import type { OffreId } from "@/types";
+import type { GenreVendu, OffreId } from "@/types";
 import type { EtatAchat } from "@/types/api";
 import { ecrire, lire } from "./stockage";
 import { suiteSure } from "./suite";
@@ -81,13 +81,13 @@ export const versLeRetour = (achat: string, paiement: string | null): Route => `
 
 /**
  * Commence le paiement de cette offre et part le payer (`aller` : la navigation de l’écran, pour une page de l’appli) ;
- * `suite` : où reprendre ensuite. Une erreur la rejette (ErreurApi « bientot », « renonciation »…) : rien n’est parti.
+ * `suite` : où reprendre ensuite ; `vente` : la carte du chat d’où il part. Une erreur la rejette (ErreurApi « bientot », « renonciation »…) : rien n’est parti.
  */
 export async function partirPayer(
   offre: OffreId,
-  { renonciation, suite, aller }: { renonciation: boolean; suite?: string | null; aller: (adresse: string) => void },
+  { renonciation, suite, vente, aller }: { renonciation: boolean; suite?: string | null; vente?: GenreVendu; aller: (adresse: string) => void },
 ): Promise<void> {
-  const { achat, url, paiement } = await commencerPaiement(offre, renonciation);
+  const { achat, url, paiement } = await (vente ? commencerPaiement(offre, renonciation, { vente }) : commencerPaiement(offre, renonciation));
   noterLaSuite(achat, suite);
   /* La page de Whop est un autre site : une vraie navigation ; le faux Whop et le retour sont des pages de l’appli. Le
      paiement en un geste va au retour avec son paiement, que le serveur vérifie chez Whop si le webhook tarde (ARG-3) */

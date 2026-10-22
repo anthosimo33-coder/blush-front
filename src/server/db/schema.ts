@@ -25,6 +25,7 @@ import {
   EVENEMENTS_ECOUTE,
   FAMILLES_NAVIGATEUR,
   GENRES_FIL,
+  GENRES_VENDUS,
   JALONS,
   LOTS_DE_LA_ROUE,
   METRIQUES_WEB,
@@ -524,6 +525,8 @@ export const achats = pgTable(
     utiliseLe: quand("utilise_le"),
     /** Le lot de la roue dont il profite (src/contenu/roue.ts), figé à la commande et pris à la livraison, ou null. */
     lotRoue: text("lot_roue", { enum: LOTS_DE_LA_ROUE }),
+    /** La carte du chat d’où il est payé (src/server/vente.ts : une recharge, Premium), ou null : payé ailleurs. */
+    vente: text("vente", { enum: GENRES_VENDUS }),
   },
   (t) => [index("achats_user_idx").on(t.userId), index("achats_story_idx").on(t.storyId), index("achats_cree_idx").on(t.creeLe)],
 );

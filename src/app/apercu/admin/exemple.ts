@@ -151,6 +151,17 @@ function pilotageDe(jours: Periode, { calme = false, suivi = true }: Variante): 
       { genre: "egalite", vus: 57, payes: 6 },
       { genre: "aucun", vus: 12, payes: 1 },
     ],
+    ventesDuChat: [
+      { genre: "bulles", vues: 214, touchees: 61, refusees: 38, payees: 27, centimes: 32_830 },
+      { genre: "premium", vues: 46, touchees: 19, refusees: 9, payees: 11, centimes: 5_500 },
+      { genre: "autre", vues: 33, touchees: 14, refusees: 6, payees: 0, centimes: 0 },
+      { genre: "a_jour", vues: 21, touchees: 7, refusees: 5, payees: 0, centimes: 0 },
+      { genre: "reimport", vues: 2, touchees: 1, refusees: 0, payees: 0, centimes: 0 },
+    ],
+    abDuChat: [
+      { groupe: "avec", comptes: 188, acheteurs: 41, centimes: 61_420 },
+      { groupe: "sans", comptes: 179, acheteurs: 29, centimes: 40_150 },
+    ],
     mails: [
       { cle: "s3_rapport", envoyes: 124, clics: 98, payes: 4 },
       { cle: "s3_repondre", envoyes: 61, clics: 22, payes: 9 },

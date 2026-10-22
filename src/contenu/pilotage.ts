@@ -1,4 +1,4 @@
-import type { EtapeVisite, OffreId, SourceVisite } from "@/types";
+import type { EtapeVisite, GenreVendu, OffreId, SourceVisite } from "@/types";
 
 /*
  * Le pilotage (/admin) : les repères et les noms que le serveur et l’écran partagent. La marge se calcule ici, d’une
@@ -48,6 +48,15 @@ export const GROUPE_DE_L_OFFRE: Record<OffreId, GroupeDOffres> = {
   pack200: "bulles",
 };
 export const NOMS_DES_GROUPES: Record<GroupeDOffres, string> = { premium: "Premium", rapport: "Le rapport", suite: "Offre unique", second: "2e rapport", bulles: "Bulles" };
+
+/** Le nom de chaque carte d’achat du chat (src/server/vente.ts), dans /admin. */
+export const NOMS_DES_VENTES: Record<GenreVendu, string> = {
+  bulles: "Recharge",
+  premium: "Premium pour 5\u00a0€",
+  autre: "Une autre conv",
+  a_jour: "Le rapport à jour",
+  reimport: "Le réimport (ancien doux)",
+};
 
 /** Le nom d’une source de visiteurs ; null : un acheteur venu avant que les visites se comptent. */
 export const NOMS_DES_SOURCES: Record<SourceVisite, string> = {

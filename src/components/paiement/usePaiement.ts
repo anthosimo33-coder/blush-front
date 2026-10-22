@@ -7,7 +7,7 @@ import { codeDe } from "@/lib/messages-erreur";
 import { partirPayer, useLibererAuRetour } from "@/lib/paiement";
 import { apresDeblocage } from "@/lib/requetes";
 import { useAccord } from "@/components/juridique/cases";
-import type { OffreId } from "@/types";
+import type { GenreVendu, OffreId } from "@/types";
 
 /*
  * Ce que chaque écran qui fait payer partage (la feuille « Ta formule », l’offre ①, l’offre ③, la recharge) : la renonciation,
@@ -23,8 +23,11 @@ type Refus = "bientot" | "souci";
 /** Ce que l’écran fait quand le serveur refuse : le rapport déjà ouvert (un autre onglet a payé), l’offre unique passée. */
 export type QuandRefuse = { deja?: () => void; offre?: () => void };
 
-/** La renonciation (que le geste de payer donne), l’état du bouton, et `payer(offre)` : le paiement au premier toucher, ou le refus dit. */
-export function usePaiement({ suite, quand = {} }: { suite?: string | null; quand?: QuandRefuse }) {
+/**
+ * La renonciation (que le geste de payer donne), l’état du bouton, et `payer(offre)` : le paiement au premier toucher, ou
+ * le refus dit. `vente` : la carte du chat d’où il part, notée avec l’achat.
+ */
+export function usePaiement({ suite, quand = {}, vente }: { suite?: string | null; quand?: QuandRefuse; vente?: GenreVendu }) {
   const router = useRouter();
   const renonciation = useAccord();
   const [parti, setParti] = useState(false);
@@ -38,7 +41,7 @@ export function usePaiement({ suite, quand = {} }: { suite?: string | null; quan
     setParti(true);
     setRefus(null);
     try {
-      await partirPayer(offre, { renonciation: true, suite, aller: (adresse) => demarrer(() => router.push(adresse as Route)) });
+      await partirPayer(offre, { renonciation: true, suite, ...(vente ? { vente } : {}), aller: (adresse) => demarrer(() => router.push(adresse as Route)) });
     } catch (e) {
       setParti(false);
       const code = codeDe(e);

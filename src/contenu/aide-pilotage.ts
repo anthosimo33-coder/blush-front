@@ -115,6 +115,17 @@ export const AIDES_DU_PILOTAGE = {
     siCaBouge:
       "Un titre qui paie nettement moins que les autres\u00a0: réécris-le, ou change sa place dans la règle. Beaucoup de «\u00a0Sans assez de chiffres\u00a0»\u00a0: les convs arrivent trop courtes.",
   },
+  ventesDuChat: {
+    titre: "La vente dans le chat",
+    de: "la vente dans le chat",
+    quoi: "Les cartes d’achat que le chat pose sous les réponses de BLUSH (une recharge, Premium pour 5\u00a0€, une autre conv, le rapport à jour, le réimport d’un ancien rapport doux), ce que les gens en font, et ce qu’elles rapportent. En bas, le test A/B\u00a0: une moitié des comptes reçoit aussi les propositions spontanées, l’autre seulement ce qu’elle demande.",
+    calcul:
+      "Le modèle repère le moment (il demande à acheter, parle de quelqu’un d’autre, envoie du neuf)\u00a0; le code choisit la carte (src/server/vente.ts), une spontanée par jour au plus (jamais la recharge, que le bandeau des bulles propose déjà), rien de spontané sur une réponse en alerte ni pendant 3\u00a0jours après un «\u00a0Pas maintenant\u00a0». «\u00a0Posées\u00a0», «\u00a0Touchées\u00a0», «\u00a0Pas maintenant\u00a0»\u00a0: comptées par jour de Paris. «\u00a0Payées\u00a0»\u00a0: les achats payés depuis la carte (la recharge, Premium), sur la période, même remboursés depuis\u00a0; une autre conv ou un réimport se paie plus tard sur son paywall, et ne compte que dans le test. Le test\u00a0: les comptes qui ont écrit au chat sur la période, partagés en deux moitiés fixes, et tout ce qu’ils ont payé sur la période.",
+    repere:
+      "Le chiffre qui tranche est le payé par compte de chaque moitié, à partir d’une centaine de comptes par moitié. Beaucoup de «\u00a0Pas maintenant\u00a0» sur une carte\u00a0: elle tombe au mauvais moment.",
+    siCaBouge:
+      "La moitié «\u00a0avec\u00a0» paie plus\u00a0: garde les propositions. Elle paie autant ou moins, ou ses comptes écrivent moins\u00a0: elles dérangent, resserre les seuils (SEUILS_DE_VENTE). Rien ne va\u00a0: BLUSH_VENTE_CHAT=0 coupe toutes les cartes.",
+  },
   mails: {
     titre: "Les mails des séquences",
     de: "les mails des séquences",

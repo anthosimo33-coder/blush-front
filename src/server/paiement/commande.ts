@@ -3,7 +3,7 @@ import { and, desc, eq, gt, inArray, isNotNull, isNull, sql } from "drizzle-orm"
 import { after } from "next/server";
 import { CATALOGUE, DUREE_AJOUT_MS, RAPPORTS_SEULS, titreChezWhop } from "@/contenu/offres";
 import { champsDErreur } from "@/lib/tracer";
-import type { IssueDuFauxWhop, OffreId, OffreProposee } from "@/types";
+import type { GenreVendu, IssueDuFauxWhop, OffreId, OffreProposee } from "@/types";
 import type { Avoirs, EtatAchat, FeuilleDuPaiement, OffreUniqueMontree, PaiementCommence } from "@/types/api";
 import { avanceDuCompte, commander, convEnAlerte, marquerEchoue, premiumLePlusChoisi, rechargeDejaPayee, type Achat, type RefusDeCommande } from "../achats";
 import type { Utilisateur } from "../auth";
@@ -68,8 +68,19 @@ async function moyenGarde(userId: string, mode: Fournisseur["mode"]): Promise<{ 
   return l?.membreId && l.moyenId ? { membreId: l.membreId, moyenId: l.moyenId } : null;
 }
 
-/** Les offres qui se paient en un geste, avec le moyen de paiement gardé du paiement d’avant : celles de « C’est débloqué ». */
+/**
+ * Les offres qui se paient en un geste, avec le moyen de paiement gardé du paiement d’avant : celles de « C’est débloqué »,
+ * et les recharges, que le chat vend sans le quitter (src/server/vente.ts, une proposition du 22 octobre 2026).
+ */
 const EN_UN_GESTE: ReadonlySet<OffreId> = new Set(["premium_ajout", "second"]);
+/** Les recharges qui se paient en un geste, quand l’écran le demande (`geste` : le chat), jamais d’elles-mêmes. */
+const EN_UN_GESTE_DEMANDE: ReadonlySet<OffreId> = new Set(["pack30", "pack80", "pack200"]);
+
+/** Ce compte a-t-il une carte gardée chez le prestataire, pour payer en un geste ? Faux sans prestataire branché. */
+export async function aUneCarteGardee(userId: string): Promise<boolean> {
+  const f = fournisseur();
+  return !!f && !!(await moyenGarde(userId, f.mode));
+}
 
 /** Les rapports payés après lesquels « C’est débloqué » propose ses offres (le 2e rapport, son repli) : les formules, la suite, le −50 % gardé. */
 const RAPPORTS_PAYES: readonly OffreId[] = ["rapport", "premium", "suite", "rapport_garde"];
@@ -208,7 +219,8 @@ export type RefusDePaiement = "bientot" | "carte" | RefusDeCommande;
  * Commence le paiement d’une offre (la renonciation déjà vérifiée par la route : `renonciation`, sa version et
  * son heure, gardées avec l’achat ; null pour le rapport d’avance, livré seulement à son usage) : l’achat écrit « en_attente » au prix du catalogue (commander : le droit de
  * l’acheter), puis, avec un `jeton` des Elements de Whop, le paiement dans la feuille ; sinon le paiement en un geste
- * (les offres de « C’est débloqué »), ou la page de Whop où le payer.
+ * (les offres de « C’est débloqué », et une recharge du chat quand il le demande : `geste`), ou la page de Whop où le payer.
+ * `vente` : la carte du chat d’où il se paie, notée avec l’achat (commander).
  * Refusé dans la feuille (« carte »), ou une page que Whop refuse de créer, l’achat passe « echoue » (rien n’a été
  * payé) ; une panne remonte (« panne »). Un paiement dont Whop n’a pas dit s’il est parti (aVerifier) reste en attente,
  * sans paiement : l’écran attend son webhook sur la page du retour. Un paiement parti malgré tout se livre quand même
@@ -219,12 +231,12 @@ export async function commencerPaiement(
   offre: OffreId,
   storyId: string | null,
   renonciation: Consentement | null,
-  { jeton = null }: { jeton?: string | null } = {},
+  { jeton = null, geste = false, vente = null }: { jeton?: string | null; geste?: boolean; vente?: GenreVendu | null } = {},
 ): Promise<PaiementCommence | RefusDePaiement> {
   const f = fournisseur();
   if (!f) return "bientot";
   if (estEquipe(compte)) return "deja";
-  const achat = await commander(compte, offre, { storyId, fournisseur: f.mode, renonciation: renonciation ?? undefined });
+  const achat = await commander(compte, offre, { storyId, fournisseur: f.mode, renonciation: renonciation ?? undefined, vente });
   if (typeof achat === "string") return achat;
   const retour = adresseDuRetour(f, achat.id);
   try {
@@ -233,7 +245,8 @@ export async function commencerPaiement(
       if (r === "carte") await marquerEchoue(achat.id);
       return r;
     }
-    return (EN_UN_GESTE.has(offre) && (await enUnGeste(f, compte, achat, retour))) || (await pageDePaiement(f, achat, retour));
+    const unGeste = EN_UN_GESTE.has(offre) || (geste && EN_UN_GESTE_DEMANDE.has(offre));
+    return (unGeste && (await enUnGeste(f, compte, achat, retour))) || (await pageDePaiement(f, achat, retour));
   } catch (e) {
     await marquerEchoue(achat.id);
     throw e;

@@ -433,24 +433,31 @@ export type BlushAnswer = {
 };
 
 /**
- * Une offre posée dans le chat, payée sans le quitter (en un geste, la carte gardée ; sinon la feuille du paiement).
- * Le chat n’est ouvert qu’avec un rapport payé (ou un rapport doux, offert) : tout s’y vend à quelqu’un qui a déjà payé.
- * - `rapport` : le rapport de cette conv, pas encore débloqué ; il s’écrit sur place une fois payé ;
- * - `bulles` : plus de bulles. `solde` : ce qu’il lui en reste ; à zéro, la réponse prête (`reponse`, `envoi`) attend,
- *   floutée, et se lit dès la recharge ;
- * - `premium` : Premium pour qui a pris le rapport seul, `bulles` en plus pour `centimes` (au lieu de `barre`), une fois ;
- * - `a_jour` : le rapport de la même personne, réécrit avec ce qu’il a ajouté depuis (`nouveaux` messages, `depuis`) ;
- * - `autre` : une conv avec quelqu’un d’autre (`prenom`), importée d’abord, payée en un geste à la fin de sa lecture ;
- * - `reimport` : le rapport complet d’un ancien rapport doux, payé tout de suite, ouvert dès que la conv est réimportée.
- * `titres` : les chapitres fermés qu’il débloque (ceux du verdict).
+ * Une offre posée dans le chat, sous la réponse de BLUSH (src/server/vente.ts la choisit, la carte la montre :
+ * src/app/app/accueil/achat.tsx). Le chat n’est ouvert qu’avec un rapport payé (ou un rapport doux, offert) : tout s’y
+ * vend à quelqu’un qui a déjà payé. Les prix et les packs viennent du catalogue (src/contenu/offres.ts, recharge.ts).
+ * - `bulles` : une recharge. `solde` : ce qu’il lui en reste (à zéro, sa réponse attend, verrouillée, et se lit dès la
+ *   recharge) ;
+ * - `premium` : Premium pour qui a pris le rapport seul (l’offre unique ③, montrée par le serveur avec la carte) ;
+ * - `autre` : une conv avec quelqu’un d’autre (`prenom`, s’il l’a dit), importée d’abord, puis payée sur son paywall ;
+ * - `a_jour` : la conv de la même personne (`prenom`) réimportée, pour un rapport qui lit aussi ce qui a suivi son
+ *   rapport (`depuis` : le jour de ce rapport, en lettres, ou null sans rapport écrit) ;
+ * - `reimport` : un ancien rapport doux (une alerte « danger » d’avant le 21 octobre 2026), à réimporter pour le rapport complet.
+ * `enUnGeste` : une carte est gardée, le paiement se fait d’un toucher ; sinon la feuille de la recharge (ou la page du
+ * paiement) s’ouvre. `reponse`, `envoi` : dans l’aperçu de l’équipe seulement, la réponse que la recharge ouvre.
  */
 export type OffreDuChat =
-  | { genre: "rapport"; offre: OffreId; centimes: number; chapitres: number; titres: string[] }
-  | { genre: "bulles"; solde: number; packs: { offre: OffreId; bulles: number; centimes: number }[]; reponse: string[]; envoi: string[] }
-  | { genre: "premium"; offre: OffreId; centimes: number; barre: number; bulles: number }
-  | { genre: "a_jour"; offre: OffreId; centimes: number; barre: number; nouveaux: number; depuis: string; prenom: string }
-  | { genre: "autre"; prenom: string }
-  | { genre: "reimport"; offre: OffreId; centimes: number; barre: number; prenom: string };
+  | { genre: "bulles"; solde: number; enUnGeste: boolean; reponse?: string[]; envoi?: string[] }
+  | { genre: "premium"; enUnGeste: boolean }
+  | { genre: "autre"; prenom: string | null }
+  | { genre: "a_jour"; prenom: string; depuis: string | null }
+  | { genre: "reimport"; prenom: string };
+
+/** Ce qui se vend dans le chat (OffreDuChat), et ce qu’on en compte (src/server/vente.ts, /admin, achats.vente). */
+export const GENRES_VENDUS = ["bulles", "premium", "autre", "a_jour", "reimport"] as const satisfies readonly OffreDuChat["genre"][];
+export type GenreVendu = (typeof GENRES_VENDUS)[number];
+/** Ce qu’on compte d’une carte du chat, par jour : posée sous une réponse, touchée (son bouton), ou « Pas maintenant ». Payée : achats.vente. */
+export type EvenementDeVente = "vue" | "touchee" | "refusee";
 
 /**
  * Ce qu’une réponse verrouillée cache, et sa forme : la longueur (en caractères) de chacune de ses lignes, jamais leur

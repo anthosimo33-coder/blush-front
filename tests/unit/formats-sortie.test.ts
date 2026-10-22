@@ -9,7 +9,8 @@ import { Etape05, Maj07, Plan05, Sortie01, Sortie04, Sortie05, Sortie06, Sortie0
  * (src/server/ia/claude.ts). Ils font partie de ce que le modèle reçoit à chaque appel, avant la partie mise en cache :
  * un format qui bouge sans qu’on le veuille change ce qu’il écrit, et refait le cache. Les empreintes ont été prises
  * avant que Maj07 ne soit tiré de Sortie07 (prompts b4e222c), et n’ont pas changé ; celle de Sortie04, le 13 octobre, avec les
- * titres des chapitres fermés (`titres`). Jamais le texte du schéma : le dépôt
+ * titres des chapitres fermés (`titres`) ; celle de Sortie10, le 22 octobre 2026, avec le moment de vendre (`moment`,
+ * `prenom_autre`). Jamais le texte du schéma : le dépôt
  * est public. Un format changé exprès (un prompt qui change) : on met son empreinte à jour, dans le même commit.
  */
 const empreinte = (x: unknown) => createHash("sha256").update(JSON.stringify(x)).digest("hex").slice(0, 16);
@@ -28,7 +29,7 @@ describe("les formats de sortie du modèle", () => {
       Sortie06: "43e1e4810a387ca3 8e5ccdecad19d7b2",
       Sortie07: "baa87f7849f5699d db6539af1af82272",
       Maj07: "7c8474e94c2e59cc 0f3034d663ff7079",
-      Sortie10: "ba887395f9c7a21b f3e27c85fd681ed7",
+      Sortie10: "21c4fb952cb4be94 7060f5a3c7dd862f",
     });
   });
 });

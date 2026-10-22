@@ -21,7 +21,7 @@ import type { BlushAnswer, ConvSummary } from "@/types";
 import { BarreDeLaFenetre, EnTeteMobile } from "./accueil/Barres";
 import { useAnnonce } from "./accueil/annonce";
 import { BandeauBulles, etatDuBandeau } from "./accueil/BandeauBulles";
-import { AchatDuChatContext, type AchatDuChat } from "./accueil/achat";
+import { AchatDuChatContext, useAchatDuChat, type AchatDuChat } from "./accueil/achat";
 import { ContactContext, CreditContext, FilDeLaConv } from "./accueil/bulles";
 import { Composer } from "./accueil/Composer";
 import { ContactSheet } from "./accueil/ContactSheet";
@@ -117,8 +117,8 @@ export function HomeScreen(p: {
   dire?: string;
   recharger?: boolean;
   /**
-   * Le paiement dans le chat (./accueil/achat.tsx) : les cartes d’achat sous les réponses de BLUSH se paient sans quitter
-   * la conv. Une proposition du 22 octobre 2026 : seul l’aperçu de l’équipe (/apercu/achat) le donne pour l’instant.
+   * Le paiement dans le chat simulé (l’aperçu de l’équipe, /apercu/achat). Sans lui, l’accueil paie pour de vrai les
+   * cartes d’achat sous les réponses de BLUSH (./accueil/achat.tsx, useAchatDuChat), pour un compte qui a des bulles.
    */
   achat?: AchatDuChat;
 }) {
@@ -230,19 +230,50 @@ export function HomeScreen(p: {
    */
   const recharge = p.recharge;
   const rechargeVue = useRef(false);
+  /* Des bulles payées : la réponse prête se lit (la recharge la paie), et un mot dit les bulles reçues. La conv du moment */
+  const convVue = useRef(conv);
+  useEffect(() => {
+    convVue.current = conv;
+  });
+  const lireApresLaRecharge = useCallback(async (bulles: number) => {
+    const c = convVue.current;
+    const m = c.msgs.find((x) => x.type === "reponse" && !!x.result.verrouillee);
+    const v = m?.type === "reponse" ? m.result.verrouillee : undefined;
+    const lue = m && v ? await c.lire(m.id, v.message) : false;
+    setMot(apresLaRecharge(bulles, lue));
+  }, []);
   useEffect(() => {
     if (!recharge || rechargeVue.current) return;
     rechargeVue.current = true;
     const ici = new URL(window.location.href);
     ici.searchParams.delete("recharge");
     window.history.replaceState(window.history.state, "", `${ici.pathname}${ici.search}${ici.hash}`);
-    const m = conv.msgs.find((x) => x.type === "reponse" && !!x.result.verrouillee);
-    const v = m?.type === "reponse" ? m.result.verrouillee : undefined;
-    void (async () => {
-      const lue = m && v ? await conv.lire(m.id, v.message) : false;
-      setMot(apresLaRecharge(recharge, lue));
-    })();
-  }, [recharge, conv]);
+    void lireApresLaRecharge(recharge);
+  }, [recharge, lireApresLaRecharge]);
+  /*
+   * Le paiement des cartes d’achat du chat (./accueil/achat.tsx), pour un compte qui a des bulles (pas l’équipe) : payé en
+   * un geste, le compteur prend les bulles livrées et la réponse prête se lit ; sans carte gardée, la feuille de la
+   * recharge, notée comme venue du chat
+   */
+  const [rechargeDuChat, setRechargeDuChat] = useState(false);
+  const surBullesDuChat = useCallback(
+    (bulles: number) => {
+      const c = compteVu.current;
+      if (c) setQueryData("account", { ...c, bulles: c.bulles + bulles });
+      void lireApresLaRecharge(bulles);
+    },
+    [lireApresLaRecharge],
+  );
+  const rechargerDuChat = useCallback(() => {
+    setRechargeDuChat(true);
+    setFeuille("recharge");
+  }, []);
+  const achatReel = useAchatDuChat({ surBulles: surBullesDuChat, recharger: rechargerDuChat });
+  const achat = p.achat ?? (solde !== null ? achatReel : null);
+  /* La dernière réponse porte une carte d’achat de bulles : le bandeau des bulles ne la double pas */
+  const derniere = conv.msgs.findLast((m) => m.type === "reponse");
+  const vendue = derniere?.type === "reponse" ? derniere.result.offre?.genre : undefined;
+  const carteDeBulles = !!achat && (vendue === "bulles" || vendue === "premium");
   /* Arrivé par un bouton d’un mail : l’adresse perd son `?dire=` et son `?recharger=1` (un rechargement ne les redit pas) */
   const { dire, recharger } = p;
   useEffect(() => {
@@ -290,7 +321,7 @@ export function HomeScreen(p: {
   };
 
   const credit = useMemo(() => ({ solde, recharger: () => setFeuille("recharge") }), [solde]);
-  const etatBandeau = etatDuBandeau({ solde, prete: !!verrou, expliquees });
+  const etatBandeau = carteDeBulles ? null : etatDuBandeau({ solde, prete: !!verrou, expliquees });
   const barre = {
     contact: live,
     others,
@@ -324,7 +355,7 @@ export function HomeScreen(p: {
           <div className="-mx-[22px] -mt-1 flex flex-1 flex-col lg:mx-0 lg:mt-0 lg:h-[clamp(540px,calc(100dvh_-_132px),700px)] lg:flex-none lg:overflow-hidden lg:rounded-[32px] lg:bg-white lg:shadow-[0_0_0_1px_rgba(17,17,20,0.05),0_2px_6px_rgba(17,17,20,0.03),0_48px_90px_-48px_rgba(17,17,20,0.32)]">
             <BarreDeLaFenetre {...barre} />
             <CreditContext value={credit}>
-              <AchatDuChatContext value={p.achat ?? null}>
+              <AchatDuChatContext value={achat}>
                 <FilDeLaConv
                   threadRef={thread}
                   hautRef={haut}
@@ -386,10 +417,14 @@ export function HomeScreen(p: {
           {solde !== null && rechargePrete && (
             <FeuilleRecharge
               open={feuille === "recharge"}
-              onClose={() => setFeuille(null)}
+              onClose={() => {
+                setFeuille(null);
+                setRechargeDuChat(false);
+              }}
               reponsePrete={!!verrou}
               autre={contact.fiche.person.name}
               suite={(bulles) => `/app?recharge=${bulles}`}
+              {...(rechargeDuChat ? { vente: "bulles" as const } : {})}
             />
           )}
           {mot && <Toast className="fixed inset-x-4 top-3 z-[95] lg:left-1/2 lg:right-auto lg:w-[420px] lg:-translate-x-1/2">{mot}</Toast>}
