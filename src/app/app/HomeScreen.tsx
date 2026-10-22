@@ -21,6 +21,7 @@ import type { BlushAnswer, ConvSummary } from "@/types";
 import { BarreDeLaFenetre, EnTeteMobile } from "./accueil/Barres";
 import { useAnnonce } from "./accueil/annonce";
 import { BandeauBulles, etatDuBandeau } from "./accueil/BandeauBulles";
+import { AchatDuChatContext, type AchatDuChat } from "./accueil/achat";
 import { ContactContext, CreditContext, FilDeLaConv } from "./accueil/bulles";
 import { Composer } from "./accueil/Composer";
 import { ContactSheet } from "./accueil/ContactSheet";
@@ -115,6 +116,11 @@ export function HomeScreen(p: {
    */
   dire?: string;
   recharger?: boolean;
+  /**
+   * Le paiement dans le chat (./accueil/achat.tsx) : les cartes d’achat sous les réponses de BLUSH se paient sans quitter
+   * la conv. Une proposition du 22 octobre 2026 : seul l’aperçu de l’équipe (/apercu/achat) le donne pour l’instant.
+   */
+  achat?: AchatDuChat;
 }) {
   const { contact, storyId: cle, others = [], quick = [], script = [], plusAnciens = false, arrive = false, fromReport = false, ideesMasquees = false, envoyer } = p;
   /* L’accueil entier (il recule derrière la feuille du contact, ses entrées se posent au premier geste), le fil et son haut */
@@ -318,19 +324,21 @@ export function HomeScreen(p: {
           <div className="-mx-[22px] -mt-1 flex flex-1 flex-col lg:mx-0 lg:mt-0 lg:h-[clamp(540px,calc(100dvh_-_132px),700px)] lg:flex-none lg:overflow-hidden lg:rounded-[32px] lg:bg-white lg:shadow-[0_0_0_1px_rgba(17,17,20,0.05),0_2px_6px_rgba(17,17,20,0.03),0_48px_90px_-48px_rgba(17,17,20,0.32)]">
             <BarreDeLaFenetre {...barre} />
             <CreditContext value={credit}>
-              <FilDeLaConv
-                threadRef={thread}
-                hautRef={haut}
-                msgs={conv.msgs}
-                opened={opened}
-                depuis={conv.depuis}
-                plus={conv.plus}
-                anciens={conv.anciens}
-                chargerAnciens={conv.chargerAnciens}
-                partager={setImage}
-                relancer={relancer}
-                lire={conv.lire}
-              />
+              <AchatDuChatContext value={p.achat ?? null}>
+                <FilDeLaConv
+                  threadRef={thread}
+                  hautRef={haut}
+                  msgs={conv.msgs}
+                  opened={opened}
+                  depuis={conv.depuis}
+                  plus={conv.plus}
+                  anciens={conv.anciens}
+                  chargerAnciens={conv.chargerAnciens}
+                  partager={setImage}
+                  relancer={relancer}
+                  lire={conv.lire}
+                />
+              </AchatDuChatContext>
             </CreditContext>
             {/* La barre de saisie : « + » pour des captures ou un export, ou un message à BLUSH */}
             <Composer

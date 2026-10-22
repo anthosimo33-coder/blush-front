@@ -425,7 +425,26 @@ export type BlushAnswer = {
    * « bulles », src/services/api.ts). L’accueil ouvre alors la recharge.
    */
   plusDeBulles?: true;
+  /**
+   * Ce que BLUSH propose d’acheter, sous sa réponse : il l’a demandé, ou BLUSH a vu le moment (OffreDuChat). Une
+   * proposition du 22 octobre 2026, montrée seulement dans l’aperçu de l’équipe (/apercu/achat) tant qu’elle n’est pas validée.
+   */
+  offre?: OffreDuChat;
 };
+
+/**
+ * Une offre posée dans le chat, payée sans le quitter (en un geste, la carte gardée ; sinon la feuille du paiement) :
+ * - `rapport` : le rapport de cette conv, pas encore débloqué ; il s’écrit sur place une fois payé ;
+ * - `bulles` : plus de bulles, et la réponse prête (`reponse`, `envoi`) se lit dès la recharge ;
+ * - `autre` : une conv avec quelqu’un d’autre (`prenom`), importée d’abord, payée en un geste à la fin de sa lecture ;
+ * - `reimport` : le rapport complet d’un ancien rapport doux, payé tout de suite, ouvert dès que la conv est réimportée.
+ * `titres` : les chapitres fermés qu’il débloque (ceux du verdict).
+ */
+export type OffreDuChat =
+  | { genre: "rapport"; offre: OffreId; centimes: number; chapitres: number; titres: string[] }
+  | { genre: "bulles"; packs: { offre: OffreId; bulles: number; centimes: number }[]; reponse: string[]; envoi: string[] }
+  | { genre: "autre"; prenom: string }
+  | { genre: "reimport"; offre: OffreId; centimes: number; barre: number; prenom: string };
 
 /**
  * Ce qu’une réponse verrouillée cache, et sa forme : la longueur (en caractères) de chacune de ses lignes, jamais leur

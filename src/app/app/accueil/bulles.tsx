@@ -41,6 +41,7 @@ import {
   type MsgABulles,
   type Row,
 } from "./conv/modele";
+import { OffreDuChatCarte } from "./achat";
 import type { HomeContact } from "./contact";
 import { AvecLogoDuFil, LogoDuFil } from "./Entetes";
 import { useHomeMotion } from "./mouvement/contexte";
@@ -629,6 +630,8 @@ function bullesDeLaReponse(r: BlushAnswer, shine: boolean): BulleDeBlush[] {
     ...aEnvoyer,
     ...(r.ask ? [{ quote: r.ask, body: <span className="text-corps font-bold leading-[1.4]">{r.ask}</span> }] : []),
     ...(r.react ? [{ quote: r.react, body: <span className="text-corps font-bold leading-[1.4]">{r.react}</span> }] : []),
+    /* Ce qu’il propose d’acheter, payé sans quitter la conv (./achat.tsx) */
+    ...(r.offre ? [{ body: <OffreDuChatCarte offre={r.offre} /> }] : []),
   ];
 }
 
