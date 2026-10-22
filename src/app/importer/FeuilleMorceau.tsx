@@ -25,11 +25,10 @@ export function FeuilleMorceau({ open, onClose }: { open: boolean; onClose: () =
 
 /**
  * La ligne qui ouvre la feuille, seule dans son groupe : « Il manque un bout de votre histoire ? » sur la conv reçue.
- * `note` : la phrase grise dessous.
  */
-export function LigneMorceau({ titre, sous, note, onClick }: { titre: string; sous?: string; note?: string; onClick: () => void }) {
+export function LigneMorceau({ titre, sous, onClick }: { titre: string; sous?: string; onClick: () => void }) {
   return (
-    <InsetGroup footer={note}>
+    <InsetGroup>
       <InsetRow leading={<RowIcon icon="plus" tone="vrai" />} title={<span className="text-toi-ink">{titre}</span>} sub={sous} onClick={onClick} chevron />
     </InsetGroup>
   );
