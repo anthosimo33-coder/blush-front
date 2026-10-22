@@ -87,7 +87,8 @@ export function Sphere({ size, kind = "nacre", shadow = true, className, style }
   );
 }
 
-const BUBBLE_BODY = "M60 55 H140 A45 45 0 0 1 140 145 H76 C68 153 57 159 44 161 C51 153 53 146 51 140 A45 45 0 0 1 60 55 Z";
+/** Le corps de la bulle du logo (viewBox 30 40 150 136) : le logo, et son contour d’autocollant (le pied de page de la landing). */
+export const BUBBLE_BODY = "M60 55 H140 A45 45 0 0 1 140 145 H76 C68 153 57 159 44 161 C51 153 53 146 51 140 A45 45 0 0 1 60 55 Z";
 
 /**
  * Le logo officiel : la bulle rose en volume, deux points nacre et un point opale.
