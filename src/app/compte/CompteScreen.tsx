@@ -372,7 +372,7 @@ export function CompteScreen({
             </h2>
             <p className="m-0 text-detail font-extrabold leading-[1.45]">Votre histoire analysée, sa fiche, tes notes.</p>
             <NotePrivee>{PROMESSE_CONV}</NotePrivee>
-            {/* « Hébergement en Europe » taisait les États-Unis (l’IA et la voix de BLUSH) : la page Confidentialité le dit, ceci aussi */}
+            {/* « Hébergement en Europe » taisait les États-Unis (la lecture et la voix de BLUSH) : la page Confidentialité le dit, ceci aussi */}
             <p className="m-0 text-legende font-bold leading-[1.45] text-grey">{`${PROMESSE_DONNEES} ${PROMESSE_LIEU} ${PROMESSE_EFFACEMENT}`}</p>
             <Button variant="secondary" onClick={fermer}>
               Fermer

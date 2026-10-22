@@ -200,7 +200,7 @@ test("« En savoir plus » : ce que BLUSH fait de ta conv, et la main sur ton co
   await test.step("la feuille dit ce que devient la conv, et que rien ne part sans toi", async () => {
     await enSavoirPlus.click();
     await expect(feuille).toBeVisible();
-    await expect(feuille.getByText("Chiffrée, lue seulement par l’IA")).toBeVisible();
+    await expect(feuille.getByText("Chiffrée, lue seulement par BLUSH")).toBeVisible();
     await expect(feuille.getByText("Ta conv, ton rapport et le chat sont chiffrés. Personne chez BLUSH ne les lit.")).toBeVisible();
     await expect(feuille.getByText("Effacée après ton rapport")).toBeVisible();
     await expect(

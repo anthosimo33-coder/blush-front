@@ -142,7 +142,7 @@ test("la confidentialité : ce qui part, qui le lit, combien de temps, sans nomm
   for (const titre of ["Ce que tu nous envoies", "Qui la lit", "Comment on la protège", "Combien de temps", "Nos prestataires"]) {
     await expect(main.getByRole("heading", { level: 2, name: titre, exact: true })).toBeVisible();
   }
-  await expect(main.getByText("Une IA, et seulement elle")).toBeVisible();
+  await expect(main.getByText("BLUSH, et seulement lui")).toBeVisible();
   await expect(main.getByText("La conv brute, effacée après ton rapport")).toBeVisible();
   /* Le partage, comme la feuille « En savoir plus » du rapport le résume : le lien comme l’image */
   await expect(main.getByText("Rien ne sort sans toi")).toBeVisible();

@@ -82,8 +82,10 @@ export function ConfidentialiteScreen() {
 
       <InsetGroup title="Qui la lit" id="lecture" className="mt-6">
         {/* Les prestataires d’IA et de voix ne sont pas nommés (choix du 9 octobre 2026) : leur rôle, et où ils sont, suffisent. Les autres (l’hébergement, la base, les mails) le sont, plus bas */}
-        <Ligne icone="sparkle" ton="toi" titre="Une IA, et seulement elle">
-          Elle lit votre conv pour écrire ton verdict, ton rapport et ses réponses dans le chat. Notre prestataire d’IA ne s’en sert pas pour entraîner ses modèles.
+        {/* « BLUSH » partout, plus « une IA » (22 octobre) : cette phrase et celle des conditions gardent seules qu’il en est une (l’AI Act, article 50) */}
+        <Ligne icone="sparkle" ton="toi" titre="BLUSH, et seulement lui">
+          BLUSH est une intelligence artificielle{NBSP}: il lit votre conv pour écrire ton verdict, ton rapport et ses réponses dans le chat. Le prestataire qui le fait tourner ne
+          s’en sert pas pour entraîner ses modèles.
         </Ligne>
         <Ligne icone="sound" ton="elle" titre="La voix de BLUSH">
           Pour les vocaux de BLUSH (ton rapport, ses réponses dans le chat), notre prestataire de voix reçoit seulement leur texte, jamais ta conv entière. Tes vocaux à toi passent
@@ -107,7 +109,7 @@ export function ConfidentialiteScreen() {
           Tout ce qui vient de ta conv (le texte, ton rapport, sa fiche, le chat) est chiffré avec une clé gardée à part. Sans elle, c’est illisible.
         </Ligne>
         <Ligne icone="cloud" titre="Où ça vit">
-          Le site et la base de données sont à Francfort, en Allemagne. L’analyse par l’IA et les vocaux passent par les serveurs de nos prestataires, aux États-Unis.
+          Le site et la base de données sont à Francfort, en Allemagne. La lecture de BLUSH et ses vocaux passent par les serveurs de nos prestataires, aux États-Unis.
         </Ligne>
         <Ligne icone="heart" ton="elle" titre="Ce que tu confies au chat">
           Même ce qui est intime (ta santé, ta vie amoureuse) reste dans la mémoire de BLUSH, chiffré, et n’est montré qu’à toi.
@@ -148,10 +150,10 @@ export function ConfidentialiteScreen() {
         </Ligne>
       </InsetGroup>
 
-      <InsetGroup title="Nos prestataires" id="prestataires" className="mt-6" footer={`BLUSH est ouvert dès 15 ans. Dernière mise à jour\u00a0: 19 octobre 2026.`}>
+      <InsetGroup title="Nos prestataires" id="prestataires" className="mt-6" footer={`BLUSH est ouvert dès 15 ans. Dernière mise à jour\u00a0: 22 octobre 2026.`}>
         <InsetRow title="Vercel" sub="L’hébergement du site, à Francfort" />
         <InsetRow title="Neon" sub="La base de données, à Francfort" />
-        <InsetRow title="Un prestataire d’IA" sub="L’IA qui lit ta conv, aux États-Unis" />
+        <InsetRow title="Le prestataire qui fait tourner BLUSH" sub="Il lit ta conv pour BLUSH, aux États-Unis" />
         {/* ElevenLabs reçoit le script du vocal (des prénoms et quelques phrases de la conv), pas la conv : src/server/ia/voix.ts */}
         <InsetRow title="Un prestataire de voix" sub="La voix de BLUSH, et la transcription de tes vocaux, aux États-Unis" />
         <InsetRow title="Resend" sub="L’envoi des mails (ton code, ton rapport prêt, le rappel d’un paiement, la liste d’attente)" />

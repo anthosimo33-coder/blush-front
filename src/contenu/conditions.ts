@@ -40,7 +40,7 @@ export type Section = { id: string; titre: string; blocs: readonly Bloc[] };
 export const CONDITIONS = {
   titre: "Conditions",
   sous: "Les règles entre toi et BLUSH, sans jargon\u00a0: ce que fait BLUSH, ce que tu peux acheter, et ce qui se passe si ça coince.",
-  maj: "Dernière mise à jour\u00a0: 21 octobre 2026.",
+  maj: "Dernière mise à jour\u00a0: 22 octobre 2026.",
 } as const;
 
 /** Utiliser BLUSH : les conditions d’utilisation. */
@@ -57,7 +57,7 @@ const UTILISATION: readonly Section[] = [
     id: "conseil",
     titre: "Une lecture, pas un conseil",
     blocs: [
-      "BLUSH t’aide à y voir plus clair, avec un peu d’humour. Ce n’est ni un service de conseil, ni une thérapie, ni un avis médical, psychologique ou juridique. Une IA peut se tromper\u00a0: ce que tu décides reste ta décision.",
+      "BLUSH t’aide à y voir plus clair, avec un peu d’humour. Ce n’est ni un service de conseil, ni une thérapie, ni un avis médical, psychologique ou juridique. BLUSH est une intelligence artificielle et peut se tromper\u00a0: ce que tu décides reste ta décision.",
       URGENCES,
     ],
   },
