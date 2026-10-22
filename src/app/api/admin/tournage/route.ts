@@ -4,7 +4,7 @@ import { cleDeLApi, etatDuTournage, preparerTournage, tournageDeLaRef } from "@/
 import { ROUTES } from "@/types/api";
 
 /* La lecture part après la réponse (le verdict, puis le rapport et la mémoire) : la fonction vit le temps de l’enchaîner */
-export const maxDuration = 300;
+export const maxDuration = 800;
 
 /**
  * L’API du mode tournage (src/server/tournage.ts) : l’outil des créatrices prépare un lien depuis le .txt d’une

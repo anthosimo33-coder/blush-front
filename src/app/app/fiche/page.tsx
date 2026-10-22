@@ -12,7 +12,7 @@ export const metadata: Metadata = { title: "Sa fiche" };
  * Une mise à jour de la mémoire restée en plan repart après le rendu (getFicheEtMaj, relancerApres) : elle prend 20 à
  * 60 s, trois essais au plus. La même durée que GET /api/fiche, qui fait la même chose (src/app/api/fiche/route.ts).
  */
-export const maxDuration = 300;
+export const maxDuration = 800;
 
 /* Depuis l’accueil, sa fiche arrive par la droite ; « Retour » la renvoie à droite (globals.css, « Sophie, en glissé ») */
 export default async function Page() {

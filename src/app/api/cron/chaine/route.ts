@@ -7,7 +7,7 @@ import { relancerChaine } from "@/server/pipeline";
 import { RELAIS_MAX } from "@/server/relais";
 
 /* La chaîne qu’elle reprend tourne après sa réponse : la fonction vit autant que l’échéance de la chaîne le suppose */
-export const maxDuration = 300;
+export const maxDuration = 800;
 
 /** Ce que le relais donne : l’histoire, et le rang du relais (que la chaîne reprise rend au suivant). */
 const Relais = z.object({ histoire: z.string().uuid(), relais: z.coerce.number().int().min(1).max(RELAIS_MAX) });

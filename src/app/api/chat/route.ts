@@ -26,7 +26,7 @@ import { codePublic } from "@/types/erreurs-api";
  * La réponse prend 10 à 20 secondes (une minute avec des captures à lire) : elle part en flux, bulle par bulle, et son
  * vocal après elle ; la mise à jour de la mémoire tourne une fois tout parti
  */
-export const maxDuration = 300;
+export const maxDuration = 800;
 const LONGUEUR_MAX = 4000;
 /* La réponse en flux, quand le navigateur la demande (Accept) */
 const NDJSON = "application/x-ndjson";

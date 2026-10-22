@@ -24,11 +24,11 @@ export const maxDuration = 30;
 /*
  * Les lots viennent du navigateur (relus par le prompt 01, mais renvoyés par lui) : on borne ce qu’un envoi peut
  * contenir, pour qu’un envoi forgé ne coûte pas des secondes de calcul ni des Mo en base. Un enregistrement réel en
- * est loin (trente-deux lots de six écrans au plus, un peu plus quand des écrans lourds les font couper).
+ * est loin (quinze lots de douze écrans au plus, un peu plus quand des écrans lourds les font couper).
  */
 const MESSAGES_MAX = 3000;
-/* Un lot : six écrans d’une vingtaine de messages, qui se recouvrent */
-const MESSAGES_PAR_LOT_MAX = 300;
+/* Un lot : jusqu’à douze écrans d’une vingtaine de messages, qui se recouvrent (ECRANS_PAR_LOT, src/lib/limites.ts) */
+const MESSAGES_PAR_LOT_MAX = 600;
 const TEXTE_MAX = 4000;
 /* Tous les messages ensemble : un enregistrement réel en compte une centaine de Ko */
 const TEXTE_TOTAL_MAX = 2_000_000;

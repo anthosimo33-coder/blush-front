@@ -2,7 +2,7 @@ import { erreur, repondre, route } from "@/server/http";
 import { cleDeLApi, etatDuTournage } from "@/server/tournage";
 
 /* Une lecture en plan repart après la réponse (etatDuTournage) : la fonction vit le temps de l’enchaîner */
-export const maxDuration = 300;
+export const maxDuration = 800;
 
 /**
  * Où en est une conv de tournage, pour l’outil des créatrices (sa clé, sinon 401 « interdit ») : sa lecture, et son

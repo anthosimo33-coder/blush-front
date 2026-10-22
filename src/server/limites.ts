@@ -153,8 +153,9 @@ export const LIMITES = {
   /** Les images « Partager en image » (une réponse du chat, la chute d’un chapitre) et le rapport en PDF, dessinés à la demande. */
   imageParCompte: { max: 60, fenetreS: 86400 },
   /**
-   * Les lots d’images d’un enregistrement d’écran, chacun lu par le modèle : des lots de six écrans (douze avant),
-   * jusqu’à trente-deux pour un long enregistrement (seize avant le 20 octobre). Les plafonds des lots ont doublé à
+   * Les lots d’images d’un enregistrement d’écran, chacun lu par le modèle : des lots de six à douze écrans selon la
+   * longueur (depuis le 21 octobre ; six le 20, douze avant), jusqu’à quinze pour un long enregistrement (trente-deux le
+   * 20 octobre, seize avant). Les plafonds des lots ont doublé à
    * chaque fois : autant d’enregistrements qu’avant (un Wi-Fi partagé ou le NAT d’un opérateur en font passer
    * plusieurs), pour à peu près la même dépense (un lot lu par Sonnet coûte moitié moins qu’avec Opus).
    */

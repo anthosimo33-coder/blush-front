@@ -16,7 +16,7 @@ export const metadata: Metadata = { title: "C’est débloqué" };
  * jamais un achat d’un autre compte, ni pas encore payé, ni un achat qui n’a ouvert aucune conv (des bulles, un rapport
  * d’avance qui attend) : sans lui, le rapport.
  */
-export const maxDuration = 300;
+export const maxDuration = 800;
 
 export default async function Page({ searchParams }: PageProps<"/rapport/debloque">) {
   /* L’heure du rendu, avant les lectures : le compte posé par PageDeConv en part */

@@ -12,7 +12,7 @@ import { lecturePayeeRefusee, rejouer, tournageDe, tournageDuNavigateur } from "
 import { ROUTES } from "@/types/api";
 
 /* Le verdict (le rapport ouvert : payé, ou l’équipe), puis le rapport et la mémoire s’enchaînent après la réponse */
-export const maxDuration = 300;
+export const maxDuration = 800;
 
 /**
  * Lance la lecture : « Qui es-tu ? » est rempli. Le paywall passe avant toute lecture (décidé le 16 octobre) : sans le

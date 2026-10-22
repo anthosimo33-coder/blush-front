@@ -8,7 +8,8 @@ import { ErreurApi } from "@/types/erreurs-api";
  * L’envoi d’un enregistrement d’écran (uploadRecording, src/services/api.ts) quand le serveur répond une 5xx : ses lots
  * partent cinq à la fois vers /api/captures/lot, puis leurs lectures vers /api/captures/video. Le réseau est un `fetch`
  * simulé, et l’extraction des écrans de la vidéo (qui demande un vrai navigateur) rend des images toutes faites, que
- * lotsDe découpe pour de vrai : six par lot, chacun reprenant le dernier écran du précédent.
+ * lotsDe découpe pour de vrai, à la taille de tailleDesLots (six à douze écrans), chaque lot reprenant le dernier écran du
+ * précédent.
  */
 vi.mock("@/services/preparer-video", async (importOriginal) => {
   const vrai = await importOriginal<typeof import("@/services/preparer-video")>();
@@ -22,7 +23,7 @@ vi.mock("@/services/preparer-video", async (importOriginal) => {
   };
 });
 
-/** Combien d’écrans la vidéo simulée donne : 11 font deux lots (1 à 6, 6 à 11), 36 en font sept. */
+/** Combien d’écrans la vidéo simulée donne : 11 font deux lots de six (1 à 6, 6 à 11), 80 en font huit de douze. */
 let ecrans = 11;
 
 const json = (corps: unknown, status = 200) => new Response(JSON.stringify(corps), { status, headers: { "content-type": "application/json" } });
@@ -103,8 +104,8 @@ describe("uploadRecording sur une 5xx", () => {
   });
 
   it("une seconde 5xx sur le même lot : l’envoi échoue sur elle, les lots en cours s’arrêtent, aucun autre ne part et rien n’est assemblé", async () => {
-    /* Sept lots : cinq partent ensemble, les deux derniers attendent une place */
-    ecrans = 36;
+    /* Huit lots : cinq partent ensemble, les trois derniers attendent une place */
+    ecrans = 80;
     const { appels, signaux } = serveur({ lot: (n) => (n === 1 ? json({ erreur: "erreur" }, 502) : "pend") });
     const envoi = uploadRecording(VIDEO, "imessage", CASE_IMPORT.version);
     const resultat = envoi.catch((e: unknown) => e);

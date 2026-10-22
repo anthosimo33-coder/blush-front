@@ -1,9 +1,19 @@
 import { describe, expect, it } from "vitest";
-import { DEMANDE_PLAN, demandeMoitie, requeteChat, requeteMemoireMaj, requeteRapport, type Requete } from "@prompts/lib/contextes";
+import {
+  DEMANDE_PLAN,
+  demandeMoitie,
+  requeteChat,
+  requeteMemoireCreation,
+  requeteMemoireMaj,
+  requeteRapport,
+  requeteVerdict,
+  requeteVocal,
+  type Requete,
+} from "@prompts/lib/contextes";
 import { lire, rendre, type Histoire } from "@prompts/lib/conv";
 import { Plan05, Sortie04 } from "@prompts/lib/schemas";
 import { profil } from "@prompts/lib/style";
-import { memoire } from "../aide/fabriques";
+import { chapitre, memoire } from "../aide/fabriques";
 
 /*
  * Ce que reçoit le modèle pour le rapport (prompt 05) et le chat (prompt 10), bloc par bloc. Le premier bloc est mis
@@ -108,7 +118,8 @@ describe("le rapport (prompt 05) : le plan, puis deux moitiés", () => {
     for (const r of Object.values(requetes)) for (const t of textes(r)) expect(bienFermees(t)).toBe(true);
     /* Le bloc en cache porte toute la conv rendue et ses chiffres, tels que lib/conv les rend (comparés à eux-mêmes, pas figés) */
     const enCache = textes(requetes.plan)[0];
-    for (const l of rendu.lignes.values()) expect(enCache).toContain(l);
+    expect(enCache).toContain(rendu.conversation);
+    for (const id of rendu.lignes.keys()) expect(enCache).toContain(id);
     expect(enCache).toContain(rendu.chiffres);
   });
 
@@ -308,5 +319,150 @@ describe("le chat (prompt 10) : la mémoire à la place de la conv", () => {
         },
       }
     `);
+  });
+});
+
+describe("le montage partagé : la conv en cache une fois pour le verdict, le rapport et la mémoire", () => {
+  /* Des consignes inventées : les vrais prompts restent dans le sous-module privé */
+  const [c04, c05, c07] = ["consigne du verdict", "consigne du rapport", "consigne de la mémoire"];
+  const rapport = { these: plan.these, chapitres: [chapitre(1)], sobre: null };
+  const requetes = {
+    verdict: requeteVerdict(rendu, c04),
+    plan: requeteRapport(rendu, verdict, DEMANDE_PLAN, c05),
+    premiere: requeteRapport(rendu, verdict, demandeMoitie(plan, "1 à 4"), c05),
+    seconde: requeteRapport(rendu, verdict, demandeMoitie(plan, "5 à 8"), c05),
+    memoire: requeteMemoireCreation(rendu, verdict, rapport, c07),
+  };
+
+  it("les cinq appels commencent par le même bloc, la conv et l’aide, mis en cache ; la consigne de chaque tâche vient après", () => {
+    const [premier, ...autres] = Object.values(requetes).map((r) => r.blocs[0]);
+    expect(premier).toMatchObject({ cache: true });
+    for (const b of autres) expect(b).toEqual(premier);
+    for (const r of Object.values(requetes)) expect(r.partage).toBe(true);
+    const enCache = textes(requetes.verdict)[0]!;
+    expect(enCache).toContain(rendu.conversation);
+    for (const id of rendu.lignes.keys()) expect(enCache).toContain(id);
+    expect(enCache).not.toContain(c04);
+    expect(textes(requetes.verdict)[1]).toContain(c04);
+    expect(textes(requetes.memoire)[1]).toContain(c07);
+    for (const r of Object.values(requetes)) for (const t of textes(r)) expect(bienFermees(t)).toBe(true);
+  });
+
+  it("le plan et les deux moitiés partagent aussi la consigne et le verdict, en cache ; seule la demande change", () => {
+    const [plan2, ...moities] = [requetes.plan, requetes.premiere, requetes.seconde].map((r) => r.blocs[1]);
+    expect(plan2).toMatchObject({ cache: true });
+    for (const b of moities) expect(b).toEqual(plan2);
+    expect(textes(requetes.plan)[1]).toContain(c05);
+    expect(new Set([requetes.plan, requetes.premiere, requetes.seconde].map((r) => textes(r)[2])).size).toBe(3);
+  });
+
+  it("ses blocs (instantané)", () => {
+    expect({ verdict: structure(requetes.verdict), plan: structure(requetes.plan), memoire: structure(requetes.memoire) }).toMatchInlineSnapshot(`
+      {
+        "memoire": {
+          "blocs": [
+            {
+              "balises": [
+                "histoire",
+                "chiffres",
+                "conversation",
+                "aide",
+              ],
+              "cache": true,
+              "messages": "60 : m0001 … m0060",
+            },
+            {
+              "balises": [
+                "consigne",
+                "format",
+                "verdict",
+                "rapport",
+              ],
+              "cache": false,
+              "messages": "m0004, m0010",
+            },
+            {
+              "balises": [],
+              "cache": false,
+              "messages": "aucun",
+            },
+          ],
+          "tache": "07-memoire",
+        },
+        "plan": {
+          "blocs": [
+            {
+              "balises": [
+                "histoire",
+                "chiffres",
+                "conversation",
+                "aide",
+              ],
+              "cache": true,
+              "messages": "60 : m0001 … m0060",
+            },
+            {
+              "balises": [
+                "consigne",
+                "format",
+                "verdict",
+              ],
+              "cache": true,
+              "messages": "m0004, m0010",
+            },
+            {
+              "balises": [],
+              "cache": false,
+              "messages": "aucun",
+            },
+          ],
+          "tache": "05-rapport",
+        },
+        "verdict": {
+          "blocs": [
+            {
+              "balises": [
+                "histoire",
+                "chiffres",
+                "conversation",
+                "aide",
+              ],
+              "cache": true,
+              "messages": "60 : m0001 … m0060",
+            },
+            {
+              "balises": [
+                "consigne",
+                "format",
+              ],
+              "cache": false,
+              "messages": "aucun",
+            },
+          ],
+          "tache": "04-verdict",
+        },
+      }
+    `);
+  });
+
+  it("le vocal : la consigne d’abord, puis ce qu’il dit, le même texte qu’avec le montage d’origine ; rien en cache (le socle, lui, l’est par le système)", () => {
+    const args = { h, aujourdhui: Date.UTC(2026, 9, 1), verdict, rapport: { plan }, messages: [...rendu.lignes.values()].slice(0, 3) };
+    const partage = requeteVocal({ ...args, consigne: "consigne du vocal" });
+    const origine = requeteVocal(args);
+    expect(partage.partage).toBe(true);
+    expect(origine.partage).toBeUndefined();
+    expect(origine.blocs).toHaveLength(1);
+    expect(partage.blocs.some((b) => "cache" in b && b.cache)).toBe(false);
+    expect(textes(partage)[0]).toContain("consigne du vocal");
+    expect(textes(partage)[1]).toBe(textes(origine)[0]);
+    expect(structure(partage).blocs.map((b) => ("balises" in b ? b.balises : []))).toEqual([
+      ["consigne", "format"],
+      ["histoire", "verdict", "rapport", "messages"],
+    ]);
+  });
+
+  it("sans consigne, rien ne change : le montage d’origine", () => {
+    expect(requeteVerdict(rendu).partage).toBeUndefined();
+    expect(requeteRapport(rendu, verdict, DEMANDE_PLAN)).toEqual(requeteRapport(rendu, verdict, DEMANDE_PLAN, undefined));
   });
 });

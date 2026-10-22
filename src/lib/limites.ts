@@ -12,6 +12,13 @@ const MO = 1024 * 1024;
 export const CAPTURES_MAX = 20;
 
 /**
+ * Les écrans d’un lot d’enregistrement d’écran (tailleDesLots, src/services/preparer-video.ts) : six pour une courte
+ * vidéo, lue en un seul tour, jusqu’à douze pour une longue. /api/captures/video borne les messages d’un lot en
+ * conséquence, et /api/captures/lot les images d’un envoi (CAPTURES_MAX).
+ */
+export const ECRANS_PAR_LOT = { min: 6, max: 12 } as const;
+
+/**
  * Au plus 50 invitations de la liste d’attente dans un lot (/admin, POST /api/admin) : le formulaire s’arrête là, le
  * serveur refuse au-delà (src/server/attente.ts, inviterLaListe). Le plafond des mails du jour arrête souvent avant.
  */

@@ -175,6 +175,13 @@ export const Env = z.object({
     .string()
     .regex(/^phc_\w+$/, "une clé de projet PostHog (phc_…), jamais une clé personnelle")
     .optional(),
+  /**
+   * Le montage des appels qui lisent la conv (le verdict, le rapport, la création de la mémoire) : « separe » (le défaut),
+   * chacun son système et son format imposé ; « partage » (une proposition, prompts/lib/contextes.ts), le socle seul en
+   * système, la conv en cache une fois pour les trois, la consigne de la tâche après elle ; et le vocal, qui y relit le
+   * socle seul.
+   */
+  BLUSH_MONTAGE: z.enum(["separe", "partage"]).default("separe"),
   /** Tests et dev sans coût : le modèle rejoue des sorties enregistrées au lieu d’appeler l’API. Ignoré sur Vercel. */
   BLUSH_IA_FACTICE: z
     .enum(["0", "1"])

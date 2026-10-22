@@ -235,7 +235,7 @@ async function echecPourDeBon(t: Tache, erreur: string): Promise<void> {
 export const ECHEANCE_CHAINE_MS = echeancePour(DUREE_FONCTION_S);
 
 /*
- * Une fonction Vercel vit 5 minutes au plus (plan gratuit) : on ne commence une étape que s’il reste, avant l’échéance,
+ * Une fonction Vercel vit DUREE_FONCTION_S au plus (800 s, l’offre Pro) : on ne commence une étape que s’il reste, avant l’échéance,
  * sa durée habituelle et 30 % de marge. Un budget fixe (rien après 100 s) arrêtait la chaîne après le verdict et le
  * plan : les chapitres attendaient qu’un sondage la relance, ce que ne font ni la révélation, ni une appli fermée (et
  * le mail « ton rapport est prêt » avec eux).

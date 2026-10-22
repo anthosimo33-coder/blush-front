@@ -274,7 +274,7 @@ describe("S-03 · un enregistrement d’écran forgé ne gonfle plus en mémoire
   });
 });
 
-describe("S-12 · un enregistrement d’écran : des lots de 300 messages au plus", () => {
+describe("S-12 · un enregistrement d’écran : des lots de 600 messages au plus", () => {
   /* Un lot d’un seul bloc de `n` messages, alternés */
   const lot = (n: number) => {
     const l = lotVideo("Léa");
@@ -290,11 +290,11 @@ describe("S-12 · un enregistrement d’écran : des lots de 300 messages au plu
       }),
     );
 
-  it("301 messages dans un lot : refusé ; 300 : la conv est lue", async () => {
+  it("601 messages dans un lot : refusé ; 600 : la conv est lue", async () => {
     etat.fermee = false;
     etat.cookies.set(SESSION, secretSession);
-    expect((await envoyer(301)).status).toBe(422);
-    const bon = await envoyer(300);
+    expect((await envoyer(601)).status).toBe(422);
+    const bon = await envoyer(600);
     expect(bon.status).toBe(200);
     const { story } = (await bon.json()) as { story: { id: string } };
     await db().delete(schema.stories).where(eq(schema.stories.id, story.id));

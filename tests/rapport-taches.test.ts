@@ -15,7 +15,7 @@ import * as coffre from "@/server/coffre";
 import { db, schema } from "@/server/db";
 import { ouvrirLeRapport, rapportDe } from "@/server/donnees";
 import { histoireOuverte } from "@/server/histoires";
-import { fournisseurFactice } from "@/server/ia/factice";
+import { fournisseurFactice, type RequeteFactice } from "@/server/ia/factice";
 import { etatDesTaches } from "@/server/taches";
 import { avecFactice, compteDeTest, debloquerLaConv, histoireLue, ligneEnBase } from "./aide/fixtures";
 
@@ -125,6 +125,21 @@ describe("le rapport sobre, de bout en bout (S-25)", () => {
     expect(await tachesDe(imp.id, "rapport_plan")).toEqual([{ status: "fini", error: null }]);
     expect(await tachesDe(imp.id, "memoire")).toEqual([{ status: "fini", error: null }]);
     expect((await ligneEnBase(imp.id)).conv).toBeNull();
+  });
+});
+
+describe("les découvertes du rapport", () => {
+  it("un plan qui en écrit quatre : le rapport garde les trois premières", async () => {
+    const u = await compteDeTest("rapport-decouvertes", "debloque");
+    const quatre = (req: RequeteFactice) => {
+      const s = fournisseurFactice(req) as { plan?: { decouvertes: { texte: string; preuves: string[] }[] } };
+      if (req.tache !== "05-rapport" || req.partie !== "plan" || !s.plan) return s;
+      return { ...s, plan: { ...s.plan, decouvertes: [...s.plan.decouvertes, { texte: "Une de trop", preuves: [] }] } };
+    };
+    const imp = await avecFactice(quatre, () => histoireLue(u, "06-elle-hesite.txt"));
+    const r = (await db().select().from(schema.reports).where(eq(schema.reports.storyId, imp.id)))[0]!;
+    const { sortie } = coffre.lire("reports.data", r.data!);
+    expect(sortie.decouvertes.map((d) => d.texte)).toEqual(["Découverte 1", "Découverte 2", "Découverte 3"]);
   });
 });
 

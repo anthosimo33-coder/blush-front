@@ -4,7 +4,7 @@ import { erreur, repondre, route } from "@/server/http";
 import { garde, lecture, sousLaLimiteDuCompte } from "@/server/requete";
 import { reprendre } from "@/server/taches";
 
-export const maxDuration = 300;
+export const maxDuration = 800;
 
 /**
  * Le rapport (ou le verdict seul, sans accès). `generating` : il s’écrit encore ; le front repasse dans quelques secondes.
