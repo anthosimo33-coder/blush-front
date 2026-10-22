@@ -213,7 +213,6 @@ export function AppTile({
   title,
   subtitle,
   href,
-  wide = false,
   onClick,
   className,
 }: {
@@ -221,28 +220,18 @@ export function AppTile({
   title: string;
   subtitle: string;
   href: Route;
-  wide?: boolean;
   onClick?: () => void;
   className?: string;
 }) {
   return (
-    <Link
-      href={href}
-      onClick={onClick}
-      className={cn(
-        "lift relative flex rounded-card bg-white text-ink no-underline shadow-soft",
-        wide ? "col-span-full items-center gap-3 px-4 py-3.5" : "flex-col items-start gap-2.5 p-4",
-        className,
-      )}
-    >
+    <Link href={href} onClick={onClick} className={cn("lift relative flex flex-col items-start gap-2.5 rounded-card bg-white p-4 text-ink no-underline shadow-soft", className)}>
       <AppBadge app={app} className="lift-badge" />
-      {/* Desktop : même chevron que la tuile large, centré sur la pastille (remplit le coin vide, dit « on y va ») */}
-      {!wide && <Icon name="chevron" size={18} stroke={2.6} className="lift-chev absolute right-4 top-[30px] hidden lg:block text-muted" />}
-      <span className={cn("flex flex-col gap-0.5", wide && "flex-1")}>
+      {/* Desktop : un chevron centré sur la pastille (remplit le coin vide, dit « on y va ») */}
+      <Icon name="chevron" size={18} stroke={2.6} className="lift-chev absolute right-4 top-[30px] hidden lg:block text-muted" />
+      <span className="flex flex-col gap-0.5">
         <span className="text-accent font-black">{title}</span>
         <span className="text-micro font-extrabold text-grey">{subtitle}</span>
       </span>
-      {wide && <Icon name="chevron" size={18} stroke={2.6} className="lift-chev text-muted" />}
     </Link>
   );
 }

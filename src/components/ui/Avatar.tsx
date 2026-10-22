@@ -109,15 +109,25 @@ export function AppBadge({ app, size = 46, radius = 13, className }: { app: AppK
           H
         </span>
       );
-    case "autre":
+    case "autre": {
+      /* Des captures ou une vidéo de l’écran, de n’importe quelle appli : une photo, et sa pastille de lecture dans le coin */
+      const pastille = Math.round(size * 0.43);
+      const decalage = -Math.round(size * 0.11);
       return (
-        <span aria-hidden="true" className={cls} style={{ ...box, background: "var(--plaque)" }}>
-          <span data-dots="" className="inline-flex items-center gap-1">
-            <span className="inline-block size-1.5 rounded-full bg-grey" />
-            <span className="inline-block size-1.5 rounded-full bg-grey" />
-            <span className="inline-block size-1.5 rounded-full" style={{ background: "var(--degrade-perle)" }} />
+        <span
+          aria-hidden="true"
+          className={cn(cls, "relative")}
+          style={{ ...box, background: `${GLOSS}, var(--rose-blush)`, boxShadow: "inset 0 0 0 1px rgba(0,0,0,0.06), 0 6px 14px -6px rgba(232,53,138,0.6)" }}
+        >
+          <Icon name="photo" size={glyph} stroke={2} className="text-white" />
+          <span
+            className="absolute flex items-center justify-center rounded-full bg-white"
+            style={{ width: pastille, height: pastille, right: decalage, bottom: decalage, boxShadow: "0 0 0 1px rgba(17,17,20,0.08), 0 2px 6px rgba(17,17,20,0.2)" }}
+          >
+            <Icon name="play" size={Math.round(pastille * 0.55)} fill="currentColor" stroke={1} style={{ color: "#E8358A" }} />
           </span>
         </span>
       );
+    }
   }
 }
