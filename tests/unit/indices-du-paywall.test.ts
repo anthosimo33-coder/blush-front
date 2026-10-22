@@ -2,15 +2,14 @@ import { describe, expect, it } from "vitest";
 import type { Message } from "@prompts/lib/conv";
 import { PAYWALL } from "@/contenu/paiement";
 import { apercuDuPaywall } from "@/server/ecrans/haut-du-paywall";
-import { indices, moments } from "@/server/ecrans/indices";
+import { indices } from "@/server/ecrans/indices";
 
 /*
- * Ta question, les indices et les moments cachés du paywall (une proposition du 22 octobre 2026) : comptés par le code
- * sur des convs fabriquées, deux prénoms inventés (Inès et Lucas), et leurs textes.
+ * Ta question et les indices du paywall (une proposition du 22 octobre 2026) : comptés par le code sur des convs
+ * fabriquées, deux prénoms inventés (Inès et Lucas), et leurs textes.
  */
 
 const H = 3600e3;
-const J = 24 * H;
 const DEBUT = Date.parse("2026-03-01T10:00:00Z");
 
 let n = 0;
@@ -66,44 +65,8 @@ describe("les indices : des mots comptés de chaque côté", () => {
   });
 });
 
-describe("les moments cachés : de vrais messages de leur conv", () => {
-  it("le tien qu’il a mis le plus de temps à te répondre (2 h à 7 jours, aux heures sûres), et son plus long (25 mots au moins)", () => {
-    const long = Array.from({ length: 30 }, (_, i) => `mot${i}`).join(" ");
-    const conv = [
-      msg("toi", "tu fais quoi ce soir", 0),
-      msg("autre", "rien de spécial et toi", 3 * H),
-      msg("toi", "on se fait un ciné demain ?", 4 * H),
-      msg("autre", "ah ouais pourquoi pas", 4 * H + 14 * H),
-      msg("toi", "ça dit quoi depuis tout ce temps", 20 * J),
-      msg("autre", "désolé j’étais pas là", 30 * J),
-      msg("toi", "réponds stp je sais", 31 * J, { approx: "heure" }),
-      msg("autre", "oui", 33 * J),
-      msg("autre", long, 34 * J),
-    ];
-    const [attente, plusLong, ...rien] = moments(conv, null);
-    expect(attente).toEqual({ id: "attente", de: "toi", texte: "on se fait un ciné demain ?", jour: "2026-03-01", valeur: 14 * H });
-    expect(plusLong).toMatchObject({ id: "long", de: "elle", valeur: 30, jour: "2026-04-04" });
-    expect(rien).toEqual([]);
-  });
-
-  it("avec une chute : son premier message écrit du jour où ça a changé, en premier ; un texte trop long coupé à un mot", () => {
-    const tres = `${"blabla ".repeat(40)}fin`;
-    const conv = [msg("autre", "ok", 11 * J), msg("autre", tres, 11 * J + H), msg("toi", "cool", 11 * J + 2 * H)];
-    const [bascule] = moments(conv, { depuis: "2026-03-12", avant: 30, apres: 10, semaines: [], coupure: 0, delai: null });
-    expect(bascule).toMatchObject({ id: "bascule", de: "elle", jour: "2026-03-12" });
-    expect(bascule!.texte.length).toBeLessThanOrEqual(161);
-    expect(bascule!.texte.endsWith("blabla…")).toBe(true);
-  });
-
-  it("le même message n’est montré qu’une fois", () => {
-    const long = Array.from({ length: 30 }, (_, i) => `mot${i}`).join(" ");
-    const conv = [msg("toi", "hello", 0), msg("autre", long, 11 * J)];
-    expect(moments(conv, { depuis: "2026-03-12", avant: 30, apres: 10, semaines: [], coupure: 0, delai: null }).map((m) => m.id)).toEqual(["bascule"]);
-  });
-});
-
 describe("ta question, sur le paywall", () => {
-  it("l’aperçu la rend avec la devinette, les indices et les moments ; sans elle, le haut seul", () => {
+  it("l’aperçu la rend avec la devinette et les indices ; sans elle, le haut seul", () => {
     const conv = [msg("toi", "tu me manques", 0), msg("toi", "tu me manques", H), msg("toi", "tu me manques", 2 * H)];
     const chiffres = {
       qui: { toi: "Inès", autre: "Lucas" },
@@ -125,7 +88,6 @@ describe("ta question, sur le paywall", () => {
     const avec = apercuDuPaywall(chiffres, conv, { devinette: "flou", objectif: "reciproque" });
     expect(avec.question).toEqual({ devinette: "flou", objectif: "reciproque" });
     expect(avec.indices).toEqual([{ id: "manques", toi: 3, elle: 0 }]);
-    expect(avec.moments).toEqual([]);
     expect(apercuDuPaywall(chiffres, conv)).not.toHaveProperty("question");
   });
 

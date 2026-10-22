@@ -2,7 +2,7 @@ import { CEST_QUOI, PIECES } from "./bulles";
 import { CHAPITRES_OFFERTS, NB_CHAPITRES } from "./chapitres";
 import { CATALOGUE, enEuros, prixDe, RAPPORT_D_AVANCE } from "./offres";
 import { GUESS_LABELS } from "./parcours";
-import type { Goal, Guess, IndiceDuPaywall, MomentDuPaywall } from "@/types";
+import type { Goal, Guess, IndiceDuPaywall } from "@/types";
 
 /*
  * Les textes des écrans du paiement par Whop : le bas de l’aperçu gratuit (PiedGratuit), la feuille « Ta formule »,
@@ -83,22 +83,6 @@ export const PAYWALL = {
     if (n === 1) return objectif ? VERDICT_DE_L_OBJECTIF[objectif](il) : `Est-ce qu’${il ? "il est intéressé" : "elle est intéressée"}\u00a0?`;
     if (n === 5) return `${autre}, décrypté${il ? "" : "e"}`;
     return CHAPITRES_EN_QUESTIONS[n] ?? "";
-  },
-  /**
-   * Les moments cachés (une proposition du 22 octobre 2026) : de vrais messages de leur conv, repérés par le code,
-   * floutés jusqu’au paiement.
-   */
-  moments: {
-    titre: "Ce que BLUSH a repéré dans votre conv",
-    sous: "De vrais messages de votre conv, débloqués avec ton rapport",
-    libelle: (id: MomentDuPaywall["id"], il: boolean) =>
-      id === "bascule"
-        ? `Ce qu’${il ? "il" : "elle"} t’a écrit le jour où ça a changé`
-        : id === "attente"
-          ? `Le message qu’${il ? "il" : "elle"} a mis le plus de temps à te répondre`
-          : "Son message le plus long",
-    mots: (n: number) => `${n}\u00a0mots`,
-    cache: "Message flouté, débloqué avec ton rapport",
   },
   /** Sur téléphone, au-dessus des formules, quand les aperçus du rapport portent déjà son nom. */
   choisis: "Choisis ta formule",

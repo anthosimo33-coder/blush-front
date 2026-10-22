@@ -1,6 +1,6 @@
 import type { Chiffres, Histoire, Message } from "@prompts/lib/conv";
 import type { ApercuDuPaywall, SignalDuPaywall } from "@/types";
-import { indices, moments } from "./indices";
+import { indices } from "./indices";
 import { tendance } from "./tendance";
 
 /*
@@ -60,12 +60,10 @@ export function signaux(c: Chiffres): SignalDuPaywall[] {
 
 /**
  * Le haut du paywall d’une conv : ses déséquilibres, et la chute de ses messages s’il y en a une ; avec `h` (une
- * proposition du 22 octobre 2026), ta question et ta devinette de « Qui es-tu ? », ses indices et ses moments cachés
- * (./indices.ts).
+ * proposition du 22 octobre 2026), ta question et ta devinette de « Qui es-tu ? », et ses indices (./indices.ts).
  */
 export function apercuDuPaywall(c: Chiffres, messages: Message[], h?: Pick<Histoire, "devinette" | "objectif">): ApercuDuPaywall {
-  const chute = tendance(messages);
-  const base = { signaux: signaux(c), tendance: chute };
+  const base = { signaux: signaux(c), tendance: tendance(messages) };
   if (!h) return base;
-  return { ...base, question: { objectif: h.objectif, devinette: h.devinette }, indices: indices(messages), moments: moments(messages, chute) };
+  return { ...base, question: { objectif: h.objectif, devinette: h.devinette }, indices: indices(messages) };
 }

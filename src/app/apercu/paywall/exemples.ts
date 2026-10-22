@@ -1,5 +1,5 @@
 import type { GenreDuHaut } from "@/contenu/haut-du-paywall";
-import type { ApercuDuPaywall, MomentDuPaywall, SignalDuPaywall, Story } from "@/types";
+import type { ApercuDuPaywall, SignalDuPaywall, Story } from "@/types";
 
 /*
  * Les exemples de /apercu/paywall : une conv inventée (Inès et Lucas, 4 365 messages, les chiffres des maquettes « Le
@@ -40,24 +40,8 @@ function signaux(changes: Partial<Record<Id, SignalDuPaywall>>): SignalDuPaywall
   return (["ouvre", "reprend", "relance", "delai", "longueur"] as const).map((id) => changes[id] ?? base[id]);
 }
 
-/*
- * Ta question, tes indices et tes moments cachés (une proposition du 22 octobre 2026) : Inès veut savoir si c’est
- * réciproque, et dit « c’est flou ». Des messages inventés, comme le reste.
- */
-const MOMENTS: MomentDuPaywall[] = [
-  { id: "attente", de: "toi", texte: "t’as vu la vidéo que je t’ai envoyée\u00a0? j’ai pensé à toi direct mdr", jour: "2026-03-03", valeur: 14 * H },
-  {
-    id: "long",
-    de: "elle",
-    texte:
-      "franchement j’ai passé une soirée trop bien hier, j’avais pas autant rigolé depuis longtemps et je sais pas, j’ai l’impression qu’avec toi c’est simple, j’aime bien ça, même si des fois j’ai du mal à le dire",
-    jour: "2026-02-14",
-    valeur: 41,
-  },
-];
-const BASCULE: MomentDuPaywall = { id: "bascule", de: "elle", texte: "jsp trop cette semaine, je te redis\u00a0?", jour: "2026-03-12" };
-
-/** Ce que chaque exemple a de plus : ta question, tes indices, tes moments (le jour où ça a changé, seulement avec une chute). */
+/* Ta question et tes indices (une proposition du 22 octobre 2026) : Inès veut savoir si c’est réciproque, et dit « c’est flou ». */
+/** Ce que chaque exemple a de plus : ta question et tes indices. */
 const avecLaSuite = (a: ApercuDuPaywall): ApercuDuPaywall => ({
   ...a,
   question: { objectif: "reciproque", devinette: "flou" },
@@ -65,7 +49,6 @@ const avecLaSuite = (a: ApercuDuPaywall): ApercuDuPaywall => ({
     { id: "manques", toi: 6, elle: 1 },
     { id: "voir", toi: 9, elle: 2 },
   ],
-  moments: a.tendance ? [BASCULE, ...MOMENTS] : MOMENTS,
 });
 
 const BASES: Record<GenreDuHaut, ApercuDuPaywall> = {
