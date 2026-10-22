@@ -105,7 +105,9 @@ function prendre(index: Map<string, number>, pris: Map<string, number>, cles: st
  * Les morceaux lus, réunis : les exports d’abord, puis les captures, chacun dans l’ordre de son import. Un message déjà
  * vu dans un morceau d’avant (même auteur, même texte ; à la même minute entre deux exports, le même jour à un près pour
  * des captures) n’est pas gardé deux fois. Autant de fois qu’il est écrit, pas plus : trois « ok » à la même minute dans
- * deux exports restent trois. Puis tout se range par date, et se renumérote. Le temps croît comme le nombre de messages.
+ * deux exports restent trois. Puis tout se range par date, et se renumérote ; chaque message garde le rang de son
+ * morceau (`morceau`), dont le premier message ne compte pas dans les chiffres (chiffrer, prompts/lib/conv.ts). Le temps
+ * croît comme le nombre de messages.
  */
 export function reunir(lus: Lu[]): { messages: Message[]; doublons: number; gardes: number[] } {
   const exactes = new Map<string, number>();
@@ -132,7 +134,7 @@ export function reunir(lus: Lu[]): { messages: Message[]; doublons: number; gard
     }
   }
   tous.sort((a, b) => a.m.t - b.m.t || a.k - b.k || a.i - b.i);
-  return { messages: tous.map(({ m }, n) => ({ ...m, id: idMessage(n + 1), ligne: n + 1 })), doublons, gardes };
+  return { messages: tous.map(({ m, k }, n) => ({ ...m, id: idMessage(n + 1), ligne: n + 1, morceau: k })), doublons, gardes };
 }
 
 /** Qui est toi dans la conv réunie : le participant `k` ; `connu`, « Qui es-tu ? » l’a dit (« Moi », sur des captures, est alors lui). */

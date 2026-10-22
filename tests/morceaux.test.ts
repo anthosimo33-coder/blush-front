@@ -15,6 +15,7 @@ import {
   importerCaptures,
   metaDe,
   morceauDejaAjoute,
+  provenancesDe,
   tropCourte,
   type Meta,
 } from "@/server/histoires";
@@ -139,6 +140,14 @@ describe("une conv en plusieurs morceaux", () => {
     expect(rendu.conversation).toContain("m0001 2026-08-20 jeu. ~21:00 Hugo : capture 0");
     expect(rendu.conversation).toContain("m0025 2026-09-01 mar. 10:00 Hugo : message 0");
     expect(rendu.chiffres).toContain("24 messages lus sur des captures");
+    /* Chaque message garde son morceau (dans l’ordre d’import) : le modèle lit d’où vient chacun, du plus ancien au plus récent */
+    expect([lu.messages[0]!.morceau, lu.messages[24]!.morceau, lu.messages.at(-1)!.morceau]).toEqual([1, 0, 2]);
+    const reunie = rendre({ ...h, aujourdhui: "2026-10-22" }, lu, { morceaux: provenancesDe(apres) }).conversation.split("\n");
+    expect(reunie[0]).toContain(`appli="instagram, whatsapp" source="morceaux" morceaux="3"`);
+    expect(reunie[1]).toContain("3 morceaux importés à part : Instagram (captures) le 2026-08-20, WhatsApp (export) le 2026-09-01, WhatsApp (export) le 2026-09-01.");
+    expect(reunie[2]).toBe("m0001 2026-08-20 jeu. ~21:00 Hugo : capture 0");
+    /* Une conv d’un seul morceau : rien de plus */
+    expect(provenancesDe(await meta((await brouillon(exportWhatsapp("2026-09-01T10:00", 60))).id))).toEqual([]);
   });
 
   it("le même fichier deux fois, ou le même envoi de captures, ne fait pas un morceau de plus", async () => {
