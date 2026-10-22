@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode, type Ref, type RefObject } from "react";
-import { NB_CHAPITRES } from "@/contenu/chapitres";
-import { TEMOIGNAGES, TESTIMONIALS } from "@/contenu/landing";
+import { useEffect, useId, useRef, useState, type ReactNode, type Ref, type RefObject } from "react";
+import { NB_CHAPITRES, titreDAttente } from "@/contenu/chapitres";
+import { AVIS_DU_HAUT, TEMOIGNAGES, TESTIMONIALS } from "@/contenu/landing";
 import { CATALOGUE, enEuros, FORMULE_CHOISIE } from "@/contenu/offres";
 import { DANS_LA_FEUILLE, FEUILLE_FORMULE, MESSAGES_LUS, NOTE_DES_AVIS, OFFRE_SUITE, PAYWALL } from "@/contenu/paiement";
 import { hautDuPaywall } from "@/contenu/haut-du-paywall";
@@ -136,6 +136,7 @@ export function Paywall({
             <PreuveDuHaut haut={haut} className="lg:hidden" />
             <BulleDeBlush question={haut.question} className="lg:hidden" />
             <CarteDuHaut haut={haut} autre={autre.name} className="hidden lg:flex" />
+            <Sommaire autre={autre.name} className="hidden lg:flex" />
             <AvantApres elle={elle} className="hidden lg:flex" />
           </section>
           <Paiement
@@ -149,7 +150,8 @@ export function Paywall({
             {...(enUnGeste ? { enUnGeste } : {})}
           />
         </div>
-        <Temoignages items={temoignages} />
+        <Sommaire autre={autre.name} className="mt-3 flex lg:hidden" />
+        <Temoignages items={enPremier(temoignages, AVIS_DU_HAUT[haut.genre])} />
         <AvantApres elle={elle} className="lg:hidden" />
         <Questions autre={autre.name} elle={elle} />
         <FinDuPaywall />
@@ -534,6 +536,53 @@ function Temoignages({ items }: { items: Testimonial[] }) {
           </button>
         </div>
       )}
+    </section>
+  );
+}
+
+/** Les avis, celui de ce prénom en premier (AVIS_DU_HAUT : il ressemble au titre du haut), les autres dans leur ordre. */
+function enPremier(avis: Testimonial[], nom: string | undefined): Testimonial[] {
+  const premier = avis.find((t) => t.name === nom);
+  return premier ? [premier, ...avis.filter((t) => t !== premier)] : avis;
+}
+
+/**
+ * Ce que tu débloques (une proposition du 22 octobre 2026, PAYWALL.sommaire) : le vocal, puis les chapitres, leurs
+ * titres d’attente lisibles, leur texte flouté et un cadenas. Sous le paiement sur téléphone (le bouton qui paie reste
+ * dans le premier écran), sous la carte du haut sur ordinateur.
+ */
+function Sommaire({ autre, className }: { autre: string; className: string }) {
+  const t = PAYWALL.sommaire;
+  const titre = useId();
+  const ligne = (rond: ReactNode, texte: string, fin?: ReactNode, rondEnCouleur?: boolean) => (
+    <li key={texte} className="flex items-center gap-2.5 border-t border-sep py-2">
+      <span className={cn("flex size-6 shrink-0 items-center justify-center rounded-full text-micro font-black", rondEnCouleur ? "bg-elle text-white" : "bg-paper text-soft")}>
+        {rond}
+      </span>
+      <span className="min-w-0 truncate text-note font-black text-ink">{texte}</span>
+      {/* Son texte, flouté : on devine qu’il est écrit, sans le lire */}
+      <span aria-hidden="true" className="h-2 min-w-6 flex-1 rounded-full bg-[rgba(17,17,20,0.12)] blur-[2px]" />
+      {fin}
+      <Icon name="lock" size={13} stroke={2.4} className="shrink-0 text-grey" />
+    </li>
+  );
+  return (
+    <section aria-labelledby={titre} className={cn("flex-col rounded-[22px] bg-white px-4 pb-1.5 pt-3.5 shadow-card lg:px-5 lg:pt-4", className)}>
+      <div className="flex items-center justify-between gap-3 pb-2.5">
+        <h2 id={titre} className="m-0 text-detail font-black">
+          {t.titre}
+        </h2>
+        <span className="text-micro font-extrabold text-muted">{t.compte}</span>
+      </div>
+      <ol className="m-0 flex list-none flex-col p-0">
+        {ligne(
+          <Icon name="play" size={11} fill="currentColor" stroke={1} />,
+          t.vocal(autre),
+          <span className="shrink-0 text-legende font-black tabular-nums text-soft">{t.duree}</span>,
+          true,
+        )}
+        {Array.from({ length: NB_CHAPITRES }, (_, k) => ligne(k + 1, titreDAttente(k + 1, autre)))}
+      </ol>
     </section>
   );
 }

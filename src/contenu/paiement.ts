@@ -79,6 +79,17 @@ export const PAYWALL = {
   /** Sous le bouton qui paie, en une ligne : pas d’abonnement, et « Léa n’est jamais prévenue » (BLUSH n’écrit jamais à l’autre). */
   paiementUnique: "Paiement unique",
   jamaisPrevenu: (autre: string, elle: boolean) => `${autre} n’est jamais prévenu${elle ? "e" : ""}`,
+  /**
+   * Ce que tu débloques (une proposition du 22 octobre 2026) : le vocal, puis les chapitres du rapport, leurs titres
+   * d’attente (titreDAttente : le 5e porte le prénom de l’autre), leur texte flouté. Rien n’est encore lu au paywall :
+   * aucune ligne ne dit rien de la conv. Le vocal dure 30 secondes, comme le promet le mail S3.
+   */
+  sommaire: {
+    titre: "Ce que tu débloques",
+    compte: `${NB_CHAPITRES} chapitres + ton vocal`,
+    vocal: (autre: string) => `Ton vocal sur toi et ${autre}`,
+    duree: "30\u00a0s",
+  },
   precedent: "Témoignage précédent",
   suivant: "Témoignage suivant",
   /** L’avant / après : une réponse sans BLUSH, une avec, sur un message inventé (« exemple »). */

@@ -1,4 +1,5 @@
 import { NB_CHAPITRES } from "@/contenu/chapitres";
+import type { GenreDuHaut } from "@/contenu/haut-du-paywall";
 import type { LandingConv, QuestionAnswer, Testimonial } from "@/types";
 
 /*
@@ -361,6 +362,15 @@ export const TESTIMONIALS: Testimonial[] = [
     photo: "/avis/charlotte.webp",
   },
 ];
+
+/**
+ * Sur le paywall, l’avis qui passe en premier, d’après le titre du haut (genreDuHaut) : celui dont l’histoire lui
+ * ressemble (une proposition du 22 octobre 2026). « C’est toi qui portes la conv » : Charlotte, qui relançait seule ;
+ * « Tu ouvres la conv. Lucas, lui, revient » et « Lucas court après toi » : Mattheo, qu’elle reprenait après ses
+ * silences ; la tendance : Sonia, le moment où ça a changé. Les autres gardent leur ordre ; à l’égalité, ou sans titre,
+ * l’ordre de TESTIMONIALS. Chaque prénom est celui d’un avis de TESTIMONIALS (tests/client/temoignages.test.tsx).
+ */
+export const AVIS_DU_HAUT: Partial<Record<GenreDuHaut, string>> = { tendance: "Sonia", toi: "Charlotte", elle: "Mattheo", contraste: "Mattheo" };
 
 /**
  * La note des avis sur la landing (NOTE_DES_AVIS, src/contenu/paiement.ts) : sous les boutons, et, au-dessus des avis,
