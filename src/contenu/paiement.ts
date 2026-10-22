@@ -58,6 +58,8 @@ export const PAYWALL = {
    * ligne sous le bouton.
    */
   formule: (autre: string) => `Ton rapport sur ${autre}`,
+  /** Sur téléphone, au-dessus des formules, quand les aperçus du rapport portent déjà son nom. */
+  choisis: "Choisis ta formule",
   rapport: {
     titre: CATALOGUE.rapport.titre,
     note: (bulles: number) => `${NB_CHAPITRES} chapitres sur vous deux, ton vocal, ${bulles} réponses de BLUSH`,
@@ -93,6 +95,16 @@ export const PAYWALL = {
    * (ceux d’attente) et la question qu’on pose à BLUSH se lisent.
    */
   apercus: {
+    /**
+     * Leur en-tête, comme le nom et la fiche d’un produit (demandé le 22 octobre : des images sans titre ni description
+     * faisaient fouillis) : sur téléphone, le nom du rapport, la note des avis à côté ; sur ordinateur, où la carte du
+     * paiement porte déjà ce nom, « Un aperçu de ton rapport ». Dessous, sa fiche en une ligne.
+     */
+    titre: (autre: string) => `Ton rapport sur ${autre}`,
+    titreOrdinateur: "Un aperçu de ton rapport",
+    /** Sa fiche : les messages lus (sur téléphone seulement : sur ordinateur, ils sont au-dessus du titre), puis ce qu’il contient. */
+    fiche: { messages: (messages: string) => `${messages} messages lus · `, contenu: `${NB_CHAPITRES} chapitres + ton vocal` },
+    avis: (nombre: string) => `${nombre} avis`,
     /** Pour un lecteur d’écran : les miniatures, elles, sont décoratives. */
     resume: (autre: string) => `Aperçu de ton rapport sur ${autre}\u00a0: ton vocal, ses chapitres et BLUSH pour lui répondre, floutés jusqu’au paiement.`,
     vocal: "BLUSH t’a laissé un vocal",

@@ -68,10 +68,11 @@ function Case({ c, className }: { c: CaseDuHaut; className?: string }) {
 
 /**
  * La bulle de BLUSH (la piste H3) : il écrit, interrompu, ce que ton rapport te dira ; et ta réponse, en bleu. Sur
- * ordinateur, sur une ligne au bas de la carte ; sur un téléphone bas (375 × 667), sans ta réponse, pour que le bouton
- * qui paie reste à l’écran.
+ * ordinateur, sur une ligne au bas de la carte. Sur téléphone, elle était sous les chiffres (sans ta réponse sur un
+ * téléphone bas, 375 × 667) ; retirée le 22 octobre (une proposition : la première section en disait trop, et les
+ * aperçus du rapport montrent déjà le chat), sa version courte (`grand` à false) attend la décision.
  */
-export function BulleDeBlush({ question, grand = false, className }: { question: string; grand?: boolean; className?: string }) {
+function BulleDeBlush({ question, grand = false, className }: { question: string; grand?: boolean; className?: string }) {
   return (
     <div className={cn(grand ? "flex items-center justify-between gap-3 rounded-[20px] bg-[#f6f4ef] px-4 py-3.5" : "flex flex-col gap-1.5", className)}>
       <div className={cn("flex items-center", grand ? "gap-3" : "gap-2.5")}>

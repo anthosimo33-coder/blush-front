@@ -33,7 +33,7 @@ import { Icon } from "@/components/ui/icons";
 import { Tag } from "@/components/ui/messages";
 import { Toast } from "@/components/ui/surfaces";
 import { ApercusDuRapport } from "./ApercusDuRapport";
-import { BulleDeBlush, CarteDuHaut, PreuveDuHaut, TitreDuHaut } from "./HautDuPaywall";
+import { CarteDuHaut, PreuveDuHaut, TitreDuHaut } from "./HautDuPaywall";
 import type { ApercuDuPaywall, Formule, LotDeLaRoue, OffreId, Story, Testimonial } from "@/types";
 import type { RoueDuCompte } from "@/types/api";
 
@@ -132,14 +132,14 @@ export function Paywall({
           {/* data-prive : le haut, tiré de la conv (son titre, ses chiffres, la bulle), masqué dans l’enregistrement des visites */}
           <section data-prive="" className="flex flex-col gap-3 lg:gap-6">
             <div className="flex flex-col gap-1.5 pt-1 lg:gap-3">
-              <span className="text-legende font-black text-grey lg:text-note">{PAYWALL.conv(formatCount(story.totalMessages))}</span>
+              {/* Sur téléphone, le nombre de messages lus et la note des avis passent dans l’en-tête des aperçus du rapport (moins de lignes au-dessus du titre) */}
+              <span className="text-legende font-black text-grey max-lg:hidden lg:text-note">{PAYWALL.conv(formatCount(story.totalMessages))}</span>
               <TitreDuHaut titre={haut.titre} />
               {haut.sous && <p className={cn("m-0 text-detail font-extrabold leading-[1.4] text-soft lg:text-[19px] lg:leading-[1.42]", preuve && "max-lg:hidden")}>{haut.sous}</p>}
-              <Preuves />
+              <Preuves className="max-lg:hidden" />
             </div>
             <PreuveDuHaut haut={haut} className="lg:hidden" />
-            <BulleDeBlush question={haut.question} className="lg:hidden" />
-            <ApercusDuRapport autre={autre.name} />
+            <ApercusDuRapport autre={autre.name} messages={formatCount(story.totalMessages)} className="max-lg:mt-3" />
             <CarteDuHaut haut={haut} autre={autre.name} className="hidden lg:flex" />
             <Sommaire autre={autre.name} className="hidden lg:flex" />
             <AvantApres elle={elle} className="hidden lg:flex" />
@@ -205,10 +205,10 @@ function BandeauDuCadeau({ lot, reste, onPasse }: { lot: LotDeLaRoue; reste: num
 }
 
 /** Sous le titre : la note des avis (de vrais avis seulement) et tout ce que BLUSH a lu ; rien tant qu’ils manquent. */
-function Preuves() {
+function Preuves({ className }: { className?: string }) {
   if (!NOTE_DES_AVIS && !MESSAGES_LUS) return null;
   return (
-    <p className="m-0 flex flex-wrap items-center gap-x-1.5 text-legende font-extrabold text-grey lg:text-note">
+    <p className={cn("m-0 flex flex-wrap items-center gap-x-1.5 text-legende font-extrabold text-grey lg:text-note", className)}>
       {NOTE_DES_AVIS && (
         <>
           <span aria-hidden="true" className="text-attente">
@@ -324,7 +324,10 @@ function Paiement({
     <section ref={ref} className="flex scroll-mt-4 flex-col gap-3 lg:sticky lg:top-6 lg:rounded-[28px] lg:bg-white lg:p-6 lg:shadow-card">
       {!paye && (
         <>
-          <span className="pt-1 text-legende font-black text-grey lg:text-titre-3 lg:text-ink">{PAYWALL.formule(autre)}</span>
+          <span className="pt-1 text-legende font-black text-grey lg:text-titre-3 lg:text-ink">
+            <span className="lg:hidden">{PAYWALL.choisis}</span>
+            <span className="max-lg:hidden">{PAYWALL.formule(autre)}</span>
+          </span>
           <RadioGroup label={FEUILLE_FORMULE.groupe} className="flex flex-col gap-3.5">
             {avoirs?.avance && (
               <Option

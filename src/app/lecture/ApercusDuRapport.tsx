@@ -1,6 +1,6 @@
 import type { CSSProperties, ReactNode } from "react";
 import { CHAPITRE_DE_L_AUTRE, CHAPITRE_DE_LA_BASCULE, titreDAttente } from "@/contenu/chapitres";
-import { PAYWALL } from "@/contenu/paiement";
+import { NOTE_DES_AVIS, PAYWALL } from "@/contenu/paiement";
 import { cn } from "@/lib/cn";
 import { BubbleLogo } from "@/components/brand/objects3d";
 import { Avatar } from "@/components/ui/Avatar";
@@ -21,10 +21,35 @@ const FOND_DU_VOCAL = "radial-gradient(70% 120% at 18% 110%, rgba(232,53,138,0.5
 /** L’onde du vocal : la hauteur de chaque trait, en pixels. */
 const ONDE = [6, 12, 18, 10, 22, 14, 8, 16, 20, 9, 13, 6, 11, 17, 7];
 
-export function ApercusDuRapport({ autre, className }: { autre: string; className?: string }) {
+export function ApercusDuRapport({ autre, messages, className }: { autre: string; messages: string; className?: string }) {
   const t = PAYWALL.apercus;
   return (
-    <div className={cn("-mx-4 lg:mx-0", className)}>
+    <div className={cn("-mx-4 flex flex-col gap-3 lg:mx-0", className)}>
+      {/* L’en-tête, comme le nom et la fiche d’un produit ; la note des avis à côté sur téléphone (sur ordinateur, elle est sous le titre) */}
+      <div className="flex items-start justify-between gap-3 px-4 lg:px-0">
+        <div className="flex min-w-0 flex-col gap-0.5">
+          <h2 className="m-0 text-titre-3 font-black leading-[1.15]">
+            <span className="lg:hidden">{t.titre(autre)}</span>
+            <span className="max-lg:hidden">{t.titreOrdinateur}</span>
+          </h2>
+          <p className="m-0 text-legende font-extrabold text-grey [text-wrap:balance]">
+            <span className="lg:hidden">{t.fiche.messages(messages)}</span>
+            {t.fiche.contenu}
+          </p>
+        </div>
+        {NOTE_DES_AVIS && (
+          <span className="flex shrink-0 flex-col items-end gap-0.5 lg:hidden">
+            <span className="flex items-center gap-1 rounded-[10px] bg-ink px-2 py-1 text-legende font-black text-white">
+              {NOTE_DES_AVIS.note}
+              <span aria-hidden="true" className="text-attente">
+                ★
+              </span>
+              <span className="sr-only">sur 5</span>
+            </span>
+            <span className="text-micro font-extrabold text-grey">{t.avis(NOTE_DES_AVIS.nombre)}</span>
+          </span>
+        )}
+      </div>
       <p className="sr-only">{t.resume(autre)}</p>
       <ul
         aria-hidden="true"
