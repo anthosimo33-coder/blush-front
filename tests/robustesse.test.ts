@@ -15,6 +15,7 @@ import { db, schema } from "@/server/db";
 import { ouvrirLeRapport } from "@/server/donnees";
 import { depuisFichier, depuisPaquet, ErreurImport } from "@/server/import";
 import { fournisseurFactice, REFUS_FACTICE } from "@/server/ia/factice";
+import { retenir } from "@/server/memoire-groupee";
 import { planifier, prendre } from "@/server/taches";
 import { echange } from "./aide/fabriques";
 import { avecFactice, compteDeTest, debloquerLaConv, histoireLue, ligneEnBase } from "./aide/fixtures";
@@ -83,16 +84,15 @@ describe("les tâches d’une histoire", () => {
       .from(schema.tasks)
       .where(and(eq(schema.tasks.storyId, id), eq(schema.tasks.kind, "rapport_plan"), inArray(schema.tasks.status, ["attente", "en_cours"])));
     expect(enAttente).toHaveLength(1);
-    /* Les mises à jour de la mémoire, elles, s’empilent */
-    const [m1, m2] = [await planifier(id, "memoire_maj", echange(1)), await planifier(id, "memoire_maj", echange(2))];
-    expect(m1).not.toBe(m2);
   });
 
   it("jamais deux étapes d’une même histoire en même temps", async () => {
     const id = await lue("03-elle-s-eloigne.txt");
-    const t1 = await planifier(id, "memoire_maj", echange(1));
-    const t2 = await planifier(id, "memoire_maj", echange(2));
+    const t1 = (await retenir(id, echange(1), { neuf: true, maintenant: true })).id!;
     expect(await prendre(t1)).not.toBeNull();
+    /* La première prise, l’échange suivant en ouvre une autre (les mises à jour de la mémoire ne passent pas par l’index) */
+    const t2 = (await retenir(id, echange(2), { neuf: true, maintenant: true })).id!;
+    expect(t2).not.toBe(t1);
     expect(await prendre(t2)).toBeNull();
     /* La première abandonnée (battement périmé) : la seconde peut partir */
     await db()

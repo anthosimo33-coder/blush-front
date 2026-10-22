@@ -1,0 +1,1 @@
+ALTER TABLE "tasks" ADD COLUMN "pas_avant" timestamp with time zone;

@@ -26,14 +26,15 @@ import { textesSysteme, type Avance } from "./ia/claude";
 import { recopieLesPrompts, REFUS_FUITE } from "./ia/garde";
 import { dire, voixDisponible, voixPour } from "./ia/voix";
 import { auMieux, journal, journalErreur } from "./journal";
-import { planifier } from "./taches";
+import { retenir } from "./memoire-groupee";
 import { aujourdhuiParis } from "./temps";
 import { venteDuChat } from "./vente";
 
 /* Le chat du quotidien : la mémoire à la place de la conv, les derniers échanges, ce qu’il vient d’écrire. */
 
+/** Les derniers échanges que le chat relit : plus que ceux qu’une mise à jour de la mémoire attend (ECHANGES_PAR_MAJ, src/server/memoire-groupee.ts). */
 const ECHANGES_DANS_LE_FIL = 6;
-/** Des messages envoyés avec un échange, le fil garde les derniers. */
+/** Des messages envoyés avec un échange, le fil garde les derniers : au-delà, la mémoire se met à jour sans attendre. */
 const LIGNES_DANS_LE_FIL = 15;
 
 async function fil(storyId: string): Promise<Fil> {
@@ -58,6 +59,16 @@ async function fil(storyId: string): Promise<Fil> {
 
 const resume = (r: ReponseChat) => [...r.lecture.map((b) => b.texte), ...(r.a_envoyer ?? []), r.question ?? "", r.reaction ?? ""].filter(Boolean).join(" / ");
 const texteDe = (r: ReponseChat) => [resume(r), r.pourquoi ?? ""].join(" ");
+
+/**
+ * Ce qu’un échange demande à la mémoire (retenir, src/server/memoire-groupee.ts). Des messages ajoutés, une nouvelle, un
+ * message reçu, une suite, ou un niveau qui bouge : il ouvre une mise à jour (`neuf`). Un niveau atteint, ou plus de
+ * messages ajoutés que le fil n’en garde : elle part sans attendre que le chat se calme (`maintenant`).
+ */
+export const pourLaMemoire = (sortie: Pick<ReponseChat, "type" | "niveau_atteint">, ajoutes: number) => ({
+  neuf: ajoutes > 0 || ["nouvelle", "message_recu", "suite"].includes(sortie.type) || !!sortie.niveau_atteint,
+  maintenant: !!sortie.niveau_atteint || ajoutes > LIGNES_DANS_LE_FIL,
+});
 
 /** Ce qu’il écrit quand il envoie des messages sans un mot : la demande qu’on a testée sur les évals. */
 const DEMANDE_PAR_DEFAUT = "ça veut dire quoi ? je lui réponds quoi ?";
@@ -189,7 +200,8 @@ function bullesAuFil(lignes: Map<string, string>, messages: Map<string, Message>
 
 /**
  * Une réponse de BLUSH, en bulles. `ajout` : les messages de leur conv (ou son profil) qu’il vient d’envoyer, et
- * ce que l’historique en réaffiche. Elle enregistre l’échange et, s’il apporte du neuf, programme la mise à jour de la mémoire.
+ * ce que l’historique en réaffiche. Elle enregistre l’échange et le retient pour la mise à jour de la mémoire, groupée
+ * (`majMemoire` : elle part tout de suite, la chaîne est à relancer).
  * `parVocal` : il a envoyé un vocal, BLUSH répond en vocal. Elle répond aussi en vocal tant qu’il le lui a demandé.
  * `surEvenement` : la réponse en flux (POST /api/chat) : ses bulles une à une pendant qu’il écrit, la réponse validée
  * dès que l’échange est enregistré, puis le vocal, fait après elle. La réponse rendue à la fin a son vocal.
@@ -387,18 +399,17 @@ export async function repondre(
   surEvenement?.({ reponse: { ...montree, ...(voix ? { vocalEnCours: true } : {}) } });
 
   /*
-   * Des messages ajoutés, une nouvelle, un message reçu, une suite, ou un niveau qui bouge : la mémoire se met à jour
-   * après la réponse. Verrouillée, elle n’apprend que ce qu’il a dit : rien de la réponse ne doit ressortir ailleurs (sa
-   * fiche) avant d’être payé
+   * L’échange est retenu pour la mise à jour de la mémoire (pourLaMemoire, retenir) : elle part quand le chat se calme,
+   * ou tout de suite (`majMemoire` : la chaîne repart après la réponse). Verrouillée, elle n’apprend que ce qu’il a dit :
+   * rien de la réponse ne doit ressortir ailleurs (sa fiche) avant d’être payé. Celle du garde-fou ne lui apprend rien
    */
-  const majMemoire = !fuite && (nouvelles.length > 0 || ["nouvelle", "message_recu", "suite"].includes(sortie.type) || !!sortie.niveau_atteint);
   const echange: Echange = {
     date: jour.iso,
     dit,
     reponse: verrouillee ? [] : sortie.lecture.map((b) => b.texte).concat(sortie.a_envoyer ?? []),
     ...(nouvelles.length ? { lignes: nouvelles } : {}),
   };
-  if (majMemoire) await planifier(story.id, "memoire_maj", echange);
+  const majMemoire = !fuite && (await retenir(story.id, echange, pourLaMemoire(sortie, nouvelles.length))).part;
 
   /* Le vocal, fait après la réponse : l’échange enregistré le reprend (l’historique le réécoute), puis il part */
   const vocal = (voix ? await voix : null) ?? null;

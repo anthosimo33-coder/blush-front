@@ -323,6 +323,11 @@ export const tasks = pgTable(
     /** Le détail de l’avancée (les chapitres du rapport : écrits, en cours), des numéros seulement, jamais de contenu. */
     detail: jsonb("detail").$type<DetailEcriture>(),
     heartbeatAt: quand("heartbeat_at"),
+    /**
+     * Une mise à jour de la mémoire groupée (memoire_maj) ne part pas avant cette heure : le chat se calme d’abord
+     * (src/server/memoire-groupee.ts). Null : elle part tout de suite, comme toute autre tâche.
+     */
+    pasAvant: quand("pas_avant"),
     createdAt: quand("created_at").notNull().defaultNow(),
     updatedAt: quand("updated_at").notNull().defaultNow(),
   },

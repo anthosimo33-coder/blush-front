@@ -59,8 +59,8 @@ export type Formes = {
   "memories.data": DonneesMemoire;
   "chat_messages.data:toi": MessageToi;
   "chat_messages.data:blush": MessageBlush;
-  /** L’entrée d’une tâche : l’échange qui met la mémoire à jour (memoire_maj, la seule qui en a une). */
-  "tasks.input": Echange;
+  /** L’entrée d’une tâche : les échanges qui mettent la mémoire à jour (memoire_maj, la seule qui en a une), dans l’ordre. */
+  "tasks.input": Echange[];
   "shares.data": VerdictPartage;
   "vocals.data": DonneesVocal;
   /** L’email de la liste d’attente, en minuscules (src/server/attente.ts). */
@@ -152,6 +152,9 @@ const RapportGarde = z.looseObject({
   lecture: z.looseObject({ free: z.string(), full: z.string() }),
 });
 
+/* Avant le 22 octobre 2026 (la mise à jour groupée, src/server/memoire-groupee.ts) : un seul échange par tâche */
+const EntreeGardee = z.union([z.array(objet<Echange>()), objet<Echange>().transform((e) => [e])]);
+
 const VocalGarde = z.looseObject({
   sobre: z.boolean(),
   lignes: z.array(objet<VocalLigne>()),
@@ -173,7 +176,7 @@ const REGISTRE: { [C in Colonne]: Regle<Formes[C]> } = {
   "memories.data": { relecture: MemoireGardee },
   "chat_messages.data:toi": {},
   "chat_messages.data:blush": {},
-  "tasks.input": {},
+  "tasks.input": { relecture: EntreeGardee },
   "shares.data": {},
   "vocals.data": { relecture: VocalGarde },
   "waitlist.email": {},

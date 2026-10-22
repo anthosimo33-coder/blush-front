@@ -82,10 +82,11 @@ test("le chat au quotidien : l’intro de BLUSH, un message écrit, ses bulles, 
     expect(await messagesDuChat(email)).toEqual(["toi", "blush"]);
   });
 
-  await test.step("la nouvelle rejoint sa fiche : la mémoire se met à jour après la réponse", async () => {
-    expect((await attendreTaches(email)).map((t) => [t.genre, t.statut])).toContainEqual(["memoire_maj", "fini"]);
+  await test.step("la nouvelle rejoint sa fiche : la mémoire attend que le chat se calme, et se met à jour dès que sa fiche s’ouvre", async () => {
+    expect((await attendreTaches(email)).map((t) => [t.genre, t.statut, t.differee])).toContainEqual(["memoire_maj", "attente", true]);
     await ouvrir(page, "/app/fiche");
     await expect(page.getByRole("region", { name: "Tes notes" }).getByText("Adore les soirées improvisées")).toBeVisible();
+    expect((await attendreTaches(email)).map((t) => [t.genre, t.statut])).toContainEqual(["memoire_maj", "fini"]);
   });
 });
 
@@ -200,9 +201,12 @@ test("le « + » du chat : le menu, un nouvel export puis des captures, montrés
     await expect(fil.getByText(nouvel.nom)).toHaveCount(0);
     await expect(deja).toHaveCount(0);
     expect(await messagesDuChat(email)).toEqual(["toi", "blush", "toi", "blush"]);
-    /* L’export et les captures apportent du neuf : deux mises à jour de la mémoire, après les réponses (ce qu’elles
-       rangent dans sa fiche : chat-fiche-sa-fiche.spec.ts) */
-    expect((await attendreTaches(email)).filter((t) => t.genre === "memoire_maj").map((t) => t.statut)).toEqual(["fini", "fini"]);
+    /* L’export et les captures apportent plus de messages que le fil n’en garde : la mémoire se met à jour sans attendre,
+       après chaque réponse, ou une fois pour les deux si la seconde a rejoint la première avant qu’elle parte (ce
+       qu’elles rangent dans sa fiche : chat-fiche-sa-fiche.spec.ts) */
+    const majs = (await attendreTaches(email)).filter((t) => t.genre === "memoire_maj").map((t) => t.statut);
+    expect(majs.length).toBeGreaterThanOrEqual(1);
+    expect(majs.every((s) => s === "fini")).toBe(true);
   });
 });
 
