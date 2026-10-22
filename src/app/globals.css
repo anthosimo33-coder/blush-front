@@ -751,7 +751,9 @@
 /* Une feuille ouverte : les boucles de la page derrière (défilé, logos qui flottent ou écrivent, bulle qui s’agite) se figent ;
    rien ne bouge plus sous le voile, le téléphone n’a que la feuille à dessiner. Le contenu de la feuille, lui, continue */
 html:has(dialog[open])
-  :is([data-marquee], [data-float], [data-nudge], [data-dring], [data-dring-icone], [data-live] [data-pearl], [data-live] [data-shade], [data-live] [data-glow]):not(dialog *) {
+  :is([data-marquee], [data-float], [data-nudge], [data-dring], [data-dring-icone], [data-live] [data-pearl], [data-live] [data-shade], [data-live] [data-glow], [data-pied] *):not(
+    dialog *
+  ) {
   animation-play-state: paused;
 }
 /* Code faux : les cases tremblent une fois */
@@ -1651,6 +1653,189 @@ html:active-view-transition-type(accueil-vers-convs)::view-transition-new(root) 
   animation: blushDringIcone 5s linear 1.5s infinite;
 }
 
+/* ———— La landing : le pied de page (src/components/landing/PiedDePage.tsx) ————
+   Une scène dessinée deux fois, pour le téléphone (390 de large) et pour l’ordi (1440), qui suit la largeur du pied de
+   page : --m et --u valent un pixel de chaque maquette (mesurés en cqw, sur le pied de page lui-même, sans la barre de
+   défilement ; de 0,8 à 1,6 px au téléphone et à la tablette, jusqu’à 1 px à l’ordi, puis la scène se centre).
+   Chaque objet (.pied-objet) lit sa place dans les deux maquettes : --x --y --l (largeur) --t (taille du texte, ses
+   dimensions en em la suivent) --rm (rotation) au téléphone, --X --Y --L --T --rd à l’ordi, et --b / --B pour une place
+   par le bas (ce qui grandit vers le haut). Une variable absente laisse la propriété en automatique.
+   Le navigateur ne dessine pas le pied de page tant qu’on en est loin (content-visibility). */
+[data-pied] {
+  container-type: inline-size;
+  content-visibility: auto;
+  /* Sa hauteur tant qu’il n’est pas dessiné, à peu près celle de la maquette à cette largeur (puis la vraie, retenue) */
+  contain-intrinsic-block-size: auto calc(940 * clamp(0.8px, 100vw / 390, 1.6px) + 388px);
+}
+.pied-scene {
+  --m: clamp(0.8px, 100cqw / 390, 1.6px);
+  --u: min(1px, 100cqw / 1440);
+}
+.pied-objet {
+  position: absolute;
+  left: calc(var(--x) * var(--m));
+  top: calc(var(--y) * var(--m));
+  bottom: calc(var(--b) * var(--m));
+  width: calc(var(--l) * var(--m));
+  font-size: calc(var(--t) * var(--m));
+  /* La rotation passe par --r : la boucle qui flotte (dFloat) la garde */
+  --r: var(--rm, 0deg);
+  transform: rotate(var(--r));
+}
+/* Les yeux du chat regardent sa bulle : à gauche au téléphone (le chat est à droite), à droite à l’ordi */
+.pied-pupilles {
+  transform: translateX(-12px);
+}
+@media (min-width: 1024px) {
+  [data-pied] {
+    contain-intrinsic-block-size: auto calc(1170 * min(1px, 100vw / 1440) + 100px);
+  }
+  .pied-objet {
+    left: calc(var(--X) * var(--u));
+    top: calc(var(--Y) * var(--u));
+    bottom: calc(var(--B) * var(--u));
+    width: calc(var(--L) * var(--u));
+    font-size: calc(var(--T) * var(--u));
+    --r: var(--rd, var(--rm, 0deg));
+  }
+  .pied-pupilles {
+    transform: none;
+  }
+}
+/* Le bouton blanc sur le rose : ses ombres de survol et de pression, teintées de rose plutôt que grises */
+.lift-rose {
+  --lift-hover: 0 2px 4px rgba(110, 0, 50, 0.18), 0 22px 40px -14px rgba(110, 0, 50, 0.6);
+  --lift-press: 0 1px 2px rgba(110, 0, 50, 0.2), 0 8px 16px -10px rgba(110, 0, 50, 0.5);
+}
+/* Le focus, en blanc : le bleu de partout se perd dans le rose */
+[data-pied] :focus-visible {
+  outline-color: #ffffff;
+}
+/* Les boucles : chacune sur un calque à soi (un élément HTML, ou un <svg> entier), qui ne change que transform ou opacity.
+   Le compositeur les joue sans repeindre la page ; hors de l’écran (data-hors-champ, l’îlot PiedEnVue), elles se figent. */
+@keyframes piedSonne {
+  0%,
+  46%,
+  100% {
+    transform: rotate(0deg);
+  }
+  4% {
+    transform: rotate(-7deg);
+  }
+  8% {
+    transform: rotate(6deg);
+  }
+  12% {
+    transform: rotate(-6deg);
+  }
+  16% {
+    transform: rotate(5deg);
+  }
+  20% {
+    transform: rotate(-4deg);
+  }
+  24% {
+    transform: rotate(3deg);
+  }
+  28% {
+    transform: rotate(-1.5deg);
+  }
+  32% {
+    transform: rotate(0deg);
+  }
+}
+@keyframes piedOnde {
+  0% {
+    opacity: 0;
+    transform: scale(0.7);
+  }
+  30% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.25);
+  }
+}
+@keyframes piedHalo {
+  from {
+    opacity: 0.8;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.7);
+  }
+}
+@keyframes piedPatte {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-5%);
+  }
+}
+@keyframes piedQueue {
+  0%,
+  100% {
+    transform: rotate(-8deg);
+  }
+  50% {
+    transform: rotate(12deg);
+  }
+}
+@keyframes piedClin {
+  0%,
+  90%,
+  100% {
+    transform: scaleY(1);
+  }
+  94% {
+    transform: scaleY(0.1);
+  }
+}
+@keyframes piedSaute {
+  0%,
+  55%,
+  100% {
+    transform: translateY(0);
+  }
+  25% {
+    transform: translateY(-18%);
+  }
+}
+[data-pied-sonne] {
+  animation: piedSonne 2.2s ease-in-out infinite;
+}
+[data-pied-onde] {
+  animation: piedOnde 1.4s ease-out infinite;
+}
+[data-pied-halo] {
+  animation: piedHalo 1.6s ease-out infinite;
+}
+[data-pied-patte] {
+  animation: piedPatte 1.1s ease-in-out infinite;
+}
+[data-pied-queue] {
+  animation: piedQueue 1.8s ease-in-out infinite;
+}
+[data-pied-clin] {
+  animation: piedClin 4s ease-in-out infinite;
+}
+[data-pied-saute] {
+  animation: piedSaute 1.3s ease-in-out infinite;
+}
+[data-pied][data-hors-champ] * {
+  animation-play-state: paused;
+}
+/* Safari, sur iPhone, teinte sa barre du bas du fond du body : arrivé au pied de page (l’îlot PiedEnVue), ce fond prend le
+   rose foncé de son bas, sans bande crème sous « blush » (et le rebond du bas est rose). La landing a son propre papier
+   (LandingFrame) : rien d’autre ne change de couleur */
+html[data-pied-en-vue] body {
+  background: #a50f55;
+}
+
 /* Un chapitre qui s’écrit : ses lignes se remplissent, l’une après l’autre */
 /* Une échelle plutôt qu’une largeur : l’animation tourne pendant les 2 à 3 minutes de l’écriture, sans recalculer la page */
 @keyframes ecrit {
@@ -1729,6 +1914,13 @@ html:active-view-transition-type(accueil-vers-convs)::view-transition-new(root) 
   [data-nudge],
   [data-dring],
   [data-dring-icone],
+  [data-pied-sonne],
+  [data-pied-onde],
+  [data-pied-halo],
+  [data-pied-patte],
+  [data-pied-queue],
+  [data-pied-clin],
+  [data-pied-saute],
   [data-ecrit],
   [data-float],
   [data-marquee],

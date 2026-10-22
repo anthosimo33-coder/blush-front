@@ -11,7 +11,7 @@ import { desactiverPartage, expect, partageIllisible, test } from "./aide";
 const NB = "\u00a0";
 
 test("la landing : la promesse, les boutons vers le parcours, les faits, sans faux avis", async ({ page }) => {
-  await test.step("la promesse, et le bouton principal deux fois (en haut, en bas)", async () => {
+  await test.step("la promesse, et le bouton principal deux fois (en haut, puis dans le pied de page)", async () => {
     const reponse = await page.goto("/");
     expect(reponse?.status()).toBe(200);
     await expect(page).toHaveTitle("BLUSH · Analyse ta conv\u00a0: ce qui se passe vraiment entre vous");
@@ -20,11 +20,15 @@ test("la landing : la promesse, les boutons vers le parcours, les faits, sans fa
     await expect(titre).toContainText("en dit plus");
     await expect(titre).toContainText("que tu crois");
     await expect(main.getByText("Importe-la. BLUSH te dit ce qui se passe vraiment entre vous, messages à l’appui, et quoi répondre.")).toBeVisible();
-    const boutons = main.getByRole("link", { name: "Analyser ma conv" });
+    await expect(main.getByRole("link", { name: "Analyser ma conv" })).toHaveAttribute("href", "/commencer");
+    await expect(main.getByText("Paiement unique · Ta conv reste confidentielle")).toBeVisible();
+    /* Le pied de page fait le dernier appel : son titre géant, le bouton blanc et la même ligne, puis ses liens */
+    const pied = page.getByRole("contentinfo");
+    await expect(pied.getByRole("heading", { level: 2, name: "ta conv sait tout." })).toBeAttached();
+    const boutons = pied.getByRole("link", { name: "Analyser ma conv" });
     await expect(boutons).toHaveCount(2);
     for (const bouton of await boutons.all()) await expect(bouton).toHaveAttribute("href", "/commencer");
-    await expect(main.getByText("Paiement unique · Ta conv reste confidentielle")).toHaveCount(2);
-    await expect(main.getByRole("heading", { level: 2, name: "Ta conv a déjà la réponse." })).toBeVisible();
+    await expect(pied.getByText("Paiement unique · Ta conv reste confidentielle")).toBeAttached();
   });
 
   await test.step("les faits, et les témoignages des testeurs", async () => {
