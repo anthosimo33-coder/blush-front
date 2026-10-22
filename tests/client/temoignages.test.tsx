@@ -1,3 +1,5 @@
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { CarteTemoignage, enCitation } from "@/components/temoignages/CarteTemoignage";
@@ -36,5 +38,19 @@ describe("les témoignages (la maquette A1)", () => {
     const { container } = render(<CarteTemoignage t={t} />);
     expect(container.querySelector("blockquote")?.textContent).toBe(t.text);
     expect(container.querySelector("mark")).toBeNull();
+  });
+
+  it("sa photo dans le rond quand il l’a donnée (un fichier de public/avis/), son initiale sinon", () => {
+    for (const t of TESTIMONIALS.filter((t) => t.photo)) {
+      expect(t.photo, `${t.name} : sa photo`).toMatch(/^\/avis\/[a-z-]+\.webp$/);
+      expect(existsSync(join(process.cwd(), "public", t.photo!)), `${t.name} : ${t.photo} existe`).toBe(true);
+    }
+    const t = { ...TESTIMONIALS[0]!, photo: "/avis/mattheo.webp" };
+    const avec = render(<CarteTemoignage t={t} />);
+    expect(avec.container.querySelector("figcaption img")?.getAttribute("src")).toBe("/avis/mattheo.webp");
+    avec.unmount();
+    const sans = render(<CarteTemoignage t={{ ...t, photo: undefined }} />);
+    expect(sans.container.querySelector("figcaption img")).toBeNull();
+    expect(sans.container.querySelector("figcaption")?.textContent).toContain(t.name.charAt(0));
   });
 });
