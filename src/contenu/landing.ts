@@ -364,12 +364,13 @@ export const TESTIMONIALS: Testimonial[] = [
 
 /**
  * La note des avis sur la landing (NOTE_DES_AVIS, src/contenu/paiement.ts) : sous les boutons, et, au-dessus des avis,
- * d’où elle vient. À côté d’une note, la loi demande de dire qui l’a donnée et quand (Code de la consommation, art.
- * D.111-17 ; la directive Omnibus).
+ * qui l’a donnée (des testeurs).
+ * TODO(produit): à côté d’une note, la loi demande aussi quand et comment les avis ont été recueillis (Code de la
+ * consommation, art. D.111-17 ; la directive Omnibus) ; retiré le 22 octobre à la demande de l’utilisateur.
  */
 export const NOTE_LANDING = {
   avis: (nombre: string) => ` · ${nombre} avis de testeurs`,
-  origine: (note: string, nombre: string) => `${note} sur 5, d’après ${nombre} avis de testeurs de BLUSH, recueillis lors de tests menés en université en octobre 2026.`,
+  origine: (note: string, nombre: string) => `${note} sur 5, d’après ${nombre} avis de testeurs de BLUSH.`,
 };
 
 /** Dans le bloc du quotidien, la réponse de BLUSH à « elle voit quelqu’un d’autre ? ». */
