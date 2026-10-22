@@ -116,7 +116,8 @@ export function Paywall({
   return (
     <main className="mx-auto flex min-h-dvh w-full flex-col">
       {lot && roue?.etat === "gagnee" && <BandeauDuCadeau key={roue.fin} lot={lot} reste={roue.reste} onPasse={() => setPasse(true)} />}
-      <div className="mx-auto flex w-full max-w-[1120px] flex-1 flex-col gap-3 px-4 pb-6 pt-3 lg:gap-8 lg:px-12 lg:py-10">
+      {/* Sur téléphone, le bas laisse la place de la barre du bas (BarreDuBas, 74 px et l’encoche) : la dernière question n’est jamais dessous */}
+      <div className="mx-auto flex w-full max-w-[1120px] flex-1 flex-col gap-3 px-4 pb-[calc(96px+env(safe-area-inset-bottom))] pt-3 lg:gap-8 lg:px-12 lg:py-10">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1.5">
             <BubbleLogo size={16} />
