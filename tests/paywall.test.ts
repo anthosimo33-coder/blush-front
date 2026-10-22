@@ -166,14 +166,14 @@ describe("une conv payée qui lève une alerte", () => {
       .where(and(eq(schema.achats.userId, u.id), eq(schema.achats.storyId, conv)));
   });
 
-  /** Le modèle factice, son verdict avec cette alerte ; en détresse, son rapport doux suit (FACTICE.alerte). */
-  const avecAlerte = (alerte: "danger" | "detresse") => (req: Requete) => {
+  /** Le modèle factice, son verdict avec cette alerte ; pour la règle de l’âge, son rapport doux suit (FACTICE.alerte). */
+  const avecAlerte = (alerte: "danger" | "detresse" | "mineur") => (req: Requete) => {
     if (req.tache === "04-verdict") return { ...(fournisseurFactice(req) as object), alerte };
-    return fournisseurFactice(alerte === "detresse" ? { ...req, blocs: [...req.blocs, { texte: FACTICE.alerte }] } : req);
+    return fournisseurFactice(alerte === "mineur" ? { ...req, blocs: [...req.blocs, { texte: FACTICE.alerte }] } : req);
   };
 
   /** Une conv payée (un achat « paye »), puis sa chaîne entière, son verdict levant cette alerte. Rend la conv et son verdict gardé. */
-  async function payeeAvec(prefixe: string, alerte: "danger" | "detresse") {
+  async function payeeAvec(prefixe: string, alerte: "danger" | "detresse" | "mineur") {
     const { u, conv } = await lectureLancee(prefixe);
     await db().insert(schema.achats).values({ userId: u.id, storyId: conv, offre: "rapport", centimes: 990, bulles: 10, fournisseur: "factice", statut: "paye" });
     await debloquerLaConv(conv);
@@ -190,10 +190,10 @@ describe("une conv payée qui lève une alerte", () => {
     return { conv, sortie: coffre.lire("verdicts.data", v!.data).sortie, nettoyer };
   }
 
-  it("une alerte danger (21 octobre 2026) : le verdict et le rapport complets, rien à rembourser", async () => {
+  it.each(["danger", "detresse"] as const)("une alerte %s (21 et 22 octobre 2026) : le verdict et le rapport complets, rien à rembourser", async (alerte) => {
     etat.alertes.length = 0;
-    const { conv, sortie, nettoyer } = await payeeAvec("paywall-danger", "danger");
-    expect(sortie).toMatchObject({ alerte: "danger", mode_sobre: false });
+    const { conv, sortie, nettoyer } = await payeeAvec(`paywall-${alerte}`, alerte);
+    expect(sortie).toMatchObject({ alerte, mode_sobre: false });
     expect(sortie.titres).not.toBeNull();
     expect(await convEnAlerte(conv)).toBe(false);
     expect((await etatDesTaches(conv, ["rapport_chapitres"])).rapport_chapitres?.status).toBe("fini");
@@ -201,10 +201,10 @@ describe("une conv payée qui lève une alerte", () => {
     await nettoyer();
   });
 
-  it("une alerte détresse : le mode sobre, et l’équipe prévenue de rembourser", async () => {
+  it("une alerte de la règle de l’âge : le mode sobre, et l’équipe prévenue de rembourser", async () => {
     etat.alertes.length = 0;
-    const { conv, sortie, nettoyer } = await payeeAvec("paywall-detresse", "detresse");
-    expect(sortie).toMatchObject({ alerte: "detresse", mode_sobre: true, titres: null });
+    const { conv, sortie, nettoyer } = await payeeAvec("paywall-mineur", "mineur");
+    expect(sortie).toMatchObject({ alerte: "mineur", mode_sobre: true, titres: null });
     expect(await convEnAlerte(conv)).toBe(true);
     expect(etat.alertes).toContain("à rembourser : une conv payée lève une alerte");
     await nettoyer();

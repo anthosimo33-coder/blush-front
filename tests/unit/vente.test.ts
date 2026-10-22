@@ -12,7 +12,7 @@ const calme: SituationDeVente = {
   memePersonne: false,
   alerte: false,
   sobre: false,
-  dangerSobre: false,
+  ancienSobre: false,
   verrouillee: false,
   rapportSeul: false,
   messages48h: 4,
@@ -54,13 +54,13 @@ describe("la vente dans le chat : quelle carte, et quand", () => {
     expect(avec({ verrouillee: true, rapportSeul: true })).toEqual({ genre: "premium", spontanee: false });
   });
 
-  it("un rapport doux : rien, même demandé ; un ancien doux « danger » : le réimport, seulement s’il le demande", () => {
+  it("un rapport doux : rien, même demandé ; un ancien doux « danger » ou « détresse » : le réimport, seulement s’il le demande", () => {
     expect(avec({ sobre: true, moment: "demande_achat" })).toBeNull();
     expect(avec({ sobre: true, verrouillee: true })).toBeNull();
-    expect(avec({ sobre: true, dangerSobre: true, moment: "demande_achat" })).toEqual({ genre: "reimport", spontanee: false });
-    expect(avec({ sobre: true, dangerSobre: true, moment: "demande_rapport", prenomAutre: "Inès" })).toEqual({ genre: "reimport", spontanee: false });
+    expect(avec({ sobre: true, ancienSobre: true, moment: "demande_achat" })).toEqual({ genre: "reimport", spontanee: false });
+    expect(avec({ sobre: true, ancienSobre: true, moment: "demande_rapport", prenomAutre: "Inès" })).toEqual({ genre: "reimport", spontanee: false });
     expect(avec({ sobre: true, moment: "demande_rapport" })).toBeNull();
-    expect(avec({ sobre: true, dangerSobre: true, moment: "autre_personne", prenomAutre: "Léa" })).toBeNull();
+    expect(avec({ sobre: true, ancienSobre: true, moment: "autre_personne", prenomAutre: "Léa" })).toBeNull();
   });
 
   it("il parle de quelqu’un d’autre : l’autre conv, spontanée, une fois par prénom", () => {

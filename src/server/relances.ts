@@ -1,5 +1,6 @@
 import "server-only";
 import { and, eq, isNull, sql } from "drizzle-orm";
+import { alerteSobre } from "@prompts/lib/titres";
 import { empreinte, memeEmpreinte } from "./chiffrement";
 import { db, schema } from "./db";
 import { donneesVerdict } from "./depot";
@@ -151,13 +152,14 @@ export async function envoyerLesRelances(): Promise<PassageDesRelances> {
       break;
     }
     /*
-     * L’équipe ne paie rien, la bêta fermée ne laisse pas entrer tout le monde, une alerte n’appelle aucun mail (danger
-     * compris, qui se vend dans l’appli depuis le 21 octobre 2026 : sa boîte peut être lue par l’autre). Sans
+     * L’équipe ne paie rien, la bêta fermée ne laisse pas entrer tout le monde, le mode sobre n’appelle aucun mail (la
+     * règle de l’âge, ou un rapport doux gardé). « Danger » et « détresse » sont relancés comme les autres depuis le 22
+     * octobre 2026 (décision validée par l’avocat). Sans
      * verdict, seule une conv qui attend son paiement (le paywall d’abord, rien de lu) est relancée
      */
     const verdict = await donneesVerdict(c.storyId);
     const attendSonPaiement = !verdict && (await etatDesTaches(c.storyId, ["verdict"])).verdict?.status === "paiement";
-    if (estEquipe(c) || !(await entre(c.email)) || (!verdict && !attendSonPaiement) || verdict?.sortie.alerte || verdict?.sortie.mode_sobre) {
+    if (estEquipe(c) || !(await entre(c.email)) || (!verdict && !attendSonPaiement) || (verdict && (verdict.sortie.mode_sobre || alerteSobre(verdict.sortie.alerte)))) {
       passage.ecartees++;
       continue;
     }

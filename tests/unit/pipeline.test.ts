@@ -28,6 +28,7 @@ const etat = (e: Partial<EtatChaine> = {}): EtatChaine => ({
   taches: taches({ verdict: "fini" }),
   ...e,
 });
+/** Un rapport doux gardé d’avant le 21 octobre 2026 (« danger », alors en mode sobre) : comme la règle de l’âge aujourd’hui. */
 const ALERTE = { alerte: "danger", mode_sobre: true } as const;
 /** Le mode sobre d’avant le 9 octobre : un rejet, sans alerte (héritage). */
 const SOBRE_SANS_ALERTE = { alerte: null, mode_sobre: true } as const;
@@ -47,6 +48,12 @@ const LIGNES: Ligne[] = [
   ["après le verdict, la conv effacée (30 jours) : rien ne la relit", etat({ conv: false }), true, []],
   /* Le rapport */
   ["après le plan : les chapitres, et le vocal", etat({ plan: true, taches: taches({ verdict: "fini", rapport_plan: "fini" }) }), true, ["rapport_chapitres", "vocal"]],
+  [
+    "une alerte « détresse » d’aujourd’hui (sans mode sobre, 22 octobre 2026), après le plan : les chapitres, et le vocal",
+    etat({ verdict: { alerte: "detresse", mode_sobre: false }, plan: true, taches: taches({ verdict: "fini", rapport_plan: "fini" }) }),
+    true,
+    ["rapport_chapitres", "vocal"],
+  ],
   ["après le plan, sans voix : les chapitres", etat({ voix: false, plan: true, taches: taches({ verdict: "fini", rapport_plan: "fini" }) }), true, ["rapport_chapitres"]],
   ["le plan en cours : le moteur planifiera la suite à sa fin", etat({ taches: taches({ verdict: "fini", rapport_plan: "en_cours" }) }), true, []],
   ["le plan en échec : « Relancer l’écriture », pas ici", etat({ taches: taches({ verdict: "fini", rapport_plan: "echec" }) }), true, []],

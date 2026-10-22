@@ -41,10 +41,10 @@ const RETRACTATION_MS = 14 * 24 * 3600e3;
 export type RefusDeCommande = "aucune" | "deja" | "offre" | "sobre" | "trop";
 
 /**
- * La conv est-elle en mode sobre (une alerte détresse, ou la règle de l’âge : moins de 15 ans, un adulte avec un
- * mineur) ? Son rapport est alors le rapport doux, offert : rien ne s’y vend, ni le rapport, ni sa suite, ni le rapport
- * d’avance. Une alerte « danger » n’y met plus depuis le 21 octobre 2026 (alerteSobre) : son rapport complet se vend
- * comme les autres. Un verdict « danger » gardé avant reste sobre (`mode_sobre`). Sans verdict encore écrit : non.
+ * La conv est-elle en mode sobre (la règle de l’âge : moins de 15 ans, un adulte avec un mineur) ? Son rapport est
+ * alors le rapport doux, offert : rien ne s’y vend, ni le rapport, ni sa suite, ni le rapport d’avance. Une alerte
+ * « danger » n’y met plus depuis le 21 octobre 2026, une alerte « détresse » depuis le 22 (alerteSobre) : leur rapport
+ * complet se vend comme les autres. Un verdict gardé avant reste sobre (`mode_sobre`). Sans verdict encore écrit : non.
  */
 export async function convEnAlerte(storyId: string): Promise<boolean> {
   const v = await donneesVerdict(storyId);
@@ -314,7 +314,7 @@ async function ouvrirLaConv(tx: Transaction, userId: string, storyId: string): P
 
 /**
  * Le paywall passe avant la lecture (16 octobre) : une conv payée peut lever une alerte qui la met en mode sobre
- * (détresse, mineur ; « danger » se vend depuis le 21 octobre 2026), et le mode sobre ne se vend jamais. Son rapport doux reste offert ; ses achats payés sont signalés à l’équipe, qui les rembourse chez
+ * (la règle de l’âge ; « danger » se vend depuis le 21 octobre 2026, « détresse » depuis le 22), et le mode sobre ne se vend jamais. Son rapport doux reste offert ; ses achats payés sont signalés à l’équipe, qui les rembourse chez
  * Whop (le webhook du remboursement les reprend). Rien de la conv dans l’alerte : la tâche, l’achat, le montant.
  * TODO(produit): rembourser tout seul par l’API de Whop, une fois son appel vérifié.
  */

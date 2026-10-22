@@ -66,14 +66,20 @@ afterEach(async () => {
   await poserLeCompteur(0);
 });
 
-/** Un compte et une conv lue (son verdict), sans rapport débloqué. `alerte` : le verdict lève une alerte (le mode sobre). */
-async function compteAvecConv(prefixe: string, { alerte = false } = {}): Promise<{ u: Utilisateur; conv: string }> {
+/**
+ * Un compte et une conv lue (son verdict), sans rapport débloqué. `alerte` : le verdict lève cette alerte, en mode sobre
+ * ou non (un rapport doux gardé d’avant le 22 octobre 2026, ou une alerte « danger » ou « détresse » d’aujourd’hui).
+ */
+async function compteAvecConv(
+  prefixe: string,
+  { alerte }: { alerte?: { alerte: "danger" | "detresse" | "mineur"; mode_sobre: boolean } } = {},
+): Promise<{ u: Utilisateur; conv: string }> {
   const u = await compteDeTest(prefixe);
   const imp = await convRattachee(u, "01-a-deux-doigts.txt");
   let data = verdictLu;
   if (alerte) {
     const v = coffre.lire("verdicts.data", verdictLu);
-    data = coffre.ecrire("verdicts.data", { ...v, sortie: { ...v.sortie, alerte: "danger", mode_sobre: true } });
+    data = coffre.ecrire("verdicts.data", { ...v, sortie: { ...v.sortie, ...alerte } });
   }
   await db().insert(schema.verdicts).values({ storyId: imp.id, data });
   return { u, conv: imp.id };
@@ -177,8 +183,14 @@ describe("la relance par mail (②)", () => {
     expect([await relanceNotee(debloquee.u), await relanceNotee(payee.u)]).toEqual([null, null]);
   });
 
-  it("jamais pour une conv en alerte (le mode sobre), ni à l’équipe", async () => {
-    const alerte = await compteAvecConv("relance-alerte", { alerte: true });
+  it.each(["danger", "detresse"] as const)("une alerte %s d’aujourd’hui (22 octobre 2026, sans mode sobre) : la relance part comme pour les autres", async (alerte) => {
+    const { u, conv } = await compteAvecConv(`relance-${alerte}`, { alerte: { alerte, mode_sobre: false } });
+    await feuilleFermee(u, conv);
+    expect(await relancesPour(u.email, envoyerLesRelances)).toBe(1);
+  });
+
+  it("jamais pour une conv en alerte sobre (la règle de l’âge, ou un rapport doux gardé), ni à l’équipe", async () => {
+    const alerte = await compteAvecConv("relance-alerte", { alerte: { alerte: "mineur", mode_sobre: true } });
     await feuilleFermee(alerte.u, alerte.conv);
     const equipe = await compteAvecConv("relance-equipe");
     EQUIPE.email = equipe.u.email;

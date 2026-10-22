@@ -82,24 +82,32 @@ type Emoji = "🔥" | "🤏" | "🤔" | "🧊";
 
 /**
  * Un compte et sa conv (Hugo, il, parle de Sophie), son verdict (`emoji`, `alerte`, `niveau`) et son rapport écrits,
- * débloquée il y a `debloque`. `pronom` : celui de l’utilisateur ; `bulles` : son solde.
+ * débloquée il y a `debloque`. `alerte` : celle du verdict, en mode sobre ou non. `pronom` : celui de l’utilisateur ;
+ * `bulles` : son solde.
  */
 async function client(
   prefixe: string,
   {
     debloque = 25 * HEURE,
     emoji = "🤏",
-    alerte = false,
+    alerte,
     pronom = "il",
     niveau = "voit",
     bulles = 0,
-  }: { debloque?: number; emoji?: Emoji; alerte?: boolean; pronom?: "il" | "elle"; niveau?: LevelId; bulles?: number } = {},
+  }: {
+    debloque?: number;
+    emoji?: Emoji;
+    alerte?: { alerte: "danger" | "detresse" | "mineur"; mode_sobre: boolean };
+    pronom?: "il" | "elle";
+    niveau?: LevelId;
+    bulles?: number;
+  } = {},
 ) {
   const u = await compteDeTest(prefixe);
   const conv = (await convPrete(u, "01-a-deux-doigts.txt", { moi: "Hugo", pronom })).id;
   if (bulles) await db().update(schema.users).set({ bulles }).where(eq(schema.users.id, u.id));
   const v = coffre.lire("verdicts.data", lu.verdict);
-  const sortie = { ...v.sortie, emoji, niveau, ...(alerte && { alerte: "danger" as const, mode_sobre: true }) };
+  const sortie = { ...v.sortie, emoji, niveau, ...alerte };
   await db()
     .insert(schema.verdicts)
     .values({ storyId: conv, data: coffre.ecrire("verdicts.data", { ...v, sortie }) });
@@ -222,8 +230,15 @@ describe("S3 · après l’achat", () => {
     expect(doux!.html).not.toContain("€");
   });
 
-  it("une conv en alerte : rien, jamais", async () => {
-    const { u } = await client("sequence-alerte", { alerte: true });
+  it.each(["danger", "detresse"] as const)("une alerte %s d’aujourd’hui (22 octobre 2026, sans mode sobre) : ses mails comme les autres", async (alerte) => {
+    const { u } = await client(`sequence-${alerte}`, { alerte: { alerte, mode_sobre: false } });
+    await passer();
+    expect(pour(u).map((m) => m.sujet)).toEqual(["alors\u00a0?"]);
+    expect(await envois(u)).toEqual([{ cle: "s3_repondre", parti: true }]);
+  });
+
+  it("une conv en alerte sobre (la règle de l’âge, ou un rapport doux gardé) : rien, jamais", async () => {
+    const { u } = await client("sequence-alerte", { alerte: { alerte: "mineur", mode_sobre: true } });
     await passer();
     expect(pour(u)).toEqual([]);
     expect(await envois(u)).toEqual([{ cle: "s3_repondre", parti: false }]);

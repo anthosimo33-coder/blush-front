@@ -3,7 +3,7 @@
  * quand il n’y a plus de bulles), et les lignes d’écoute du rapport doux (le mode sobre). Un numéro changé ici change
  * partout.
  * Aucune détection de la détresse ne tourne sur le serveur avant le modèle : c’est le modèle qui lève une alerte (le
- * mode sobre pour la détresse et l’âge ; une réponse du chat en alerte se paie comme les autres depuis le 21 octobre
+ * mode sobre pour la règle de l’âge ; une réponse du chat en alerte se paie comme les autres depuis le 21 octobre
  * 2026, mais verrouillée, elle montre les numéros d’urgence). Un message envoyé sans bulles quand une réponse verrouillée attend déjà
  * n’arrive pas jusqu’à lui (402 « bulles ») : cette réponse, et ce que l’écran en dit, portent donc toujours les
  * numéros d’urgence (AIDE_SANS_BULLES), quoi qu’il ait écrit.
