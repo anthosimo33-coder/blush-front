@@ -152,7 +152,13 @@ export function Paywall({
         <Sommaire autre={autre.name} className="mt-3 flex lg:hidden" />
         <Temoignages items={enPremier(temoignages, AVIS_DU_HAUT[haut.genre])} />
         <AvantApres elle={elle} className="lg:hidden" />
-        <Questions autre={autre.name} elle={elle} />
+        <Questions autre={autre.name} />
+        {/* Sur ordinateur, la carte du paiement n’est plus à l’écran en bas : un dernier bouton y ramène (sur téléphone, la barre du bas) */}
+        <div className="mx-auto hidden w-full max-w-[420px] pt-2 lg:block">
+          <Button arrow onClick={() => paiement.current?.scrollIntoView({ behavior: "smooth", block: "start" })}>
+            {PAYWALL.finale(autre.name)}
+          </Button>
+        </div>
         <FinDuPaywall />
       </div>
       <BarreDuBas cible={paiement} lot={lot} />
@@ -500,12 +506,13 @@ function Temoignages({ items }: { items: Testimonial[] }) {
           </p>
         )}
       </div>
-      {/* Zone qui défile : atteignable au clavier (ses flèches la font glisser) */}
+      {/* Zone qui défile : atteignable au clavier (ses flèches la font glisser). Elle déborde des marges de la page (et de
+          20 px sous les cartes, rendus par -mb-5) pour que l’ombre des cartes ne soit pas coupée net par ses bords */}
       <div
         ref={piste}
         tabIndex={0}
         aria-label={PAYWALL.lesAvis}
-        className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-4 [scrollbar-width:none] lg:mx-0 lg:w-full lg:gap-5 lg:px-0 [&::-webkit-scrollbar]:hidden"
+        className="-mx-4 -mb-5 flex snap-x snap-mandatory scroll-px-4 gap-3 overflow-x-auto px-4 pb-9 [scrollbar-width:none] lg:-mx-12 lg:w-[calc(100%+96px)] lg:scroll-px-12 lg:gap-5 lg:px-12 [&::-webkit-scrollbar]:hidden"
       >
         {items.map((t) => (
           <CarteTemoignage key={t.name + t.label} t={t} className="w-[312px] shrink-0 snap-start lg:w-[400px]" />
@@ -608,12 +615,12 @@ function AvantApres({ elle, className }: { elle: boolean; className?: string }) 
 }
 
 /** Les questions, en bas : la discrétion, l’abonnement, un souci (des volets qui s’ouvrent). */
-function Questions({ autre, elle }: { autre: string; elle: boolean }) {
+function Questions({ autre }: { autre: string }) {
   const volets = useRef<HTMLDivElement>(null);
   useJalonEnVue(volets, "questions");
   return (
     <div ref={volets} className="mt-2 flex flex-col rounded-[18px] bg-white px-4 shadow-[inset_0_0_0_1px_rgba(17,17,20,0.07)] lg:mx-auto lg:w-full lg:max-w-[720px]">
-      {PAYWALL.questions(autre, elle).map(({ q, r }, k) => (
+      {PAYWALL.questions(autre).map(({ q, r }, k) => (
         <details key={q} open={k === 0} className="group border-b border-sep py-3.5 last:border-b-0">
           <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-note font-black [&::-webkit-details-marker]:hidden">
             {q}

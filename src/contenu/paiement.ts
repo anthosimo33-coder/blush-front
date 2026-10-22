@@ -103,18 +103,28 @@ export const PAYWALL = {
     avecReponse: "je te laissais le temps de me manquer",
     avecSuite: (elle: boolean) => `${elle ? "Elle" : "Il"} relance.`,
   },
-  /** Les questions, en bas : la discrétion, l’abonnement, un souci (le remboursement, sur un problème technique seulement : les conditions). */
-  questions: (autre: string, elle: boolean) => [
+  /**
+   * Les questions, en bas (réécrites le 22 octobre, une proposition) : elles rassurent et redisent ce qu’on gagne, sans
+   * soulever de peur qu’on n’avait pas (plus d’« abonnement », plus de « si mon rapport ne s’écrit pas » : le
+   * remboursement sur un problème technique reste dans les conditions). Ce qu’on reçoit, que ce n’est pas deviné (la
+   * note des testeurs, quand il y en a une), et la discrétion, dite comme une promesse.
+   */
+  questions: (autre: string) => [
     {
-      q: `${autre} sera prévenu${elle ? "e" : ""}\u00a0?`,
-      r: "Jamais. BLUSH ne lui écrit pas. Ta conv reste chiffrée, et tu peux tout effacer à tout moment.",
+      q: "Je reçois quoi\u00a0?",
+      r: `Ton rapport sur toi et ${autre}, tout de suite\u00a0: ${NB_CHAPITRES} chapitres sur vous deux, ton vocal de 30 secondes, et BLUSH pour t’aider à lui répondre.`,
     },
-    { q: "C’est un abonnement\u00a0?", r: "Non. Tu paies une fois, et c’est à toi." },
     {
-      q: "Et si mon rapport ne s’écrit pas\u00a0?",
-      r: "Écris-nous à bonjour@askblush.com\u00a0: si un problème technique t’empêche de l’avoir, on le répare, ou on te rembourse.",
+      q: "C’est fiable\u00a0?",
+      r: `BLUSH ne devine pas\u00a0: tout ce qu’il te dit vient de vos messages, avec les passages qui le montrent et à quel point il en est sûr.${NOTE_DES_AVIS ? ` Ses testeurs lui donnent ${NOTE_DES_AVIS.note} sur 5.` : ""}`,
+    },
+    {
+      q: "Ça reste entre nous\u00a0?",
+      r: `Oui. ${autre} n’en saura jamais rien\u00a0: BLUSH ne lui écrit pas. Ta conv est chiffrée, et tu l’effaces quand tu veux.`,
     },
   ],
+  /** Sur ordinateur, sous les questions : le dernier bouton, qui ramène au paiement (la carte du paiement n’est plus à l’écran). */
+  finale: (autre: string) => `Débloquer mon rapport sur ${autre}`,
   /** La barre du bas, sur téléphone, quand le bouton qui paie est sorti de l’écran : elle y ramène. */
   barre: "Débloquer",
   barreAller: "Aller au paiement",
