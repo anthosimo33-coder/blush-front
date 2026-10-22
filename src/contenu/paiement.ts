@@ -87,6 +87,19 @@ export const PAYWALL = {
     vocal: (autre: string) => `Ton vocal sur toi et ${autre}`,
     duree: "30\u00a0s",
   },
+  /**
+   * Les aperçus du rapport (une proposition du 22 octobre 2026, la « photo produit » des boutiques) : quatre écrans en
+   * miniature, à son nom, avant les formules. Rien n’y est lu avant de payer : leur texte est flouté, seuls les titres
+   * (ceux d’attente) et la question qu’on pose à BLUSH se lisent.
+   */
+  apercus: {
+    /** Pour un lecteur d’écran : les miniatures, elles, sont décoratives. */
+    resume: (autre: string) => `Aperçu de ton rapport sur ${autre}\u00a0: ton vocal, ses chapitres et BLUSH pour lui répondre, floutés jusqu’au paiement.`,
+    vocal: "BLUSH t’a laissé un vocal",
+    duree: "0:30",
+    chapitre: (n: number) => `Chapitre ${n}`,
+    question: "je lui réponds quoi\u00a0?",
+  },
   /** La zone des avis qui défile, pour un lecteur d’écran. */
   lesAvis: "Les avis",
   precedent: "Témoignage précédent",

@@ -32,6 +32,7 @@ import { RadioGroup } from "@/components/ui/controls";
 import { Icon } from "@/components/ui/icons";
 import { Tag } from "@/components/ui/messages";
 import { Toast } from "@/components/ui/surfaces";
+import { ApercusDuRapport } from "./ApercusDuRapport";
 import { BulleDeBlush, CarteDuHaut, PreuveDuHaut, TitreDuHaut } from "./HautDuPaywall";
 import type { ApercuDuPaywall, Formule, LotDeLaRoue, OffreId, Story, Testimonial } from "@/types";
 import type { RoueDuCompte } from "@/types/api";
@@ -105,6 +106,8 @@ export function Paywall({
   const [passe, setPasse] = useState(false);
   const lot = roue?.etat === "gagnee" && roue.valable && !passe ? roue.lot : null;
   const paiement = useRef<HTMLElement>(null);
+  /* Le bouton qui paie : la barre du bas se montre dès qu’il n’est pas tout entier à l’écran */
+  const bouton = useRef<HTMLDivElement>(null);
   useJalon("paywall");
   useJalonEnVue(paiement, "offres");
 
@@ -136,12 +139,14 @@ export function Paywall({
             </div>
             <PreuveDuHaut haut={haut} className="lg:hidden" />
             <BulleDeBlush question={haut.question} className="lg:hidden" />
+            <ApercusDuRapport autre={autre.name} />
             <CarteDuHaut haut={haut} autre={autre.name} className="hidden lg:flex" />
             <Sommaire autre={autre.name} className="hidden lg:flex" />
             <AvantApres elle={elle} className="hidden lg:flex" />
           </section>
           <Paiement
             ref={paiement}
+            refDuBouton={bouton}
             lot={lot}
             sansOffre={(roue?.etat === "a_tourner" && !offreDirecte) || roue?.etat === "gagnee"}
             offreDirecte={offreDirecte}
@@ -162,7 +167,7 @@ export function Paywall({
         </div>
         <FinDuPaywall />
       </div>
-      <BarreDuBas cible={paiement} lot={lot} />
+      <BarreDuBas cible={paiement} bouton={bouton} lot={lot} />
       <FeuilleDeLaRoue open={roueOuverte} onJoue={joue} onFermer={() => setVueRoue("fermee")} />
     </main>
   );
@@ -273,6 +278,7 @@ function PayerEnUnGeste({ geste, offre, libelle, surPaye }: { geste: EnUnGeste; 
  */
 function Paiement({
   ref,
+  refDuBouton,
   lot,
   sansOffre,
   offreDirecte,
@@ -281,6 +287,8 @@ function Paiement({
   enUnGeste,
 }: {
   ref: Ref<HTMLElement>;
+  /** Le bouton qui paie (et ce qu’il devient) : la barre du bas le guette. */
+  refDuBouton: Ref<HTMLDivElement>;
   lot: LotDeLaRoue | null;
   sansOffre: boolean;
   offreDirecte: boolean;
@@ -369,7 +377,7 @@ function Paiement({
           </RadioGroup>
         </>
       )}
-      <div className="flex flex-col gap-1">
+      <div ref={refDuBouton} className="flex flex-col gap-1">
         {choisie === "avance" ? (
           <DebloquerAvecLAvance suite="/lecture" deja={relire} />
         ) : enUnGeste ? (
@@ -641,19 +649,25 @@ function FinDuPaywall() {
   return <div ref={fin} aria-hidden="true" className="h-px" />;
 }
 
+/** La part du bouton qui paie à l’écran au-delà de laquelle il compte comme vu (la barre du bas se retire). */
+const VU_EN_ENTIER = 0.98;
+
 /**
- * La barre du bas, sur téléphone : quand le bouton qui paie est sorti de l’écran (plus bas, les témoignages), elle
- * rappelle la formule et son prix, et y ramène. Jamais sur ordinateur (la carte du paiement y reste visible).
+ * La barre du bas, sur téléphone : dès que le bouton qui paie n’est pas tout entier à l’écran, elle rappelle la formule
+ * et son prix, et ramène au paiement (`cible`). Avant le 22 octobre, seulement une fois le bouton dépassé (plus bas, les
+ * témoignages) ; depuis les aperçus du rapport (une proposition), le bouton peut aussi être encore plus bas, sur un petit
+ * téléphone, et la barre le remplace, comme le bouton d’achat toujours là des boutiques. Jamais sur ordinateur (la carte
+ * du paiement y reste visible).
  */
-function BarreDuBas({ cible, lot }: { cible: RefObject<HTMLElement | null>; lot: LotDeLaRoue | null }) {
+function BarreDuBas({ cible, bouton, lot }: { cible: RefObject<HTMLElement | null>; bouton: RefObject<HTMLDivElement | null>; lot: LotDeLaRoue | null }) {
   const [montree, setMontree] = useState(false);
   useEffect(() => {
-    const el = cible.current;
+    const el = bouton.current;
     if (!el) return;
-    const o = new IntersectionObserver(([e]) => setMontree(!!e && !e.isIntersecting && e.boundingClientRect.top < 0), { threshold: 0 });
+    const o = new IntersectionObserver(([e]) => setMontree(!!e && e.intersectionRatio < VU_EN_ENTIER), { threshold: [0, VU_EN_ENTIER] });
     o.observe(el);
     return () => o.disconnect();
-  }, [cible]);
+  }, [bouton]);
   if (!montree) return null;
   const premium = prixAvecLot("premium", lot);
   /* Barrée comme sur sa carte (Paiement) : seulement par le prix d’avant le lot de la roue, jamais par la valeur du catalogue */
