@@ -1,5 +1,6 @@
 import { CEST_QUOI, PIECES } from "./bulles";
 import { CHAPITRES_OFFERTS, NB_CHAPITRES } from "./chapitres";
+import type { GenreDuHaut } from "./haut-du-paywall";
 import { CATALOGUE, enEuros, prixDe, RAPPORT_D_AVANCE } from "./offres";
 
 /*
@@ -104,17 +105,58 @@ export const PAYWALL = {
   lesAvis: "Les avis",
   precedent: "Témoignage précédent",
   suivant: "Témoignage suivant",
-  /** L’avant / après : une réponse sans BLUSH, une avec, sur un message inventé (« exemple »). */
+  /**
+   * L’avant / après, à choisir (une proposition du 22 octobre 2026, comme « Votre morphologie » des boutiques) : quatre
+   * situations, et pour chacune son dernier message (le sien, ou le tien resté en vu), la réponse sans BLUSH et avec, et
+   * ce qui suit. Des messages inventés, marqués « exemple » ; les réponses de BLUSH parlent comme lui (une vanne, courte).
+   * Celle qui ressemble au titre du haut est choisie d’avance (SITUATION_DU_HAUT).
+   */
   avantApres: {
+    titre: "Choisis ta situation",
     exemple: "exemple",
-    message: "t’as disparu toi",
-    titre: (elle: boolean) => `${elle ? "Elle" : "Il"} t’écrit «\u00a0t’as disparu toi\u00a0»`,
     sans: "Sans BLUSH",
-    sansReponse: "dsl j’étais occupé",
-    sansSuite: (elle: boolean) => `${elle ? "Elle" : "Il"} répond «\u00a0ok\u00a0».`,
     avec: "Avec BLUSH",
-    avecReponse: "je te laissais le temps de me manquer",
-    avecSuite: (elle: boolean) => `${elle ? "Elle" : "Il"} relance.`,
+    situations: (elle: boolean): SituationAvantApres[] => {
+      const p = elle ? "Elle" : "Il";
+      return [
+        {
+          id: "trois_mots",
+          choix: `${p} répond en 3 mots`,
+          message: { de: "elle", texte: "ah ouais cool" },
+          sans: `t’es fâché${elle ? "e" : ""}\u00a0?`,
+          sansSuite: `${p} répond «\u00a0non\u00a0». Puis plus rien.`,
+          avec: "3 mots, je vais les encadrer",
+          avecSuite: `${p} rit, et t’écrit un vrai message.`,
+        },
+        {
+          id: "on_verra",
+          choix: `${p} dit «\u00a0on verra\u00a0»`,
+          message: { de: "elle", texte: "on verra" },
+          sans: "ok dis-moi quand t’es dispo\u00a0!",
+          sansSuite: `${p} ne propose jamais rien.`,
+          avec: "«\u00a0on verra\u00a0» c’est oui ou c’est non, j’ai pas le décodeur",
+          avecSuite: `${p} propose jeudi.`,
+        },
+        {
+          id: "vu",
+          choix: `${p} te laisse en vu`,
+          message: { de: "toi", texte: "on se voit ce week-end\u00a0?", legende: "Vu à 23\u00a0h\u00a047" },
+          sans: "allo\u00a0??",
+          sansSuite: "Toujours rien.",
+          avec: "j’ai vu un truc qui m’a fait penser à toi",
+          avecSuite: `Deux jours plus tard. ${p} répond en 4 minutes.`,
+        },
+        {
+          id: "disparu",
+          choix: `${p} te relance`,
+          message: { de: "elle", texte: "t’as disparu toi" },
+          sans: "dsl j’étais occupé",
+          sansSuite: `${p} répond «\u00a0ok\u00a0».`,
+          avec: "je te laissais le temps de me manquer",
+          avecSuite: `${p} relance.`,
+        },
+      ];
+    },
   },
   /**
    * Les questions, en bas (réécrites le 22 octobre, une proposition) : elles rassurent et redisent ce qu’on gagne, sans
@@ -141,6 +183,33 @@ export const PAYWALL = {
   /** La barre du bas, sur téléphone, quand le bouton qui paie est sorti de l’écran : elle y ramène. */
   barre: "Débloquer",
   barreAller: "Aller au paiement",
+};
+
+/** Une situation de l’avant / après du paywall (PAYWALL.avantApres). */
+type SituationAvantApres = {
+  id: "trois_mots" | "on_verra" | "vu" | "disparu";
+  /** Son bouton, pour la choisir. */
+  choix: string;
+  /** Le dernier message : le sien (« elle »), ou le tien resté en vu (« toi », sa légende dessous). */
+  message: { de: "elle" | "toi"; texte: string; legende?: string };
+  sans: string;
+  sansSuite: string;
+  avec: string;
+  avecSuite: string;
+};
+
+/**
+ * La situation de l’avant / après choisie d’avance, d’après le titre du haut (genreDuHaut) : celle qui lui ressemble.
+ * Ses messages chutent : il répond en 3 mots ; tu portes la conv : il dit « on verra » ; il court après toi, ou il
+ * revient : il te relance.
+ */
+export const SITUATION_DU_HAUT: Record<GenreDuHaut, SituationAvantApres["id"]> = {
+  tendance: "trois_mots",
+  toi: "on_verra",
+  elle: "disparu",
+  contraste: "disparu",
+  egalite: "trois_mots",
+  aucun: "trois_mots",
 };
 
 /**
