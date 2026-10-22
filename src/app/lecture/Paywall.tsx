@@ -145,7 +145,6 @@ export function Paywall({
             sansOffre={(roue?.etat === "a_tourner" && !offreDirecte) || roue?.etat === "gagnee"}
             offreDirecte={offreDirecte}
             autre={autre.name}
-            elle={elle}
             surEnRoute={setEnRoute}
             {...(enUnGeste ? { enUnGeste } : {})}
           />
@@ -260,7 +259,8 @@ function PayerEnUnGeste({ geste, offre, libelle, surPaye }: { geste: EnUnGeste; 
 /**
  * Le paiement (la maquette « La formule · après », 17 octobre) : « Ton rapport sur Léa », les deux formules (Premium
  * choisie d’avance, ses réponses offertes à 0 €, le lot de la roue ; « Le plus choisi » seulement quand c’est vrai), ou ce que le compte a d’avance (le rapport d’avance, le −50 % gardé), puis le bouton qui
- * paie (Apple Pay, Google Pay ou la carte, dans BLUSH), et une ligne : paiement unique, l’autre jamais prévenu. Payé :
+ * paie (Apple Pay, Google Pay ou la carte, dans BLUSH) ; la ligne « Paiement unique · Léa n’est jamais prévenue », dessous,
+ * est retirée le 22 octobre (une proposition : la question « … sera prévenue ? » le dit en bas). Payé :
  * « C’est payé », puis « C’est débloqué ». Et l’offre ①, quand elle vient (`sansOffre` : la roue attend, ou un lot est
  * gagné). `surEnRoute` : dans le paiement ou payé, ou plus (la roue du paywall attend d’en être sortie).
  */
@@ -270,7 +270,6 @@ function Paiement({
   sansOffre,
   offreDirecte,
   autre,
-  elle,
   surEnRoute,
   enUnGeste,
 }: {
@@ -279,7 +278,6 @@ function Paiement({
   sansOffre: boolean;
   offreDirecte: boolean;
   autre: string;
-  elle: boolean;
   surEnRoute: (enRoute: boolean) => void;
   enUnGeste?: EnUnGeste;
 }) {
@@ -386,14 +384,6 @@ function Paiement({
           />
         )}
       </div>
-      {!paye && choisie !== "avance" && (
-        <p className="m-0 flex items-center justify-center gap-1 text-center text-legende font-extrabold text-soft">
-          <Icon name="lock" size={13} stroke={2.6} className="shrink-0" />
-          <span>
-            <span className="font-black text-ink">{PAYWALL.paiementUnique}</span> · {PAYWALL.jamaisPrevenu(autre, elle)}
-          </span>
-        </p>
-      )}
       {suiteMontree && (
         <OffreAvantDePartir fin={suiteMontree} chapitres={NB_CHAPITRES} suite="/lecture" onRefus={() => {}} onPassee={() => setPassee(true)} onClosed={fermer} jalons />
       )}
@@ -653,13 +643,15 @@ function BarreDuBas({ cible, lot }: { cible: RefObject<HTMLElement | null>; lot:
   }, [cible]);
   if (!montree) return null;
   const premium = prixAvecLot("premium", lot);
+  /* Barrée comme sur sa carte (Paiement) : seulement par le prix d’avant le lot de la roue, jamais par la valeur du catalogue */
+  const barre = lot && lotSAppliqueA(lot, "premium") && premium.centimes < CATALOGUE.premium.centimes ? CATALOGUE.premium.centimes : null;
   return (
     <div className="fixed inset-x-0 bottom-0 z-40 flex items-center gap-3 border-t border-line bg-[rgba(244,242,237,0.96)] px-4 pb-[max(14px,env(safe-area-inset-bottom))] pt-2.5 shadow-[0_-12px_24px_-16px_rgba(17,17,20,0.25)] lg:hidden">
       <span className="flex flex-1 flex-col">
         <span className="text-legende font-black">{PAYWALL.premium.titre}</span>
         <span className="flex items-baseline gap-1.5">
           <span className="text-[20px] font-black">{enEuros(premium.centimes)}</span>
-          {premium.barre && <s className="text-micro font-extrabold text-grey">{enEuros(premium.barre)}</s>}
+          {barre && <s className="text-micro font-extrabold text-grey">{enEuros(barre)}</s>}
         </span>
       </span>
       <button

@@ -76,9 +76,6 @@ export const PAYWALL = {
     plusChoisi: "Le plus choisi",
   },
   gratuit: prixCourt(0),
-  /** Sous le bouton qui paie, en une ligne : pas d’abonnement, et « Léa n’est jamais prévenue » (BLUSH n’écrit jamais à l’autre). */
-  paiementUnique: "Paiement unique",
-  jamaisPrevenu: (autre: string, elle: boolean) => `${autre} n’est jamais prévenu${elle ? "e" : ""}`,
   /**
    * Ce que tu débloques (une proposition du 22 octobre 2026) : le vocal, puis les chapitres du rapport, leurs titres
    * d’attente (titreDAttente : le 5e porte le prénom de l’autre), leur texte flouté. Rien n’est encore lu au paywall :
