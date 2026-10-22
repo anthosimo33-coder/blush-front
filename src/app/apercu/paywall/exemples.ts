@@ -40,16 +40,8 @@ function signaux(changes: Partial<Record<Id, SignalDuPaywall>>): SignalDuPaywall
   return (["ouvre", "reprend", "relance", "delai", "longueur"] as const).map((id) => changes[id] ?? base[id]);
 }
 
-/* Ta question et tes indices (une proposition du 22 octobre 2026) : Inès veut savoir si c’est réciproque, et dit « c’est flou ». */
-/** Ce que chaque exemple a de plus : ta question et tes indices. */
-const avecLaSuite = (a: ApercuDuPaywall): ApercuDuPaywall => ({
-  ...a,
-  question: { objectif: "reciproque", devinette: "flou" },
-  indices: [
-    { id: "manques", toi: 6, elle: 1 },
-    { id: "voir", toi: 9, elle: 2 },
-  ],
-});
+/** Ce que chaque exemple a de plus (une proposition du 22 octobre 2026) : Inès veut savoir si c’est réciproque. */
+const avecLaSuite = (a: ApercuDuPaywall): ApercuDuPaywall => ({ ...a, objectif: "reciproque" });
 
 const BASES: Record<GenreDuHaut, ApercuDuPaywall> = {
   contraste: { signaux: signaux({ ouvre: s("ouvre", "toi", 70, 30), reprend: s("reprend", "elle", 6, 24), delai: s("delai", "pareil", 3 * MIN, 2 * MIN) }), tendance: null },

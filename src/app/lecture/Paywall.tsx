@@ -33,7 +33,6 @@ import { Icon } from "@/components/ui/icons";
 import { Tag } from "@/components/ui/messages";
 import { Toast } from "@/components/ui/surfaces";
 import { ApercusDuRapport } from "./ApercusDuRapport";
-import { TaQuestion } from "./IndicesDuPaywall";
 import { CarteDuHaut, PreuveDuHaut, TitreDuHaut } from "./HautDuPaywall";
 import type { ApercuDuPaywall, Formule, Goal, LotDeLaRoue, OffreId, Story, Testimonial } from "@/types";
 import type { RoueDuCompte } from "@/types/api";
@@ -140,10 +139,9 @@ export function Paywall({
               <Preuves className="max-lg:hidden" />
             </div>
             <PreuveDuHaut haut={haut} className="lg:hidden" />
-            <TaQuestion apercu={apercu} autre={autre.name} il={!elle} className="max-lg:mt-1" />
-            <ApercusDuRapport autre={autre.name} il={!elle} objectif={apercu.question?.objectif} messages={formatCount(story.totalMessages)} className="max-lg:mt-3" />
+            <ApercusDuRapport autre={autre.name} il={!elle} objectif={apercu.objectif} messages={formatCount(story.totalMessages)} className="max-lg:mt-3" />
             <CarteDuHaut haut={haut} autre={autre.name} className="hidden lg:flex" />
-            <Sommaire autre={autre.name} il={!elle} objectif={apercu.question?.objectif} className="hidden lg:flex" />
+            <Sommaire autre={autre.name} il={!elle} objectif={apercu.objectif} className="hidden lg:flex" />
             <AvantApres elle={elle} className="hidden lg:flex" />
           </section>
           <Paiement
@@ -157,7 +155,7 @@ export function Paywall({
             {...(enUnGeste ? { enUnGeste } : {})}
           />
         </div>
-        <Sommaire autre={autre.name} il={!elle} objectif={apercu.question?.objectif} className="mt-3 flex lg:hidden" />
+        <Sommaire autre={autre.name} il={!elle} objectif={apercu.objectif} className="mt-3 flex lg:hidden" />
         <Temoignages items={enPremier(temoignages, AVIS_DU_HAUT[haut.genre])} />
         <AvantApres elle={elle} className="lg:hidden" />
         <Questions autre={autre.name} />

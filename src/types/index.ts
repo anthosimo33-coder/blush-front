@@ -264,21 +264,14 @@ export type TendanceDuPaywall = {
 };
 
 /**
- * Un indice du paywall (une proposition du 22 octobre 2026) : un mot qu’ils s’écrivent, compté de chaque côté, en
- * messages qui le contiennent (src/server/ecrans/indices.ts) : « tu me manques », lui 3 fois, toi jamais.
- */
-export type IndiceDuPaywall = { id: "manques" | "aime" | "voir" | "coeurs" | "nuit" | "pardon"; toi: number; elle: number };
-
-/**
  * Ce que le haut du paywall montre d’une conv qui attend son paiement : les déséquilibres comptés, et la chute s’il y en
- * a une. Depuis le 22 octobre (une proposition) : ta question et ta devinette de « Qui es-tu ? », et les indices ;
- * absents, le paywall s’en passe.
+ * a une. Depuis le 22 octobre (une proposition) : ce que tu veux savoir, sur « Qui es-tu ? » (le 1er chapitre de
+ * « Ce que tu débloques » le dit) ; absent, le paywall s’en passe.
  */
 export type ApercuDuPaywall = {
   signaux: SignalDuPaywall[];
   tendance: TendanceDuPaywall | null;
-  question?: { objectif: Goal; devinette: Guess } | null;
-  indices?: IndiceDuPaywall[];
+  objectif?: Goal;
 };
 
 export type ChapterBlock =

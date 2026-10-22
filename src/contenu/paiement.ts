@@ -1,8 +1,7 @@
 import { CEST_QUOI, PIECES } from "./bulles";
 import { CHAPITRES_OFFERTS, NB_CHAPITRES } from "./chapitres";
 import { CATALOGUE, enEuros, prixDe, RAPPORT_D_AVANCE } from "./offres";
-import { GUESS_LABELS } from "./parcours";
-import type { Goal, Guess, IndiceDuPaywall } from "@/types";
+import type { Goal } from "@/types";
 
 /*
  * Les textes des écrans du paiement par Whop : le bas de l’aperçu gratuit (PiedGratuit), la feuille « Ta formule »,
@@ -61,21 +60,9 @@ export const PAYWALL = {
    */
   formule: (autre: string) => `Ton rapport sur ${autre}`,
   /**
-   * Ta question (une proposition du 22 octobre 2026) : ce que tu as dit vouloir savoir sur « Qui es-tu ? », redit avec
-   * son prénom ; dessous, ce que vos messages montrent déjà (les indices, comptés par le code), puis ta devinette face à
-   * ce que disent ses messages, flouté : la réponse est dans le rapport.
-   */
-  question: {
-    titre: "Ta question",
-    texte: (objectif: Goal, autre: string, il: boolean) => QUESTION_DE_L_OBJECTIF[objectif](autre, il),
-    deja: "Ce que vos messages montrent déjà",
-    indice: (i: IndiceDuPaywall, autre: string) => `${MOT_DE_L_INDICE[i.id]}\u00a0: ${autre} ${fois(i.elle)}, toi ${fois(i.toi)}`,
-    devinette: (d: Guess) => `Toi, tu dis ${GUESS_LABELS[d].quote}. Ses messages disent`,
-    cache: "la réponse, dans ton rapport",
-  },
-  /**
    * Les chapitres en questions, sur le paywall (une proposition du 22 octobre 2026) : chacun dit la question à laquelle
-   * il répond, le 1er avec ta question de « Qui es-tu ? ». Le rapport payé garde ses titres ; chaque question est celle
+   * il répond, le 1er avec ce que tu veux savoir sur « Qui es-tu ? » (le bloc « Ta question », au-dessus des aperçus,
+   * retiré le 22 octobre : le premier écran en disait trop ; ta question reste ici). Le rapport payé garde ses titres ; chaque question est celle
    * de son chapitre (le verdict, la bascule, votre histoire, ce qui coince, l’autre, toi, le duo et ses scores, le
    * prochain pas).
    */
@@ -179,28 +166,6 @@ export const PAYWALL = {
   /** La barre du bas, sur téléphone, quand le bouton qui paie est sorti de l’écran : elle y ramène. */
   barre: "Débloquer",
   barreAller: "Aller au paiement",
-};
-
-/** « jamais », « 1 fois », « 6 fois » : un indice, d’un côté. */
-const fois = (n: number) => (n === 0 ? "jamais" : `${n}\u00a0fois`);
-
-/** Ce que dit un indice (PAYWALL.question.indice). */
-const MOT_DE_L_INDICE: Record<IndiceDuPaywall["id"], string> = {
-  manques: "«\u00a0tu me manques\u00a0»",
-  aime: "«\u00a0je t’aime\u00a0»",
-  voir: "Proposer de se voir",
-  coeurs: "Les cœurs",
-  nuit: "«\u00a0bonne nuit\u00a0»",
-  pardon: "«\u00a0désolé\u00a0»",
-};
-
-/** Ta question, d’après ce que tu veux savoir sur « Qui es-tu ? » (src/app/qui/QuiScreen.tsx, GOALS). */
-const QUESTION_DE_L_OBJECTIF: Record<Goal, (autre: string, il: boolean) => string> = {
-  reciproque: () => "Est-ce que c’est réciproque\u00a0?",
-  ensemble: (autre) => `Est-ce que ${autre} veut la même chose que toi\u00a0?`,
-  comprendre: (autre) => `Qu’est-ce qui se passe vraiment avec ${autre}\u00a0?`,
-  mieux: () => "Comment faire pour que ça aille mieux\u00a0?",
-  point: () => "Où vous en êtes, vraiment\u00a0?",
 };
 
 /** Le 1er chapitre, le verdict, dit comme ta question, en court (sur sa ligne de « Ce que tu débloques »). */
