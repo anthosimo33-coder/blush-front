@@ -69,6 +69,8 @@ const chat = (texte: string, preuves: string[] = []): ReponseChat =>
     niveau_atteint: null,
     mode_vocal: null,
     dit: null,
+    moment: "aucun",
+    prenom_autre: null,
   });
 
 const sorties = (autres: Partial<SortiesDuBanc> = {}): SortiesDuBanc =>

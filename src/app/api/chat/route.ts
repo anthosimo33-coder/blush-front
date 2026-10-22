@@ -258,8 +258,15 @@ async function repondreA(
       ajout = { ajout: lu, affiche: resumeAjout(lu, "export", 1) };
     }
     /* La réponse de BLUSH, payée */
-    const reponseDeBlush = (suite: Omit<OptionsDeReponse, "parVocal" | "reglement" | "cle"> = {}) =>
-      blushRepond(story, memoire, dit, ajout, { parVocal: !!envoi.vocal, reglement: paiement.reglement, ...(envoi.cle ? { cle: envoi.cle } : {}), ...suite });
+    const reponseDeBlush = (suite: Omit<OptionsDeReponse, "parVocal" | "reglement" | "cle" | "vendre"> = {}) =>
+      blushRepond(story, memoire, dit, ajout, {
+        parVocal: !!envoi.vocal,
+        reglement: paiement.reglement,
+        /* La carte d’achat sous la réponse : le chat de l’accueil, pas la question du rapport */
+        vendre: !envoi.question,
+        ...(envoi.cle ? { cle: envoi.cle } : {}),
+        ...suite,
+      });
     /* Une page chargée avant le flux (pendant une mise en ligne) attend la réponse d’un bloc, vocal compris */
     if (!req.headers.get("accept")?.includes(NDJSON)) {
       const r = await reponseDeBlush();

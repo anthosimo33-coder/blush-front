@@ -23,7 +23,7 @@ let dossier: string;
  */
 const reponse = (texte: string) => `{
   prenom: "Tom",
-  sortie: ${texte} === null ? null : { alerte: null, type: "question", coup: null, mode: "jeu", confiance: "probable", lecture: [{ texte: ${texte}, preuves: ["m0001"] }], a_envoyer: null, question: null, reaction: null, pourquoi: null, niveau_atteint: null, mode_vocal: null, dit: null },
+  sortie: ${texte} === null ? null : { alerte: null, type: "question", coup: null, mode: "jeu", confiance: "probable", lecture: [{ texte: ${texte}, preuves: ["m0001"] }], a_envoyer: null, question: null, reaction: null, pourquoi: null, niveau_atteint: null, mode_vocal: null, dit: null, moment: "aucun", prenom_autre: null },
   lignes: [["m0001", "m0001 2026-03-02 lun. 23:41 Léa : on se voit samedi ?"]],
 }`;
 /** Le faux lanceur des prompts : ce qu’il a reçu (ses arguments, la clé), dans sa bulle. */

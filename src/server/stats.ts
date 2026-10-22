@@ -3,7 +3,7 @@ import { sql, type SQL } from "drizzle-orm";
 import { GENRES_DU_HAUT, type GenreDuHaut } from "@/contenu/haut-du-paywall";
 import { CATALOGUE } from "@/contenu/offres";
 import { GROUPE_DE_L_OFFRE, GROUPES_D_OFFRES, type GroupeDOffres } from "@/contenu/pilotage";
-import { JALONS, OFFRES, OFFRES_UNIQUES, type Jalon, type OffreId, type OffreUnique, type SourceVisite } from "@/types";
+import { GENRES_VENDUS, JALONS, OFFRES, OFFRES_UNIQUES, type GenreVendu, type Jalon, type OffreId, type OffreUnique, type SourceVisite } from "@/types";
 import { etatDeLaListe } from "./attente";
 import { BUDGET_IA } from "./budget";
 import { COMPTE_DU_TOURNAGE } from "./compte-du-tournage";
@@ -13,6 +13,7 @@ import { db, uneLigne } from "./db";
 import { env } from "./env";
 import { actionsRecentes, type ActionRecente } from "./equipe";
 import { PERIME_S } from "./taches";
+import { dansLaMoitieAvec, VENTE, type GroupeDeVente } from "./vente";
 
 /*
  * Le tableau de bord (/admin) : que des nombres. Aucune conv, aucun message, aucun email n’en sort.
@@ -140,6 +141,18 @@ export type Pilotage = {
    * « haut:vu:<titre> », « haut:paye:<titre> ») : sur la période en jours entiers, comme les pannes.
    */
   hauts: { genre: GenreDuHaut; vus: number; payes: number }[];
+  /**
+   * La vente dans le chat (src/server/vente.ts) : pour chaque carte, dans l’ordre de GENRES_VENDUS, même vide, celles
+   * posées sous une réponse, touchées (leur bouton) et refusées (« Pas maintenant »), comptées par jour de Paris
+   * (counters, « vente:<événement>:<genre> » : sur la période en jours entiers), et les achats payés depuis elles
+   * (achats.vente, payés sur la période, même remboursés depuis) et leur montant.
+   */
+  ventesDuChat: { genre: GenreVendu; vues: number; touchees: number; refusees: number; payees: number; centimes: number }[];
+  /**
+   * L’A/B de la vente dans le chat (groupeDeVente) : pour chaque moitié, les comptes qui ont écrit au chat sur la période,
+   * ceux d’entre eux qui ont payé quelque chose sur la période (n’importe quelle offre, d’où qu’elle se paie), et ce montant.
+   */
+  abDuChat: { groupe: GroupeDeVente; comptes: number; acheteurs: number; centimes: number }[];
   /**
    * Les mails des séquences (src/server/sequences.ts) : pour chaque mail, dans l’ordre des séquences, ceux partis sur la
    * période (envois_mails, sans les écartés), les boutons touchés (counters, « mail:<clé> », par jour de Paris : sur la
@@ -389,6 +402,9 @@ async function pilotageDe(jours: Periode): Promise<Pilotage> {
     envois,
     clics,
     ab,
+    ventesCompteurs,
+    ventesPayees,
+    abChat,
   ] = await Promise.all([
     lignes<{ debut: string; visiteurs: string; acheteurs: string; centimes: string; micros: string }>(
       sql`with c as (${cases}),
@@ -458,6 +474,20 @@ async function pilotageDe(jours: Periode): Promise<Pilotage> {
               and a.paye_le > e.envoye_le and a.paye_le <= e.envoye_le + interval '3 days')) as payes
           from envois_mails e where e.cle = 's1_derniere' and (e.parti or e.occasion like '%:temoin') and ${W("e.envoye_le")} group by 1`,
     ),
+    lignes<{ key: string; n: string }>(
+      sql`select key, sum(count) as n from counters where key like ${`${VENTE}%`} and day > (now() at time zone 'Europe/Paris')::date - ${jours}::int group by key`,
+    ),
+    lignes<{ vente: GenreVendu; n: string; centimes: string }>(
+      sql`select vente, count(*) as n, sum(centimes) as centimes from achats where vente is not null and paye_le is not null and ${W("paye_le")} group by vente`,
+    ),
+    lignes<{ avec: boolean; comptes: string; acheteurs: string; centimes: string }>(
+      sql`with c as (select distinct s.user_id from chat_messages m join stories s on s.id = m.story_id
+                     where m.role = 'toi' and s.user_id is not null and ${W("m.created_at")}),
+            p as (select a.user_id, sum(a.centimes) as centimes from achats a
+                  where a.paye_le is not null and ${W("a.paye_le")} and a.user_id in (select user_id from c) group by a.user_id)
+          select ${dansLaMoitieAvec(sql`c.user_id`)} as avec, count(*) as comptes, count(p.user_id) as acheteurs, coalesce(sum(p.centimes), 0) as centimes
+          from c left join p on p.user_id = c.user_id group by 1`,
+    ),
   ]);
 
   const m = (c: unknown) => n(c);
@@ -496,6 +526,15 @@ async function pilotageDe(jours: Periode): Promise<Pilotage> {
       vus: n(hauts.find((h) => h.key === `${HAUT}vu:${genre}`)?.n),
       payes: n(hauts.find((h) => h.key === `${HAUT}paye:${genre}`)?.n),
     })),
+    ventesDuChat: GENRES_VENDUS.map((genre) => {
+      const compte = (evenement: string) => n(ventesCompteurs.find((v) => v.key === `${VENTE}${evenement}:${genre}`)?.n);
+      const p = ventesPayees.find((v) => v.vente === genre);
+      return { genre, vues: compte("vue"), touchees: compte("touchee"), refusees: compte("refusee"), payees: n(p?.n), centimes: n(p?.centimes) };
+    }),
+    abDuChat: (["avec", "sans"] as const).map((groupe) => {
+      const l = abChat.find((x) => x.avec === (groupe === "avec"));
+      return { groupe, comptes: n(l?.comptes), acheteurs: n(l?.acheteurs), centimes: n(l?.centimes) };
+    }),
     mails: CLES_DES_MAILS.map((cle) => {
       const e = envois.find((l) => l.cle === cle);
       return { cle, envoyes: n(e?.envoyes), clics: n(clics.find((c) => c.key === `${MAIL}${cle}`)?.n), payes: n(e?.payes) };

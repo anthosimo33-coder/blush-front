@@ -10,7 +10,7 @@ import { introuvables, preuvesChat } from "@prompts/lib/preuves";
 import { Sortie10, type ReponseChat } from "@prompts/lib/schemas";
 import { ondeDe, texteDit } from "@/lib/vocal";
 import type { BlushAnswer, EvenementChat, Message } from "@/types";
-import { coutDe, garderVerrouillee } from "./bulles";
+import { coutDe, garderVerrouillee, soldeDe } from "./bulles";
 import { ErreurInvariant, ErreurPublique, ErreurTache } from "./erreurs";
 import { bulleAffichee, bullesAffichees } from "./ecrans/chat";
 import { messagesAffiches } from "./ecrans/messages";
@@ -20,6 +20,7 @@ import { db, schema, uneLigne } from "./db";
 import { contexteDe, histoireDe, metaDe, type Ligne } from "./histoires";
 import { reponseMasquee } from "./historique";
 import { editionsBornees, type DonneesMemoire } from "./stockage/types";
+import { env } from "./env";
 import { appelVerifie } from "./ia/appel-verifie";
 import { textesSysteme, type Avance } from "./ia/claude";
 import { recopieLesPrompts, REFUS_FUITE } from "./ia/garde";
@@ -27,6 +28,7 @@ import { dire, voixDisponible, voixPour } from "./ia/voix";
 import { auMieux, journal, journalErreur } from "./journal";
 import { planifier } from "./taches";
 import { aujourdhuiParis } from "./temps";
+import { venteDuChat } from "./vente";
 
 /* Le chat du quotidien : la mémoire à la place de la conv, les derniers échanges, ce qu’il vient d’écrire. */
 
@@ -197,6 +199,8 @@ function bullesAuFil(lignes: Map<string, string>, messages: Map<string, Message>
  * paiera), sans échange à partager, et ne nourrit la mémoire que de ce qu’il a dit ; une réponse en alerte se paie comme
  * les autres (décidé le 21 octobre 2026), mais verrouillée, elle montre les numéros d’urgence en clair. Une autre réponse verrouillée déjà là : ErreurPublique « bulles », rien n’est gardé. `cle` : la clé de
  * l’envoi, gardée avec ton message (« Réessayer » retrouve sa réponse : reponseDeLEnvoi, src/server/historique.ts).
+ * `vendre` : une carte d’achat peut se poser sous la réponse (venteDuChat, src/server/vente.ts) : le chat de l’accueil,
+ * pas la question du rapport. Elle part avec la réponse, jamais gardée en base.
  */
 export async function repondre(
   story: Ligne,
@@ -209,7 +213,15 @@ export async function repondre(
     differer,
     reglement,
     cle,
-  }: { parVocal?: boolean; surEvenement?: (e: EvenementChat) => void; differer?: (tache: () => Promise<unknown>) => void; reglement?: Reglement; cle?: string } = {},
+    vendre = false,
+  }: {
+    parVocal?: boolean;
+    surEvenement?: (e: EvenementChat) => void;
+    differer?: (tache: () => Promise<unknown>) => void;
+    reglement?: Reglement;
+    cle?: string;
+    vendre?: boolean;
+  } = {},
 ): Promise<{ reponse: BlushAnswer; majMemoire: boolean }> {
   const meta = metaDe(story);
   const h = histoireDe(meta);
@@ -349,9 +361,29 @@ export async function repondre(
    * (src/app/app/garde.ts), sans la doubler ; une verrouillée ne se partage pas pour autant (momentAPartager la refuse)
    */
   const avecEchange = echangeId === undefined ? {} : { echange: echangeId };
+  /*
+   * La carte d’achat sous la réponse, s’il y a lieu : le modèle a vu le moment, le code choisit l’offre (venteDuChat).
+   * Jamais sous la réponse du garde-fou, ni pour un compte de l’équipe (pas de solde : bulles illimitées)
+   */
+  const solde = verrouillee && compte ? await soldeDe(compte) : bulles?.restantes;
+  const offre =
+    vendre && env().BLUSH_VENTE_CHAT && !fuite && compte && solde !== undefined
+      ? await venteDuChat({
+          userId: compte,
+          storyId: story.id,
+          prenom: h.autre.prenom,
+          moment: sortie.moment,
+          prenomAutre: sortie.prenom_autre,
+          alerte,
+          verrouillee,
+          solde,
+          ajout: nouvelles.length > 0,
+        })
+      : null;
+  const avecOffre = offre ? { offre } : {};
   const montree: BlushAnswer = verrouillee
-    ? { ...reponseMasquee(blushId, cout ?? 1, reponse, modeVocal, alerte), ...avecEchange }
-    : { ...reponse, ...(bulles ? { bulles } : {}), ...avecEchange };
+    ? { ...reponseMasquee(blushId, cout ?? 1, reponse, modeVocal, alerte), ...avecEchange, ...avecOffre }
+    : { ...reponse, ...(bulles ? { bulles } : {}), ...avecEchange, ...avecOffre };
   surEvenement?.({ reponse: { ...montree, ...(voix ? { vocalEnCours: true } : {}) } });
 
   /*

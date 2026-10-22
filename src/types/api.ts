@@ -11,6 +11,7 @@ import {
   DESINSCRIPTIONS,
   ETAPES_VISITE,
   EVENEMENTS_ECOUTE,
+  GENRES_VENDUS,
   GESTES_DE_LA_ROUE,
   GOALS,
   GUESSES,
@@ -358,6 +359,7 @@ type Reponses = {
   "POST /api/chat/vocal": { modeVocal: boolean };
   /** La réponse verrouillée, payée (par la recharge, ou son coût débité) : en entier, avec ce qu’elle a coûté et ce qu’il reste. */
   "POST /api/chat/debloquer": BlushAnswer;
+  "POST /api/chat/vente": Ok;
   "GET /api/compte": Account;
   "DELETE /api/compte": Ok;
   /** Ce que la purge de la nuit a effacé. */
@@ -501,6 +503,8 @@ export const ROUTES = {
   "POST /api/chat/vocal": { corps: z.object({ actif: z.boolean() }) },
   /* La réponse verrouillée à lire : son message (BlushAnswer.verrouillee) */
   "POST /api/chat/debloquer": { corps: z.object({ message: z.number().int().positive() }) },
+  /* Une carte d’achat du chat (src/server/vente.ts) : son bouton touché, ou « Pas maintenant » */
+  "POST /api/chat/vente": { corps: z.object({ evenement: z.enum(["touchee", "refusee"]), genre: z.enum(GENRES_VENDUS) }) },
   "GET /api/compte": {},
   "DELETE /api/compte": {},
   /* Le relais de la chaîne (src/server/relais.ts) : `?histoire=<uuid>&relais=<rang>`, avec le secret CRON_SECRET */
@@ -539,6 +543,10 @@ export const ROUTES = {
         .string()
         .regex(/^ctok_[A-Za-z0-9_-]{1,200}$/)
         .optional(),
+      /* Une recharge payée en un geste depuis le chat, avec la carte gardée : seulement quand l’écran le demande */
+      geste: z.literal(true).optional(),
+      /* La carte du chat d’où il se paie (src/server/vente.ts), notée avec l’achat pour /admin */
+      vente: z.enum(GENRES_VENDUS).optional(),
     }),
   },
   "GET /api/paiement/feuille": {},

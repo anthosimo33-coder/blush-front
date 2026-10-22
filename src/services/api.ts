@@ -16,6 +16,7 @@ import type {
   Fiche,
   FicheFact,
   FicheUpdate,
+  GenreVendu,
   GesteDeLaRoue,
   Goal,
   Guess,
@@ -575,8 +576,20 @@ export const lireLeRepereDuTournage = (signal: AbortSignal) => appel("GET /api/t
  * du texte que l’onglet montre), et la garde avec l’achat. Sans elle, ou une version qui n’est plus la sienne (le texte
  * a changé depuis l’ouverture de la page) : 422 « renonciation ».
  */
-export async function commencerPaiement(offre: OffreId, renonciation: boolean, { jeton }: { jeton?: string } = {}): Promise<PaiementCommence> {
-  return appel("POST /api/paiement", { corps: { offre, ...(renonciation ? { renonciation: CASE_RENONCIATION.version } : {}), ...(jeton ? { jeton } : {}) } });
+export async function commencerPaiement(
+  offre: OffreId,
+  renonciation: boolean,
+  { jeton, geste, vente }: { jeton?: string; geste?: boolean; vente?: GenreVendu } = {},
+): Promise<PaiementCommence> {
+  return appel("POST /api/paiement", {
+    corps: {
+      offre,
+      ...(renonciation ? { renonciation: CASE_RENONCIATION.version } : {}),
+      ...(jeton ? { jeton } : {}),
+      ...(geste ? { geste: true as const } : {}),
+      ...(vente ? { vente } : {}),
+    },
+  });
 }
 
 /**
@@ -695,6 +708,11 @@ export async function sendVoiceToBlush(input: { audio: Blob; seconds: number; cl
  */
 export async function lireLaReponse(message: number): Promise<BlushAnswer> {
   return appel("POST /api/chat/debloquer", { corps: { message } });
+}
+
+/** Un geste sur une carte d’achat du chat (src/server/vente.ts) : son bouton touché, ou « Pas maintenant ». */
+export async function noterUnGesteDeVente(evenement: "touchee" | "refusee", genre: GenreVendu): Promise<void> {
+  await appel("POST /api/chat/vente", { corps: { evenement, genre } });
 }
 
 /* Une réponse de BLUSH en une ou quelques bulles (une erreur dite simplement) */

@@ -104,7 +104,9 @@ test("un compte à 6 bulles parle jusqu’à 0 ; sa réponse prête, la lecture 
     await expect(prete.getByText("Ta réponse est prête")).toBeVisible();
     await expect(prete.getByText("Ta meilleure réponse")).toBeVisible();
     await expect(prete.getByText("Recommandée")).toBeVisible();
-    await expect(prete.getByRole("button", { name: "Recharger pour la lire" })).toBeVisible();
+    /* La carte de la recharge, juste dessous (src/server/vente.ts), prend la place de son bouton et du bandeau */
+    await expect(prete.getByRole("button", { name: "Recharger pour la lire" })).toHaveCount(0);
+    await expect(fil.getByRole("button", { name: "Recharger mes bulles" })).toBeVisible();
     /* Ses lignes : floutées, neutres (la forme de la réponse, pas son texte) */
     const lignes = prete.locator("[data-ligne-floutee]");
     expect(await lignes.count()).toBeGreaterThan(0);
@@ -113,12 +115,15 @@ test("un compte à 6 bulles parle jusqu’à 0 ; sa réponse prête, la lecture 
     await expect(fil.getByText(PREMIERE_BULLE)).toHaveCount(7);
     await expect(prete.getByRole("button", { name: "Copier" })).toHaveCount(0);
     await expect(fil.locator("[data-recu]")).toHaveCount(6);
-    await expect(page.getByText("Ta réponse à Maëlys est écrite")).toBeVisible();
+    await expect(page.getByText("Ta réponse à Maëlys est écrite")).toHaveCount(0);
     expect(await messagesDuChat(email)).toHaveLength(14);
     expect(await compteDe(email)).toMatchObject({ bulles: 0 });
-    /* Rechargée : l’historique rendu par le serveur (la page et ses données) la redonne telle quelle */
+    /* Rechargée : l’historique rendu par le serveur (la page et ses données) la redonne telle quelle, sans la carte (elle ne se garde pas) : son bouton et le bandeau reviennent */
     await ouvrir(page);
     await expect(fil.locator("[data-verrouillee=reponse]")).toBeVisible();
+    await expect(fil.getByRole("button", { name: "Recharger pour la lire" })).toBeVisible();
+    await expect(page.getByText("Ta réponse à Maëlys est écrite")).toBeVisible();
+    await expect(fil.getByRole("button", { name: "Recharger mes bulles" })).toHaveCount(0);
     await expect(fil.getByText(PREMIERE_BULLE)).toHaveCount(7);
     avantLePaiement = [await page.content(), await page.locator("body").textContent()].join("\n");
   });

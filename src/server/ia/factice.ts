@@ -237,6 +237,17 @@ export function fournisseurFactice(req: RequeteFactice): SortieFactice {
       pourquoi: aEnvoyer ? "un jour, une heure : elle n’a qu’à dire oui" : null,
       niveau_atteint: dernier.includes("on est ensemble") ? "ensemble" : null,
       mode_vocal: modeVocal,
+      /* Le moment de vendre : il demande à acheter, parle d’une autre personne, ou envoie du neuf (captures, export) */
+      moment: dernier.includes(FACTICE.achat)
+        ? "demande_achat"
+        : dernier.includes(FACTICE.autreRapport)
+          ? "demande_rapport"
+          : dernier.includes(FACTICE.autrePersonne)
+            ? "autre_personne"
+            : /\n→ /.test(demande)
+              ? "nouveau"
+              : "aucun",
+      prenom_autre: dernier.includes(FACTICE.autrePersonne) || dernier.includes(FACTICE.autreRapport) ? "Léa" : null,
       dit: enVocal
         ? [
             { jeu: "in disbelief", texte: "Attends, elle te cherche, là." },

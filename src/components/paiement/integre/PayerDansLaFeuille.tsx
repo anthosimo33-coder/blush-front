@@ -20,7 +20,7 @@ import { Button, IconButton } from "@/components/ui/Button";
 import { Alert, TypingDots } from "@/components/ui/feedback";
 import { Icon } from "@/components/ui/icons";
 import { Sheet } from "@/components/ui/surfaces";
-import type { Jalon, OffreId } from "@/types";
+import type { GenreVendu, Jalon, OffreId } from "@/types";
 import type { EtatAchat } from "@/types/api";
 import { usePaiement, type QuandRefuse } from "../usePaiement";
 import { APPARENCE, chargerWhop } from "./whop";
@@ -84,6 +84,8 @@ type Proprietes = {
   sansCarteGardee?: boolean;
   /** Les jalons du tunnel d’/admin (src/lib/jalons.ts), du bouton touché à l’issue du paiement : seulement le paywall. */
   jalons?: boolean;
+  /** La carte du chat d’où ce paiement part (src/server/vente.ts), notée avec l’achat pour /admin. */
+  vente?: GenreVendu;
   className?: string;
 };
 
@@ -157,8 +159,11 @@ function useParcours({
   surOccupe,
   livre,
   jalons,
+  vente,
   finirEtape,
-}: Pick<Proprietes, "offre" | "quoi" | "suite" | "quand" | "surPaye" | "surOccupe" | "livre" | "jalons"> & { finirEtape: (secret: string) => Promise<"ok" | "parti" | "refuse"> }) {
+}: Pick<Proprietes, "offre" | "quoi" | "suite" | "quand" | "surPaye" | "surOccupe" | "livre" | "jalons" | "vente"> & {
+  finirEtape: (secret: string) => Promise<"ok" | "parti" | "refuse">;
+}) {
   const router = useRouter();
   const renonciation = useAccord();
   const [etat, setEtat] = useState<"pret" | "envoi" | "paye">("pret");
@@ -236,7 +241,7 @@ function useParcours({
       }
       jalonSi(jalons, "envoye");
       /* La renonciation part avec le geste, sauf pour une offre livrée à son usage */
-      const r = await commencerPaiement(offre, quoi !== null, { jeton: j });
+      const r = await commencerPaiement(offre, quoi !== null, vente ? { jeton: j, vente } : { jeton: j });
       noterLaSuite(r.achat, suite);
       const p = r.paiement;
       /* Whop n’a pas dit si le paiement est parti (aVerifier, côté serveur) : la page du retour attend son webhook, et le dit */
@@ -595,8 +600,8 @@ function AvecLeFauxWhop(p: Proprietes) {
 /* ———— Sans paiement dans la feuille : la page de Whop ———— */
 
 /** Le bouton d’avant : il part payer sur la page de Whop (ou dit « bientôt » sans paiement branché). */
-function SurLaPageDeWhop({ offre, libelle, quoi, suite, quand, fleche, jalons, surOuvert, className }: Proprietes) {
-  const paiement = usePaiement({ suite, quand });
+function SurLaPageDeWhop({ offre, libelle, quoi, suite, quand, fleche, jalons, vente, surOuvert, className }: Proprietes) {
+  const paiement = usePaiement({ suite, quand, ...(vente ? { vente } : {}) });
   useOuvert(paiement.occupe, surOuvert);
   const payer = () => {
     jalonsDuBouton({ jalons, offre }, "page_whop");

@@ -4,7 +4,7 @@ import { Icon } from "@/components/ui/icons";
 import { NOM_DU_GENRE } from "@/contenu/haut-du-paywall";
 import { NOMS_DES_MAILS } from "@/contenu/mails";
 import { prixDe } from "@/contenu/offres";
-import { CIBLE_DE_MARGE, EUROS_PAR_DOLLAR, NOMS_DES_GROUPES, NOMS_DES_SOURCES, SOURCE_INCONNUE, margeApresIA } from "@/contenu/pilotage";
+import { CIBLE_DE_MARGE, EUROS_PAR_DOLLAR, NOMS_DES_GROUPES, NOMS_DES_SOURCES, NOMS_DES_VENTES, SOURCE_INCONNUE, margeApresIA } from "@/contenu/pilotage";
 import { cn } from "@/lib/cn";
 import { NBSP } from "@/lib/format";
 import type { Delivrabilite as ChiffresDeDelivrabilite } from "@/server/delivrabilite";
@@ -139,6 +139,7 @@ export function Pilotage({
             <PaywallJusquAuPaiement p={p} jours={s.jours} />
           </div>
           <HautsDuPaywall p={p} />
+          <VentesDuChat p={p} />
           <MailsDesSequences p={p} />
           {delivrabilite && <Delivrabilite d={delivrabilite} />}
 
@@ -725,6 +726,97 @@ function HautsDuPaywall({ p }: { p: Chiffres }) {
       ) : (
         <p className="m-0 mt-[18px] text-note font-bold text-grey">Aucun paywall vu sur la période.</p>
       )}
+    </Bloc>
+  );
+}
+
+/* ———— La vente dans le chat ———— */
+
+function VentesDuChat({ p }: { p: Chiffres }) {
+  const vues = p.ventesDuChat.reduce((t, v) => t + v.vues, 0);
+  const lignes = p.ventesDuChat.filter((v) => v.vues || v.touchees || v.refusees || v.payees);
+  const maxVues = Math.max(1, ...lignes.map((v) => v.vues));
+  return (
+    <Bloc
+      id="vente-du-chat"
+      titre="La vente dans le chat"
+      sous="Les cartes posées sous les réponses de BLUSH, et ce qu’elles rapportent"
+      aide={{ cle: "ventesDuChat", valeur: pluriel(vues, "carte posée", "cartes posées"), contexte: "sur la période" }}
+    >
+      {lignes.length ? (
+        <div role="region" aria-label="Les cartes du chat, à faire défiler" tabIndex={0} className="-mx-2 mt-[18px] overflow-x-auto px-2">
+          <table className="w-full min-w-[620px] border-collapse text-left">
+            <caption className="sr-only">Les cartes d’achat du chat, posées, touchées, refusées et payées, et le payé</caption>
+            <thead>
+              <tr className="text-micro font-black uppercase tracking-[0.06em] text-grey">
+                <th scope="col" className="pb-2.5 font-black">
+                  Carte
+                </th>
+                <th scope="col" className="w-[26%] pb-2.5 font-black">
+                  Posées
+                </th>
+                <th scope="col" className="pb-2.5 text-right font-black">
+                  Touchées
+                </th>
+                <th scope="col" className="pb-2.5 text-right font-black">
+                  Pas maintenant
+                </th>
+                <th scope="col" className="pb-2.5 text-right font-black">
+                  Payées
+                </th>
+                <th scope="col" className="pb-2.5 text-right font-black">
+                  Payé
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {lignes.map((v) => {
+                const taux = rapport(v.payees, v.vues);
+                return (
+                  <tr key={v.genre} className="border-t border-sep text-detail font-extrabold">
+                    <th scope="row" className="py-3 pr-3 text-left font-extrabold">
+                      {NOMS_DES_VENTES[v.genre]}
+                    </th>
+                    <td className="py-3 pr-3">
+                      <span className="flex items-center gap-2.5">
+                        <Barre part={v.vues / maxVues} couleur="var(--elle)" />
+                        <span className="min-w-[40px] text-right tabular-nums">{nombre(v.vues)}</span>
+                      </span>
+                    </td>
+                    <td className="py-3 pr-3 text-right tabular-nums">{nombre(v.touchees)}</td>
+                    <td className="py-3 pr-3 text-right tabular-nums">{nombre(v.refusees)}</td>
+                    <td className="py-3 pr-3 text-right tabular-nums">
+                      {nombre(v.payees)}
+                      {taux !== null && <span className="ml-1.5 text-micro text-grey">{pourcent(taux * 100)}</span>}
+                    </td>
+                    <td className="py-3 text-right tabular-nums">{euros(v.centimes, 0)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <p className="m-0 mt-[18px] text-note font-bold text-grey">Aucune carte posée sur la période.</p>
+      )}
+      <div className="mt-[18px] grid grid-cols-1 gap-3 sm:grid-cols-2">
+        {p.abDuChat.map((g) => {
+          const part = rapport(g.acheteurs, g.comptes);
+          const parCompte = rapport(g.centimes, g.comptes);
+          return (
+            <div key={g.groupe} className="flex flex-col gap-1 rounded-[16px] bg-paper px-4 py-3">
+              <span className="text-micro font-black uppercase tracking-[0.06em] text-grey">{g.groupe === "avec" ? "Avec les propositions" : "Sans (le témoin)"}</span>
+              <span className="text-detail font-extrabold">
+                {pluriel(g.comptes, "compte au chat", "comptes au chat")} · {pluriel(g.acheteurs, "acheteur")}
+                {part !== null && ` (${pourcent(part * 100)})`}
+              </span>
+              <span className="text-note font-bold text-soft">
+                {euros(g.centimes, 0)} payés{parCompte !== null && ` · ${euros(parCompte)} par compte`}
+              </span>
+            </div>
+          );
+        })}
+      </div>
     </Bloc>
   );
 }

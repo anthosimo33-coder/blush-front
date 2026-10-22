@@ -20,6 +20,13 @@ export const FACTICE = {
    */
   alerte: "#factice-alerte",
   danger: "#factice-danger",
+  /**
+   * Dans un message au chat : il demande à acheter (`achat`), il demande le rapport d’une autre conv (`autreRapport`, avec
+   * Léa), ou il parle d’une autre personne (`autrePersonne`, Léa).
+   */
+  achat: "#factice-achat",
+  autreRapport: "#factice-rapport",
+  autrePersonne: "#factice-autre",
   refus: "#factice-refus",
   /** Les messages qu’il lit dans des captures, quelles qu’elles soient : deux soirées de 12. */
   messagesCaptures: 24,

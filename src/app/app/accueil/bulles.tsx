@@ -41,6 +41,7 @@ import {
   type MsgABulles,
   type Row,
 } from "./conv/modele";
+import { OffreDuChatCarte, useAchatDuChatPresent } from "./achat";
 import type { HomeContact } from "./contact";
 import { AvecLogoDuFil, LogoDuFil } from "./Entetes";
 import { useHomeMotion } from "./mouvement/contexte";
@@ -440,11 +441,13 @@ function ligneNeutre(n: number) {
  * « Ta réponse est prête » (le serveur garde le texte). Avec une réponse à envoyer (`cache.quoi` « reponse »), la
  * lecture de BLUSH se lit au-dessus, et c’est « Ta meilleure réponse », « Recommandée », ses bulles bleues floutées ;
  * sinon (« tout »), la réponse entière, ses bulles floutées. « Recharger pour la lire » ouvre la recharge ; si le solde
- * couvre déjà son coût (rechargé ailleurs), « La lire » la demande, et sans bulles, BLUSH le redit.
+ * couvre déjà son coût (rechargé ailleurs), « La lire » la demande, et sans bulles, BLUSH le redit. `vendue` : une carte
+ * d’achat suit (./achat.tsx), qui la débloque : son bouton lui cède la place.
  */
-function ReponseVerrouillee({ reponse, verrou }: { reponse: number; verrou: NonNullable<BlushAnswer["verrouillee"]> }) {
+function ReponseVerrouillee({ reponse, verrou, vendue = false }: { reponse: number; verrou: NonNullable<BlushAnswer["verrouillee"]>; vendue?: boolean }) {
   const lire = use(LireContext);
   const credit = use(CreditContext);
+  const carte = useAchatDuChatPresent() && vendue;
   const [enCours, setEnCours] = useState(false);
   const { message, cout, cache } = verrou;
   const lisible = credit.solde === null || credit.solde >= cout;
@@ -480,20 +483,22 @@ function ReponseVerrouillee({ reponse, verrou }: { reponse: number; verrou: NonN
           </span>
         </span>
       </span>
-      <button
-        type="button"
-        disabled={enCours}
-        aria-haspopup={lisible ? undefined : "dialog"}
-        onClick={() => {
-          if (!lisible) return credit.recharger();
-          setEnCours(true);
-          void lire(reponse, message).finally(() => setEnCours(false));
-        }}
-        className="lift lift-sm lift-ink mt-1 inline-flex h-[34px] items-center gap-1.5 self-start rounded-[17px] bg-ink px-3.5 text-legende font-black text-white disabled:opacity-60"
-      >
-        <Perle taille={14} />
-        {lisible ? REPONSE_PRETE.lire : REPONSE_PRETE.recharger}
-      </button>
+      {(lisible || !carte) && (
+        <button
+          type="button"
+          disabled={enCours}
+          aria-haspopup={lisible ? undefined : "dialog"}
+          onClick={() => {
+            if (!lisible) return credit.recharger();
+            setEnCours(true);
+            void lire(reponse, message).finally(() => setEnCours(false));
+          }}
+          className="lift lift-sm lift-ink mt-1 inline-flex h-[34px] items-center gap-1.5 self-start rounded-[17px] bg-ink px-3.5 text-legende font-black text-white disabled:opacity-60"
+        >
+          <Perle taille={14} />
+          {lisible ? REPONSE_PRETE.lire : REPONSE_PRETE.recharger}
+        </button>
+      )}
     </span>
   );
 }
@@ -599,7 +604,15 @@ function bubblesOf(m: MsgABulles, env: BubbleEnv): BulleDeBlush[] {
     case "reponse":
       /* 5 · La meilleure réponse d’une réponse qui vient d’arriver brille une fois */
       /* Verrouillée (écrite à 0 bulle) : sa lecture, s’il y en a une en clair, puis ce qui attend d’être payé */
-      if (m.result.verrouillee) return [...m.result.bubbles.flatMap(bulleEcrite), { body: <ReponseVerrouillee reponse={m.id} verrou={m.result.verrouillee} /> }];
+      if (m.result.verrouillee) {
+        const { offre } = m.result;
+        return [
+          ...m.result.bubbles.flatMap(bulleEcrite),
+          { body: <ReponseVerrouillee reponse={m.id} verrou={m.result.verrouillee} vendue={!!offre} /> },
+          /* La carte d’achat qui la débloque, sans quitter la conv (./achat.tsx) */
+          ...(offre ? [{ body: <OffreDuChatCarte offre={offre} attend /> }] : []),
+        ];
+      }
       return bullesDeLaReponse(m.result, !!m.answered);
     default:
       return typeInconnu(m);
@@ -629,6 +642,8 @@ function bullesDeLaReponse(r: BlushAnswer, shine: boolean): BulleDeBlush[] {
     ...aEnvoyer,
     ...(r.ask ? [{ quote: r.ask, body: <span className="text-corps font-bold leading-[1.4]">{r.ask}</span> }] : []),
     ...(r.react ? [{ quote: r.react, body: <span className="text-corps font-bold leading-[1.4]">{r.react}</span> }] : []),
+    /* Ce qu’il propose d’acheter, payé sans quitter la conv (./achat.tsx) */
+    ...(r.offre ? [{ body: <OffreDuChatCarte offre={r.offre} /> }] : []),
   ];
 }
 

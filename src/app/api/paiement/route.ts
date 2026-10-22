@@ -31,7 +31,11 @@ export const POST = route("POST /api/paiement", async (req: Request) => {
   if (livree && !renonciation) return erreur("renonciation");
   const { utilisateur, story } = g;
   if (!(await sousLaLimiteDuCompte(utilisateur, "commande"))) return erreur("trop");
-  const r = await commencerPaiement(utilisateur, corps.offre, corps.conv ?? story?.id ?? null, renonciation, { jeton: corps.jeton ?? null });
+  const r = await commencerPaiement(utilisateur, corps.offre, corps.conv ?? story?.id ?? null, renonciation, {
+    jeton: corps.jeton ?? null,
+    geste: corps.geste === true,
+    vente: corps.vente ?? null,
+  });
   if (typeof r === "string") return erreur(r);
   /* Au fil du direct, avec la ville de la connexion : l’achat payé la reprendra (le webhook n’a pas de connexion à situer) */
   after(() => noterAuFil(req, { genre: "paiement", offre: corps.offre, ref: r.achat }));

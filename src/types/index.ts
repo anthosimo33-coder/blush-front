@@ -429,7 +429,39 @@ export type BlushAnswer = {
    * « bulles », src/services/api.ts). L’accueil ouvre alors la recharge.
    */
   plusDeBulles?: true;
+  /**
+   * Ce que BLUSH propose d’acheter, sous sa réponse : il l’a demandé, ou BLUSH a vu le moment (OffreDuChat). Une
+   * proposition du 22 octobre 2026, montrée seulement dans l’aperçu de l’équipe (/apercu/achat) tant qu’elle n’est pas validée.
+   */
+  offre?: OffreDuChat;
 };
+
+/**
+ * Une offre posée dans le chat, sous la réponse de BLUSH (src/server/vente.ts la choisit, la carte la montre :
+ * src/app/app/accueil/achat.tsx). Le chat n’est ouvert qu’avec un rapport payé (ou un rapport doux, offert) : tout s’y
+ * vend à quelqu’un qui a déjà payé. Les prix et les packs viennent du catalogue (src/contenu/offres.ts, recharge.ts).
+ * - `bulles` : une recharge. `solde` : ce qu’il lui en reste (à zéro, sa réponse attend, verrouillée, et se lit dès la
+ *   recharge) ;
+ * - `premium` : Premium pour qui a pris le rapport seul (l’offre unique ③, montrée par le serveur avec la carte) ;
+ * - `autre` : une conv avec quelqu’un d’autre (`prenom`, s’il l’a dit), importée d’abord, puis payée sur son paywall ;
+ * - `a_jour` : la conv de la même personne (`prenom`) réimportée, pour un rapport qui lit aussi ce qui a suivi son
+ *   rapport (`depuis` : le jour de ce rapport, en lettres, ou null sans rapport écrit) ;
+ * - `reimport` : un ancien rapport doux (une alerte « danger » d’avant le 21 octobre 2026), à réimporter pour le rapport complet.
+ * `enUnGeste` : une carte est gardée, le paiement se fait d’un toucher ; sinon la feuille de la recharge (ou la page du
+ * paiement) s’ouvre. `reponse`, `envoi` : dans l’aperçu de l’équipe seulement, la réponse que la recharge ouvre.
+ */
+export type OffreDuChat =
+  | { genre: "bulles"; solde: number; enUnGeste: boolean; reponse?: string[]; envoi?: string[] }
+  | { genre: "premium"; enUnGeste: boolean }
+  | { genre: "autre"; prenom: string | null }
+  | { genre: "a_jour"; prenom: string; depuis: string | null }
+  | { genre: "reimport"; prenom: string };
+
+/** Ce qui se vend dans le chat (OffreDuChat), et ce qu’on en compte (src/server/vente.ts, /admin, achats.vente). */
+export const GENRES_VENDUS = ["bulles", "premium", "autre", "a_jour", "reimport"] as const satisfies readonly OffreDuChat["genre"][];
+export type GenreVendu = (typeof GENRES_VENDUS)[number];
+/** Ce qu’on compte d’une carte du chat, par jour : posée sous une réponse, touchée (son bouton), ou « Pas maintenant ». Payée : achats.vente. */
+export type EvenementDeVente = "vue" | "touchee" | "refusee";
 
 /**
  * Ce qu’une réponse verrouillée cache, et sa forme : la longueur (en caractères) de chacune de ses lignes, jamais leur

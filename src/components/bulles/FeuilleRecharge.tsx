@@ -12,6 +12,7 @@ import { Sheet } from "@/components/ui/surfaces";
 import { PayerDansLaFeuille } from "@/components/paiement/integre/PayerDansLaFeuille";
 import { CATALOGUE } from "@/contenu/offres";
 import { lePack, PACK_CONSEILLE, PACKS, RECHARGE, type Pack } from "@/contenu/recharge";
+import type { GenreVendu } from "@/types";
 import { Grappe } from "./perles";
 import { LigneOfferte, Option } from "./pieces";
 
@@ -31,7 +32,8 @@ type Bonus = "inconnu" | "oui" | "non";
 /**
  * La feuille de la recharge. `reponsePrete` : ouverte depuis une réponse écrite à 0 bulle (floutée), elle le rappelle
  * (`autre`, le prénom de l’autre personne). `suite` : où revenir une fois payé, d’après les bulles achetées (l’accueil,
- * qui y lit la réponse prête et le dit). Sur ordinateur, son voile couvre tout l’écran, en-tête compris (belowHeader faux).
+ * qui y lit la réponse prête et le dit). `vente` : ouverte depuis une carte du chat (src/server/vente.ts), notée avec
+ * l’achat. Sur ordinateur, son voile couvre tout l’écran, en-tête compris (belowHeader faux).
  */
 export function FeuilleRecharge({
   open,
@@ -39,12 +41,14 @@ export function FeuilleRecharge({
   reponsePrete = false,
   autre,
   suite,
+  vente,
 }: {
   open: boolean;
   onClose: () => void;
   reponsePrete?: boolean;
   autre?: string;
   suite: (bulles: number) => string;
+  vente?: GenreVendu;
 }) {
   const titre = useId();
   useAuPaiement(open);
@@ -139,6 +143,7 @@ export function FeuilleRecharge({
           titre={packs[choisi].titre}
           libelle={RECHARGE.payer(packs[choisi].prix)}
           quoi="bulles"
+          {...(vente ? { vente } : {})}
           /* La suite d’après le pack choisi : ses bulles (le mot « +N bulles » de l’arrivée, que le serveur corrige s’il le faut) */
           suite={suite(packs[choisi].total)}
           surPaye={setPaye}

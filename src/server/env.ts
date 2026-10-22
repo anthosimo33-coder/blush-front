@@ -91,6 +91,11 @@ export const Env = z.object({
     .enum(["0", "1"])
     .default("0")
     .transform((v) => v === "1"),
+  /** Les cartes d’achat sous les réponses du chat (src/server/vente.ts) : « 0 » les coupe toutes, sans rien changer d’autre. */
+  BLUSH_VENTE_CHAT: z
+    .enum(["0", "1"])
+    .default("1")
+    .transform((v) => v === "1"),
   /** Qui reçoit les alertes (un échec définitif) et le résumé de chaque nuit : un ou des emails, séparés par des virgules. */
   BLUSH_ALERTES: z.string().default("").transform(emails),
   /**

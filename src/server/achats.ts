@@ -3,7 +3,7 @@ import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, ne, sql } from "dri
 import { alerteSobre } from "@prompts/lib/titres";
 import { bullesDe, CATALOGUE, PREMIERE_RECHARGE, RAPPORT_D_AVANCE, RAPPORTS_SEULS } from "@/contenu/offres";
 import { bullesDuLot, DUREE_DU_SECOND_GAGNE_MS, lotSAppliqueA, prixAvecLot } from "@/contenu/roue";
-import type { OffreId } from "@/types";
+import type { GenreVendu, OffreId } from "@/types";
 import type { AchatDuCompte } from "@/types/api";
 import { alerter } from "./alertes";
 import type { Utilisateur } from "./auth";
@@ -82,12 +82,18 @@ export async function rechargeDejaPayee(userId: string): Promise<boolean> {
  * montré et valable, et qu’aucune recharge n’a encore été payée. Une formule (le rapport, Premium) prend le lot de la
  * roue gagné et encore valable (src/server/roue.ts) : son prix (prixAvecLot) et ses bulles (bullesDuLot), figés eux
  * aussi, et le lot noté sur l’achat, pris à la livraison. `renonciation` : la renonciation au délai de rétractation
- * donnée avec la commande (sa version et son heure), gardée avec l’achat. Rend l’achat, ou le refus.
+ * donnée avec la commande (sa version et son heure), gardée avec l’achat. `vente` : la carte du chat d’où il se paie
+ * (src/server/vente.ts), notée avec lui pour /admin. Rend l’achat, ou le refus.
  */
 export async function commander(
   compte: Pick<Utilisateur, "id" | "email">,
   offre: OffreId,
-  { storyId = null, fournisseur, renonciation }: { storyId?: string | null; fournisseur: FournisseurPaiement; renonciation?: Consentement },
+  {
+    storyId = null,
+    fournisseur,
+    renonciation,
+    vente = null,
+  }: { storyId?: string | null; fournisseur: FournisseurPaiement; renonciation?: Consentement; vente?: GenreVendu | null },
 ): Promise<Achat | RefusDeCommande> {
   const c = CATALOGUE[offre];
   const [attente] = await db()
@@ -135,6 +141,7 @@ export async function commander(
       fournisseur,
       renonciationVersion: renonciation?.version ?? null,
       renonciationLe: renonciation?.le ?? null,
+      vente,
     })
     .returning();
   return achat!;

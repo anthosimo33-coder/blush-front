@@ -95,6 +95,11 @@ const envoyer = (texte: string, { flux = true, question = false, cle }: { flux?:
 /** La réponse d’un envoi, en flux ou d’un bloc (une réponse déjà écrite revient d’un bloc). */
 const reponseDe = async (r: Response): Promise<BlushAnswer> =>
   r.headers.get("content-type")?.includes("ndjson") ? reponseDu((await fluxDe(r)).evenements) : ((await r.json()) as BlushAnswer);
+/**
+ * La carte d’achat qu’une réponse verrouillée porte en arrivant (src/server/vente.ts) : la recharge, à zéro, sans carte
+ * gardée (aucun paiement branché ici). Elle ne dit rien de la réponse, et ne se garde pas : ni l’historique ni « Réessayer » ne l’ont.
+ */
+const RECHARGE_A_ZERO = { offre: { genre: "bulles", solde: 0, enUnGeste: false } } as const;
 /** Ce que porte une réponse 402 « bulles » : les numéros d’aide de l’appli (src/contenu/aide.ts), toujours. */
 const SANS_BULLES = { erreur: "bulles", aide: AIDE_SANS_BULLES };
 /* Une capture (de leur conv), comme l’envoie le « + » du chat */
@@ -383,6 +388,7 @@ describe("POST /api/chat, avec des bulles", () => {
       verrouillee: { message: (await derniereVerrouillee(u.id)).id, cout: 1, cache: { quoi: "tout", lignes: expect.any(Array) } },
       modeVocal: false,
       echange: expect.any(Number),
+      ...RECHARGE_A_ZERO,
     });
     expect(await soldeDe(u.id)).toBe(0);
     expect((await journalDe(u.id)).map((m) => m.raison)).toEqual(["reponse"]);
@@ -410,7 +416,7 @@ describe("à 0 bulle : la réponse verrouillée", () => {
     const v = await derniereVerrouillee(u.id);
     const masquee = reponseDu(evenements);
     const cache = { quoi: "tout", lignes: expect.any(Array) };
-    expect(masquee).toEqual({ kind: "bubbles", bubbles: [], verrouillee: { message: v.id, cout: 1, cache }, modeVocal: false, echange: expect.any(Number) });
+    expect(masquee).toEqual({ kind: "bubbles", bubbles: [], verrouillee: { message: v.id, cout: 1, cache }, modeVocal: false, echange: expect.any(Number), ...RECHARGE_A_ZERO });
     expect(await derniereReponse(id)).toMatchObject({ id: v.id, cout: 1, verrouillee: true });
     expect(await soldeDe(u.id)).toBe(0);
 
@@ -479,7 +485,7 @@ describe("à 0 bulle : la réponse verrouillée", () => {
     /* La lecture, en clair, telle que la réponse payée la montre (ses bulles, avec les messages qu’elles citent) ; et rien d’autre */
     expect(lue.bubbles.length).toBeGreaterThan(0);
     expect(lue.bubbles.some((b) => b.messages?.length)).toBe(true);
-    expect(masquee).toEqual({ kind: "bubbles", bubbles: lue.bubbles, verrouillee: { message: v.id, cout: 1, cache }, modeVocal: false, echange: echange.id });
+    expect(masquee).toEqual({ kind: "bubbles", bubbles: lue.bubbles, verrouillee: { message: v.id, cout: 1, cache }, modeVocal: false, echange: echange.id, ...RECHARGE_A_ZERO });
     expect(echange.answer).toEqual({ kind: "bubbles", bubbles: lue.bubbles, verrouillee: { message: v.id, cout: 1, cache } });
     expect(encore).toEqual({ kind: "bubbles", bubbles: lue.bubbles, verrouillee: { message: v.id, cout: 1, cache }, echange: echange.id });
     for (const b of lue.bubbles) expect(brut.includes(JSON.stringify(b.text)), "la lecture se lit dans le flux").toBe(true);
