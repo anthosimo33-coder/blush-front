@@ -43,7 +43,8 @@ export function chiffrer(valeur: unknown): Buffer {
 
 /* ———— Les comptes et leurs histoires ———— */
 
-export type Tache = { genre: string; statut: "attente" | "en_cours" | "fini" | "echec" | "paiement"; essais: number; erreur: string | null };
+/** `differee` : une mise à jour de la mémoire qui attend que le chat se calme (src/server/memoire-groupee.ts). */
+export type Tache = { genre: string; statut: "attente" | "en_cours" | "fini" | "echec" | "paiement"; essais: number; erreur: string | null; differee: boolean };
 export type Histoire = { id: string; messages: number; convGardee: boolean };
 
 /** Le compte de cet email, ou null (il naît au premier bon code) : son solde de bulles, et combien de ses convs sont débloquées. */
@@ -93,7 +94,7 @@ export async function histoireExiste(id: string): Promise<boolean> {
 /** Les tâches de toutes les histoires du compte, dans l’ordre où elles ont été planifiées. */
 export async function tachesDe(email: string): Promise<Tache[]> {
   return sql()<Tache[]>`
-    select t.kind as genre, t.status as statut, t.attempts as essais, t.error as erreur
+    select t.kind as genre, t.status as statut, t.attempts as essais, t.error as erreur, coalesce(t.status = 'attente' and t.pas_avant > now(), false) as differee
     from tasks t join stories s on s.id = t.story_id join users u on u.id = s.user_id
     where u.email = ${email.toLowerCase()} order by t.created_at`;
 }
@@ -108,8 +109,11 @@ export async function attendreTaches(email: string, { timeout = RESEAU, echecPer
   const fin = Date.now() + timeout;
   for (;;) {
     const taches = await tachesDe(email);
-    /* Le verdict d’une conv pas encore payée attend son paiement (le paywall d’abord) : rien ne bougera, la chaîne est au repos */
-    if (taches.length && taches.every((t) => t.statut === "fini" || t.statut === "echec" || t.statut === "paiement")) {
+    /*
+     * Le verdict d’une conv pas encore payée attend son paiement (le paywall d’abord), une mise à jour de la mémoire attend
+     * que le chat se calme : rien ne bougera, la chaîne est au repos
+     */
+    if (taches.length && taches.every((t) => t.statut === "fini" || t.statut === "echec" || t.statut === "paiement" || t.differee)) {
       const echecs = taches.filter((t) => t.statut === "echec");
       if (echecs.length && !echecPermis)
         throw new Error(`la chaîne de ${email} a échoué : ${echecs.map((t) => `${t.genre} (${t.erreur ?? "sans code"}, ${t.essais} essais)`).join(", ")}`);

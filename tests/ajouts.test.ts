@@ -9,6 +9,7 @@ const apres = vi.hoisted(() => [] as (() => unknown)[]);
 vi.mock("next/server", async (original) => ({ ...(await original<typeof import("next/server")>()), after: (f: () => unknown) => apres.push(f) }));
 
 import { ajouterALaFiche, depuisCaptures, depuisExport, majEnCours, resumeAjout } from "@/server/ajouts";
+import { sansAttendre } from "@/server/memoire-groupee";
 import { repondre } from "@/server/chat";
 import { historique } from "@/server/historique";
 import { ficheDe, memoireDe } from "@/server/donnees";
@@ -122,12 +123,14 @@ describe("après l’import : le chat et sa fiche", () => {
 
     const { reponse, majMemoire } = await repondre(await ligneEnBase(id), memoire, "", { ajout, affiche: resumeAjout(ajout, "export", 1) });
     expect(reponse.kind).toBe("bubbles");
-    expect(majMemoire).toBe(true);
+    /* Trois messages : le fil du chat les garde, la mémoire les relira quand le chat se calme */
+    expect(majMemoire).toBe(false);
     const chat = derniere("10-chat");
     expect(chat).toContain(`→ ${ajout.lignes[2]}`);
     expect(chat).toContain("Hugo (à toi) : ça veut dire quoi ? je lui réponds quoi ?");
     expect((await historique(id)).echanges.at(-1)?.mine).toBe("(ton export\u00a0: 3 nouveaux messages)");
 
+    await sansAttendre(id);
     await executerChaine(id);
     expect(derniere("07-memoire")).toContain(`ajouté à la conv :\n${ajout.lignes.join("\n")}`);
 

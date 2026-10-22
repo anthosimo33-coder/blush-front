@@ -32,7 +32,7 @@ import { db, schema } from "@/server/db";
 import { ErreurTache } from "@/server/erreurs";
 import { contexteDe } from "@/server/histoires";
 import { fournisseurFactice } from "@/server/ia/factice";
-import { planifier } from "@/server/taches";
+import { retenir } from "@/server/memoire-groupee";
 import { getFiche, getFicheEtMaj } from "@/services/serveur";
 import type { Fiche, FicheUpdate } from "@/types";
 import { echange } from "./aide/fabriques";
@@ -62,8 +62,8 @@ async function apresLeDernierLu(minutes: number, qui: string, texte: string): Pr
   const p = (n: number) => String(n).padStart(2, "0");
   return `[${p(d.getUTCDate())}/${p(d.getUTCMonth() + 1)}/${d.getUTCFullYear()} ${p(d.getUTCHours())}:${p(d.getUTCMinutes())}:${p(d.getUTCSeconds())}] ${qui}: ${texte}`;
 }
-/** Une mise à jour de la mémoire planifiée par le chat (un échange qui apporte du neuf). */
-const majDuChat = () => planifier(id, "memoire_maj", echange(1, { dit: "on s’est vus hier, c’était trop bien" }));
+/** Une mise à jour de la mémoire lancée par le chat (un échange qui apporte du neuf, qui part sans attendre). Rend sa tâche. */
+const majDuChat = async () => (await retenir(id, echange(1, { dit: "on s’est vus hier, c’était trop bien" }), { neuf: true, maintenant: true })).id!;
 
 facticePourChaqueTest((req: Requete) => (taches.push(req.tache), fournisseurFactice(req)));
 beforeAll(async () => {

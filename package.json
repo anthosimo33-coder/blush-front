@@ -34,6 +34,7 @@
     "charge": "tsx scripts/charge.mjs",
     "essai:vrai-modele": "tsx --conditions=react-server scripts/essai-vrai-modele.mts",
     "essai:memoire": "tsx --conditions=react-server scripts/essai-memoire.mts",
+    "essai:memoire-groupee": "tsx --conditions=react-server scripts/essai-memoire-groupee.mts",
     "essai:ajouts": "tsx --conditions=react-server scripts/essai-ajouts.mts",
     "essai:captures": "tsx --conditions=react-server scripts/essai-captures.mts",
     "essai:video": "tsx --conditions=react-server scripts/essai-video-modeles.mts"

@@ -240,7 +240,7 @@ describe("le chat (prompt 10) : la mémoire à la place de la conv", () => {
       return l.slice(l.indexOf(ouvre), l.indexOf(ferme) + 1);
     };
     const enChat = textes(chat())[0]!;
-    const maj = textes(requeteMemoireMaj(h, Date.UTC(2026, 9, 1), etat, lignes, "<nouveau>\n</nouveau>"))[0]!;
+    const maj = textes(requeteMemoireMaj(h, Date.UTC(2026, 9, 1), etat, lignes, ["<nouveau>\n</nouveau>"]))[0]!;
     const histoire = { chat: bloc(enChat, "<histoire>", "</histoire>"), maj: bloc(maj, "<histoire>", "</histoire>") };
     const memoire = { chat: bloc(enChat, "<memoire>", "</fiche>"), maj: bloc(maj, "<memoire>", "</fiche>") };
     /* Le chat : une ligne de plus juste avant </histoire>, qui porte le niveau ; le reste est celui de la mise à jour */

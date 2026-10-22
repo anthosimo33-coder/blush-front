@@ -4,7 +4,7 @@ import { blocAjout, numeroter } from "@prompts/lib/ajouts";
 import { versTexteCaptures } from "@prompts/lib/captures";
 import { lire, rendre, type Histoire, type Message } from "@prompts/lib/conv";
 import { estLigneMessage, estLigneProfil, idDeLigne, idMessage, ligneMessage, ligneProfil, lireLigne, parIdentifiant, rangDe } from "@prompts/lib/ligne";
-import { rendreMemoire, rendreNouveau, type Echange } from "@prompts/lib/memoire";
+import { rendreMemoire, rendreNouveau, rendreNouveaux, type Echange } from "@prompts/lib/memoire";
 import { faitsAffiches } from "@/server/ecrans/fiche";
 import { messagesAffiches } from "@/server/ecrans/messages";
 import { captures, memoire, msg } from "../aide/fabriques";
@@ -110,6 +110,18 @@ describe("les lignes de la conv, à l’octet", () => {
     const nouveau = rendreNouveau({ date: "2024-02-21", messages: [{ qui: "autre", quand: "2024-02-21 10:09", texte: "a\nb" }] }, h, 12);
     expect(nouveau.texte).toBe('<nouveau date="2024-02-21 mer.">\nmessages ajoutés à la conv, par capture :\nm0012 2024-02-21 mer. 10:09 Inès : a ⏎ b\n</nouveau>');
     expect(nouveau.lignes.get("m0012")).toBe("m0012 2024-02-21 mer. 10:09 Inès : a ⏎ b");
+  });
+
+  it("la mémoire groupée : un bloc par échange, dans l’ordre, les messages numérotés à la suite d’un échange à l’autre", () => {
+    const capture = (texte: string) => ({ qui: "autre" as const, quand: "2024-02-21 10:09", texte });
+    const premier: Echange = { date: "2024-02-21", messages: [capture("a"), capture("b")], dit: "elle m’a répondu", reponse: ["Ok."] };
+    const second: Echange = { date: "2024-02-22", messages: [capture("c")], dit: "et là ?" };
+    const groupe = rendreNouveaux([premier, second], h, 12);
+    expect(groupe.blocs).toEqual([rendreNouveau(premier, h, 12).texte, rendreNouveau(second, h, 14).texte]);
+    expect([...groupe.lignes.keys()]).toEqual(["m0012", "m0013", "m0014"]);
+    expect(groupe.suivant).toBe(15);
+    /* Un seul échange : le bloc d’avant, mot pour mot */
+    expect(rendreNouveaux([premier], h, 12).blocs).toEqual([rendreNouveau(premier, h, 12).texte]);
   });
 
   it("les preuves affichées et les sources de sa fiche", () => {

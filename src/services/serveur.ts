@@ -110,12 +110,13 @@ export async function getFiche(): Promise<Fiche | null> {
 
 /**
  * Sa fiche pour sa page, comme GET /api/fiche la donne (ficheEtMaj) : avec `updating` si une mise à jour de la mémoire
- * tourne (l’écran, qui ne relit pas une fiche rendue à l’instant, la relit alors dès le montage), et une mise à jour
- * restée en plan relancée après le rendu.
+ * tourne ou attend que le chat se calme (l’écran, qui ne relit pas une fiche rendue à l’instant, la relit alors dès le
+ * montage), et une mise à jour restée en plan relancée après le rendu. Celle qui attend, la page ne la lance pas : l’accueil
+ * la précharge (ficheEtMaj, `page`).
  */
 export async function getFicheEtMaj(): Promise<Fiche | null> {
   const { utilisateur, story } = await contexte();
-  return utilisateur && story ? ficheEtMaj(story) : null;
+  return utilisateur && story ? ficheEtMaj(story, { page: true }) : null;
 }
 
 /** Les questions tirées de la mémoire de la conv : les questions toutes prêtes de l’accueil, les idées de « Ta question ». */

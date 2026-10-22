@@ -1,8 +1,9 @@
 import { inArray, sql } from "drizzle-orm";
 import { beforeAll, describe, expect, it } from "vitest";
+import * as coffre from "@/server/coffre";
 import { db, schema } from "@/server/db";
 import { statsAdmin } from "@/server/stats";
-import { PERIME_S, planifier } from "@/server/taches";
+import { PERIME_S } from "@/server/taches";
 import { echange } from "./aide/fabriques";
 import { convImportee } from "./aide/fixtures";
 
@@ -16,9 +17,12 @@ describe("une tâche « bloquée » au tableau de bord", () => {
 
   beforeAll(async () => {
     id = (await convImportee("01-a-deux-doigts.txt")).id;
-    /* Des mises à jour de la mémoire : elles s’empilent, une même histoire peut en avoir plusieurs */
-    taches = [await planifier(id, "memoire_maj", echange(1)), await planifier(id, "memoire_maj", echange(2)), await planifier(id, "memoire_maj", echange(3))];
-    await db().update(schema.tasks).set({ status: "en_cours" }).where(inArray(schema.tasks.id, taches));
+    /* Des mises à jour de la mémoire : hors de l’index des étapes de la chaîne, une même histoire peut en avoir plusieurs */
+    const posees = await db()
+      .insert(schema.tasks)
+      .values([1, 2, 3].map((n) => ({ storyId: id, kind: "memoire_maj" as const, status: "en_cours" as const, input: coffre.ecrire("tasks.input", [echange(n)]) })))
+      .returning({ id: schema.tasks.id });
+    taches = posees.map((t) => t.id);
   });
 
   it("sans battement depuis PERIME_S (90 s), pas avant", async () => {
