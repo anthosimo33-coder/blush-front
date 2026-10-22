@@ -1,6 +1,7 @@
 import { CEST_QUOI, PIECES } from "./bulles";
 import { CHAPITRES_OFFERTS, NB_CHAPITRES } from "./chapitres";
 import { CATALOGUE, enEuros, prixDe, RAPPORT_D_AVANCE } from "./offres";
+import type { Goal } from "@/types";
 
 /*
  * Les textes des écrans du paiement par Whop : le bas de l’aperçu gratuit (PiedGratuit), la feuille « Ta formule »,
@@ -58,6 +59,20 @@ export const PAYWALL = {
    * ligne sous le bouton.
    */
   formule: (autre: string) => `Ton rapport sur ${autre}`,
+  /**
+   * Les chapitres en questions, sur le paywall (une proposition du 22 octobre 2026) : chacun dit la question à laquelle
+   * il répond, le 1er avec ce que tu veux savoir sur « Qui es-tu ? » (le bloc « Ta question », au-dessus des aperçus,
+   * retiré le 22 octobre : le premier écran en disait trop ; ta question reste ici). Le rapport payé garde ses titres ; chaque question est celle
+   * de son chapitre (le verdict, la bascule, votre histoire, ce qui coince, l’autre, toi, le duo et ses scores, le
+   * prochain pas).
+   */
+  chapitre: (n: number, autre: string, il: boolean, objectif?: Goal) => {
+    if (n === 1) return objectif ? VERDICT_DE_L_OBJECTIF[objectif](il) : `Est-ce qu’${il ? "il est intéressé" : "elle est intéressée"}\u00a0?`;
+    if (n === 5) return `${autre}, décrypté${il ? "" : "e"}`;
+    return CHAPITRES_EN_QUESTIONS[n] ?? "";
+  },
+  /** Sur téléphone, au-dessus des formules, quand les aperçus du rapport portent déjà son nom. */
+  choisis: "Choisis ta formule",
   rapport: {
     titre: CATALOGUE.rapport.titre,
     note: (bulles: number) => `${NB_CHAPITRES} chapitres sur vous deux, ton vocal, ${bulles} réponses de BLUSH`,
@@ -76,9 +91,42 @@ export const PAYWALL = {
     plusChoisi: "Le plus choisi",
   },
   gratuit: prixCourt(0),
-  /** Sous le bouton qui paie, en une ligne : pas d’abonnement, et « Léa n’est jamais prévenue » (BLUSH n’écrit jamais à l’autre). */
-  paiementUnique: "Paiement unique",
-  jamaisPrevenu: (autre: string, elle: boolean) => `${autre} n’est jamais prévenu${elle ? "e" : ""}`,
+  /**
+   * Ce que tu débloques (une proposition du 22 octobre 2026) : le vocal, puis les chapitres du rapport, leurs titres
+   * d’attente (titreDAttente : le 5e porte le prénom de l’autre), leur texte flouté. Rien n’est encore lu au paywall :
+   * aucune ligne ne dit rien de la conv. Le vocal dure 30 secondes, comme le promet le mail S3.
+   */
+  sommaire: {
+    titre: "Ce que tu débloques",
+    compte: `${NB_CHAPITRES} chapitres + ton vocal`,
+    vocal: (autre: string) => `Ton vocal sur toi et ${autre}`,
+    duree: "30\u00a0s",
+  },
+  /**
+   * Les aperçus du rapport (une proposition du 22 octobre 2026, la « photo produit » des boutiques) : quatre écrans en
+   * miniature, à son nom, avant les formules. Rien n’y est lu avant de payer : leur texte est flouté, seuls les titres
+   * (ceux d’attente) et la question qu’on pose à BLUSH se lisent.
+   */
+  apercus: {
+    /**
+     * Leur en-tête, comme le nom et la fiche d’un produit (demandé le 22 octobre : des images sans titre ni description
+     * faisaient fouillis) : sur téléphone, le nom du rapport, la note des avis à côté ; sur ordinateur, où la carte du
+     * paiement porte déjà ce nom, « Un aperçu de ton rapport ». Dessous, sa fiche en une ligne.
+     */
+    titre: (autre: string) => `Ton rapport sur ${autre}`,
+    titreOrdinateur: "Un aperçu de ton rapport",
+    /** Sa fiche : les messages lus (sur téléphone seulement : sur ordinateur, ils sont au-dessus du titre), puis ce qu’il contient. */
+    fiche: { messages: (messages: string) => `${messages} messages lus · `, contenu: `${NB_CHAPITRES} chapitres + ton vocal` },
+    avis: (nombre: string) => `${nombre} avis`,
+    /** Pour un lecteur d’écran : les miniatures, elles, sont décoratives. */
+    resume: (autre: string) => `Aperçu de ton rapport sur ${autre}\u00a0: ton vocal, ses chapitres et BLUSH pour lui répondre, floutés jusqu’au paiement.`,
+    vocal: "BLUSH t’a laissé un vocal",
+    duree: "0:30",
+    chapitre: (n: number) => `Chapitre ${n}`,
+    question: "je lui réponds quoi\u00a0?",
+  },
+  /** La zone des avis qui défile, pour un lecteur d’écran. */
+  lesAvis: "Les avis",
   precedent: "Témoignage précédent",
   suivant: "Témoignage suivant",
   /** L’avant / après : une réponse sans BLUSH, une avec, sur un message inventé (« exemple »). */
@@ -93,21 +141,50 @@ export const PAYWALL = {
     avecReponse: "je te laissais le temps de me manquer",
     avecSuite: (elle: boolean) => `${elle ? "Elle" : "Il"} relance.`,
   },
-  /** Les questions, en bas : la discrétion, l’abonnement, un souci (le remboursement, sur un problème technique seulement : les conditions). */
-  questions: (autre: string, elle: boolean) => [
+  /**
+   * Les questions, en bas (réécrites le 22 octobre, une proposition) : elles rassurent et redisent ce qu’on gagne, sans
+   * soulever de peur qu’on n’avait pas (plus d’« abonnement », plus de « si mon rapport ne s’écrit pas » : le
+   * remboursement sur un problème technique reste dans les conditions). Ce qu’on reçoit, que ce n’est pas deviné (la
+   * note des testeurs, quand il y en a une), et la discrétion, dite comme une promesse.
+   */
+  questions: (autre: string) => [
     {
-      q: `${autre} sera prévenu${elle ? "e" : ""}\u00a0?`,
-      r: "Jamais. BLUSH ne lui écrit pas. Ta conv reste chiffrée, et tu peux tout effacer à tout moment.",
+      q: "Je reçois quoi\u00a0?",
+      r: `Ton rapport sur toi et ${autre}, tout de suite\u00a0: ${NB_CHAPITRES} chapitres sur vous deux, ton vocal de 30 secondes, et BLUSH pour t’aider à lui répondre.`,
     },
-    { q: "C’est un abonnement\u00a0?", r: "Non. Tu paies une fois, et c’est à toi." },
     {
-      q: "Et si mon rapport ne s’écrit pas\u00a0?",
-      r: "Écris-nous à bonjour@askblush.com\u00a0: si un problème technique t’empêche de l’avoir, on le répare, ou on te rembourse.",
+      q: "C’est fiable\u00a0?",
+      r: `BLUSH ne devine pas\u00a0: tout ce qu’il te dit vient de vos messages, avec les passages qui le montrent et à quel point il en est sûr.${NOTE_DES_AVIS ? ` Ses testeurs lui donnent ${NOTE_DES_AVIS.note} sur 5.` : ""}`,
+    },
+    {
+      q: "Ça reste entre nous\u00a0?",
+      r: `Oui. ${autre} n’en saura jamais rien\u00a0: BLUSH ne lui écrit pas. Ta conv est chiffrée, et tu l’effaces quand tu veux.`,
     },
   ],
+  /** Sur ordinateur, sous les questions : le dernier bouton, qui ramène au paiement (la carte du paiement n’est plus à l’écran). */
+  finale: (autre: string) => `Débloquer mon rapport sur ${autre}`,
   /** La barre du bas, sur téléphone, quand le bouton qui paie est sorti de l’écran : elle y ramène. */
   barre: "Débloquer",
   barreAller: "Aller au paiement",
+};
+
+/** Le 1er chapitre, le verdict, dit comme ta question, en court (sur sa ligne de « Ce que tu débloques »). */
+const VERDICT_DE_L_OBJECTIF: Record<Goal, (il: boolean) => string> = {
+  reciproque: () => "Est-ce que c’est réciproque\u00a0?",
+  ensemble: (il) => `Est-ce qu’${il ? "il" : "elle"} veut la même chose\u00a0?`,
+  comprendre: () => "Ce qui se passe vraiment",
+  mieux: () => "Comment ça peut aller mieux",
+  point: () => "Où vous en êtes, vraiment",
+};
+
+/** Les autres chapitres en questions (le 5e, son prénom : PAYWALL.chapitre). */
+const CHAPITRES_EN_QUESTIONS: Record<number, string> = {
+  2: "Le jour où ça a changé",
+  3: "Comment vous en êtes là",
+  4: "Ce qui bloque entre vous",
+  6: "Ce que tu fais sans le voir",
+  7: "Qui fait le plus d’efforts\u00a0?",
+  8: "Quoi lui répondre maintenant",
 };
 
 /**

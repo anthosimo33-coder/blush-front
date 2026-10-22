@@ -70,9 +70,11 @@ test("un nouveau venu : la lecture du code, le paywall, payé, puis la vraie lec
 
   await test.step("le paywall prime : les deux formules aux prix du 16 octobre, Premium choisie d’avance", async () => {
     const ecran = page.getByRole("main");
+    /* Sur téléphone, la première section est rangée comme une fiche produit (22 octobre) : les messages lus et la note passent dans l’en-tête des aperçus du rapport */
+    const telephone = page.viewportSize()!.width < 1024;
     /* Le titre : la première trouvaille du code, qui nomme l’autre */
     await expect(ecran.getByRole("heading", { level: 1 })).toContainText("Maëlys");
-    await expect(ecran.getByText(/^Ton rapport · .+ messages lus$/)).toBeVisible();
+    await expect(ecran.getByText(telephone ? /^.+ messages lus · 8 chapitres \+ ton vocal$/ : /^Ton rapport · .+ messages lus$/)).toBeVisible();
     await expect(ecran.getByRole("radio", { name: /^Le rapport/ })).toContainText("9,90\u00a0€");
     const premium = ecran.getByRole("radio", { name: /Premium/ });
     await expect(premium).toContainText("14,90\u00a0€");
@@ -80,12 +82,16 @@ test("un nouveau venu : la lecture du code, le paywall, payé, puis la vraie lec
     await expect(premium).not.toContainText("23,80");
     await expect(premium).not.toContainText("pour 5");
     await expect(premium).toContainText("90 réponses, dont 30 offertes");
-    await expect(ecran.getByText("Ton rapport sur Maëlys", { exact: true })).toBeVisible();
-    await expect(ecran.getByText(/^Paiement unique · Maëlys n’est jamais prévenue$/)).toBeVisible();
+    /* Le nom du rapport : l’en-tête des aperçus sur téléphone, la carte du paiement sur ordinateur */
+    await expect(ecran.getByText("Ton rapport sur Maëlys", { exact: true }).filter({ visible: true })).toHaveCount(1);
+    /* Retirée le 22 octobre : la ligne « Paiement unique · … jamais prévenue » sous le bouton */
+    await expect(ecran.getByText(/^Paiement unique · /)).toHaveCount(0);
     await expect(premium).toHaveAttribute("aria-checked", "true");
     await expect(ecran.getByRole("button", { name: "Débloquer · 14,90\u00a0€" })).toBeVisible();
     await expect(ecran.getByText(/Tu économises|Ton verdict arrive/)).toHaveCount(0);
-    await expect(ecran.getByText(/4,8 · 654 avis · déjà 1,2\u00a0million de messages lus$/)).toBeVisible();
+    await expect(
+      telephone ? ecran.getByText("654 avis", { exact: true }).filter({ visible: true }) : ecran.getByText(/4,8 · 654 avis · déjà 1,2\u00a0million de messages lus$/),
+    ).toBeVisible();
     await paieEnPetitEcran(page, "Débloquer · 14,90\u00a0€");
     expect(await verdictsEcrits(email)).toBe(0);
   });
