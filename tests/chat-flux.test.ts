@@ -162,12 +162,20 @@ describe("POST /api/chat en flux", () => {
     await lancerApres();
   });
 
-  it("en vocal, une alerte : la réponse reste écrite, ses bulles arrivent au fil de l’eau", async () => {
+  it("en vocal, une alerte de la règle de l’âge : la réponse reste écrite, ses bulles arrivent au fil de l’eau", async () => {
     await vocalEnBase(true);
-    chat = (req) => reponseChat(req, (r) => ({ ...r, alerte: "detresse", mode: "sobre" }));
+    chat = (req) => reponseChat(req, (r) => ({ ...r, alerte: "mineur", mode: "sobre" }));
     const evenements = (await lectures(await envoyer("j’en peux plus"))).flat();
     expect(evenements.map((e) => Object.keys(e)[0])).toEqual(["bulle", "bulle", "reponse"]);
     expect((evenements[2] as { reponse: { vocalEnCours?: boolean } }).reponse.vocalEnCours).toBeUndefined();
+    await lancerApres();
+  });
+
+  it.each(["danger", "detresse"] as const)("en vocal, une alerte %s (22 octobre 2026) : le vocal part comme pour tout le monde", async (alerte) => {
+    await vocalEnBase(true);
+    chat = (req) => reponseChat(req, (r) => ({ ...r, alerte, mode: "doux" }));
+    const evenements = (await lectures(await envoyer("j’en peux plus"))).flat();
+    expect(evenements.map((e) => Object.keys(e)[0])).toEqual(["reponse", "vocal"]);
     await lancerApres();
   });
 
@@ -368,8 +376,11 @@ describe("POST /api/chat en flux", () => {
   });
 
   it("la mise à jour de la mémoire qui ne repart pas (la base tombe) : la réponse est partie, une ligne au journal, sans le message de l’erreur", async () => {
-    /* Une suite : la mémoire se met à jour après la réponse */
-    chat = (req) => reponseChat(req, (r) => ({ ...r, type: "suite" }));
+    /*
+     * Une suite qui franchit une étape : la mémoire se met à jour tout de suite après la réponse, sans attendre que le
+     * chat se calme (src/server/memoire-groupee.ts), quel que soit le nombre d’échanges que les autres tests ont laissés
+     */
+    chat = (req) => reponseChat(req, (r) => ({ ...r, type: "suite", niveau_atteint: "dit" }));
     for (const flux of [true, false]) {
       etat.chaineEnPanne = Object.assign(new Error(`Failed query: select … params: ${compte.email}`), { name: "DrizzleQueryError" });
       const erreur = vi.spyOn(console, "error").mockImplementation(() => {});

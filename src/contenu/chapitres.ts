@@ -33,8 +33,8 @@ export const TITRE_DU_VERDICT = "Le verdict";
 /** « Le moment où tout a basculé », payant : la révélation du verdict y prend « le moment » et « à toi de jouer », une fois débloqué. */
 export const CHAPITRE_DE_LA_BASCULE = 2;
 
-/** Le chapitre de l’autre personne : son titre est son prénom. */
-const DE_L_AUTRE = 5;
+/** Le chapitre de l’autre personne : son titre est son prénom (les aperçus du paywall le montrent). */
+export const CHAPITRE_DE_L_AUTRE = 5;
 
 /*
  * Les titres de chaque chapitre, sauf celui de l’autre : les titres d’attente. Les chapitres fermés montrent ceux que le
@@ -60,7 +60,7 @@ const TITRES: Record<number, string> = {
  * ou dans le mail.
  */
 export function titreDAttente(numero: number, autre: string): string {
-  if (numero === DE_L_AUTRE) return autre;
+  if (numero === CHAPITRE_DE_L_AUTRE) return autre;
   const titre = TITRES[numero];
   if (titre === undefined) throw new RangeError(`chapitre ${numero} : pas de titre d’attente`);
   return titre;

@@ -57,12 +57,15 @@ export type SituationDeVente = {
   prenomAutre: string | null;
   /** Le prénom que le modèle a donné est celui de l’autre personne de cette conv : il parle d’elle (un rapport refait). */
   memePersonne: boolean;
-  /** Cette réponse est sortie en alerte (danger, détresse, mineur) : il va mal, rien de spontané. */
+  /** Cette réponse est sortie en alerte de la règle de l’âge : rien de spontané. « Danger » et « détresse » suivent la règle de tous (le moment du modèle). */
   alerte: boolean;
   /** Sa conv est en mode sobre (le rapport doux) : rien ne s’y vend. */
   sobre: boolean;
-  /** Un ancien rapport doux « danger » (d’avant le 21 octobre 2026) : seul le réimport se vend, et seulement s’il le demande. */
-  dangerSobre: boolean;
+  /**
+   * Un ancien rapport doux dont l’alerte se vend désormais (« danger » avant le 21 octobre 2026, « détresse » avant le
+   * 22) : seul le réimport se vend, et seulement s’il le demande.
+   */
+  ancienSobre: boolean;
   /** Sa réponse s’est écrite verrouillée : il n’avait plus de bulles, elle attend la recharge. */
   verrouillee: boolean;
   /** Il a payé le rapport seul (pas Premium) : Premium pour 5 € de plus (③) peut encore se proposer, une fois. */
@@ -95,7 +98,7 @@ export type ChoixDeVente = { genre: GenreVendu; spontanee: boolean };
  */
 export function choisirLaVente(s: SituationDeVente): ChoixDeVente | null {
   const demande = s.moment === "demande_achat" || s.moment === "demande_rapport";
-  if (s.dangerSobre) return demande ? { genre: "reimport", spontanee: false } : null;
+  if (s.ancienSobre) return demande ? { genre: "reimport", spontanee: false } : null;
   if (s.sobre) return null;
   /* Le besoin : sa réponse attend, verrouillée */
   if (s.verrouillee) return { genre: s.rapportSeul ? "premium" : "bulles", spontanee: false };
@@ -210,7 +213,7 @@ async function lireLaSituation(r: ReponseVendue) {
     alerte: r.alerte,
     /* Le mode sobre, comme convEnAlerte (src/server/achats.ts) : un verdict sobre, ou une alerte qui l’est toujours */
     sobre: !!v && (v.mode_sobre || alerteSobre(v.alerte)),
-    dangerSobre: !!v?.mode_sobre && v.alerte === "danger",
+    ancienSobre: !!v?.mode_sobre && !!v.alerte && !alerteSobre(v.alerte),
     verrouillee: r.verrouillee,
     rapportSeul: RAPPORTS_SEULS.some((o) => offres.has(o)) && !offres.has("premium") && !offres.has("premium_ajout"),
     messages48h: Math.max(1, recents?.n ?? 0),

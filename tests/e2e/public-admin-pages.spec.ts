@@ -75,7 +75,8 @@ test("une conv d’exemple qui défile montre le verdict de BLUSH, qui se ferme 
     await expect(feuille.getByText("Vous êtes à deux doigts.")).toBeVisible();
     await expect(feuille.getByText("Elle te tend des perches depuis trois semaines.")).toBeVisible();
     await expect(feuille.getByText("on refait un verre quand tu veux, mais cette fois c’est toi qui choisis le bar")).toBeVisible();
-    await expect(feuille.getByText("Ton prochain pas")).toBeVisible();
+    /* Sa carte « Ton prochain pas » (le titre revient, plus bas, dans « La suite de son rapport ») */
+    await expect(feuille.getByText("Ton prochain pas").first()).toBeVisible();
     await expect(feuille.getByText("Choisis le bar, et propose-lui un soir précis.")).toBeVisible();
     await feuille.getByRole("button", { name: "Fermer" }).click();
     await expect(feuille).toBeHidden();
@@ -115,7 +116,7 @@ test("une conv de la copie qui boucle s’ouvre aussi au toucher (elle est à l�
   else await page.mouse.click(x, y);
   const feuille = page.getByRole("dialog", { name: nom, exact: true });
   await expect(feuille).toBeVisible();
-  await expect(feuille.getByText("Ton prochain pas")).toBeVisible();
+  await expect(feuille.getByText("Ton prochain pas").first()).toBeVisible();
 });
 
 test("le bloc du quotidien : une question touchée ouvre sa réponse et referme la précédente", async ({ page }) => {

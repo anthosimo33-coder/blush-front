@@ -1,4 +1,5 @@
 import { NB_CHAPITRES } from "@/contenu/chapitres";
+import type { GenreDuHaut } from "@/contenu/haut-du-paywall";
 import type { LandingConv, QuestionAnswer, Testimonial } from "@/types";
 
 /*
@@ -22,6 +23,10 @@ export const LANDING_CONVS: LandingConv[] = [
     confidence: "sur",
     proofs: 9,
     next: "Choisis le bar, et propose-lui un soir précis.",
+    chiffres: [
+      { valeur: "4 sur 5", texte: "des convs, c’est elle qui les lance depuis le 12\u00a0févr.", cote: "elle" },
+      { valeur: "6 fois", texte: "elle a parlé de se revoir depuis le 3\u00a0mars", cote: "elle" },
+    ],
   },
   {
     id: "coeur",
@@ -35,6 +40,10 @@ export const LANDING_CONVS: LandingConv[] = [
     confidence: "sur",
     proofs: 11,
     next: "Propose-lui une soirée rien qu’à vous deux, avec un jour précis.",
+    chiffres: [
+      { valeur: "5 fois", texte: "«\u00a0c’est pas grave\u00a0» depuis le 14\u00a0févr.", cote: "elle" },
+      { valeur: "−40\u00a0%", texte: "de messages par jour depuis le 14\u00a0févr.", cote: "elle" },
+    ],
   },
   {
     id: "theo",
@@ -47,6 +56,10 @@ export const LANDING_CONVS: LandingConv[] = [
     confidence: "sur",
     proofs: 6,
     next: "Dis oui, et confirme l’heure.",
+    chiffres: [
+      { valeur: "6\u00a0min", texte: "pour te répondre, en moyenne", cote: "elle" },
+      { valeur: "12\u00a0févr.", texte: "il propose un soir et une heure", cote: "elle" },
+    ],
   },
   {
     id: "ines",
@@ -60,6 +73,10 @@ export const LANDING_CONVS: LandingConv[] = [
     confidence: "probable",
     proofs: 5,
     next: "Propose-lui un vrai rendez-vous, sans parler de «\u00a0nous\u00a0».",
+    chiffres: [
+      { valeur: "6 sur 7", texte: "de ses messages arrivent après 23\u00a0h", cote: "elle" },
+      { valeur: "28\u00a0janv.", texte: "la seule fois où elle parle de «\u00a0nous\u00a0»", cote: "elle" },
+    ],
   },
   {
     id: "nathan",
@@ -72,6 +89,10 @@ export const LANDING_CONVS: LandingConv[] = [
     confidence: "sur",
     proofs: 11,
     next: "Arrête de relancer. Laisse-lui la place de revenir vers toi.",
+    chiffres: [
+      { valeur: "−60\u00a0%", texte: "de longueur pour ses messages depuis le 26\u00a0févr.", cote: "elle" },
+      { valeur: "9 sur 10", texte: "des relances viennent de toi depuis le 26\u00a0févr.", cote: "toi" },
+    ],
   },
   {
     id: "camille",
@@ -84,6 +105,10 @@ export const LANDING_CONVS: LandingConv[] = [
     confidence: "sur",
     proofs: 4,
     next: "Propose-lui le resto dont elle t’a parlé.",
+    chiffres: [
+      { valeur: "11\u00a0h\u00a020", texte: "le lendemain du date, elle t’écrit la première", cote: "elle" },
+      { valeur: "3", texte: "propositions de sa part depuis le 9\u00a0mars", cote: "elle" },
+    ],
   },
 
   /* ———— Rangée 2 ———— */
@@ -99,6 +124,10 @@ export const LANDING_CONVS: LandingConv[] = [
     confidence: "probable",
     proofs: 3,
     next: "Dis oui, et glisse-lui que t’es libre jeudi soir. Laisse-le fixer le reste.",
+    chiffres: [
+      { valeur: "3 fois", texte: "il propose un verre… «\u00a0si t’as le temps\u00a0»", cote: "elle" },
+      { valeur: "4\u00a0avr.", texte: "son premier «\u00a0on devrait se faire un verre\u00a0»", cote: "elle" },
+    ],
   },
   {
     id: "cheri",
@@ -112,6 +141,10 @@ export const LANDING_CONVS: LandingConv[] = [
     confidence: "sur",
     proofs: 8,
     next: "Réponds avec une date et une destination.",
+    chiffres: [
+      { valeur: "7 fois", texte: "il parle de projets à deux depuis janvier", cote: "elle" },
+      { valeur: "4\u00a0min", texte: "pour te répondre, comme au début", cote: "elle" },
+    ],
   },
   {
     id: "margaux",
@@ -125,6 +158,10 @@ export const LANDING_CONVS: LandingConv[] = [
     confidence: "probable",
     proofs: 4,
     next: "Fais une seule proposition claire. Puis laisse-la revenir vers toi.",
+    chiffres: [
+      { valeur: "2\u00a0jours", texte: "pour te répondre depuis le 16\u00a0févr.", cote: "elle" },
+      { valeur: "0", texte: "question de sa part depuis votre date", cote: "elle" },
+    ],
   },
   {
     id: "jules",
@@ -137,6 +174,10 @@ export const LANDING_CONVS: LandingConv[] = [
     confidence: "sur",
     proofs: 8,
     next: "Renvoie-lui la balle sur le même ton. Le verre, c’est à lui de le proposer.",
+    chiffres: [
+      { valeur: "5\u00a0min", texte: "pour te répondre, même tard le soir", cote: "elle" },
+      { valeur: "15\u00a0mars", texte: "son premier message ouvertement dragueur", cote: "elle" },
+    ],
   },
   {
     id: "chloe",
@@ -149,6 +190,10 @@ export const LANDING_CONVS: LandingConv[] = [
     confidence: "sur",
     proofs: 7,
     next: "Dis oui, et propose d’y aller ensemble.",
+    chiffres: [
+      { valeur: "4 fois", texte: "elle propose de vous voir depuis le 1er\u00a0mars", cote: "elle" },
+      { valeur: "21\u00a0mars", texte: "elle te demande si tu viens à l’anniv", cote: "elle" },
+    ],
   },
   {
     id: "yanis",
@@ -162,6 +207,10 @@ export const LANDING_CONVS: LandingConv[] = [
     confidence: "probable",
     proofs: 3,
     next: "Glisse-lui que t’es libre jeudi, et laisse-le proposer.",
+    chiffres: [
+      { valeur: "3", texte: "«\u00a0on verra\u00a0» depuis le 23\u00a0févr.", cote: "elle" },
+      { valeur: "0", texte: "proposition de sa part en deux semaines", cote: "elle" },
+    ],
   },
 
   /* ———— Rangée 3 ———— */
@@ -177,6 +226,10 @@ export const LANDING_CONVS: LandingConv[] = [
     confidence: "sur",
     proofs: 10,
     next: "Dis-lui ce que tu ressens, en face.",
+    chiffres: [
+      { valeur: "23\u00a0févr.", texte: "elle parle de toi à sa coloc", cote: "elle" },
+      { valeur: "2\u00a0min", texte: "pour te répondre, le soir", cote: "elle" },
+    ],
   },
   {
     id: "maxime",
@@ -189,6 +242,10 @@ export const LANDING_CONVS: LandingConv[] = [
     confidence: "sur",
     proofs: 5,
     next: "Monte, et apporte de quoi boire.",
+    chiffres: [
+      { valeur: "5", texte: "prétextes pour te voir depuis janvier", cote: "elle" },
+      { valeur: "2\u00a0févr.", texte: "les crêpes «\u00a0il va en rester\u00a0»", cote: "elle" },
+    ],
   },
   {
     id: "julien",
@@ -202,6 +259,10 @@ export const LANDING_CONVS: LandingConv[] = [
     confidence: "probable",
     proofs: 6,
     next: "Envoie-lui un message qui n’a rien à voir avec l’organisation.",
+    chiffres: [
+      { valeur: "8 sur 10", texte: "de vos messages parlent d’organisation", cote: "pareil" },
+      { valeur: "19\u00a0janv.", texte: "son dernier «\u00a0tu me manques\u00a0»", cote: "elle" },
+    ],
   },
   {
     id: "alice",
@@ -215,6 +276,10 @@ export const LANDING_CONVS: LandingConv[] = [
     confidence: "probable",
     proofs: 4,
     next: "Propose-lui quelque chose de précis, une seule fois. Sa réponse te dira tout.",
+    chiffres: [
+      { valeur: "14\u00a0h", texte: "pour te répondre, en moyenne", cote: "elle" },
+      { valeur: "11\u00a0mars", texte: "elle reparle de samedi, trois jours après", cote: "elle" },
+    ],
   },
   {
     id: "lucas",
@@ -227,6 +292,10 @@ export const LANDING_CONVS: LandingConv[] = [
     confidence: "sur",
     proofs: 12,
     next: "Pose-lui la question\u00a0: «\u00a0on\u00a0est\u00a0quoi,\u00a0nous\u00a0?\u00a0»",
+    chiffres: [
+      { valeur: "1er\u00a0mars", texte: "il parle de te présenter à ses parents", cote: "elle" },
+      { valeur: "9 sur 10", texte: "de vos soirées, c’est lui qui les propose", cote: "elle" },
+    ],
   },
   {
     id: "zoe",
@@ -240,6 +309,10 @@ export const LANDING_CONVS: LandingConv[] = [
     confidence: "sur",
     proofs: 6,
     next: "Like son message, et passe à autre chose. Si elle revient, ce sera pour de vrai.",
+    chiffres: [
+      { valeur: "9\u00a0h", texte: "pour te répondre, contre 10 min en janvier", cote: "elle" },
+      { valeur: "0", texte: "question de sa part depuis le 20\u00a0févr.", cote: "elle" },
+    ],
   },
 ];
 
@@ -251,8 +324,11 @@ export const TEMOIGNAGES = {
 
 /**
  * Les témoignages, sur la landing et sous le paywall. Vide : la section n’apparaît pas. Uniquement de vrais avis, avec
- * l’accord écrit des personnes : jamais d’avis inventé. Ces trois-là sont ceux de testeurs de BLUSH, dans leurs mots,
- * donnés le 16 octobre. Leur phrase en grand (`citation`) et le passage surligné (`surligne`) sont des morceaux de leur
+ * l’accord écrit des personnes : jamais d’avis inventé. Ce sont ceux de testeurs de BLUSH, dans leurs mots : Mattheo,
+ * Sonia et Charlotte donnés le 16 octobre, les sept autres le 22 octobre (avec leur photo et leur accord écrit, d’après
+ * l’utilisateur ; seules les fautes de frappe sont corrigées, « oi » en « moi », « cest », « ca », « fréquentait »,
+ * « meilleure ami », et les guillemets mis à la française). L’ordre est celui de la landing et, sans titre qui
+ * leur ressemble (AVIS_DU_HAUT), du paywall : les trois avis sur le vocal (Jasmine, Enzo, Lina) jamais côte à côte. Leur phrase en grand (`citation`) et le passage surligné (`surligne`) sont des morceaux de leur
  * avis, mot pour mot (tests/client/temoignages.test.tsx) ; `vu` dit, en une ligne, ce que BLUSH a vu pour eux ; `photo`, leur
  * visage dans le rond (public/avis/, recadrée en carré de 256 px, sans ses métadonnées).
  * TODO(produit): garder leur accord écrit, et les remplacer par des avis de clients quand il y en aura.
@@ -269,6 +345,26 @@ export const TESTIMONIALS: Testimonial[] = [
     photo: "/avis/mattheo.webp",
   },
   {
+    name: "Erine",
+    label: "Ils se parlent",
+    teinte: "flou",
+    vu: "un mec qui la gardait au chaud",
+    citation: "Je l’ai bloqué le soir même et jme sens trop mieux",
+    surligne: "J’ai mis notre conv sur BLUSH et le verdict m’a dit cash qu’il me gardait au chaud.",
+    text: "Wsh faut que je vous raconte. Le mec à qui je parle depuis 2 mois likait toutes mes stories mais répondait jamais à mes messages. J’ai mis notre conv sur BLUSH et le verdict m’a dit cash qu’il me gardait au chaud. J’avais le seum mais c’était trop vrai mdrr. Je l’ai bloqué le soir même et jme sens trop mieux",
+    photo: "/avis/erine.webp",
+  },
+  {
+    name: "Jasmine",
+    label: "Son crush",
+    teinte: "elle",
+    vu: "tout sur son crush, en un vocal",
+    citation: "elle avait raison sur tout.",
+    surligne: "C’est trop fun et en vrai ça aide grave",
+    text: "Ma pote m’a fait écouter sa vocale et j’ai cru mourir de rire mdrrrr. Du coup j’ai testé avec mon crush et la vocale m’a clashée encore plus fort lol. Mais enfaite elle avait raison sur tout. C’est trop fun et en vrai ça aide grave",
+    photo: "/avis/jasmine.webp",
+  },
+  {
     name: "Sonia",
     label: "En couple",
     teinte: "vrai",
@@ -277,6 +373,26 @@ export const TESTIMONIALS: Testimonial[] = [
     surligne: "BLUSH a retracé nos derniers échanges et repéré le moment où nos conversations ont commencé à changer.",
     text: "Je pensais qu’on s’éloignait sans vraiment savoir pourquoi. BLUSH a retracé nos derniers échanges et repéré le moment où nos conversations ont commencé à changer. On a tout relu ensemble, on s’est reconnus dans certains passages, et pour la première fois depuis longtemps, on a réussi à parler de ce qui n’allait pas.",
     photo: "/avis/sonia.webp",
+  },
+  {
+    name: "Sofia",
+    label: "Son crush",
+    teinte: "elle",
+    vu: "des «\u00a0on verra\u00a0» qui veulent dire non",
+    citation: "ça m’a évité de perdre encore 3 mois.",
+    surligne: "BLUSH m’a expliqué que ses «\u00a0on verra\u00a0» c’était des non polis.",
+    text: "Le mec me disait «\u00a0on verra\u00a0» à chaque fois que je proposais de se voir. Moi je pensais qu’il était juste occupé lol. BLUSH m’a expliqué que ses «\u00a0on verra\u00a0» c’était des non polis. Ça m’a piquée mais ça m’a évité de perdre encore 3 mois. Merci BLUSH sérieux",
+    photo: "/avis/sofia.webp",
+  },
+  {
+    name: "Enzo",
+    label: "Sa crush",
+    teinte: "elle",
+    vu: "tout sur sa crush, en un vocal",
+    citation: "la vocale m’a clashé encore plus fort que eux",
+    surligne: "Mais en vrai elle a tout capté sur la meuf.",
+    text: "Mes potes m’ont fait écouter leurs vocales en soirée et c’était trop drôle mdrrrr. Du coup j’ai testé avec ma crush et la vocale m’a clashé encore plus fort que eux lol. Mais en vrai elle a tout capté sur la meuf. C’est trop fun et ça aide grave",
+    photo: "/avis/enzo.webp",
   },
   {
     name: "Charlotte",
@@ -288,7 +404,58 @@ export const TESTIMONIALS: Testimonial[] = [
     text: "J’étais à deux doigts de lui renvoyer un message, comme d’habitude. BLUSH m’a montré que c’était toujours moi qui relançais et que ses réponses ne menaient jamais nulle part. Ça m’a fait mal de le voir noir sur blanc, mais j’ai fini par supprimer mon brouillon. Son dernier vocal\u00a0? Je l’ai écouté bien trop de fois avant d’en arriver là.",
     photo: "/avis/charlotte.webp",
   },
+  {
+    name: "Lucas",
+    label: "Son ex",
+    teinte: "flou",
+    vu: "ce qu’elle lui avait fait, dans l’ordre",
+    citation: "Ça m’a mis une claque, j’ai pas répondu",
+    surligne: "Le rapport m’a rappelé tout ce qu’elle m’avait fait en mode chronologie.",
+    text: "Mon ex m’a écrit «\u00a0tu me manques\u00a0» après 5 mois et j’allais repartir direct jpp. Un pote m’a dit de passer par BLUSH avant de répondre. Le rapport m’a rappelé tout ce qu’elle m’avait fait en mode chronologie. Ça m’a mis une claque, j’ai pas répondu et franchement merci",
+    photo: "/avis/lucas.webp",
+  },
+  {
+    name: "Maelys",
+    label: "Situationship",
+    teinte: "flou",
+    vu: "des réponses en 3 mots depuis une semaine",
+    citation: "BLUSH m’a sorti la phrase parfaite et depuis c’est niquel",
+    surligne: "c’est trop bien maintenant c’est ma meilleure amie",
+    text: "Enfaite on m’a envoyé ça pour tester, j’me disais c’est banal, mais enfaite c’est trop bien maintenant c’est ma meilleure amie. Le mec que je fréquentais me répondait en 3 mots depuis une semaine. J’ai demandé à BLUSH quoi lui dire. BLUSH m’a sorti la phrase parfaite et depuis c’est niquel",
+    photo: "/avis/maelys.webp",
+  },
+  {
+    name: "Lina",
+    label: "Testé entre potes",
+    teinte: "flou",
+    vu: "tout, en un vocal",
+    citation: "La vocale m’a clashée direct",
+    surligne: "En vrai elle a tout capté BLUSH, c’est trop fun et réel",
+    text: "La vocale m’a clashée direct mdrrrr. Ma pote a pleuré de rire mais moi j’ai moins rigolé lol. En vrai elle a tout capté BLUSH, c’est trop fun et réel",
+    photo: "/avis/lina.webp",
+  },
 ];
+
+/**
+ * Sur le paywall, l’avis qui passe en premier, d’après le titre du haut (genreDuHaut) : celui dont l’histoire lui
+ * ressemble (une proposition du 22 octobre 2026). « C’est toi qui portes la conv » : Charlotte, qui relançait seule ;
+ * « Tu ouvres la conv. Lucas, lui, revient » et « Lucas court après toi » : Mattheo, qu’elle reprenait après ses
+ * silences ; la tendance (« Depuis le 12 mars, Lucas t’écrit 2 fois moins ») : Maelys, des réponses en 3 mots depuis une
+ * semaine. Les autres gardent leur ordre ; à l’égalité, ou sans titre, l’ordre de TESTIMONIALS. Chaque prénom est celui
+ * d’un avis de TESTIMONIALS (tests/client/temoignages.test.tsx).
+ */
+export const AVIS_DU_HAUT: Partial<Record<GenreDuHaut, string>> = { tendance: "Maelys", toi: "Charlotte", elle: "Mattheo", contraste: "Mattheo" };
+
+/**
+ * La note des avis sur la landing (NOTE_DES_AVIS, src/contenu/paiement.ts) : sous les boutons, et, au-dessus des avis,
+ * qui l’a donnée (des testeurs).
+ * TODO(produit): à côté d’une note, la loi demande aussi quand et comment les avis ont été recueillis (Code de la
+ * consommation, art. D.111-17 ; la directive Omnibus) ; retiré le 22 octobre à la demande de l’utilisateur.
+ */
+export const NOTE_LANDING = {
+  avis: (nombre: string) => ` · ${nombre} avis de testeurs`,
+  origine: (note: string, nombre: string) => `${note} sur 5, d’après ${nombre} avis de testeurs de BLUSH.`,
+};
 
 /** Dans le bloc du quotidien, la réponse de BLUSH à « elle voit quelqu’un d’autre ? ». */
 export const REPONSE_EXEMPLE: Pick<QuestionAnswer, "title" | "evidence" | "confidence" | "limits"> = {

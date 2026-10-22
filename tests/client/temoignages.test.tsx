@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { CarteTemoignage, enCitation } from "@/components/temoignages/CarteTemoignage";
-import { TEMOIGNAGES, TESTIMONIALS } from "@/contenu/landing";
+import { AVIS_DU_HAUT, TEMOIGNAGES, TESTIMONIALS } from "@/contenu/landing";
 
 describe("les témoignages (la maquette A1)", () => {
   it("leur phrase en grand et le passage surligné sont des morceaux de leur avis, mot pour mot", () => {
@@ -12,6 +12,14 @@ describe("les témoignages (la maquette A1)", () => {
       expect(t.text, `${t.name} : sa phrase en grand`).toContain(t.citation);
       expect(t.text, `${t.name} : son passage surligné`).toContain(t.surligne);
     }
+  });
+
+  it("sur le paywall, l’avis mis en premier selon le titre du haut est un vrai avis de la liste", () => {
+    for (const [genre, nom] of Object.entries(AVIS_DU_HAUT))
+      expect(
+        TESTIMONIALS.map((t) => t.name),
+        `${genre} : ${nom}`,
+      ).toContain(nom);
   });
 
   it("la phrase en grand : une majuscule, un point au bout s’il manque, entre guillemets", () => {

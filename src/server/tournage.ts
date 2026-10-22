@@ -1,6 +1,7 @@
 import "server-only";
 import { and, count, desc, eq, inArray, isNotNull, isNull, max, ne, or, sql } from "drizzle-orm";
 import type { Devinette, Objectif, Pronom } from "@prompts/lib/conv";
+import { enAlerteSobre } from "@prompts/lib/titres";
 import { CASE_IMPORT } from "@/contenu/consentements";
 import { CATALOGUE } from "@/contenu/offres";
 import { NOM_TOURNAGE_MAX, PRENOM_MAX } from "@/lib/limites";
@@ -207,13 +208,13 @@ export async function tournagesAffiches(): Promise<TournageAffiche[]> {
 
 /**
  * Où en est la lecture de la conv d’une conv de tournage. Prête : rien ne lui manque (manqueDe). En échec pour de bon :
- * une alerte de danger (son rapport doux ne se filme pas), ou une étape du verdict, du rapport ou de la mémoire en échec
+ * une alerte sobre (la règle de l’âge, ou un rapport doux gardé : il ne se filme pas), ou une étape du verdict, du rapport ou de la mémoire en échec
  * (hors du budget de l’IA, qui la fait repartir après minuit) ; `erreur` dit laquelle et son code, jamais de contenu.
  * Sinon, elle se lit encore.
  */
 async function statutDe(storyId: string): Promise<{ statut: StatutDuTournage; erreur: string | null }> {
   const verdict = await donneesVerdict(storyId);
-  if (verdict?.sortie.alerte) return { statut: "echec", erreur: "alerte" };
+  if (verdict && enAlerteSobre(verdict.sortie)) return { statut: "echec", erreur: "alerte" };
   if (!(await manqueDe(storyId))) return { statut: "pret", erreur: null };
   const taches = await etatDesTaches(storyId, ["verdict", "rapport_plan", "rapport_chapitres", "memoire"]);
   const echec = Object.values(taches).find((x) => x.status === "echec" && !estBudget(x.error));

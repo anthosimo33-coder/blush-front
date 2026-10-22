@@ -263,8 +263,16 @@ export type TendanceDuPaywall = {
   delai: { avant: number; apres: number } | null;
 };
 
-/** Ce que le haut du paywall montre d’une conv qui attend son paiement : les déséquilibres comptés, et la chute s’il y en a une. */
-export type ApercuDuPaywall = { signaux: SignalDuPaywall[]; tendance: TendanceDuPaywall | null };
+/**
+ * Ce que le haut du paywall montre d’une conv qui attend son paiement : les déséquilibres comptés, et la chute s’il y en
+ * a une. Depuis le 22 octobre (une proposition) : ce que tu veux savoir, sur « Qui es-tu ? » (le 1er chapitre de
+ * « Ce que tu débloques » le dit) ; absent, le paywall s’en passe.
+ */
+export type ApercuDuPaywall = {
+  signaux: SignalDuPaywall[];
+  tendance: TendanceDuPaywall | null;
+  objectif?: Goal;
+};
 
 export type ChapterBlock =
   | { kind: "essential"; text: string }
@@ -349,7 +357,12 @@ export type LandingConv = {
   confidence: Confidence;
   proofs: number;
   next: string;
+  /** Deux chiffres de la conv, dont un daté : ce que BLUSH a compté, comme en haut du paywall. */
+  chiffres: [ChiffreDeConv, ChiffreDeConv];
 };
+
+/** Un chiffre d’une conv d’exemple : sa valeur en gros, ce qu’il dit, et de quel côté il penche (toi, l’autre, les deux). */
+type ChiffreDeConv = { valeur: string; texte: string; cote: "toi" | "elle" | "pareil" };
 
 /** Landing et paywall : un vrai avis, publié avec l’accord de la personne. */
 export type Testimonial = {

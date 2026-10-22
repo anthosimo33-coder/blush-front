@@ -338,7 +338,7 @@ function OffreAJour({ offre, achat }: { offre: Extract<OffreDuChat, { genre: "a_
   );
 }
 
-/** Un ancien rapport doux (une alerte « danger » d’avant le 21 octobre 2026) : la conv réimportée a son rapport complet. Il l’a demandé. */
+/** Un ancien rapport doux (une alerte « danger » ou « détresse » d’avant les 21 et 22 octobre 2026) : la conv réimportée a son rapport complet. Il l’a demandé. */
 function OffreReimport({ offre, achat }: { offre: Extract<OffreDuChat, { genre: "reimport" }>; achat: AchatDuChat }) {
   return (
     <VersLImport genre="reimport" achat={achat} libelle={T.reimport.reimporter} ecartable={false}>

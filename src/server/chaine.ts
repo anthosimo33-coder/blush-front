@@ -1,4 +1,5 @@
 import type { Verdict } from "@prompts/lib/schemas";
+import { enAlerteSobre } from "@prompts/lib/titres";
 import type { Genre } from "./db/enums";
 import type { Tache } from "./taches";
 
@@ -48,7 +49,7 @@ export const vocalTente = (t: Pick<Tache, "createdAt"> | undefined, vocal: { fai
  * verdict d’avant le 9 octobre n’a mode_sobre sans alerte.
  */
 function vocalAFaire({ voix, verdict, plan, rapport, vocal, taches }: EtatChaine): boolean {
-  if (!voix || !verdict || verdict.alerte || !(plan || rapport) || vocal?.aJour) return false;
+  if (!voix || !verdict || enAlerteSobre(verdict) || !(plan || rapport) || vocal?.aJour) return false;
   return !enMarche(taches.vocal) && !vocalTente(taches.vocal, vocal);
 }
 

@@ -1,5 +1,6 @@
 import { expect, type Page, type Request } from "@playwright/test";
 import { CASE_RENONCIATION } from "../../../src/contenu/consentements";
+import { PAYWALL } from "../../../src/contenu/paiement";
 import type { OffreId } from "../../../src/types";
 import { URL_APPLI } from "../reglages";
 import { sql } from "./base";
@@ -149,8 +150,10 @@ export async function refuserLaRoue(page: Page): Promise<void> {
 }
 
 /**
- * Le paywall en 375 × 667 : le bouton qui paie est dans l’écran, sans défiler (les témoignages, l’avant / après et les
- * questions viennent dessous, la page défile pour eux).
+ * Le paywall en 375 × 667 : de quoi payer à l’écran, sans défiler (les témoignages, l’avant / après et les questions
+ * viennent dessous, la page défile pour eux). Le bouton qui paie lui-même ; ou, depuis les aperçus du rapport (22
+ * octobre, une proposition : il peut passer sous le premier écran d’un petit téléphone), la barre du bas qui le remplace
+ * dès l’arrivée et y mène, le bouton alors entier à l’écran.
  */
 export async function paieEnPetitEcran(page: Page, nom: string | RegExp): Promise<void> {
   const avant = page.viewportSize();
@@ -161,9 +164,20 @@ export async function paieEnPetitEcran(page: Page, nom: string | RegExp): Promis
       await document.fonts.ready;
       window.scrollTo(0, 0);
     });
-    const boite = await page.getByRole("button", { name: nom }).boundingBox();
-    expect(boite, "le bouton qui paie est à l’écran").not.toBeNull();
-    expect(boite!.y + boite!.height, `le bouton qui paie tient en 375 × 667 sans défiler (son bas à ${Math.round(boite!.y + boite!.height)} px)`).toBeLessThanOrEqual(667);
+    const bouton = page.getByRole("button", { name: nom });
+    const boite = await bouton.boundingBox();
+    expect(boite, "le bouton qui paie est dans la page").not.toBeNull();
+    if (boite!.y + boite!.height <= 667) return;
+    /* Sous le premier écran : la barre du bas, déjà là, le remplace */
+    const barre = page.getByRole("button", { name: PAYWALL.barreAller });
+    await expect(barre, `le bouton qui paie est sous le premier écran (son bas à ${Math.round(boite!.y + boite!.height)} px) : la barre du bas le remplace`).toBeVisible();
+    const bas = await barre.boundingBox();
+    expect(bas!.y + bas!.height, "la barre du bas tient en 375 × 667").toBeLessThanOrEqual(667);
+    await barre.click();
+    await expect(async () => {
+      const b = (await bouton.boundingBox())!;
+      expect(b.y >= 0 && b.y + b.height <= 667, "la barre mène au bouton qui paie, entier à l’écran").toBe(true);
+    }).toPass({ timeout: 5_000 });
   } finally {
     if (avant) await page.setViewportSize(avant);
   }

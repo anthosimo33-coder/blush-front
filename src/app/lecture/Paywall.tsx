@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode, type Ref, type RefObject } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode, type Ref, type RefObject } from "react";
 import { NB_CHAPITRES } from "@/contenu/chapitres";
-import { TEMOIGNAGES, TESTIMONIALS } from "@/contenu/landing";
+import { AVIS_DU_HAUT, TEMOIGNAGES, TESTIMONIALS } from "@/contenu/landing";
 import { CATALOGUE, enEuros, FORMULE_CHOISIE } from "@/contenu/offres";
 import { DANS_LA_FEUILLE, FEUILLE_FORMULE, MESSAGES_LUS, NOTE_DES_AVIS, OFFRE_SUITE, PAYWALL } from "@/contenu/paiement";
 import { hautDuPaywall } from "@/contenu/haut-du-paywall";
@@ -32,8 +32,9 @@ import { RadioGroup } from "@/components/ui/controls";
 import { Icon } from "@/components/ui/icons";
 import { Tag } from "@/components/ui/messages";
 import { Toast } from "@/components/ui/surfaces";
-import { BulleDeBlush, CarteDuHaut, PreuveDuHaut, TitreDuHaut } from "./HautDuPaywall";
-import type { ApercuDuPaywall, Formule, LotDeLaRoue, OffreId, Story, Testimonial } from "@/types";
+import { ApercusDuRapport } from "./ApercusDuRapport";
+import { CarteDuHaut, PreuveDuHaut, TitreDuHaut } from "./HautDuPaywall";
+import type { ApercuDuPaywall, Formule, Goal, LotDeLaRoue, OffreId, Story, Testimonial } from "@/types";
 import type { RoueDuCompte } from "@/types/api";
 
 /*
@@ -105,6 +106,8 @@ export function Paywall({
   const [passe, setPasse] = useState(false);
   const lot = roue?.etat === "gagnee" && roue.valable && !passe ? roue.lot : null;
   const paiement = useRef<HTMLElement>(null);
+  /* Le bouton qui paie : la barre du bas se montre dès qu’il n’est pas tout entier à l’écran */
+  const bouton = useRef<HTMLDivElement>(null);
   useJalon("paywall");
   useJalonEnVue(paiement, "offres");
 
@@ -116,7 +119,8 @@ export function Paywall({
   return (
     <main className="mx-auto flex min-h-dvh w-full flex-col">
       {lot && roue?.etat === "gagnee" && <BandeauDuCadeau key={roue.fin} lot={lot} reste={roue.reste} onPasse={() => setPasse(true)} />}
-      <div className="mx-auto flex w-full max-w-[1120px] flex-1 flex-col gap-3 px-4 pb-6 pt-3 lg:gap-8 lg:px-12 lg:py-10">
+      {/* Sur téléphone, le bas laisse la place de la barre du bas (BarreDuBas, 74 px et l’encoche) : la dernière question n’est jamais dessous */}
+      <div className="mx-auto flex w-full max-w-[1120px] flex-1 flex-col gap-3 px-4 pb-[calc(96px+env(safe-area-inset-bottom))] pt-3 lg:gap-8 lg:px-12 lg:py-10">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1.5">
             <BubbleLogo size={16} />
@@ -128,33 +132,42 @@ export function Paywall({
           {/* data-prive : le haut, tiré de la conv (son titre, ses chiffres, la bulle), masqué dans l’enregistrement des visites */}
           <section data-prive="" className="flex flex-col gap-3 lg:gap-6">
             <div className="flex flex-col gap-1.5 pt-1 lg:gap-3">
-              <span className="text-legende font-black text-grey lg:text-note">{PAYWALL.conv(formatCount(story.totalMessages))}</span>
+              {/* Sur téléphone, le nombre de messages lus et la note des avis passent dans l’en-tête des aperçus du rapport (moins de lignes au-dessus du titre) */}
+              <span className="text-legende font-black text-grey max-lg:hidden lg:text-note">{PAYWALL.conv(formatCount(story.totalMessages))}</span>
               <TitreDuHaut titre={haut.titre} />
               {haut.sous && <p className={cn("m-0 text-detail font-extrabold leading-[1.4] text-soft lg:text-[19px] lg:leading-[1.42]", preuve && "max-lg:hidden")}>{haut.sous}</p>}
-              <Preuves />
+              <Preuves className="max-lg:hidden" />
             </div>
             <PreuveDuHaut haut={haut} className="lg:hidden" />
-            <BulleDeBlush question={haut.question} className="lg:hidden" />
+            <ApercusDuRapport autre={autre.name} il={!elle} objectif={apercu.objectif} messages={formatCount(story.totalMessages)} className="max-lg:mt-3" />
             <CarteDuHaut haut={haut} autre={autre.name} className="hidden lg:flex" />
+            <Sommaire autre={autre.name} il={!elle} objectif={apercu.objectif} className="hidden lg:flex" />
             <AvantApres elle={elle} className="hidden lg:flex" />
           </section>
           <Paiement
             ref={paiement}
+            refDuBouton={bouton}
             lot={lot}
             sansOffre={(roue?.etat === "a_tourner" && !offreDirecte) || roue?.etat === "gagnee"}
             offreDirecte={offreDirecte}
             autre={autre.name}
-            elle={elle}
             surEnRoute={setEnRoute}
             {...(enUnGeste ? { enUnGeste } : {})}
           />
         </div>
-        <Temoignages items={temoignages} />
+        <Sommaire autre={autre.name} il={!elle} objectif={apercu.objectif} className="mt-3 flex lg:hidden" />
+        <Temoignages items={enPremier(temoignages, AVIS_DU_HAUT[haut.genre])} />
         <AvantApres elle={elle} className="lg:hidden" />
-        <Questions autre={autre.name} elle={elle} />
+        <Questions autre={autre.name} />
+        {/* Sur ordinateur, la carte du paiement n’est plus à l’écran en bas : un dernier bouton y ramène (sur téléphone, la barre du bas) */}
+        <div className="mx-auto hidden w-full max-w-[420px] pt-2 lg:block">
+          <Button arrow onClick={() => paiement.current?.scrollIntoView({ behavior: "smooth", block: "start" })}>
+            {PAYWALL.finale(autre.name)}
+          </Button>
+        </div>
         <FinDuPaywall />
       </div>
-      <BarreDuBas cible={paiement} lot={lot} />
+      <BarreDuBas cible={paiement} bouton={bouton} lot={lot} />
       <FeuilleDeLaRoue open={roueOuverte} onJoue={joue} onFermer={() => setVueRoue("fermee")} />
     </main>
   );
@@ -192,10 +205,10 @@ function BandeauDuCadeau({ lot, reste, onPasse }: { lot: LotDeLaRoue; reste: num
 }
 
 /** Sous le titre : la note des avis (de vrais avis seulement) et tout ce que BLUSH a lu ; rien tant qu’ils manquent. */
-function Preuves() {
+function Preuves({ className }: { className?: string }) {
   if (!NOTE_DES_AVIS && !MESSAGES_LUS) return null;
   return (
-    <p className="m-0 flex flex-wrap items-center gap-x-1.5 text-legende font-extrabold text-grey lg:text-note">
+    <p className={cn("m-0 flex flex-wrap items-center gap-x-1.5 text-legende font-extrabold text-grey lg:text-note", className)}>
       {NOTE_DES_AVIS && (
         <>
           <span aria-hidden="true" className="text-attente">
@@ -258,26 +271,28 @@ function PayerEnUnGeste({ geste, offre, libelle, surPaye }: { geste: EnUnGeste; 
 /**
  * Le paiement (la maquette « La formule · après », 17 octobre) : « Ton rapport sur Léa », les deux formules (Premium
  * choisie d’avance, ses réponses offertes à 0 €, le lot de la roue ; « Le plus choisi » seulement quand c’est vrai), ou ce que le compte a d’avance (le rapport d’avance, le −50 % gardé), puis le bouton qui
- * paie (Apple Pay, Google Pay ou la carte, dans BLUSH), et une ligne : paiement unique, l’autre jamais prévenu. Payé :
+ * paie (Apple Pay, Google Pay ou la carte, dans BLUSH) ; la ligne « Paiement unique · Léa n’est jamais prévenue », dessous,
+ * est retirée le 22 octobre (une proposition : la question « … sera prévenue ? » le dit en bas). Payé :
  * « C’est payé », puis « C’est débloqué ». Et l’offre ①, quand elle vient (`sansOffre` : la roue attend, ou un lot est
  * gagné). `surEnRoute` : dans le paiement ou payé, ou plus (la roue du paywall attend d’en être sortie).
  */
 function Paiement({
   ref,
+  refDuBouton,
   lot,
   sansOffre,
   offreDirecte,
   autre,
-  elle,
   surEnRoute,
   enUnGeste,
 }: {
   ref: Ref<HTMLElement>;
+  /** Le bouton qui paie (et ce qu’il devient) : la barre du bas le guette. */
+  refDuBouton: Ref<HTMLDivElement>;
   lot: LotDeLaRoue | null;
   sansOffre: boolean;
   offreDirecte: boolean;
   autre: string;
-  elle: boolean;
   surEnRoute: (enRoute: boolean) => void;
   enUnGeste?: EnUnGeste;
 }) {
@@ -309,7 +324,10 @@ function Paiement({
     <section ref={ref} className="flex scroll-mt-4 flex-col gap-3 lg:sticky lg:top-6 lg:rounded-[28px] lg:bg-white lg:p-6 lg:shadow-card">
       {!paye && (
         <>
-          <span className="pt-1 text-legende font-black text-grey lg:text-titre-3 lg:text-ink">{PAYWALL.formule(autre)}</span>
+          <span className="pt-1 text-legende font-black text-grey lg:text-titre-3 lg:text-ink">
+            <span className="lg:hidden">{PAYWALL.choisis}</span>
+            <span className="max-lg:hidden">{PAYWALL.formule(autre)}</span>
+          </span>
           <RadioGroup label={FEUILLE_FORMULE.groupe} className="flex flex-col gap-3.5">
             {avoirs?.avance && (
               <Option
@@ -362,7 +380,7 @@ function Paiement({
           </RadioGroup>
         </>
       )}
-      <div className="flex flex-col gap-1">
+      <div ref={refDuBouton} className="flex flex-col gap-1">
         {choisie === "avance" ? (
           <DebloquerAvecLAvance suite="/lecture" deja={relire} />
         ) : enUnGeste ? (
@@ -384,14 +402,6 @@ function Paiement({
           />
         )}
       </div>
-      {!paye && choisie !== "avance" && (
-        <p className="m-0 flex items-center justify-center gap-1 text-center text-legende font-extrabold text-soft">
-          <Icon name="lock" size={13} stroke={2.6} className="shrink-0" />
-          <span>
-            <span className="font-black text-ink">{PAYWALL.paiementUnique}</span> · {PAYWALL.jamaisPrevenu(autre, elle)}
-          </span>
-        </p>
-      )}
       {suiteMontree && (
         <OffreAvantDePartir fin={suiteMontree} chapitres={NB_CHAPITRES} suite="/lecture" onRefus={() => {}} onPassee={() => setPassee(true)} onClosed={fermer} jalons />
       )}
@@ -478,8 +488,10 @@ function LigneCadeau({ lot, perle, titre, barre, valeur }: { lot?: LotDeLaRoue; 
 }
 
 /**
- * Les témoignages (la maquette A1) : « Ils se posaient la même question. », la note des avis, puis leurs cartes, qui
- * défilent de côté sur téléphone (de vrais clients seulement : sans eux, rien).
+ * Les témoignages (la maquette A1) : « Ils se posaient la même question. », la note des avis, puis leurs cartes, en
+ * carrousel sur téléphone comme sur ordinateur (demandé le 22 octobre 2026 ; sur ordinateur, la troisième carte dépasse :
+ * il y en a d’autres), au doigt, aux flèches du clavier ou par leurs deux boutons (de vrais clients seulement : sans
+ * eux, rien).
  */
 function Temoignages({ items }: { items: Testimonial[] }) {
   const piste = useRef<HTMLDivElement>(null);
@@ -506,16 +518,20 @@ function Temoignages({ items }: { items: Testimonial[] }) {
           </p>
         )}
       </div>
+      {/* Zone qui défile : atteignable au clavier (ses flèches la font glisser). Elle déborde des marges de la page (et de
+          20 px sous les cartes, rendus par -mb-5) pour que l’ombre des cartes ne soit pas coupée net par ses bords */}
       <div
         ref={piste}
-        className="-mx-4 flex snap-x snap-mandatory items-start gap-3 overflow-x-auto px-4 pb-4 [scrollbar-width:none] lg:mx-0 lg:grid lg:w-full lg:grid-cols-3 lg:gap-5 lg:overflow-visible lg:px-0 lg:pb-0"
+        tabIndex={0}
+        aria-label={PAYWALL.lesAvis}
+        className="-mx-4 -mb-5 flex snap-x snap-mandatory scroll-px-4 gap-3 overflow-x-auto px-4 pb-9 [scrollbar-width:none] lg:-mx-12 lg:w-[calc(100%+96px)] lg:scroll-px-12 lg:gap-5 lg:px-12 [&::-webkit-scrollbar]:hidden"
       >
         {items.map((t) => (
-          <CarteTemoignage key={t.name + t.label} t={t} className="w-[312px] shrink-0 snap-start lg:w-auto" />
+          <CarteTemoignage key={t.name + t.label} t={t} className="w-[312px] shrink-0 snap-start lg:w-[400px]" />
         ))}
       </div>
       {items.length > 1 && (
-        <div className="flex justify-center gap-4 lg:hidden">
+        <div className="flex justify-center gap-4">
           <button
             type="button"
             aria-label={PAYWALL.precedent}
@@ -534,6 +550,53 @@ function Temoignages({ items }: { items: Testimonial[] }) {
           </button>
         </div>
       )}
+    </section>
+  );
+}
+
+/** Les avis, celui de ce prénom en premier (AVIS_DU_HAUT : il ressemble au titre du haut), les autres dans leur ordre. */
+function enPremier(avis: Testimonial[], nom: string | undefined): Testimonial[] {
+  const premier = avis.find((t) => t.name === nom);
+  return premier ? [premier, ...avis.filter((t) => t !== premier)] : avis;
+}
+
+/**
+ * Ce que tu débloques (une proposition du 22 octobre 2026, PAYWALL.sommaire) : le vocal, puis les chapitres, dits
+ * comme les questions auxquelles ils répondent (PAYWALL.chapitre), leur texte flouté et un cadenas. Sous le paiement sur téléphone (le bouton qui paie reste
+ * dans le premier écran), sous la carte du haut sur ordinateur.
+ */
+function Sommaire({ autre, il, objectif, className }: { autre: string; il: boolean; objectif: Goal | undefined; className: string }) {
+  const t = PAYWALL.sommaire;
+  const titre = useId();
+  const ligne = (rond: ReactNode, texte: string, fin?: ReactNode, rondEnCouleur?: boolean) => (
+    <li key={texte} className="flex items-center gap-2.5 border-t border-sep py-2">
+      <span className={cn("flex size-6 shrink-0 items-center justify-center rounded-full text-micro font-black", rondEnCouleur ? "bg-elle text-white" : "bg-paper text-soft")}>
+        {rond}
+      </span>
+      <span className="min-w-0 text-note font-black leading-[1.3] text-ink">{texte}</span>
+      {/* Son texte, flouté : on devine qu’il est écrit, sans le lire */}
+      <span aria-hidden="true" className="h-2 min-w-6 flex-1 rounded-full bg-[rgba(17,17,20,0.12)] blur-[2px]" />
+      {fin}
+      <Icon name="lock" size={13} stroke={2.4} className="shrink-0 text-grey" />
+    </li>
+  );
+  return (
+    <section aria-labelledby={titre} className={cn("flex-col rounded-[22px] bg-white px-4 pb-1.5 pt-3.5 shadow-card lg:px-5 lg:pt-4", className)}>
+      <div className="flex items-center justify-between gap-3 pb-2.5">
+        <h2 id={titre} className="m-0 text-detail font-black">
+          {t.titre}
+        </h2>
+        <span className="text-micro font-extrabold text-muted">{t.compte}</span>
+      </div>
+      <ol className="m-0 flex list-none flex-col p-0">
+        {ligne(
+          <Icon name="play" size={11} fill="currentColor" stroke={1} />,
+          t.vocal(autre),
+          <span className="shrink-0 text-legende font-black tabular-nums text-soft">{t.duree}</span>,
+          true,
+        )}
+        {Array.from({ length: NB_CHAPITRES }, (_, k) => ligne(k + 1, PAYWALL.chapitre(k + 1, autre, il, objectif)))}
+      </ol>
     </section>
   );
 }
@@ -564,12 +627,12 @@ function AvantApres({ elle, className }: { elle: boolean; className?: string }) 
 }
 
 /** Les questions, en bas : la discrétion, l’abonnement, un souci (des volets qui s’ouvrent). */
-function Questions({ autre, elle }: { autre: string; elle: boolean }) {
+function Questions({ autre }: { autre: string }) {
   const volets = useRef<HTMLDivElement>(null);
   useJalonEnVue(volets, "questions");
   return (
     <div ref={volets} className="mt-2 flex flex-col rounded-[18px] bg-white px-4 shadow-[inset_0_0_0_1px_rgba(17,17,20,0.07)] lg:mx-auto lg:w-full lg:max-w-[720px]">
-      {PAYWALL.questions(autre, elle).map(({ q, r }, k) => (
+      {PAYWALL.questions(autre).map(({ q, r }, k) => (
         <details key={q} open={k === 0} className="group border-b border-sep py-3.5 last:border-b-0">
           <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-note font-black [&::-webkit-details-marker]:hidden">
             {q}
@@ -589,28 +652,36 @@ function FinDuPaywall() {
   return <div ref={fin} aria-hidden="true" className="h-px" />;
 }
 
+/** La part du bouton qui paie à l’écran au-delà de laquelle il compte comme vu (la barre du bas se retire). */
+const VU_EN_ENTIER = 0.98;
+
 /**
- * La barre du bas, sur téléphone : quand le bouton qui paie est sorti de l’écran (plus bas, les témoignages), elle
- * rappelle la formule et son prix, et y ramène. Jamais sur ordinateur (la carte du paiement y reste visible).
+ * La barre du bas, sur téléphone : dès que le bouton qui paie n’est pas tout entier à l’écran, elle rappelle la formule
+ * et son prix, et ramène au paiement (`cible`). Avant le 22 octobre, seulement une fois le bouton dépassé (plus bas, les
+ * témoignages) ; depuis les aperçus du rapport (une proposition), le bouton peut aussi être encore plus bas, sur un petit
+ * téléphone, et la barre le remplace, comme le bouton d’achat toujours là des boutiques. Jamais sur ordinateur (la carte
+ * du paiement y reste visible).
  */
-function BarreDuBas({ cible, lot }: { cible: RefObject<HTMLElement | null>; lot: LotDeLaRoue | null }) {
+function BarreDuBas({ cible, bouton, lot }: { cible: RefObject<HTMLElement | null>; bouton: RefObject<HTMLDivElement | null>; lot: LotDeLaRoue | null }) {
   const [montree, setMontree] = useState(false);
   useEffect(() => {
-    const el = cible.current;
+    const el = bouton.current;
     if (!el) return;
-    const o = new IntersectionObserver(([e]) => setMontree(!!e && !e.isIntersecting && e.boundingClientRect.top < 0), { threshold: 0 });
+    const o = new IntersectionObserver(([e]) => setMontree(!!e && e.intersectionRatio < VU_EN_ENTIER), { threshold: [0, VU_EN_ENTIER] });
     o.observe(el);
     return () => o.disconnect();
-  }, [cible]);
+  }, [bouton]);
   if (!montree) return null;
   const premium = prixAvecLot("premium", lot);
+  /* Barrée comme sur sa carte (Paiement) : seulement par le prix d’avant le lot de la roue, jamais par la valeur du catalogue */
+  const barre = lot && lotSAppliqueA(lot, "premium") && premium.centimes < CATALOGUE.premium.centimes ? CATALOGUE.premium.centimes : null;
   return (
     <div className="fixed inset-x-0 bottom-0 z-40 flex items-center gap-3 border-t border-line bg-[rgba(244,242,237,0.96)] px-4 pb-[max(14px,env(safe-area-inset-bottom))] pt-2.5 shadow-[0_-12px_24px_-16px_rgba(17,17,20,0.25)] lg:hidden">
       <span className="flex flex-1 flex-col">
         <span className="text-legende font-black">{PAYWALL.premium.titre}</span>
         <span className="flex items-baseline gap-1.5">
           <span className="text-[20px] font-black">{enEuros(premium.centimes)}</span>
-          {premium.barre && <s className="text-micro font-extrabold text-grey">{enEuros(premium.barre)}</s>}
+          {barre && <s className="text-micro font-extrabold text-grey">{enEuros(barre)}</s>}
         </span>
       </span>
       <button

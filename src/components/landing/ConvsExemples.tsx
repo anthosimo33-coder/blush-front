@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, useState, type FocusEvent } from "react";
 import { cn } from "@/lib/cn";
 import { NBSP } from "@/lib/format";
+import { CHAPITRES_PAYANTS, titreDAttente } from "@/contenu/chapitres";
 import { LANDING_CONVS } from "@/contenu/landing";
 import { BubbleLogo } from "@/components/brand/objects3d";
 import { AppBadge, Avatar } from "@/components/ui/Avatar";
@@ -13,6 +14,9 @@ import { Bubble, ConfidenceLine } from "@/components/ui/messages";
 import { Sheet } from "@/components/ui/surfaces";
 import { APPLIS, type LandingConv } from "@/types";
 import { ctaDe, type Retour } from "./cta";
+
+/* La couleur d’un chiffre : toi en bleu, l’autre en rose, les deux en encre (comme le haut du paywall) */
+const ENCRE = { toi: "text-toi-ink", elle: "text-elle-ink", pareil: "text-ink" } as const;
 
 /* Trois rangées de six convs (dont un couple), chacune à son rythme ; la deuxième part dans l’autre sens */
 /* Même vitesse qu’à cinq convs par rangée : la durée suit la longueur */
@@ -34,6 +38,10 @@ export function ConvsExemples({ retour }: { retour: Retour }) {
   return (
     <div className="mt-14 lg:mt-20">
       <h2 className="sr-only">Des exemples de convs{NBSP}: choisis-en une pour voir le verdict de BLUSH</h2>
+      {/* Au-dessus des convs : se reconnaître dans l’une d’elles, avant de toucher */}
+      <p aria-hidden="true" className="m-0 mb-4 px-[22px] text-center text-accent font-black tracking-[-0.01em] text-ink [text-wrap:balance] lg:mb-6 lg:text-[21px]">
+        Trouve une conv qui ressemble à la tienne 👇
+      </p>
       <div className="flex flex-col">
         {ROWS.map((r, i) => (
           <ConvRow key={i} {...r} onPick={setPicked} />
@@ -158,6 +166,15 @@ function ExampleReport({ conv, retour, titreId, onClose }: { conv: LandingConv; 
       <p className="m-0 text-detail font-extrabold leading-[1.4] text-soft lg:text-accent lg:leading-[1.45] [@media(max-height:600px)]:text-note [@media(max-height:600px)]:leading-[1.3]">
         {conv.verdict.subtitle}
       </p>
+      {/* Ce que BLUSH a compté dans leur conv : deux chiffres, dont un daté (il lit vraiment, il ne devine pas) */}
+      <ul className="m-0 grid list-none grid-cols-2 overflow-hidden rounded-card bg-white p-0 shadow-card">
+        {conv.chiffres.map((c, i) => (
+          <li key={c.texte} className={cn("flex flex-col gap-1 px-3 py-2.5 lg:px-3.5 lg:py-3", i === 0 && "border-r border-sep")}>
+            <span className={cn("text-[21px] font-black leading-none tracking-[-0.02em] lg:text-[24px]", ENCRE[c.cote])}>{c.valeur}</span>
+            <span className="text-legende font-extrabold leading-[1.3] text-soft">{c.texte}</span>
+          </li>
+        ))}
+      </ul>
       <div className="flex flex-col gap-2 rounded-card bg-white p-3 shadow-card lg:p-3.5 [@media(max-height:600px)]:p-2.5">
         <div className="flex items-center justify-between gap-2">
           <span className="text-legende font-black text-grey">La preuve</span>
@@ -170,9 +187,30 @@ function ExampleReport({ conv, retour, titreId, onClose }: { conv: LandingConv; 
       <PlayCard title="Ton prochain pas" className="[@media(max-height:600px)]:py-2.5">
         {conv.next}
       </PlayCard>
-      <ButtonLink href={cta.href} scroll={cta.scroll} arrow className="mt-0.5 [@media(max-height:600px)]:h-[52px]">
-        {cta.label}
-      </ButtonLink>
+      {/* La suite de son rapport : les titres des chapitres, lisibles, leur texte flouté (ce qu’on achète, montré) */}
+      <div className="flex flex-col rounded-card bg-white px-3.5 pb-1 pt-3 shadow-card">
+        <span className="flex items-center justify-between gap-2 pb-1.5">
+          <span className="text-legende font-black text-grey">La suite de son rapport</span>
+          <span className="text-micro font-black text-soft">{CHAPITRES_PAYANTS.length} chapitres + le vocal</span>
+        </span>
+        <ol className="m-0 flex list-none flex-col p-0">
+          {CHAPITRES_PAYANTS.map((n) => (
+            <li key={n} className="flex items-center gap-2.5 border-t border-sep py-2">
+              <span className="flex size-[22px] shrink-0 items-center justify-center rounded-full bg-paper text-micro font-black text-soft">{n}</span>
+              <span className="min-w-0 truncate text-note font-black text-ink">{titreDAttente(n, conv.name)}</span>
+              {/* Son texte, flouté : on devine qu’il est écrit, sans le lire */}
+              <span aria-hidden="true" className="h-2 min-w-6 flex-1 rounded-full bg-[rgba(17,17,20,0.12)] blur-[2px]" />
+              <Icon name="lock" size={13} stroke={2.4} className="shrink-0 text-grey" />
+            </li>
+          ))}
+        </ol>
+      </div>
+      {/* Le bouton reste sous le pouce pendant qu’on lit la feuille (elle défile quand elle dépasse l’écran) ; -bottom-6 : collé au bas de la feuille, par-dessus sa marge du bas */}
+      <div className="sticky -bottom-6 -mx-[22px] -mb-6 bg-[linear-gradient(rgba(255,255,255,0),white_22%)] px-[22px] pb-6 pt-4">
+        <ButtonLink href={cta.href} scroll={cta.scroll} arrow className="w-full [@media(max-height:600px)]:h-[52px]">
+          {cta.label}
+        </ButtonLink>
+      </div>
       <p className="m-0 hidden text-center text-legende font-extrabold text-grey lg:block">Exemple fictif. Ton rapport, lui, part de vos vrais messages.</p>
     </div>
   );

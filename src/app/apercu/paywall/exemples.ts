@@ -40,7 +40,10 @@ function signaux(changes: Partial<Record<Id, SignalDuPaywall>>): SignalDuPaywall
   return (["ouvre", "reprend", "relance", "delai", "longueur"] as const).map((id) => changes[id] ?? base[id]);
 }
 
-export const EXEMPLES: Record<GenreDuHaut, ApercuDuPaywall> = {
+/** Ce que chaque exemple a de plus (une proposition du 22 octobre 2026) : Inès veut savoir si c’est réciproque. */
+const avecLaSuite = (a: ApercuDuPaywall): ApercuDuPaywall => ({ ...a, objectif: "reciproque" });
+
+const BASES: Record<GenreDuHaut, ApercuDuPaywall> = {
   contraste: { signaux: signaux({ ouvre: s("ouvre", "toi", 70, 30), reprend: s("reprend", "elle", 6, 24), delai: s("delai", "pareil", 3 * MIN, 2 * MIN) }), tendance: null },
   toi: { signaux: signaux({ ouvre: s("ouvre", "toi", 80, 20), relance: s("relance", "toi", 6, 2), delai: s("delai", "elle", 12 * MIN, 4 * MIN) }), tendance: null },
   elle: { signaux: signaux({ ouvre: s("ouvre", "elle", 20, 80), relance: s("relance", "elle", 0, 5), delai: s("delai", "elle", 2 * H, 3 * MIN) }), tendance: null },
@@ -58,3 +61,5 @@ export const EXEMPLES: Record<GenreDuHaut, ApercuDuPaywall> = {
   },
   aucun: { signaux: signaux({ ouvre: s("ouvre", "pareil", 2, 2) }).filter((x) => x.id !== "delai"), tendance: null },
 };
+
+export const EXEMPLES = Object.fromEntries(Object.entries(BASES).map(([genre, a]) => [genre, avecLaSuite(a)])) as Record<GenreDuHaut, ApercuDuPaywall>;

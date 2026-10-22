@@ -1,6 +1,7 @@
 import "server-only";
 import { createHash } from "node:crypto";
 import { and, eq, sql, type SQL } from "drizzle-orm";
+import { alerteSobre } from "@prompts/lib/titres";
 import {
   mailAnniversaire,
   mailApresGlace,
@@ -217,13 +218,13 @@ const MAIL_RECENT = sql`(
 )`;
 
 /**
- * Le prochain pas, l’emoji et l’alerte du verdict de cette conv, ou null : pas de verdict, ou une alerte, quelle qu’elle
- * soit (rien ne part). Une alerte « danger » se vend dans l’appli (21 octobre 2026), mais aucun mail sur leur histoire
- * ne part : sa boîte mail peut être lue par l’autre (« son téléphone exigé ou fouillé », le socle des prompts).
+ * Le prochain pas, l’emoji et l’alerte du verdict de cette conv, ou null : pas de verdict, ou le mode sobre (la règle de
+ * l’âge, un rapport doux gardé : rien ne part). « Danger » et « détresse » ont leurs mails comme les autres depuis le 22
+ * octobre 2026 (décision validée par l’avocat).
  */
-async function verdictSansAlerte(storyId: string) {
+async function verdictHorsModeSobre(storyId: string) {
   const v = await donneesVerdict(storyId);
-  if (!v || v.sortie.alerte || v.sortie.mode_sobre) return null;
+  if (!v || v.sortie.mode_sobre || alerteSobre(v.sortie.alerte)) return null;
   return v.sortie;
 }
 
@@ -272,20 +273,20 @@ async function candidatsS3(): Promise<Candidat[]> {
           ...base,
           cle: "s3_repondre",
           ecrire: async (p) => {
-            const verdict = await verdictSansAlerte(l.story_id);
+            const verdict = await verdictHorsModeSobre(l.story_id);
             return verdict && verdict.emoji !== "🧊" ? mailRepondre(p, { bulles: Math.max(0, l.bulles) }) : null;
           },
         },
       ];
     if (dans("s3_vocal") && l.vocal_ms && !l.ecoute)
-      return [{ ...base, cle: "s3_vocal", ecrire: async (p) => ((await verdictSansAlerte(l.story_id)) ? mailVocal(p, { secondes: Math.round(l.vocal_ms! / 1000) }) : null) }];
+      return [{ ...base, cle: "s3_vocal", ecrire: async (p) => ((await verdictHorsModeSobre(l.story_id)) ? mailVocal(p, { secondes: Math.round(l.vocal_ms! / 1000) }) : null) }];
     if (dans("s3_pas") && !l.ecrit_24h)
       return [
         {
           ...base,
           cle: "s3_pas",
           ecrire: async (p) => {
-            const verdict = await verdictSansAlerte(l.story_id);
+            const verdict = await verdictHorsModeSobre(l.story_id);
             if (!verdict?.emoji) return null;
             return verdict.emoji === "🧊" ? mailGlace(p) : mailProchainPas(p, { emoji: verdict.emoji, pas: verdict.prochain_pas, bulles: Math.max(0, l.bulles) });
           },
@@ -297,7 +298,7 @@ async function candidatsS3(): Promise<Candidat[]> {
         {
           ...base,
           cle: "s3_parrainage",
-          ecrire: async (p) => ((await verdictSansAlerte(l.story_id))?.emoji === "🔥" ? mailParrainage(p, { lien: await lienDeParrainage(l.user_id) }) : null),
+          ecrire: async (p) => ((await verdictHorsModeSobre(l.story_id))?.emoji === "🔥" ? mailParrainage(p, { lien: await lienDeParrainage(l.user_id) }) : null),
         },
       ];
     return [];
@@ -360,7 +361,7 @@ async function candidatsS4(): Promise<Candidat[]> {
       storyId: l.story_id,
       cle: "s4_prete",
       occasion: l.message_id,
-      ecrire: async (p) => ((await verdictSansAlerte(l.story_id)) ? mailReponsePrete(p, { bonus: await bonusDeLaPremiereRecharge({ id: l.user_id, email: l.email }) }) : null),
+      ecrire: async (p) => ((await verdictHorsModeSobre(l.story_id)) ? mailReponsePrete(p, { bonus: await bonusDeLaPremiereRecharge({ id: l.user_id, email: l.email }) }) : null),
     })),
     ...peu.rows.map((l): Candidat => ({
       userId: l.user_id,
@@ -369,7 +370,7 @@ async function candidatsS4(): Promise<Candidat[]> {
       cle: "s4_peu",
       occasion: l.recue,
       ecrire: async (p) =>
-        (await verdictSansAlerte(l.story_id))
+        (await verdictHorsModeSobre(l.story_id))
           ? mailPeuDeBulles(p, { bulles: l.bulles, actif: l.actif, bonus: await bonusDeLaPremiereRecharge({ id: l.user_id, email: l.email }) })
           : null,
     })),
@@ -380,7 +381,7 @@ async function candidatsS4(): Promise<Candidat[]> {
       cle: "s4_zero",
       occasion: l.recue,
       ecrire: async (p) => {
-        if (!(await verdictSansAlerte(l.story_id))) return null;
+        if (!(await verdictHorsModeSobre(l.story_id))) return null;
         const memoire = await donneesMemoire(l.story_id);
         const [{ echanges } = { echanges: 0 }] = await db()
           .select({ echanges: sql<number>`count(*)::int` })
@@ -439,7 +440,7 @@ async function candidatsS5(): Promise<Candidat[]> {
     const envoyes = new Set(l.envoyes.split(","));
     const base = { userId: l.user_id, email: l.email, storyId: l.story_id };
     const sansGlace = async () => {
-      const verdict = await verdictSansAlerte(l.story_id);
+      const verdict = await verdictHorsModeSobre(l.story_id);
       return verdict && verdict.emoji !== "🧊" ? verdict : null;
     };
     const candidats: Candidat[] = [];
@@ -515,7 +516,7 @@ async function candidatsS6(): Promise<Candidat[]> {
               storyId: l.story_id,
               cle: "s6_garde",
               occasion: "garde",
-              ecrire: async (p) => ((await verdictSansAlerte(l.story_id!)) ? mailGarde(p, aParis(new Date(l.expire_le))) : null),
+              ecrire: async (p) => ((await verdictHorsModeSobre(l.story_id!)) ? mailGarde(p, aParis(new Date(l.expire_le))) : null),
             },
           ]
         : [],
@@ -531,7 +532,7 @@ async function candidatsS6(): Promise<Candidat[]> {
           storyId: l.story_id,
           cle: "s6_avance",
           occasion: l.achat,
-          ecrire: async () => ((await verdictSansAlerte(l.story_id!)) ? mailAvance({ jusqua: aParis(fin).date, mois }) : null),
+          ecrire: async () => ((await verdictHorsModeSobre(l.story_id!)) ? mailAvance({ jusqua: aParis(fin).date, mois }) : null),
         },
       ];
     }),
@@ -555,7 +556,7 @@ async function candidatsS7(): Promise<Candidat[]> {
     storyId: l.story_id,
     cle: "s7_glace",
     occasion: l.story_id,
-    ecrire: async () => ((await verdictSansAlerte(l.story_id))?.emoji === "🧊" ? mailApresGlace() : null),
+    ecrire: async () => ((await verdictHorsModeSobre(l.story_id))?.emoji === "🧊" ? mailApresGlace() : null),
   }));
 }
 
@@ -590,7 +591,7 @@ async function candidatsS8(): Promise<Candidat[]> {
       cle: "s8_anniv",
       occasion,
       ecrire: async (p) =>
-        (await verdictSansAlerte(l.story_id))
+        (await verdictHorsModeSobre(l.story_id))
           ? mailAnniversaire(p, {
               jour: prochain.jour,
               date: prochain.date,
