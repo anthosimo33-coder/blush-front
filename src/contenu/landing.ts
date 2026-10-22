@@ -209,6 +209,7 @@ export const LANDING_CONVS: LandingConv[] = [
     label: "Ton crush de soirée",
     app: "instagram",
     avatar: "initial",
+    photo: "/convs/alice.webp",
     verdict: { emoji: "🤔", title: "Elle hésite.", subtitle: "Elle répond toujours, mais jamais avant le lendemain." },
     proof: { text: "c’était cool samedi\u00a0!", caption: "11 mars, 16\u00a0h\u00a027" },
     confidence: "probable",

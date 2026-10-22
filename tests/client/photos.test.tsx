@@ -4,6 +4,7 @@ import { render } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { Avatar } from "@/components/ui/Avatar";
 import { LANDING_CONVS } from "@/contenu/landing";
+import { EXPORT_STEPS } from "@/contenu/parcours";
 
 describe("les photos dans les ronds", () => {
   it("une photo à la place de l’initiale, sur sa couleur ; sans photo, l’initiale", () => {
@@ -32,5 +33,11 @@ describe("les photos dans les ronds", () => {
       expect(c.photo, `${c.name} : sa photo`).toMatch(/^\/convs\/[a-z-]+\.webp$/);
       expect(existsSync(join(process.cwd(), "public", c.photo!)), `${c.name} : ${c.photo} existe`).toBe(true);
     }
+  });
+
+  it("Sophie, sur le téléphone de l’export WhatsApp : sa photo existe", () => {
+    const { photo } = EXPORT_STEPS.whatsapp.menu;
+    expect(photo).toMatch(/^\/convs\/[a-z-]+\.webp$/);
+    expect(existsSync(join(process.cwd(), "public", photo)), `${photo} existe`).toBe(true);
   });
 });

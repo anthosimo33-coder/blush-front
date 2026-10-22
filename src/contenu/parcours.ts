@@ -25,7 +25,7 @@ export const READING_STEPS_AVANT_PAIEMENT = [
 /** Étapes d’export par appli (iMessage ne s’exporte pas : on filme son écran). La version iPhone/Android est choisie selon l’appareil. */
 export const EXPORT_STEPS = {
   whatsapp: {
-    menu: { contact: "Sophie", items: ["Ajouter aux favoris", "Exporter la discussion", "Effacer la discussion"], highlight: 1 },
+    menu: { contact: "Sophie", photo: "/convs/sophie.webp", items: ["Ajouter aux favoris", "Exporter la discussion", "Effacer la discussion"], highlight: 1 },
     steps: {
       all: [
         "Ouvre votre conv",

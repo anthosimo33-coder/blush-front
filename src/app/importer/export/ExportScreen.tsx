@@ -28,7 +28,7 @@ import { APPLIS, type ExportApp } from "@/types";
 import { ChoixConv } from "./ChoixConv";
 import type { ConvInstagram } from "@/services/preparer-export";
 
-type Menu = { contact: string; items: readonly string[]; highlight: number };
+type Menu = { contact: string; photo?: string; items: readonly string[]; highlight: number };
 
 /** Le mode tournage : combien de temps se joue « Je lis ton export · N % », pendant que le serveur prend la conv du lien. */
 const LECTURE_DU_TOURNAGE_MS = 1600;
@@ -268,7 +268,7 @@ function jouerLAvance(ms: number, surAvance: (p: number) => void): { fin: Promis
   return { fin, arreter: () => clearInterval(minuterie) };
 }
 
-/** Le haut d’un téléphone sur la fiche du contact : la bonne option surlignée, qui pulse. Le bas se fond dans la page. */
+/** Le haut d’un téléphone sur la fiche du contact : sa photo (sinon son initiale), la bonne option surlignée, qui pulse. Le bas se fond dans la page. */
 function PhoneScreen({ menu }: { menu: Menu }) {
   return (
     <div
@@ -277,7 +277,7 @@ function PhoneScreen({ menu }: { menu: Menu }) {
     >
       <div className="flex h-full flex-col items-center overflow-hidden rounded-t-[33px] bg-[#F2F1EE]">
         <span className="mt-2 h-[22px] w-[76px] shrink-0 rounded-full bg-[#111114]" />
-        <Avatar tone="elle" size={52} fontSize={21} className="mt-2.5">
+        <Avatar tone="elle" size={52} fontSize={21} photo={menu.photo} className="mt-2.5">
           {menu.contact.charAt(0)}
         </Avatar>
         <span className="mt-2 text-corps font-black">{menu.contact}</span>
