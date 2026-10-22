@@ -3,7 +3,8 @@ import type { ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import { NBSP } from "@/lib/format";
 import { figtree } from "@/lib/fonts";
-import { FAITS_LANDING, REPONSE_EXEMPLE, TEMOIGNAGES, VERDICT_EXEMPLE } from "@/contenu/landing";
+import { FAITS_LANDING, NOTE_LANDING, REPONSE_EXEMPLE, TEMOIGNAGES, VERDICT_EXEMPLE } from "@/contenu/landing";
+import { NOTE_DES_AVIS } from "@/contenu/paiement";
 import { AppBadge } from "@/components/ui/Avatar";
 import { Icon } from "@/components/ui/icons";
 import { ConfidenceLine, Tag } from "@/components/ui/messages";
@@ -40,10 +41,19 @@ export function CtaButton({ retour, className }: { retour: Retour; className?: s
   );
 }
 
-/** Sous le bouton principal : la ligne qui rassure (qui découvre), ou le lien pour analyser une autre conv (qui revient). */
+/**
+ * Sous le bouton principal : la note des avis et la ligne qui rassure (qui découvre), ou le lien pour analyser une autre
+ * conv (qui revient).
+ */
 export function SousLeBouton({ retour }: { retour: Retour }) {
   const cta = ctaDe(retour);
-  if (!cta.autre) return <span className="mt-3.5 text-note font-extrabold text-grey">{cta.note}</span>;
+  if (!cta.autre)
+    return (
+      <>
+        <NoteDesAvis />
+        <span className={cn("text-note font-extrabold text-grey", NOTE_DES_AVIS ? "mt-1.5" : "mt-3.5")}>{cta.note}</span>
+      </>
+    );
   return (
     <Link
       href={cta.autre.href}
@@ -54,6 +64,24 @@ export function SousLeBouton({ retour }: { retour: Retour }) {
   );
 }
 
+/**
+ * La note des avis, sous le bouton de qui découvre, comme les étoiles sous un produit : de vrais avis seulement
+ * (NOTE_DES_AVIS, rien sans eux). Elle mène aux avis, où l’on dit d’où elle vient.
+ */
+function NoteDesAvis() {
+  if (!NOTE_DES_AVIS) return null;
+  return (
+    <a href="#avis-titre" className="mt-4 inline-flex items-center gap-1.5 text-note font-extrabold text-soft no-underline transition-colors hover:text-ink">
+      <span aria-hidden="true" className="tracking-[0.04em] text-attente">
+        ★★★★★
+      </span>
+      <span className="font-black text-ink">{NOTE_DES_AVIS.note}</span>
+      <span className="sr-only">sur 5</span>
+      {NOTE_LANDING.avis(NOTE_DES_AVIS.nombre)}
+    </a>
+  );
+}
+
 function SectionHead({ id, kicker, title, sub, align = "center" }: { id: string; kicker?: string; title: ReactNode; sub?: ReactNode; align?: "center" | "start" }) {
   /* Aligné à gauche = section à deux colonnes : le titre descend d’un cran pour tenir sur deux lignes */
   return (
@@ -61,7 +89,11 @@ function SectionHead({ id, kicker, title, sub, align = "center" }: { id: string;
       {kicker && <span className="text-legende font-black text-grey">{kicker}</span>}
       <h2
         id={id}
-        className={cn("m-0 max-w-[720px] text-[34px] font-black leading-[1.04] tracking-[-0.03em] [text-wrap:balance]", align === "start" ? "lg:text-[44px]" : "lg:text-chiffre")}
+        /* scroll-mt : un lien vers le titre (la note sous les boutons) le pose sous la barre du haut, pas dessous */
+        className={cn(
+          "m-0 max-w-[720px] scroll-mt-28 text-[34px] font-black leading-[1.04] tracking-[-0.03em] [text-wrap:balance]",
+          align === "start" ? "lg:text-[44px]" : "lg:text-chiffre",
+        )}
       >
         {title}
       </h2>
@@ -301,6 +333,15 @@ export function Reviews({ items }: { items: Testimonial[] }) {
     <section aria-labelledby="avis-titre" className="py-14 lg:py-20">
       <Container>
         <SectionHead id="avis-titre" title={TEMOIGNAGES.titre} />
+        {/* D’où vient la note montrée sous les boutons : la loi demande de le dire à côté */}
+        {NOTE_DES_AVIS && (
+          <p data-reveal="" className="m-0 mx-auto mt-3 max-w-[460px] text-center text-legende font-extrabold leading-[1.5] text-grey [text-wrap:balance]">
+            <span aria-hidden="true" className="text-attente">
+              ★
+            </span>{" "}
+            {NOTE_LANDING.origine(NOTE_DES_AVIS.note, NOTE_DES_AVIS.nombre)}
+          </p>
+        )}
       </Container>
       <AvisDefilants items={items} />
     </section>
