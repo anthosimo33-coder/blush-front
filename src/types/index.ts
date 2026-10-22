@@ -354,7 +354,7 @@ export type LandingConv = {
 };
 
 /** Un chiffre d’une conv d’exemple : sa valeur en gros, ce qu’il dit, et de quel côté il penche (toi, l’autre, les deux). */
-export type ChiffreDeConv = { valeur: string; texte: string; cote: "toi" | "elle" | "pareil" };
+type ChiffreDeConv = { valeur: string; texte: string; cote: "toi" | "elle" | "pareil" };
 
 /** Landing et paywall : un vrai avis, publié avec l’accord de la personne. */
 export type Testimonial = {
