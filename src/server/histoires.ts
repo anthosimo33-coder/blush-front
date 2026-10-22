@@ -14,6 +14,7 @@ import {
   type Message,
   type Objectif,
   type Pronom,
+  type Provenance,
 } from "@prompts/lib/conv";
 import { prenomDe } from "@prompts/lib/ajouts";
 import type { Appli, ExportLu } from "@prompts/lib/export";
@@ -508,6 +509,14 @@ export function histoireDe(meta: Meta): Histoire {
     format: meta.format,
   };
 }
+
+/**
+ * D’où vient chaque morceau d’une conv réunie (son appli, un export ou des captures, ses dates), pour la ligne qui ouvre
+ * la conv que lit le modèle (rendre, prompts/lib/conv.ts) : le trou entre deux morceaux n’y est plus lu comme un
+ * silence. Aucun pour une conv d’un seul morceau.
+ */
+export const provenancesDe = (meta: Pick<Meta, "morceaux">): Provenance[] =>
+  (meta.morceaux ?? []).map((m) => ({ appli: m.appli, source: m.captures ? "captures" : "export", debut: m.resume.debut, fin: m.resume.fin }));
 
 export async function definirQui(
   id: string,
