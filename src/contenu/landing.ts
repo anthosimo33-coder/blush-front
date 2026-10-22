@@ -3,7 +3,8 @@ import type { LandingConv, QuestionAnswer, Testimonial } from "@/types";
 
 /*
  * Landing : les convs qui défilent sous le titre, et le verdict que BLUSH montre quand on en choisit une.
- * Exemples fictifs, écrits pour la landing (textes relus le 8 octobre, voix de BLUSH). Mêmes sens d’emojis :
+ * Exemples fictifs, écrits pour la landing (textes relus le 8 octobre, voix de BLUSH), avec une photo à la place de
+ * l’initiale (public/convs/, recadrées en carré de 256 px, sans leurs métadonnées). Mêmes sens d’emojis :
  * 🤏 à deux doigts · 🔥 partant·e · 🤔 hésite · 🧊 s’éloigne.
  * En couple (Mon cœur, Chéri, Julien) : 🔥 toujours le feu · 🤏 il manque un petit rien · 🤔 un truc coince · 🧊 vous vous éloignez.
  */
@@ -15,6 +16,7 @@ export const LANDING_CONVS: LandingConv[] = [
     label: "Ton crush",
     app: "whatsapp",
     avatar: "initial",
+    photo: "/convs/lea.webp",
     verdict: { emoji: "🤏", title: "Vous êtes à deux doigts.", subtitle: "Elle te tend des perches depuis trois semaines." },
     proof: { text: "on refait un verre quand tu veux, mais cette fois c’est toi qui choisis le bar", caption: "3 mars, 22\u00a0h\u00a014" },
     confidence: "sur",
@@ -27,6 +29,7 @@ export const LANDING_CONVS: LandingConv[] = [
     label: "Ta copine",
     app: "whatsapp",
     avatar: "initial",
+    photo: "/convs/moncoeur.webp",
     verdict: { emoji: "🤔", title: "Un truc coince.", subtitle: "Elle dit «\u00a0c’est pas grave\u00a0». Ses messages disent le contraire." },
     proof: { text: "c’est pas grave, vas-y avec tes potes", caption: "28 févr., 19\u00a0h\u00a041" },
     confidence: "sur",
@@ -51,6 +54,7 @@ export const LANDING_CONVS: LandingConv[] = [
     label: "Ta situationship",
     app: "imessage",
     avatar: "initial",
+    photo: "/convs/ines.webp",
     verdict: { emoji: "🤔", title: "Elle hésite.", subtitle: "Elle aime ce que vous avez. Elle n’ose pas encore le nommer." },
     proof: { text: "je sais pas trop ce qu’on fait toi et moi, mais j’aime bien", caption: "28 janv., 0\u00a0h\u00a037" },
     confidence: "probable",
@@ -89,6 +93,7 @@ export const LANDING_CONVS: LandingConv[] = [
     label: "Ton collègue",
     app: "whatsapp",
     avatar: "initial",
+    photo: "/convs/sacha.webp",
     verdict: { emoji: "🤔", title: "Il hésite.", subtitle: "Il ouvre la porte, puis il la referme à moitié." },
     proof: { text: "on devrait se faire un verre un de ces quatre… enfin si t’as le temps", caption: "4 avr., 18\u00a0h\u00a031" },
     confidence: "probable",
@@ -101,6 +106,7 @@ export const LANDING_CONVS: LandingConv[] = [
     label: "Ton copain",
     app: "imessage",
     avatar: "initial",
+    photo: "/convs/cheri.webp",
     verdict: { emoji: "🔥", title: "Toujours le feu.", subtitle: "Il parle de vos projets sans que tu lui demandes." },
     proof: { text: "faut qu’on parte quelque part cet été toi et moi", caption: "9 mars, 22\u00a0h\u00a003" },
     confidence: "sur",
@@ -113,6 +119,7 @@ export const LANDING_CONVS: LandingConv[] = [
     label: "Votre premier date",
     app: "instagram",
     avatar: "initial",
+    photo: "/convs/margaux.webp",
     verdict: { emoji: "🧊", title: "Elle s’éloigne.", subtitle: "Elle répond poliment, deux jours après, sans poser de question." },
     proof: { text: "oui c’était sympa\u00a0!", caption: "16 févr., 13\u00a0h\u00a005" },
     confidence: "probable",
@@ -149,6 +156,7 @@ export const LANDING_CONVS: LandingConv[] = [
     label: "Ton match Bumble",
     app: "autre",
     avatar: "initial",
+    photo: "/convs/yanis.webp",
     verdict: { emoji: "🤔", title: "Il hésite.", subtitle: "Trois «\u00a0on\u00a0verra\u00a0» en deux semaines. Il garde la porte ouverte, sans la franchir." },
     proof: { text: "haha peut-être, on verra", caption: "7 mars, 22\u00a0h\u00a058" },
     confidence: "probable",
@@ -163,6 +171,7 @@ export const LANDING_CONVS: LandingConv[] = [
     label: "Ton date en cours",
     app: "whatsapp",
     avatar: "initial",
+    photo: "/convs/emma.webp",
     verdict: { emoji: "🤏", title: "Vous êtes à deux doigts.", subtitle: "Elle parle déjà de toi à ses proches." },
     proof: { text: "ma coloc veut savoir qui me fait sourire comme ça devant mon tel", caption: "23 févr., 22\u00a0h\u00a009" },
     confidence: "sur",
@@ -187,6 +196,7 @@ export const LANDING_CONVS: LandingConv[] = [
     label: "Ton mec",
     app: "whatsapp",
     avatar: "initial",
+    photo: "/convs/julien.webp",
     verdict: { emoji: "🤏", title: "Il manque un petit rien.", subtitle: "Vous vous écrivez tous les jours, mais plus que pour vous organiser." },
     proof: { text: "tu peux prendre le pain en rentrant", caption: "11 mars, 18\u00a0h\u00a012" },
     confidence: "probable",
@@ -199,6 +209,7 @@ export const LANDING_CONVS: LandingConv[] = [
     label: "Ton crush de soirée",
     app: "instagram",
     avatar: "initial",
+    photo: "/convs/alice.webp",
     verdict: { emoji: "🤔", title: "Elle hésite.", subtitle: "Elle répond toujours, mais jamais avant le lendemain." },
     proof: { text: "c’était cool samedi\u00a0!", caption: "11 mars, 16\u00a0h\u00a027" },
     confidence: "probable",
@@ -223,6 +234,7 @@ export const LANDING_CONVS: LandingConv[] = [
     label: "Ton match Tinder",
     app: "autre",
     avatar: "initial",
+    photo: "/convs/zoe.webp",
     verdict: { emoji: "🧊", title: "Elle s’éloigne.", subtitle: "Elle met plus de temps à répondre, et elle ne pose plus de questions." },
     proof: { text: "ah oui pardon j’avais pas vu", caption: "27 févr., 14\u00a0h\u00a052" },
     confidence: "sur",
