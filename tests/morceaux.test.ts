@@ -19,6 +19,7 @@ import {
   type Meta,
 } from "@/server/histoires";
 import { executerChaine } from "@/server/pipeline";
+import { lectureDeLAjout } from "@/server/captures";
 import { contactDuFichier, lectureReunie, memePrenom, reunir, type ConvEnMorceaux } from "@/server/morceaux";
 import { planifier } from "@/server/taches";
 import { captures, msg } from "./aide/fabriques";
@@ -168,13 +169,42 @@ describe("une conv en plusieurs morceaux", () => {
     expect((await meta(imp.id)).morceaux).toHaveLength(4);
   });
 
-  it("au plus 5 morceaux (« trop »), et un morceau sans rien de nouveau (« rien_de_neuf »)", async () => {
+  it("au plus 5 morceaux (« morceaux »), et un morceau sans rien de nouveau (« rien_de_neuf »)", async () => {
     const imp = await brouillon(exportWhatsapp("2026-09-01T10:00", 60));
     /* Des captures de messages déjà dans l’export (le même jour, le même texte) : rien de neuf */
     const dejaLa = capturesDu("2026-09-01", 24, { texte: (k) => `message ${k}` });
     await expect(ajouterDesCaptures(imp.secret, { appli: "whatsapp", t: dejaLa })).rejects.toMatchObject({ code: "rien_de_neuf" });
     for (const jour of ["2026-08-01", "2026-08-05", "2026-08-10", "2026-08-15"]) await ajouterDesCaptures(imp.secret, { appli: "instagram", t: capturesDu(jour, 24) });
-    await expect(ajouterDesCaptures(imp.secret, { appli: "instagram", t: capturesDu("2026-08-20", 24) })).rejects.toMatchObject({ code: "trop" });
+    await expect(ajouterDesCaptures(imp.secret, { appli: "instagram", t: capturesDu("2026-08-20", 24) })).rejects.toMatchObject({ code: "morceaux" });
+  });
+
+  it("« Ajouter quand même » renvoie le même envoi de captures : leur lecture déjà faite resservit, le modèle ne les relit pas", async () => {
+    const t = capturesDu("2026-08-20", 24);
+    const lire = vi.fn(async () => t);
+    expect(await lectureDeLAjout("0123456789abcdef9999", "brouillon-de-test", lire)).toBe(t);
+    expect(await lectureDeLAjout("0123456789abcdef9999", "brouillon-de-test", lire)).toBe(t);
+    expect(lire).toHaveBeenCalledTimes(1);
+    /* Un autre envoi, ou sans clé : une lecture à lui */
+    await lectureDeLAjout("0123456789abcdef8888", "brouillon-de-test", lire);
+    await lectureDeLAjout(null, "brouillon-de-test", lire);
+    expect(lire).toHaveBeenCalledTimes(3);
+  });
+
+  it("« Ajouter quand même » : un morceau refusé comme celui de quelqu’un d’autre (un surnom d’un côté) s’ajoute", async () => {
+    const imp = await brouillon(exportWhatsapp("2026-09-01T10:00", 60, { autre: "Bébé" }));
+    /* « Discussion WhatsApp avec Bébé » face à des captures où l’on lit Léa : refusé, puis ajouté quand même */
+    const t = capturesDu("2026-08-20", 24, { autre: "Léa" });
+    await expect(ajouterDesCaptures(imp.secret, { appli: "instagram", t })).rejects.toMatchObject({ code: "autre_conv" });
+    await ajouterDesCaptures(imp.secret, { appli: "instagram", t, forcer: true });
+    /* Un export avec un autre prénom, forcé aussi : il prend la place de ses noms */
+    const sarah = exportWhatsapp("2026-07-01T10:00", 60, { autre: "Sarah" });
+    await expect(ajouterUnExport(imp.secret, sarah)).rejects.toMatchObject({ code: "autre_conv" });
+    await ajouterUnExport(imp.secret, sarah, { forcer: true });
+    const m = await meta(imp.id);
+    expect(m.morceaux).toHaveLength(3);
+    expect(m.resume.total).toBe(144);
+    /* Les noms restent ceux du premier export : Bébé reste l’autre */
+    expect(m.participants.map((p) => p.nom).sort()).toEqual(["Bébé", "Hugo"]);
   });
 
   it("des captures d’abord, puis un export : ses noms deviennent ceux de la conv, et « Qui es-tu ? » les redemande", async () => {

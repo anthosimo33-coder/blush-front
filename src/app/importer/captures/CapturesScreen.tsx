@@ -10,7 +10,7 @@ import { ACCEPT_IMAGES, CAPTURES_MAX } from "@/lib/limites";
 import { connexionPuis } from "@/lib/suite";
 import { useApercusFichiers } from "@/lib/useApercusFichiers";
 import { useMonte } from "@/lib/useMonte";
-import { codeDe, erreurDeParcours, messageErreur, type ErreurParcours } from "@/lib/messages-erreur";
+import { AJOUTER_QUAND_MEME, codeDe, erreurDeParcours, messageErreur, type ErreurParcours } from "@/lib/messages-erreur";
 import { prechargerVideo, uploadRecording, uploadScreenshots } from "@/services/api";
 import { CASE_IMPORT } from "@/contenu/consentements";
 import { MentionImport, useAccord } from "@/components/juridique/cases";
@@ -82,6 +82,8 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
   const [trop, setTrop] = useState(false);
   /* Ce qui a empêché l’envoi et ne vient pas des captures (la limite du jour, le budget de l’IA, le réseau) : dit sous elles, qui restent là */
   const [souci, setSouci] = useState<string | null>(null);
+  /* Un morceau refusé comme celui de quelqu’un d’autre : « Ajouter quand même » renvoie le même envoi (rien n’est relu) */
+  const [refuse, setRefuse] = useState(false);
   /* L’écran est-il toujours là ? Après une lecture de 10 à 40 s, on n’envoie pas vers la suite quelqu’un qui est parti */
   const monte = useMonte();
   /* L’accord de l’import : la ligne au-dessus du bouton le dit, « Continuer » le donne (refusé par le serveur, plus rien ne part) */
@@ -129,6 +131,7 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
     toutes.slice(next.length).forEach((s) => apercus.liberer(s.url));
     setTrop(!video && toutes.length > CAPTURES_MAX);
     setSouci(null);
+    setRefuse(false);
     setItems(next);
     if (!video) {
       const gardees = added.filter((s) => next.includes(s));
@@ -151,6 +154,8 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
     setItems(next);
     setAnnounce("Capture retirée.");
     setTrop(false);
+    /* D’autres captures : plus le même envoi, « Ajouter quand même » n’a plus lieu d’être */
+    setRefuse(false);
     if (next.length) return setResult((r) => (r ? { ...r, count: next.length } : r));
     setResult(null);
     requestAnimationFrame(() => zoneAjout.current?.focus());
@@ -169,20 +174,21 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
     });
   };
 
-  /* BLUSH lit toutes les captures d’un coup (de 10 à 40 secondes), puis on passe à la suite */
-  const continuer = async () => {
+  /* BLUSH lit toutes les captures d’un coup (de 10 à 40 secondes), puis on passe à la suite. `forcer` : « Ajouter quand même » */
+  const continuer = async ({ forcer = false } = {}) => {
     if (!accord.exiger()) return;
     setBusy(true);
     setSouci(null);
+    setRefuse(false);
     setAvance(null);
     const video = !!result?.video;
     const enregistre = video ? items[0] : undefined;
     try {
       const r = enregistre
-        ? await uploadRecording(enregistre.file, APPLIS_CAPTURES.includes(captureApp) ? captureApp : "autre", CASE_IMPORT.version, setAvance, { ajout: addMode })
+        ? await uploadRecording(enregistre.file, APPLIS_CAPTURES.includes(captureApp) ? captureApp : "autre", CASE_IMPORT.version, setAvance, { ajout: addMode, forcer })
         : await uploadScreenshots(
             items.map((s) => s.file),
-            { app: captureApp, mode: addMode ? "add" : "first", consentement: CASE_IMPORT.version, onAvance: setAvance },
+            { app: captureApp, mode: addMode ? "add" : "first", consentement: CASE_IMPORT.version, onAvance: setAvance, forcer },
           );
       if (!monte.current) return;
       /*
@@ -214,7 +220,10 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
       const parcours = erreurDeParcours("captures", e) ?? (code === "capture" || code === "fichier" ? "capture" : null);
       if (parcours) return echec(parcours);
       /* Un morceau avec quelqu’un d’autre : on le dit en la nommant */
-      if (code === "autre_conv") return void messagePasAvecElle().then((m) => monte.current && setSouci(m));
+      if (code === "autre_conv") {
+        setRefuse(true);
+        return void messagePasAvecElle().then((m) => monte.current && setSouci(m));
+      }
       setSouci(messageErreur("captures", e));
     }
   };
@@ -339,6 +348,15 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
         {/* L’avancée s’affiche dans le bouton ; ici, elle est seulement annoncée aux lecteurs d’écran */}
         {busy && <span className="sr-only">{enCours}</span>}
         {!busy && souci && <p className="m-0 mb-2.5 text-note font-extrabold leading-[1.45] text-ink">{souci}</p>}
+        {/* Un surnom d’un côté, son prénom de l’autre : la même personne, qu’il peut ajouter quand même */}
+        {!busy && souci && refuse && (
+          <div className="mb-3 flex flex-col gap-2.5">
+            <p className="m-0 text-note font-extrabold leading-[1.45] text-soft">{AJOUTER_QUAND_MEME.phrase}</p>
+            <Button variant="secondary" size="md" onClick={() => void continuer({ forcer: true })}>
+              {AJOUTER_QUAND_MEME.bouton}
+            </Button>
+          </div>
+        )}
         {!busy && result && !result.video && (
           <div data-rise="" className="flex items-center gap-2 text-note font-black">
             <DoneCheck size={24} />

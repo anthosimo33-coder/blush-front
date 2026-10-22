@@ -8,7 +8,7 @@ import { useDevice, useFilePicker } from "@/lib/hooks";
 import { marquerJalon, useJalon } from "@/lib/jalons";
 import { ACCEPT_EXPORT } from "@/lib/limites";
 import { useMonte } from "@/lib/useMonte";
-import { codeDe, erreurDeParcours, messageErreur } from "@/lib/messages-erreur";
+import { AJOUTER_QUAND_MEME, codeDe, erreurDeParcours, messageErreur } from "@/lib/messages-erreur";
 import { importerLaConvDuTournage, prechargerExport, uploadExport } from "@/services/api";
 import { CASE_IMPORT } from "@/contenu/consentements";
 import { EXPORT_STEPS, imageDeLaVideo, VIDEOS_EXPORT } from "@/contenu/parcours";
@@ -53,6 +53,8 @@ export function ExportScreen({ initialApp, tournage = false, ajout = false }: { 
   const [avance, setAvance] = useState<number | null>(null);
   /* L’envoi n’a pas pu se faire (le réseau, trop d’imports d’un coup) : on le dit ici, la conv n’est pas en cause */
   const [souci, setSouci] = useState<string | null>(null);
+  /* Un morceau refusé comme celui de quelqu’un d’autre : son fichier, que « Ajouter quand même » renvoie */
+  const [refuse, setRefuse] = useState<File | null>(null);
   /* L’écran est-il toujours là ? Après la lecture du fichier, on n’envoie pas vers la suite quelqu’un qui est parti */
   const monte = useMonte();
   /* L’accord de l’import : la ligne au-dessus du bouton le dit, choisir le fichier le donne (refusé par le serveur, plus rien ne part) */
@@ -97,7 +99,7 @@ export function ExportScreen({ initialApp, tournage = false, ajout = false }: { 
   };
 
   /* L’envoi raté : le fichier lui-même a son écran d’erreur (ErreurDeParcours, ?erreur=) ; le reste (réseau, limite), un message ici, et on réessaie */
-  const surEchec = (e: unknown) => {
+  const surEchec = (e: unknown, fichier?: File) => {
     if (!monte.current) return;
     setBusy(false);
     setAvance(null);
@@ -112,8 +114,11 @@ export function ExportScreen({ initialApp, tournage = false, ajout = false }: { 
       router.replace(`${ici(app)}&erreur=${parcours}`, { scroll: false });
       return;
     }
-    /* Un morceau avec quelqu’un d’autre : on le dit en la nommant */
-    if (codeDe(e) === "autre_conv") return void messagePasAvecElle().then((m) => monte.current && setSouci(m));
+    /* Un morceau avec quelqu’un d’autre : on le dit en la nommant, et il peut l’ajouter quand même (un surnom d’un côté) */
+    if (codeDe(e) === "autre_conv") {
+      setRefuse(fichier ?? null);
+      return void messagePasAvecElle().then((m) => monte.current && setSouci(m));
+    }
     setSouci(messageErreur("export", e));
   };
 
@@ -140,20 +145,22 @@ export function ExportScreen({ initialApp, tournage = false, ajout = false }: { 
     picker.open();
   };
 
-  const onFiles = async ([file]: File[]) => {
+  /* `forcer` : « Ajouter quand même », le morceau refusé renvoyé tel quel (le même paquet, sans relire le fichier) */
+  const onFiles = async ([file]: File[], { forcer = false } = {}) => {
     if (!file) return;
     /* L’accord refusé par le serveur pendant que le choix du fichier était ouvert : rien ne repart avant la page rechargée */
     if (!accord.exiger()) return;
     jalon("fichier");
     setBusy(true);
     setSouci(null);
+    setRefuse(null);
     setAvance(null);
     let recu;
     try {
       /* L’avancée ne compte plus une fois les convs proposées : la feuille « Quelle conv ? » prend le relais */
-      recu = await uploadExport(file, CASE_IMPORT.version, choisir, (p) => monte.current && setAvance(p < 1 ? p : null), { ajout });
+      recu = await uploadExport(file, CASE_IMPORT.version, choisir, (p) => monte.current && setAvance(p < 1 ? p : null), { ajout, forcer });
     } catch (e) {
-      return surEchec(e);
+      return surEchec(e, file);
     }
     if (!monte.current) return;
     if (ajout) ajoute(recu.story, recu.source.fileName ?? file.name);
@@ -172,7 +179,13 @@ export function ExportScreen({ initialApp, tournage = false, ajout = false }: { 
           {souci && (
             <Alert variant="carte" className="mb-3 text-center">
               {souci}
+              {refuse && <span className="mt-1 block text-note font-extrabold text-soft">{AJOUTER_QUAND_MEME.phrase}</span>}
             </Alert>
+          )}
+          {refuse && souci && !busy && (
+            <Button variant="secondary" size="md" className="mb-3" onClick={() => void onFiles([refuse], { forcer: true })}>
+              {AJOUTER_QUAND_MEME.bouton}
+            </Button>
           )}
           {/* Le CAPTCHA de l’import sans compte : invisible tant qu’il ne demande pas de geste */}
           <Captcha action="import" />

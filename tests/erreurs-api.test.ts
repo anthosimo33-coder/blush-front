@@ -50,6 +50,7 @@ describe("le serveur", () => {
       capture: 422,
       autre_conv: 422,
       rien_de_neuf: 422,
+      morceaux: 422,
       vocal: 422,
       vocal_vide: 422,
       vocal_illisible: 422,

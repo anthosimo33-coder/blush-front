@@ -130,3 +130,27 @@ test("des captures d’abord, puis un export : la conv reçue, l’histoire réu
     await expect(page.getByRole("heading", { level: 1, name: /BLUSH analyse tes\s*88\s*messages/ })).toBeVisible();
   });
 });
+
+test("« Ajouter quand même » : des captures refusées (le contact enregistré sous un autre nom) s’ajoutent, sans être relues", async ({ page }, testInfo) => {
+  test.setTimeout(LECTURE_DES_CAPTURES * 3);
+  const envois: string[] = [];
+  page.on("request", (r) => {
+    if (new URL(r.url()).pathname === "/api/captures") envois.push(r.method());
+  });
+
+  await test.step("un export avec « Bébé », puis des captures où l’on lit Elias : refusées, avec de quoi les ajouter quand même", async () => {
+    await importerWhatsApp(page, exportWhatsApp(testInfo, { personnes: { toi: "Noé", autre: "Bébé" } }));
+    await page.goto("/importer/captures?app=autre&mode=ajout");
+    await choisirFichier(page, capturesPng(testInfo, 2), "Choisir mes captures");
+    await page.getByRole("button", { name: "Continuer" }).click();
+    await expect(page.getByText("Ce morceau n’est pas avec Bébé.")).toBeVisible({ timeout: LECTURE_DES_CAPTURES });
+    await expect(page.getByText("C’est la même personne, sous un autre nom\u00a0? Tu peux l’ajouter quand même.")).toBeVisible();
+  });
+
+  await test.step("« Ajouter quand même » : les mêmes captures, ajoutées, l’histoire réunie en deux morceaux", async () => {
+    await page.getByRole("button", { name: "Ajouter quand même" }).click();
+    await expect(page).toHaveURL(/\/importer\/histoire$/, { timeout: LECTURE_DES_CAPTURES });
+    await expect(page.getByText(/messages · .+ · 2 morceaux/)).toBeVisible();
+    expect(envois).toEqual(["POST", "POST"]);
+  });
+});

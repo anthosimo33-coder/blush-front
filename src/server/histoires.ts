@@ -302,10 +302,11 @@ function metaReunie(avant: Meta, conv: ConvEnMorceaux, id: Identite, qui: QuiLit
  * un morceau avec quelqu’un d’autre), puis la conv réunie se recompte. Avant « Qui es-tu ? » seulement : un brouillon
  * sans compte, qui a sa conv brute (pas un brouillon du mode tournage). Le même texte, ou le même envoi (`cle`, un
  * nouvel essai après une coupure), ne s’ajoute pas deux fois : la conv revient telle quelle. Au-delà de MORCEAUX_MAX, ou
- * de TEXTE_LU_MAX_CARACTERES pour tous les morceaux ensemble : « trop » ; un morceau qui n’apporte aucun message nouveau
- * (tout y est déjà) : « rien_de_neuf ».
+ * de TEXTE_LU_MAX_CARACTERES pour tous les morceaux ensemble : « morceaux » ; un morceau qui n’apporte aucun message
+ * nouveau (tout y est déjà) : « rien_de_neuf ». `forcer` : « Ajouter quand même », un morceau que relier refusait comme
+ * celui de quelqu’un d’autre.
  */
-async function ajouterMorceau(secret: string, recu: MorceauRecu, info: Omit<MorceauMeta, "resume">): Promise<{ id: string; meta: Meta }> {
+async function ajouterMorceau(secret: string, recu: MorceauRecu, info: Omit<MorceauMeta, "resume">, { forcer = false } = {}): Promise<{ id: string; meta: Meta }> {
   return db().transaction(async (tx) => {
     /* Deux ajouts en même temps : l’un après l’autre, chacun sur la conv que l’autre a laissée */
     const [ligne] = await tx.select().from(schema.stories).where(duBrouillon(secret)).for("update");
@@ -316,8 +317,8 @@ async function ajouterMorceau(secret: string, recu: MorceauRecu, info: Omit<Morc
     if (conv.morceaux.some((m) => m.empreinte === recu.empreinte || (recu.cle && m.cle === recu.cle))) return { id: ligne.id, meta: avant };
     /* Cinq morceaux au plus, et pas plus de texte, ensemble, qu’un seul export au plus gros : la lecture les relit tous à chaque étape */
     const texte = conv.morceaux.reduce((n, m) => n + m.texte.length, recu.texte.length);
-    if (conv.morceaux.length >= MORCEAUX_MAX || texte > TEXTE_LU_MAX_CARACTERES) throw new ErreurMorceau("trop");
-    const { morceaux, identite } = relier(conv, identiteDe(avant), recu);
+    if (conv.morceaux.length >= MORCEAUX_MAX || texte > TEXTE_LU_MAX_CARACTERES) throw new ErreurMorceau("morceaux");
+    const { morceaux, identite } = relier(conv, identiteDe(avant), recu, { forcer });
     const reunie: ConvEnMorceaux = { morceaux };
     /* Avant « Qui es-tu ? » : toi est le participant 0, comme à l’import d’un seul morceau */
     const { meta: lue, parMorceau, gardes } = metaReunie(avant, reunie, identite, { k: 0, connu: false });
@@ -333,17 +334,20 @@ async function ajouterMorceau(secret: string, recu: MorceauRecu, info: Omit<Morc
 }
 
 /** Un autre export de leur conv, ajouté au brouillon du cookie (ajouterMorceau) : lu et borné comme un premier import. */
-export async function ajouterUnExport(secret: string, recu: ExportLu & { nom: string; coupe?: boolean }): Promise<{ id: string; meta: Meta }> {
+export async function ajouterUnExport(secret: string, recu: ExportLu & { nom: string; coupe?: boolean }, { forcer = false } = {}): Promise<{ id: string; meta: Meta }> {
   const { nom, appli, texte, coupe, format, premier, second, contact } = exportLu(recu);
   const morceau: MorceauRecu = { format, texte, noms: [premier.nom, second.nom], empreinte: empreinte(texte), ...(contact ? { contact } : {}) };
-  return ajouterMorceau(secret, morceau, { appli, fichier: nom.slice(0, 200), ...(coupe ? { coupe: true } : {}) });
+  return ajouterMorceau(secret, morceau, { appli, fichier: nom.slice(0, 200), ...(coupe ? { coupe: true } : {}) }, { forcer });
 }
 
 /**
  * Des captures (ou un enregistrement d’écran) ajoutées au brouillon du cookie (ajouterMorceau), déjà lues par le prompt
  * 01. `cle` : celle de l’envoi, qu’un nouvel essai retrouve. Le nom lu en haut de la conv désigne l’autre.
  */
-export async function ajouterDesCaptures(secret: string, { appli, t, cle }: { appli: Meta["appli"]; t: TexteCaptures; cle?: string | null }): Promise<{ id: string; meta: Meta }> {
+export async function ajouterDesCaptures(
+  secret: string,
+  { appli, t, cle, forcer = false }: { appli: Meta["appli"]; t: TexteCaptures; cle?: string | null; forcer?: boolean },
+): Promise<{ id: string; meta: Meta }> {
   const morceau: MorceauRecu = {
     format: "captures",
     texte: t.texte,
@@ -352,7 +356,7 @@ export async function ajouterDesCaptures(secret: string, { appli, t, cle }: { ap
     ...(cle ? { cle: empreinte(`ajout:${cle}`) } : {}),
     ...(nomLu(t.autre) ? { contact: t.autre } : {}),
   };
-  return ajouterMorceau(secret, morceau, { appli, fichier: `${t.captures} captures`, captures: t.captures });
+  return ajouterMorceau(secret, morceau, { appli, fichier: `${t.captures} captures`, captures: t.captures }, { forcer });
 }
 
 /**
