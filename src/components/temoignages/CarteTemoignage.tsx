@@ -8,8 +8,8 @@ import type { Testimonial } from "@/types";
 /*
  * Un témoignage, sur la landing et sous le paywall (la maquette A1, « La phrase qui reste », choisie le 16 octobre) :
  * ce que BLUSH a vu pour elle, sa phrase qui reste en grand, son avis en entier (le passage sur BLUSH surligné), puis qui
- * elle est. Ses mots ne changent jamais : la phrase et le passage sont des morceaux de son avis, mot pour mot
- * (tests/unit/temoignages.test.ts).
+ * elle est, avec sa photo s’il l’a donnée. Ses mots ne changent jamais : la phrase et le passage sont des morceaux de son
+ * avis, mot pour mot (tests/client/temoignages.test.tsx).
  */
 
 /** Sa situation en couleur : le petit rond sur son initiale et son étiquette (rose : un crush, vert : en couple, violet : c’est flou). */
@@ -55,7 +55,7 @@ export function CarteTemoignage({ t, className }: { t: Testimonial; className?: 
       </blockquote>
       <figcaption className="mt-auto flex items-center gap-3 border-t border-sep pt-3.5 lg:pt-4">
         <span aria-hidden="true" className="relative shrink-0">
-          <Avatar tone="toi" size={44}>
+          <Avatar tone="toi" size={44} photo={t.photo}>
             {t.name.charAt(0)}
           </Avatar>
           <span className={cn("absolute -bottom-[3px] -right-[5px] flex size-[22px] items-center justify-center rounded-full text-white shadow-[0_0_0_2.5px_#fff]", teinte.rond)}>

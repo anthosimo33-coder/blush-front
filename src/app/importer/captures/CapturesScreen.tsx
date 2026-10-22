@@ -44,17 +44,17 @@ const texteAvance = (a: AvanceVideo) =>
 
 /*
  * Ce que l’écran des captures dit d’abord, d’après l’appli. Instagram (et WhatsApp) s’exportent : on y arrive souvent
- * juste après un export trop court, l’écran ne dit donc pas le contraire. Hinge et les autres ne s’exportent pas.
- * Les autres applis (Telegram, Messenger…) s’exportent parfois, mais BLUSH ne lit pas leur export : l’écran dit ce qui est vrai.
- * TODO(produit): « Les captures suffisent aussi », et « BLUSH ne lit pas encore l’export de ton appli » pour les autres
- * applis, textes du 12 octobre, à valider.
+ * juste après un export trop court, l’écran ne dit donc pas le contraire. Hinge ne s’exporte pas, il le dit. « autre »
+ * (la tuile « Captures ou vidéo ») : n’importe quelle appli, Instagram et WhatsApp compris quand on n’a pas leur export.
+ * TODO(produit): « Les captures suffisent aussi » (12 octobre), à valider. « Des captures de n’importe quelle appli suffisent »
+ * (22 octobre) est relu.
  */
 const leadCaptures = (app: AppKind) =>
   (EXPORTS as readonly AppKind[]).includes(app)
     ? "Les captures suffisent aussi\u00a0: on reconnaît les messages, les dates et qui parle."
     : app === "hinge"
       ? "Hinge ne permet pas d’exporter\u00a0: les captures suffisent. On reconnaît les messages, les dates et qui parle."
-      : "BLUSH ne lit pas encore l’export de ton appli\u00a0: les captures suffisent. On reconnaît les messages, les dates et qui parle.";
+      : "Des captures de n’importe quelle appli suffisent\u00a0: on reconnaît les messages, les dates et qui parle.";
 
 /** Pendant la lecture des captures (sans avancée à dire) : ce que BLUSH fait, en clair dans le bouton. */
 const texteLecture = (n: number) => (n > 1 ? `BLUSH lit tes ${n} captures…` : "BLUSH lit ta capture…");

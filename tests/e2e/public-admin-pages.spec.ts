@@ -23,7 +23,7 @@ test("la landing : la promesse, les boutons vers le parcours, les faits, sans fa
     const boutons = main.getByRole("link", { name: "Analyser ma conv" });
     await expect(boutons).toHaveCount(2);
     for (const bouton of await boutons.all()) await expect(bouton).toHaveAttribute("href", "/commencer");
-    await expect(main.getByText("Paiement unique · Sans mot de passe")).toHaveCount(2);
+    await expect(main.getByText("Paiement unique · Ta conv reste confidentielle")).toHaveCount(2);
     await expect(main.getByRole("heading", { level: 2, name: "Ta conv a déjà la réponse." })).toBeVisible();
   });
 
@@ -142,7 +142,7 @@ test("la confidentialité : ce qui part, qui le lit, combien de temps, sans nomm
   for (const titre of ["Ce que tu nous envoies", "Qui la lit", "Comment on la protège", "Combien de temps", "Nos prestataires"]) {
     await expect(main.getByRole("heading", { level: 2, name: titre, exact: true })).toBeVisible();
   }
-  await expect(main.getByText("Une IA, et seulement elle")).toBeVisible();
+  await expect(main.getByText("BLUSH, et seulement lui")).toBeVisible();
   await expect(main.getByText("La conv brute, effacée après ton rapport")).toBeVisible();
   /* Le partage, comme la feuille « En savoir plus » du rapport le résume : le lien comme l’image */
   await expect(main.getByText("Rien ne sort sans toi")).toBeVisible();
@@ -190,19 +190,18 @@ test("la confidentialité : « Retour » ramène d’où l’on vient, et à la 
   });
 });
 
-test("/commencer : cinq applis, chacune vers son import (Instagram par son export), sans bandeau de bêta privée", async ({ page }) => {
+test("/commencer : trois applis et « Captures ou vidéo », chacune vers son import (Instagram par son export), sans bandeau de bêta privée", async ({ page }) => {
   const reponse = await page.goto("/commencer");
   expect(reponse?.status()).toBe(200);
   await expect(page).toHaveTitle("Vous vous parlez où ? · BLUSH");
   await expect(page.getByRole("heading", { level: 1, name: "Vous vous parlez où ?" })).toBeVisible();
   const applis = page.getByRole("navigation", { name: "Ton appli" });
-  await expect(applis.getByRole("link")).toHaveCount(5);
+  await expect(applis.getByRole("link")).toHaveCount(4);
   const attendues: [string, string][] = [
     ["WhatsApp", "/importer/export?app=whatsapp"],
     ["iMessage", "/importer/captures?app=imessage"],
     ["Instagram", "/importer/export?app=instagram"],
-    ["Hinge", "/importer/captures?app=hinge"],
-    ["Autre appli", "/importer/captures?app=autre"],
+    ["Captures ou vidéo", "/importer/captures?app=autre"],
   ];
   for (const [nom, href] of attendues) await expect(applis.getByRole("link", { name: nom })).toHaveAttribute("href", href);
   await expect(page.getByRole("link", { name: "Comment ça marche" })).toHaveAttribute("href", "/confidentialite");

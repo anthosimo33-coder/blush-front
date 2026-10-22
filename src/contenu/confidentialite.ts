@@ -8,18 +8,18 @@ import { CODE_MINUTES } from "@/lib/limites";
  */
 
 /** Le sort de la conv brute, partout le même (la page : « La conv brute, effacée après ton rapport »). */
-export const PROMESSE_CONV = "Ta conv est chiffrée, lue par une IA, et effacée après ton rapport.";
+export const PROMESSE_CONV = "Ta conv est chiffrée, lue par BLUSH, et effacée après ton rapport.";
 
 /** Ce que deviennent les convs gardées (« Mon compte ») : pas d’entraînement, et tout chiffré. */
-export const PROMESSE_DONNEES = "Tes convs ne servent jamais à entraîner une IA, et tout ce qui en vient est chiffré.";
+export const PROMESSE_DONNEES = "Tes convs ne servent jamais à entraîner BLUSH, et tout ce qui en vient est chiffré.";
 
 /**
- * Où vit ce que BLUSH garde, et par où passent l’IA et la voix (la page, « Où ça vit » : la base à Francfort, les
- * prestataires de l’IA et de la voix aux États-Unis). Tient seule, où qu’elle soit posée. Remplace « Hébergement en
- * Europe », qui taisait les États-Unis.
+ * Où vit ce que BLUSH garde, et par où passent sa lecture et sa voix (la page, « Où ça vit » : la base à Francfort, les
+ * prestataires de la lecture et de la voix aux États-Unis). Tient seule, où qu’elle soit posée. Remplace « Hébergement en
+ * Europe », qui taisait les États-Unis. Depuis le 22 octobre, les textes disent « BLUSH », plus « une IA ».
  * TODO(produit): phrase de remplacement proposée, à valider (juriste).
  */
-export const PROMESSE_LIEU = "Ce que BLUSH garde est à Francfort\u00a0; l’IA et la voix de BLUSH passent par des prestataires aux États-Unis.";
+export const PROMESSE_LIEU = "Ce que BLUSH garde est à Francfort\u00a0; sa lecture et sa voix passent par des prestataires aux États-Unis.";
 
 /** Effacer est toujours possible, depuis « Mon compte ». */
 export const PROMESSE_EFFACEMENT = "Tu peux tout effacer à tout moment.";
@@ -61,7 +61,7 @@ export const PROMESSE_PARTAGE = "Ta conv reste à toi, et c’est toi qui décid
 export const FEUILLE_CONFIDENTIALITE = {
   titre: "Ta conv reste à toi.",
   chiffree: {
-    titre: "Chiffrée, lue seulement par l’IA",
+    titre: "Chiffrée, lue seulement par BLUSH",
     page: "Chiffrée",
     detail: "Ta conv, ton rapport et le chat sont chiffrés. Personne chez BLUSH ne les lit.",
   },

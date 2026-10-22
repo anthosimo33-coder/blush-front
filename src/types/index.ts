@@ -334,6 +334,8 @@ export type LandingConv = {
   app: AppKind;
   /** La pastille : l’icône de l’appli, ou l’initiale (rose : l’autre personne). */
   avatar: "app" | "initial";
+  /** Une pastille « initiale » : sa photo à la place, carrée, dans public/convs/ (« /convs/lea.webp »). */
+  photo?: string;
   verdict: Pick<Verdict, "emoji" | "title" | "subtitle">;
   /** La preuve : un de ses messages, daté. */
   proof: { text: string; caption: string };
@@ -356,6 +358,8 @@ export type Testimonial = {
   /** Le passage sur BLUSH, surligné dans `text` : un morceau de `text`, mot pour mot. */
   surligne: string;
   text: string;
+  /** Sa photo, carrée, dans public/avis/ (« /avis/sonia.webp »), avec son accord. Sans elle : son initiale. */
+  photo?: string;
 };
 
 /** Le mode sobre, sur une alerte de danger (détresse, mineur) : un rapport court et doux, offert, jamais partagé. */

@@ -159,12 +159,11 @@ export function LectureScreen({
         </div>
 
         {failed && raison === "refus" ? (
-          /* Texte relu le 8 octobre */
+          /* Texte relu le 8 octobre ; « BLUSH » au lieu de « l’IA qui lit les convs pour BLUSH » le 22 octobre */
           <div role="alert" className="flex max-w-[520px] flex-col items-center gap-3">
             <h1 className="m-0 mt-5 text-titre-2 font-black leading-[1.1] tracking-[-0.025em] lg:mt-6 lg:text-[38px]">BLUSH ne peut pas lire cette conv.</h1>
             <p className="m-0 text-detail font-extrabold leading-[1.45] text-soft">
-              L’IA qui lit les convs pour BLUSH a refusé de l’analyser. Ça arrive quand une conv contient des passages qu’elle ne traite pas. Rien n’est perdu{NBSP}: tu peux en
-              essayer une autre.
+              Ça arrive quand une conv contient des passages que BLUSH ne peut pas analyser. Rien n’est perdu{NBSP}: tu peux en essayer une autre.
             </p>
           </div>
         ) : failed && raison === "souffle" ? (

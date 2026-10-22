@@ -10,18 +10,21 @@ import { Lead, ScreenTitle } from "@/components/shell/Screen";
 import { PROMESSE_CONV } from "@/contenu/confidentialite";
 import { useJalon } from "@/lib/jalons";
 import { readJourney, resetJourney, setJourney } from "@/state/journey";
-import { NOM_AUTRE_APPLI, type AppKind } from "@/types";
+import type { AppKind } from "@/types";
 import { NBSP } from "@/lib/format";
 
 /* Écran 01 — Vous vous parlez où ? (pas de Snapchat) */
-const TILES: { app: AppKind; title: string; subtitle: string; href: Route; wide?: boolean }[] = [
+const TILES: { app: AppKind; title: string; subtitle: string; href: Route }[] = [
   { app: "whatsapp", title: "WhatsApp", subtitle: "Export en 1 minute", href: "/importer/export?app=whatsapp" },
   /* iMessage ne s’exporte pas : on filme son écran (ou des captures) */
   { app: "imessage", title: "iMessage", subtitle: "Enregistrement de l’écran", href: "/importer/captures?app=imessage" },
   /* Instagram passe par son export (la lecture des captures arrive ensuite) */
   { app: "instagram", title: "Instagram", subtitle: "Export de tes messages", href: "/importer/export?app=instagram" },
-  { app: "hinge", title: "Hinge", subtitle: "Captures d’écran", href: "/importer/captures?app=hinge" },
-  { app: "autre", title: NOM_AUTRE_APPLI, subtitle: "Messenger, Tinder, Bumble… par captures d’écran", href: "/importer/captures?app=autre", wide: true },
+  /*
+   * Des captures ou une vidéo de l’écran, de n’importe quelle appli : Hinge et Tinder y passent, et qui n’a pas d’export
+   * Instagram ou WhatsApp aussi (à la place des tuiles Hinge et « Autre appli », 22 octobre)
+   */
+  { app: "autre", title: "Captures ou vidéo", subtitle: "Hinge, Tinder… toutes les applis", href: "/importer/captures?app=autre" },
 ];
 
 export function CommencerScreen({ fermee = false }: { fermee?: boolean }) {

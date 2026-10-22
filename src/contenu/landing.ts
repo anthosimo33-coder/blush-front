@@ -3,7 +3,8 @@ import type { LandingConv, QuestionAnswer, Testimonial } from "@/types";
 
 /*
  * Landing : les convs qui défilent sous le titre, et le verdict que BLUSH montre quand on en choisit une.
- * Exemples fictifs, écrits pour la landing (textes relus le 8 octobre, voix de BLUSH). Mêmes sens d’emojis :
+ * Exemples fictifs, écrits pour la landing (textes relus le 8 octobre, voix de BLUSH), avec une photo à la place de
+ * l’initiale (public/convs/, recadrées en carré de 256 px, sans leurs métadonnées). Mêmes sens d’emojis :
  * 🤏 à deux doigts · 🔥 partant·e · 🤔 hésite · 🧊 s’éloigne.
  * En couple (Mon cœur, Chéri, Julien) : 🔥 toujours le feu · 🤏 il manque un petit rien · 🤔 un truc coince · 🧊 vous vous éloignez.
  */
@@ -15,6 +16,7 @@ export const LANDING_CONVS: LandingConv[] = [
     label: "Ton crush",
     app: "whatsapp",
     avatar: "initial",
+    photo: "/convs/lea.webp",
     verdict: { emoji: "🤏", title: "Vous êtes à deux doigts.", subtitle: "Elle te tend des perches depuis trois semaines." },
     proof: { text: "on refait un verre quand tu veux, mais cette fois c’est toi qui choisis le bar", caption: "3 mars, 22\u00a0h\u00a014" },
     confidence: "sur",
@@ -27,6 +29,7 @@ export const LANDING_CONVS: LandingConv[] = [
     label: "Ta copine",
     app: "whatsapp",
     avatar: "initial",
+    photo: "/convs/moncoeur.webp",
     verdict: { emoji: "🤔", title: "Un truc coince.", subtitle: "Elle dit «\u00a0c’est pas grave\u00a0». Ses messages disent le contraire." },
     proof: { text: "c’est pas grave, vas-y avec tes potes", caption: "28 févr., 19\u00a0h\u00a041" },
     confidence: "sur",
@@ -51,6 +54,7 @@ export const LANDING_CONVS: LandingConv[] = [
     label: "Ta situationship",
     app: "imessage",
     avatar: "initial",
+    photo: "/convs/ines.webp",
     verdict: { emoji: "🤔", title: "Elle hésite.", subtitle: "Elle aime ce que vous avez. Elle n’ose pas encore le nommer." },
     proof: { text: "je sais pas trop ce qu’on fait toi et moi, mais j’aime bien", caption: "28 janv., 0\u00a0h\u00a037" },
     confidence: "probable",
@@ -89,6 +93,7 @@ export const LANDING_CONVS: LandingConv[] = [
     label: "Ton collègue",
     app: "whatsapp",
     avatar: "initial",
+    photo: "/convs/sacha.webp",
     verdict: { emoji: "🤔", title: "Il hésite.", subtitle: "Il ouvre la porte, puis il la referme à moitié." },
     proof: { text: "on devrait se faire un verre un de ces quatre… enfin si t’as le temps", caption: "4 avr., 18\u00a0h\u00a031" },
     confidence: "probable",
@@ -101,6 +106,7 @@ export const LANDING_CONVS: LandingConv[] = [
     label: "Ton copain",
     app: "imessage",
     avatar: "initial",
+    photo: "/convs/cheri.webp",
     verdict: { emoji: "🔥", title: "Toujours le feu.", subtitle: "Il parle de vos projets sans que tu lui demandes." },
     proof: { text: "faut qu’on parte quelque part cet été toi et moi", caption: "9 mars, 22\u00a0h\u00a003" },
     confidence: "sur",
@@ -113,6 +119,7 @@ export const LANDING_CONVS: LandingConv[] = [
     label: "Votre premier date",
     app: "instagram",
     avatar: "initial",
+    photo: "/convs/margaux.webp",
     verdict: { emoji: "🧊", title: "Elle s’éloigne.", subtitle: "Elle répond poliment, deux jours après, sans poser de question." },
     proof: { text: "oui c’était sympa\u00a0!", caption: "16 févr., 13\u00a0h\u00a005" },
     confidence: "probable",
@@ -149,6 +156,7 @@ export const LANDING_CONVS: LandingConv[] = [
     label: "Ton match Bumble",
     app: "autre",
     avatar: "initial",
+    photo: "/convs/yanis.webp",
     verdict: { emoji: "🤔", title: "Il hésite.", subtitle: "Trois «\u00a0on\u00a0verra\u00a0» en deux semaines. Il garde la porte ouverte, sans la franchir." },
     proof: { text: "haha peut-être, on verra", caption: "7 mars, 22\u00a0h\u00a058" },
     confidence: "probable",
@@ -163,6 +171,7 @@ export const LANDING_CONVS: LandingConv[] = [
     label: "Ton date en cours",
     app: "whatsapp",
     avatar: "initial",
+    photo: "/convs/emma.webp",
     verdict: { emoji: "🤏", title: "Vous êtes à deux doigts.", subtitle: "Elle parle déjà de toi à ses proches." },
     proof: { text: "ma coloc veut savoir qui me fait sourire comme ça devant mon tel", caption: "23 févr., 22\u00a0h\u00a009" },
     confidence: "sur",
@@ -187,6 +196,7 @@ export const LANDING_CONVS: LandingConv[] = [
     label: "Ton mec",
     app: "whatsapp",
     avatar: "initial",
+    photo: "/convs/julien.webp",
     verdict: { emoji: "🤏", title: "Il manque un petit rien.", subtitle: "Vous vous écrivez tous les jours, mais plus que pour vous organiser." },
     proof: { text: "tu peux prendre le pain en rentrant", caption: "11 mars, 18\u00a0h\u00a012" },
     confidence: "probable",
@@ -199,6 +209,7 @@ export const LANDING_CONVS: LandingConv[] = [
     label: "Ton crush de soirée",
     app: "instagram",
     avatar: "initial",
+    photo: "/convs/alice.webp",
     verdict: { emoji: "🤔", title: "Elle hésite.", subtitle: "Elle répond toujours, mais jamais avant le lendemain." },
     proof: { text: "c’était cool samedi\u00a0!", caption: "11 mars, 16\u00a0h\u00a027" },
     confidence: "probable",
@@ -223,6 +234,7 @@ export const LANDING_CONVS: LandingConv[] = [
     label: "Ton match Tinder",
     app: "autre",
     avatar: "initial",
+    photo: "/convs/zoe.webp",
     verdict: { emoji: "🧊", title: "Elle s’éloigne.", subtitle: "Elle met plus de temps à répondre, et elle ne pose plus de questions." },
     proof: { text: "ah oui pardon j’avais pas vu", caption: "27 févr., 14\u00a0h\u00a052" },
     confidence: "sur",
@@ -241,7 +253,8 @@ export const TEMOIGNAGES = {
  * Les témoignages, sur la landing et sous le paywall. Vide : la section n’apparaît pas. Uniquement de vrais avis, avec
  * l’accord écrit des personnes : jamais d’avis inventé. Ces trois-là sont ceux de testeurs de BLUSH, dans leurs mots,
  * donnés le 16 octobre. Leur phrase en grand (`citation`) et le passage surligné (`surligne`) sont des morceaux de leur
- * avis, mot pour mot (tests/unit/temoignages.test.ts) ; `vu` dit, en une ligne, ce que BLUSH a vu pour eux.
+ * avis, mot pour mot (tests/client/temoignages.test.tsx) ; `vu` dit, en une ligne, ce que BLUSH a vu pour eux ; `photo`, leur
+ * visage dans le rond (public/avis/, recadrée en carré de 256 px, sans ses métadonnées).
  * TODO(produit): garder leur accord écrit, et les remplacer par des avis de clients quand il y en aura.
  */
 export const TESTIMONIALS: Testimonial[] = [
@@ -253,6 +266,7 @@ export const TESTIMONIALS: Testimonial[] = [
     citation: "aujourd’hui on est ensemble.",
     surligne: "BLUSH m’a fait remarquer qu’elle reprenait toujours la conversation quand je laissais un blanc, mais qu’elle ne venait jamais me parler d’elle-même.",
     text: "Pendant 5 mois, je me suis demandé si elle était vraiment intéressée ou juste sympa avec moi. BLUSH m’a fait remarquer qu’elle reprenait toujours la conversation quand je laissais un blanc, mais qu’elle ne venait jamais me parler d’elle-même. J’ai arrêté de jouer au mec trop occupé, je lui ai proposé un resto quelques jours après, et aujourd’hui on est ensemble.",
+    photo: "/avis/mattheo.webp",
   },
   {
     name: "Sonia",
@@ -262,6 +276,7 @@ export const TESTIMONIALS: Testimonial[] = [
     citation: "pour la première fois depuis longtemps, on a réussi à parler de ce qui n’allait pas.",
     surligne: "BLUSH a retracé nos derniers échanges et repéré le moment où nos conversations ont commencé à changer.",
     text: "Je pensais qu’on s’éloignait sans vraiment savoir pourquoi. BLUSH a retracé nos derniers échanges et repéré le moment où nos conversations ont commencé à changer. On a tout relu ensemble, on s’est reconnus dans certains passages, et pour la première fois depuis longtemps, on a réussi à parler de ce qui n’allait pas.",
+    photo: "/avis/sonia.webp",
   },
   {
     name: "Charlotte",
@@ -271,6 +286,7 @@ export const TESTIMONIALS: Testimonial[] = [
     citation: "Ça m’a fait mal de le voir noir sur blanc",
     surligne: "BLUSH m’a montré que c’était toujours moi qui relançais et que ses réponses ne menaient jamais nulle part.",
     text: "J’étais à deux doigts de lui renvoyer un message, comme d’habitude. BLUSH m’a montré que c’était toujours moi qui relançais et que ses réponses ne menaient jamais nulle part. Ça m’a fait mal de le voir noir sur blanc, mais j’ai fini par supprimer mon brouillon. Son dernier vocal\u00a0? Je l’ai écouté bien trop de fois avant d’en arriver là.",
+    photo: "/avis/charlotte.webp",
   },
 ];
 
