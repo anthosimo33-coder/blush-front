@@ -88,14 +88,7 @@ export function ConvOkScreen({ story, source, ajout }: { story: Story; source: S
         </p>
       )}
 
-      {ajout && (
-        <LigneMorceau
-          titre={"Il manque un bout de votre histoire\u00a0?"}
-          sous="Ajoute des captures, une vidéo ou un autre export."
-          note="Le début sur Insta ou Hinge, un ancien numéro… BLUSH remet tout dans l’ordre et retire les doublons."
-          onClick={() => setFeuille(true)}
-        />
-      )}
+      {ajout && <LigneMorceau titre={"Il manque un bout de votre histoire\u00a0?"} sous="Ajoute des captures, une vidéo ou un autre export." onClick={() => setFeuille(true)} />}
 
       <NotePrivee className="px-1 leading-[1.45]">
         {PROMESSE_CONV} <LienDiscret href="/confidentialite">Comment ça marche</LienDiscret>
