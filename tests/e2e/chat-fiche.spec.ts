@@ -221,7 +221,7 @@ test("le rapport pas débloqué : le chat et sa fiche s’ouvrent sous le paieme
   await test.step("le chat s’ouvre sous le paiement, Premium choisi d’avance", async () => {
     await ouvrir(page, "/app");
     await expect(paiement).toBeVisible();
-    await expect(paiement.getByRole("radio", { name: /^Rapport \+ 60 bulles/ })).toBeChecked();
+    await expect(paiement.getByRole("radio", { name: /^Rapport \+ 22 bulles/ })).toBeChecked();
     await expect(paiement.getByRole("radio", { name: /^Le rapport/ })).not.toBeChecked();
     /* Sans le rapport, pas de mémoire : pas de questions toutes prêtes */
     await expect(page.getByRole("group", { name: "Questions toutes prêtes" })).toHaveCount(0);

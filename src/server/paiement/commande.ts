@@ -1,11 +1,12 @@
 import "server-only";
 import { and, desc, eq, gt, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import { after } from "next/server";
-import { CATALOGUE, DUREE_AJOUT_MS, RAPPORTS_SEULS, titreChezWhop } from "@/contenu/offres";
+import { CATALOGUE, DUREE_AJOUT_MS, PASSAGES_EN_PREMIUM, RAPPORTS_SEULS, titreChezWhop } from "@/contenu/offres";
+import { PACKS } from "@/contenu/recharge";
 import { champsDErreur } from "@/lib/tracer";
 import type { GenreVendu, IssueDuFauxWhop, OffreId, OffreProposee } from "@/types";
 import type { Avoirs, EtatAchat, FeuilleDuPaiement, OffreUniqueMontree, PaiementCommence } from "@/types/api";
-import { avanceDuCompte, commander, convEnAlerte, marquerEchoue, premiumLePlusChoisi, rechargeDejaPayee, type Achat, type RefusDeCommande } from "../achats";
+import { avanceDuCompte, commander, convEnAlerte, marquerEchoue, premiumLePlusChoisi, type Achat, type RefusDeCommande } from "../achats";
 import type { Utilisateur } from "../auth";
 import { db, schema } from "../db";
 import { estEquipe } from "../droits";
@@ -72,9 +73,9 @@ async function moyenGarde(userId: string, mode: Fournisseur["mode"]): Promise<{ 
  * Les offres qui se paient en un geste, avec le moyen de paiement gardé du paiement d’avant : celles de « C’est débloqué »,
  * et les recharges, que le chat vend sans le quitter (src/server/vente.ts, une proposition du 22 octobre 2026).
  */
-const EN_UN_GESTE: ReadonlySet<OffreId> = new Set(["premium_ajout", "second"]);
-/** Les recharges qui se paient en un geste, quand l’écran le demande (`geste` : le chat), jamais d’elles-mêmes. */
-const EN_UN_GESTE_DEMANDE: ReadonlySet<OffreId> = new Set(["pack30", "pack80", "pack200"]);
+const EN_UN_GESTE: ReadonlySet<OffreId> = new Set(["passe_premium", "second"]);
+/** Les recharges qui se paient en un geste, quand l’écran le demande (`geste` : le chat), jamais d’elles-mêmes : celles de la feuille. */
+const EN_UN_GESTE_DEMANDE: ReadonlySet<OffreId> = new Set(PACKS);
 
 /** Ce compte a-t-il une carte gardée chez le prestataire, pour payer en un geste ? Faux sans prestataire branché. */
 export async function aUneCarteGardee(userId: string): Promise<boolean> {
@@ -292,10 +293,11 @@ export async function etatDeLAchat(compte: Compte, achatId: string, paiementId: 
 /**
  * Montre une offre unique à ce compte, si le serveur le permet (montrer, src/server/offres-uniques.ts : une fois, jamais
  * deux le même jour) et si elle s’achète : ① la suite, pour la conv de la page, pas encore débloquée ; ③ Premium pour
- * 5 € de plus, juste après un rapport payé (le rapport seul, ou la suite) : sur « C’est débloqué », dont `achatId` est
+ * 6,90 € de plus, juste après un rapport payé (le rapport seul, ou la suite) : sur « C’est débloqué », dont `achatId` est
  * l’achat, payé il y a moins de 15 minutes (DUREE_AJOUT_MS : ni plus tard, ni ailleurs), et montrée, elle expire 15
- * minutes après (une commande passée avant se livre quand même, payée après : livrer ne regarde pas la fin) ; ④ le bonus de la première recharge, tant qu’aucun
- * pack n’a été payé (la recharge l’affiche, et la commande du pack conseillé le prend : commander). Jamais sans
+ * minutes après (une commande passée avant se livre quand même, payée après : livrer ne regarde pas la fin). ④, le bonus
+ * de la première recharge, est arrêté le 23 octobre 2026 : jamais plus montré (un onglet d’avant le demande encore en
+ * ouvrant la recharge ; une ligne montrée avant, sans fin, resterait sinon valable). Jamais sans
  * prestataire (rien ne s’achèterait), ni à l’équipe. `enUnGeste` : un moyen de paiement est gardé (« Ta carte est
  * enregistrée »). `reste` : le temps qu’il reste à ① à l’heure du serveur, d’où part le compte à rebours de l’écran
  * (l’horloge du téléphone peut être fausse).
@@ -303,16 +305,13 @@ export async function etatDeLAchat(compte: Compte, achatId: string, paiementId: 
 export async function proposerOffreUnique(compte: Compte, offre: OffreProposee, storyId: string | null, achatId: string | null = null): Promise<OffreUniqueMontree> {
   const f = fournisseur();
   const rien = { offre: null } as const;
-  if (!f) return rien;
+  if (!f || offre === "premiere_recharge") return rien;
   if (offre === "suite") {
     if (!storyId || !(await suiteVendable(compte, storyId))) return rien;
-  } else if (offre === "premium_ajout" || offre === "second_rapport" || offre === "garde_second") {
+  } else {
     /* ③ complète le rapport seul ; ⑤ suit tout rapport payé ; ⑥ garde le −50 % de ⑤, montrée et pas prise */
     if (!(await justeApresUnRapport(compte.id, achatId, offre === "premium_ajout" ? RAPPORTS_SEULS : RAPPORTS_PAYES))) return rien;
     if (offre === "garde_second" && !(await offreValable(compte.id, "second_rapport"))) return rien;
-  } else {
-    /* ④ : la première recharge seulement, aucun pack jamais payé (même repris ensuite) ; commander suit la même règle */
-    if (await rechargeDejaPayee(compte.id)) return rien;
   }
   const montree = await montrer(compte, offre, { storyId: offre === "suite" ? storyId : null });
   if (!montree) return rien;
@@ -370,14 +369,14 @@ export async function feuilleDuPaiement(compte: Compte): Promise<FeuilleDuPaieme
 }
 
 /**
- * Ce que ce compte a d’avance pour sa prochaine conv : un rapport d’avance (⑤ payé, à utiliser dans l’année), et le −50 %
+ * Ce que ce compte a d’avance pour sa prochaine conv : un rapport d’avance (⑤ payé, à utiliser dans l’année, avec ses bulles), et le −50 %
  * gardé (⑥, 7 jours ; seulement avec un prestataire : il se paie), chacun avec sa fin (une date ISO), ou null. L’équipe,
  * qui ne paie rien, n’en a jamais.
  */
 async function avoirsDuCompte(compte: Compte): Promise<Avoirs> {
   if (estEquipe(compte)) return { avance: null, garde: null };
   const [avance, garde] = await Promise.all([avanceDuCompte(compte.id), fournisseur() ? offreValable(compte.id, "garde_second") : null]);
-  return { avance: avance && { fin: avance.fin.toISOString() }, garde: garde?.expireLe ? { fin: garde.expireLe.toISOString() } : null };
+  return { avance: avance && { fin: avance.fin.toISOString(), bulles: avance.bulles }, garde: garde?.expireLe ? { fin: garde.expireLe.toISOString() } : null };
 }
 
 /** Ce que le faux Whop fait d’un achat de ce compte : le webhook à poster, et l’adresse du retour (null pour un remboursement). */
@@ -408,7 +407,7 @@ export async function achatDuFauxWhop(compte: Compte, achatId: string): Promise<
 
 /**
  * Pour l’écran « C’est débloqué » : l’achat payé de ce compte, son offre, et les bulles qu’il a reçues avec lui (celles
- * de l’offre ③ prise juste après comprises : l’écran y revient une fois ③ payé), ou null.
+ * de l’offre ③ prise juste après comprises, l’ancien ③ aussi : l’écran y revient une fois ③ payé), ou null.
  */
 export async function achatPaye(compte: Compte, achatId: string): Promise<Pick<Achat, "id" | "offre" | "bulles" | "storyId"> | null> {
   const achat = await achatDuCompte(compte.id, achatId);
@@ -416,7 +415,7 @@ export async function achatPaye(compte: Compte, achatId: string): Promise<Pick<A
   const [ajout] = await db()
     .select({ bulles: sql<number>`coalesce(sum(${a.bulles}), 0)::int` })
     .from(a)
-    .where(and(eq(a.userId, compte.id), eq(a.offre, "premium_ajout"), eq(a.statut, "paye"), gt(a.creeLe, achat.creeLe)));
+    .where(and(eq(a.userId, compte.id), inArray(a.offre, PASSAGES_EN_PREMIUM), eq(a.statut, "paye"), gt(a.creeLe, achat.creeLe)));
   const bulles = achat.bulles + ((RAPPORTS_SEULS as readonly OffreId[]).includes(achat.offre) ? (ajout?.bulles ?? 0) : 0);
   return { id: achat.id, offre: achat.offre, bulles, storyId: achat.storyId };
 }

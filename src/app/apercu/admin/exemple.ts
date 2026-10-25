@@ -39,8 +39,8 @@ function casesDe(jours: Periode, suivi: boolean): CaseDuPilotage[] {
       visiteurs = Math.round((480 + k * 9 + (weekend ? 140 + (jourDeLaSemaine === 0 ? 40 : 0) : 0) + ((k * 37) % 23) * 6) * (enCours ? 0.66 : 1));
     }
     const acheteurs = Math.round(visiteurs * (0.024 + ((k * 7) % 5) * 0.001));
-    /* Un panier qui varie d’un jour à l’autre, autour de 13,85 € */
-    const centimes = acheteurs * (1385 + (((k * 5) % 7) - 3) * 40);
+    /* Un panier qui varie d’un jour à l’autre, autour de 16,50 € */
+    const centimes = acheteurs * (1650 + (((k * 5) % 7) - 3) * 40);
     return { le: iso(debut), visiteurs: suivi ? visiteurs : 0, acheteurs, centimes, dollars: Math.round(centimes * 0.234) / 100 };
   });
 }
@@ -55,7 +55,7 @@ function pilotageDe(jours: Periode, { calme = false, suivi = true }: Variante): 
   const paye = somme(cases, (c) => c.centimes);
   const dollars = Math.round(somme(cases, (c) => c.dollars) * 100) / 100;
   const rembourses = { n: jours === 1 ? 1 : jours === 7 ? 3 : 11, centimes: jours === 1 ? 990 : jours === 7 ? 3470 : 12940 };
-  const contestes = jours === 30 ? { n: 1, centimes: 1490 } : { n: 0, centimes: 0 };
+  const contestes = jours === 30 ? { n: 1, centimes: 1990 } : { n: 0, centimes: 0 };
   const net = paye - rembourses.centimes - contestes.centimes;
   const imports = Math.round((suivi ? visiteurs : acheteurs * 37) * 0.146);
   /* Les sources : une part des visiteurs, un taux d’achat ; TikTok prend le reste, pour retomber sur les totaux */
@@ -70,7 +70,7 @@ function pilotageDe(jours: Periode, { calme = false, suivi = true }: Variante): 
   const autres = parts.map(([source, part, taux]) => {
     const v = Math.round(visiteurs * part);
     const a = Math.round(v * taux);
-    return { source, visiteurs: v, acheteurs: a, centimes: a * 1385 };
+    return { source, visiteurs: v, acheteurs: a, centimes: a * 1650 };
   });
   const tiktok = {
     source: "tiktok" as const,
@@ -78,16 +78,16 @@ function pilotageDe(jours: Periode, { calme = false, suivi = true }: Variante): 
     acheteurs: acheteurs - avantLeSuivi - somme(autres, (s) => s.acheteurs),
     centimes: 0,
   };
-  tiktok.centimes = paye - avantLeSuivi * 1490 - somme(autres, (s) => s.centimes);
+  tiktok.centimes = paye - avantLeSuivi * 1990 - somme(autres, (s) => s.centimes);
   /* Sans visites comptées, aucun compte n’a de source : tous les acheteurs sont « avant le suivi » */
   const sources = suivi
-    ? [tiktok, ...autres, ...(avantLeSuivi ? [{ source: null, visiteurs: 0, acheteurs: avantLeSuivi, centimes: avantLeSuivi * 1490 }] : [])].sort((a, b) => b.centimes - a.centimes)
+    ? [tiktok, ...autres, ...(avantLeSuivi ? [{ source: null, visiteurs: 0, acheteurs: avantLeSuivi, centimes: avantLeSuivi * 1990 }] : [])].sort((a, b) => b.centimes - a.centimes)
     : [{ source: null, visiteurs: 0, acheteurs, centimes: paye }];
   /* Ce qui se vend : Premium, le rapport et la suite à leur prix, les bulles prennent le reste */
   const premium = Math.round(acheteurs * 0.52);
   const rapport = Math.round(acheteurs * 0.31);
   const suite = Math.round(acheteurs * 0.17);
-  const bulles = paye - premium * 1490 - rapport * 990 - suite * 690;
+  const bulles = paye - premium * 1990 - rapport * 990 - suite * 690;
   /* Les jalons : une part des visiteurs, puis des imports et du paywall ; rien tant que les visites ne se comptent pas */
   const v = (part: number) => (suivi ? Math.round(visiteurs * part) : 0);
   const i = (part: number) => (suivi ? Math.round(imports * part) : 0);
@@ -125,7 +125,7 @@ function pilotageDe(jours: Periode, { calme = false, suivi = true }: Variante): 
     pas: jours === 1 ? "heure" : "jour",
     cases,
     net: { valeur: net, avant: Math.round(net * 0.77) },
-    payes: { n: premium + rapport + suite + Math.round(bulles / 790), centimes: paye },
+    payes: { n: premium + rapport + suite + Math.round(bulles / 990), centimes: paye },
     rembourses,
     contestes,
     visiteurs: { valeur: visiteurs, avant: Math.round(visiteurs * 0.77) },
@@ -137,10 +137,10 @@ function pilotageDe(jours: Periode, { calme = false, suivi = true }: Variante): 
     jalonsDepuis: suivi ? "2026-10-18" : null,
     sources,
     mix: [
-      { groupe: "premium", n: premium, centimes: premium * 1490 },
+      { groupe: "premium", n: premium, centimes: premium * 1990 },
       { groupe: "rapport", n: rapport, centimes: rapport * 990 },
       { groupe: "suite", n: suite, centimes: suite * 690 },
-      { groupe: "bulles", n: Math.round(bulles / 790), centimes: bulles },
+      { groupe: "bulles", n: Math.round(bulles / 990), centimes: bulles },
     ],
     /* Le haut du paywall : des vus et des payés inventés, un taux différent par titre */
     hauts: [
@@ -153,7 +153,7 @@ function pilotageDe(jours: Periode, { calme = false, suivi = true }: Variante): 
     ],
     ventesDuChat: [
       { genre: "bulles", vues: 214, touchees: 61, refusees: 38, payees: 27, centimes: 32_830 },
-      { genre: "premium", vues: 46, touchees: 19, refusees: 9, payees: 11, centimes: 5_500 },
+      { genre: "premium", vues: 46, touchees: 19, refusees: 9, payees: 11, centimes: 7_590 },
       { genre: "autre", vues: 33, touchees: 14, refusees: 6, payees: 0, centimes: 0 },
       { genre: "a_jour", vues: 21, touchees: 7, refusees: 5, payees: 0, centimes: 0 },
       { genre: "reimport", vues: 2, touchees: 1, refusees: 0, payees: 0, centimes: 0 },
@@ -247,26 +247,28 @@ export function statsDExemple(jours: Periode, variante: Variante = {}): StatsAdm
     beta: { fermee: true, invites: 12, attente: 87, attenteNouveaux: 9, comptes: 31, attenteInvites: 25, mailsPossibles: 14 },
     ventes: {
       jour: {
-        payes: { n: 4, centimes: 4460 },
+        payes: { n: 4, centimes: 5460 },
         rembourses: { n: 0, centimes: 0 },
         contestes: { n: 0, centimes: 0 },
         parOffre: [
           { offre: "rapport", n: 2, centimes: 1980 },
-          { offre: "premium", n: 1, centimes: 1490 },
-          { offre: "pack80", n: 1, centimes: 990 },
+          { offre: "premium", n: 1, centimes: 1990 },
+          { offre: "pack25", n: 1, centimes: 1490 },
         ],
       },
       semaine: {
-        payes: { n: 23, centimes: 26170 },
+        payes: { n: 24, centimes: 31260 },
         rembourses: { n: 1, centimes: 990 },
         contestes: { n: 0, centimes: 0 },
         parOffre: [
           { offre: "rapport", n: 9, centimes: 8910 },
-          { offre: "premium", n: 6, centimes: 8940 },
+          { offre: "premium", n: 6, centimes: 11940 },
           { offre: "suite", n: 3, centimes: 2070 },
-          { offre: "premium_ajout", n: 2, centimes: 1000 },
-          { offre: "pack80", n: 2, centimes: 1980 },
-          { offre: "pack200", n: 1, centimes: 1990 },
+          { offre: "passe_premium", n: 2, centimes: 1380 },
+          { offre: "pack10", n: 1, centimes: 690 },
+          { offre: "pack25", n: 1, centimes: 1490 },
+          { offre: "pack60", n: 1, centimes: 3490 },
+          { offre: "pack80", n: 1, centimes: 1390 },
         ],
       },
     },
@@ -276,7 +278,7 @@ export function statsDExemple(jours: Periode, variante: Variante = {}): StatsAdm
       { offre: "suite", montrees: 118, prises: 15 },
       { offre: "relance_mail", montrees: 96, prises: 7 },
       { offre: "premium_ajout", montrees: 41, prises: 12 },
-      { offre: "premiere_recharge", montrees: 52, prises: 9 },
+      { offre: "premiere_recharge", montrees: 0, prises: 0 },
     ],
     actions: [
       { action: "inviter", nombre: 10, le: "2026-10-12T09:12:00.000Z", depuisLeTerminal: false },
@@ -296,7 +298,7 @@ const FIL: GesteDuFil[] = [
   { genre: "import", ville: "Paris", le: avant(21) },
   { genre: "paiement", ville: "Bordeaux", offre: "rapport", le: avant(44) },
   { genre: "arrivee", ville: "Bruxelles", source: "tiktok", le: avant(63) },
-  { genre: "achat", ville: "Marseille", offre: "pack80", le: avant(95) },
+  { genre: "achat", ville: "Marseille", offre: "pack25", le: avant(95) },
   { genre: "partage", ville: "Lille", le: avant(128) },
   { genre: "achat", ville: "Toulouse", offre: "rapport", le: avant(170) },
   { genre: "arrivee", ville: "Nantes", source: "instagram", le: avant(222) },

@@ -52,7 +52,7 @@ import { POST as offre } from "@/app/api/paiement/offre/route";
 import { POST as fauxWhop } from "@/app/api/paiement/factice/route";
 import { POST as webhookRecu } from "@/app/api/paiement/whop/route";
 import { CASE_RENONCIATION } from "@/contenu/consentements";
-import { DUREE_GARDE_MS, RAPPORT_D_AVANCE } from "@/contenu/offres";
+import { DUREE_GARDE_MS, GRILLE_DU_23_OCTOBRE, RAPPORT_D_AVANCE } from "@/contenu/offres";
 import type { Utilisateur } from "@/server/auth";
 import { soldeDe } from "@/server/bulles";
 import { achatsDuCompte } from "@/server/achats";
@@ -166,7 +166,7 @@ describe("le paiement dans la feuille (POST /api/paiement avec un jeton)", () =>
     await apresLaReponse();
     expect(await achatEnBase(corps.achat)).toMatchObject({ statut: "paye", storyId: conv, renonciationVersion: CASE_RENONCIATION.version });
     expect((await ligneEnBase(conv)).debloqueLe).not.toBeNull();
-    expect(await soldeDe(u.id)).toBe(90);
+    expect(await soldeDe(u.id)).toBe(25);
   });
 
   it("la banque qui dit non : 402 « carte », l’achat échoue, rien n’est livré ; un jeton mal formé ne part pas", async () => {
@@ -202,13 +202,13 @@ describe("le paiement dans la feuille (POST /api/paiement avec un jeton)", () =>
           email: u.email,
           metadata: { achat: corps.achat },
           return_url: `https://www.askblush.com/paiement/retour?achat=${corps.achat}`,
-          plan: expect.objectContaining({ initial_price: 14.9, currency: "eur", plan_type: "one_time", product_id: "prod_test", visibility: "hidden" }),
+          plan: expect.objectContaining({ initial_price: 19.9, currency: "eur", plan_type: "one_time", product_id: "prod_test", visibility: "hidden" }),
         }),
       },
     ]);
     /* Ni la conv ni un prénom chez Whop */
     expect(JSON.stringify(envoyes)).not.toMatch(/stories|prenom/);
-    expect(await achatEnBase(corps.achat)).toMatchObject({ statut: "en_attente", fournisseur: "whop", centimes: 1490 });
+    expect(await achatEnBase(corps.achat)).toMatchObject({ statut: "en_attente", fournisseur: "whop", centimes: 1990 });
   });
 
   it("Whop qui refuse : un sous-statut refusé ou un 402, 402 « carte » (l’achat échoue) ; un autre refus net (4xx), 502 « panne » (l’achat échoue aussi)", async () => {
@@ -316,10 +316,10 @@ describe("le 2e rapport (⑤), un rapport d’avance", () => {
       renonciationVersion: null,
       renonciationLe: null,
     });
-    expect(await soldeDe(u.id)).toBe(90);
+    expect(await soldeDe(u.id)).toBe(25);
     const f = await feuille();
     const fin = new Date((await achatEnBase(second)).payeLe!.getTime() + RAPPORT_D_AVANCE.dureeMs).toISOString();
-    expect(f.avance).toEqual({ fin });
+    expect(f.avance).toEqual({ fin, bulles: RAPPORT_D_AVANCE.bulles });
     /* Une seule fois par compte */
     expect(await montrer("second_rapport", premium)).toEqual({ offre: null });
   });
@@ -337,12 +337,35 @@ describe("le 2e rapport (⑤), un rapport d’avance", () => {
     expect(achat).toMatchObject({ storyId: conv, bulles: RAPPORT_D_AVANCE.bulles, renonciationVersion: CASE_RENONCIATION.version });
     expect(achat.utiliseLe!.getTime()).toBeGreaterThanOrEqual(avant - 1000);
     expect((await ligneEnBase(conv)).debloqueLe).not.toBeNull();
-    expect(await soldeDe(u.id)).toBe(90 + RAPPORT_D_AVANCE.bulles);
+    expect(await soldeDe(u.id)).toBe(25 + RAPPORT_D_AVANCE.bulles);
     expect(etat.relancees).toContain(conv);
     expect((await feuille()).avance).toBeNull();
     /* Utilisé : plus rien pour une troisième conv */
     await autreConv(u);
     expect(await utiliser()).toEqual({ status: 422, corps: { erreur: "offre" } });
+  });
+
+  it("commandé avant la grille du 23 octobre 2026, il donne les 10 bulles que son billet promettait (la feuille le dit) ; commandé après, celles du rapport", async () => {
+    const { u } = await acheteur("second-avant-la-grille");
+    const second = await secondPris();
+    await db()
+      .update(schema.achats)
+      .set({ creeLe: new Date(GRILLE_DU_23_OCTOBRE.getTime() - 60_000) })
+      .where(eq(schema.achats.id, second));
+    expect((await feuille()).avance).toMatchObject({ bulles: RAPPORT_D_AVANCE.bullesAvantLaGrille });
+    await autreConv(u);
+    expect((await utiliser()).status).toBe(200);
+    expect(await achatEnBase(second)).toMatchObject({ bulles: 10 });
+    expect(await soldeDe(u.id)).toBe(25 + 10);
+
+    const apres = await acheteur("second-apres-la-grille");
+    const nouveau = await secondPris();
+    expect((await achatEnBase(nouveau)).creeLe.getTime()).toBeGreaterThanOrEqual(GRILLE_DU_23_OCTOBRE.getTime());
+    expect((await feuille()).avance).toMatchObject({ bulles: 3 });
+    await autreConv(apres.u);
+    expect((await utiliser()).status).toBe(200);
+    expect(await achatEnBase(nouveau)).toMatchObject({ bulles: 3 });
+    expect(await soldeDe(apres.u.id)).toBe(25 + 3);
   });
 
   it("refusé : sans rapport d’avance (422 « offre »), la conv d’un autre (404 « aucune »), une conv déjà débloquée (409 « deja »), passé d’un an (422 « offre »)", async () => {
@@ -390,7 +413,7 @@ describe("le 2e rapport (⑤), un rapport d’avance", () => {
     expect((await poster(await issue(second, "rembourser"))).status).toBe(200);
     expect((await achatEnBase(second)).statut).toBe("rembourse");
     expect((await ligneEnBase(conv)).debloqueLe).toBeNull();
-    expect(await soldeDe(u.id)).toBe(90);
+    expect(await soldeDe(u.id)).toBe(25);
 
     const b = await acheteur("second-rembourse-avant");
     const avantUsage = await secondPris();
@@ -428,20 +451,20 @@ describe("le −50 % gardé (⑥) et les offres du merci", () => {
     expect(await montrer("suite")).toEqual({ offre: null });
     /* Sans le −50 % : pas de rapport à moitié prix ; avec lui, pour cette autre conv */
     const achat = await payeDansLaFeuille("rapport_garde");
-    expect(await achatEnBase(achat)).toMatchObject({ offre: "rapport_garde", centimes: 495, bulles: 10, storyId: conv, offreUnique: "garde_second" });
+    expect(await achatEnBase(achat)).toMatchObject({ offre: "rapport_garde", centimes: 495, bulles: 3, storyId: conv, offreUnique: "garde_second" });
     expect((await ligneEnBase(conv)).debloqueLe).not.toBeNull();
     expect((await feuille()).garde).toBeNull();
     await autreConv(u);
     expect(await payer({ offre: "rapport_garde" })).toEqual({ status: 422, corps: { erreur: "offre" } });
   });
 
-  it("la règle des 24 h ne joue pas entre les offres du merci (③ puis ⑤ en repli, après la suite qu’on vient de payer), mais retient encore ④", async () => {
+  it("la règle des 24 h ne joue pas entre les offres du merci (③ puis ⑤ en repli, après la suite qu’on vient de payer) ; ④, arrêtée, ne se montre jamais", async () => {
     const { u } = await acheteur("merci-regle");
     expect((await montrer("suite")).offre).toBe("suite");
     const suite = await payeDansLaFeuille("suite");
     expect((await montrer("premium_ajout", suite)).offre).toBe("premium_ajout");
     expect((await montrer("second_rapport", suite)).offre).toBe("second_rapport");
-    /* Hors du merci, la règle tient : pas de bonus de première recharge le même jour */
+    /* ④ (le bonus de la première recharge) est arrêtée le 23 octobre 2026 : jamais montrée, ni écrite */
     expect(await montrer("premiere_recharge")).toEqual({ offre: null });
     const lignes = await db().select({ offre: schema.offresUniques.offre }).from(schema.offresUniques).where(eq(schema.offresUniques.userId, u.id));
     expect(lignes.map((l) => l.offre).sort()).toEqual(["premium_ajout", "second_rapport", "suite"]);
@@ -459,7 +482,7 @@ describe("le −50 % gardé (⑥) et les offres du merci", () => {
 
   it("le 2e rapport ne suit qu’un rapport payé il y a moins de 15 minutes, et jamais un pack de bulles", async () => {
     await acheteur("merci-tard");
-    const pack = await payeDansLaFeuille("pack30");
+    const pack = await payeDansLaFeuille("pack10");
     expect(await montrer("second_rapport", pack)).toEqual({ offre: null });
     const tard = await payeDansLaFeuille("premium");
     await db()

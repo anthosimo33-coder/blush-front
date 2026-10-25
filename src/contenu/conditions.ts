@@ -2,7 +2,8 @@ import { URGENCES } from "./aide";
 import { texteRenonciation } from "./consentements";
 import { droitApplicable, EDITEUR, type Editeur } from "./mentions-legales";
 import { CATALOGUE, COUT_EN_BULLES, prixDe, RAPPORT_D_AVANCE } from "./offres";
-import { chancesDesLots, GROS_LOTS_PAR_JOUR } from "./roue";
+import { PACKS } from "./recharge";
+import { CASE_DE_REPLI, CASES_DE_LA_ROUE, chancesDesLots, GAINS, GROS_LOTS_PAR_JOUR } from "./roue";
 
 /*
  * Les conditions de BLUSH (la page /conditions) : les conditions d’utilisation, puis celles de la vente. Elles suivent
@@ -28,7 +29,9 @@ import { chancesDesLots, GROS_LOTS_PAR_JOUR } from "./roue";
 /** « 1 bulle », « 10 bulles ». */
 const bulles = (n: number) => `${n} bulle${n > 1 ? "s" : ""}`;
 
-const { rapport, premium, pack30, pack80, pack200 } = CATALOGUE;
+const { rapport, premium } = CATALOGUE;
+/* Les trois packs de la recharge, dans l’ordre de la feuille */
+const [petit, moyen, grand] = PACKS;
 
 /** Un morceau d’une section : un paragraphe, ou une liste à puces. */
 export type Bloc = string | readonly string[];
@@ -40,7 +43,7 @@ export type Section = { id: string; titre: string; blocs: readonly Bloc[] };
 export const CONDITIONS = {
   titre: "Conditions",
   sous: "Les règles entre toi et BLUSH, sans jargon\u00a0: ce que fait BLUSH, ce que tu peux acheter, et ce qui se passe si ça coince.",
-  maj: "Dernière mise à jour\u00a0: 22 octobre 2026.",
+  maj: "Dernière mise à jour\u00a0: 23 octobre 2026.",
 } as const;
 
 /** Utiliser BLUSH : les conditions d’utilisation. */
@@ -97,11 +100,11 @@ const VENTE: readonly Section[] = [
       [
         `Le rapport d’une conv, ${prixDe("rapport")}\u00a0: tous ses chapitres, et ${bulles(rapport.bulles)}.`,
         `Premium, ${prixDe("premium")}\u00a0: le rapport de cette conv, et ${bulles(premium.bulles)}.`,
-        `Une recharge de bulles\u00a0: ${bulles(pack30.bulles)} pour ${prixDe("pack30")}, ${pack80.bulles} pour ${prixDe("pack80")}, ${pack200.bulles} pour ${prixDe("pack200")}.`,
+        `Une recharge de bulles\u00a0: ${bulles(CATALOGUE[petit].bulles)} pour ${prixDe(petit)}, ${CATALOGUE[moyen].bulles} pour ${prixDe(moyen)}, ${CATALOGUE[grand].bulles} pour ${prixDe(grand)}.`,
         `Ton 2e rapport, ${prixDe("second")}, proposé une fois juste après un rapport payé\u00a0: un rapport d’avance, à utiliser dans l’année pour la conv de ton choix, avec ${bulles(RAPPORT_D_AVANCE.bulles)}.`,
       ],
       "Un rapport, c’est la lecture d’une conv\u00a0: une autre conv a son propre rapport.",
-      "BLUSH te propose parfois une offre, une seule fois\u00a0: la suite d’un rapport moins chère pendant quelques minutes, des bulles en plus après un achat ou à ta première recharge, ou ton prochain rapport moins cher, gardé quelques jours. Son prix et ce qu’elle donne sont affichés avant que tu paies.",
+      "BLUSH te propose parfois une offre, une seule fois\u00a0: la suite d’un rapport moins chère pendant quelques minutes, Premium moins cher après avoir pris le rapport seul, ou ton prochain rapport moins cher, gardé quelques jours. Son prix et ce qu’elle donne sont affichés avant que tu paies.",
       "Les prix sont en euros, toutes taxes comprises. Celui qui compte est le prix affiché au moment de payer.",
     ],
   },
@@ -111,7 +114,7 @@ const VENTE: readonly Section[] = [
     blocs: [
       "Avant ton premier rapport, BLUSH te propose de tourner une roue, une fois par compte. Tourner est gratuit, et tu gagnes à chaque fois un de ces lots, tiré au hasard par nos serveurs avec ces chances\u00a0:",
       chancesDesLots().map((l) => `${l.titre}\u00a0: ${l.pourcent}`),
-      `Les gros lots (−15\u00a0% et Premium au prix du rapport) sont limités à ${GROS_LOTS_PAR_JOUR} par jour chacun\u00a0; au-delà, la case donne +10 bulles.`,
+      `Les gros lots (−15\u00a0% et Premium au prix du rapport) sont limités à ${GROS_LOTS_PAR_JOUR} par jour chacun\u00a0; au-delà, la case donne ${GAINS[CASES_DE_LA_ROUE[CASE_DE_REPLI]!.lot].titre}.`,
       "Le lot vaut 15 minutes, sur le rapport ou Premium payé dans ce temps (Premium au prix du rapport\u00a0: sur Premium seulement). Il ne se cumule avec aucune autre offre, ne s’échange pas et ne se rembourse pas. Ton 2e rapport à −50\u00a0% vaut ensuite 30 jours, pour une autre conv.",
     ],
   },

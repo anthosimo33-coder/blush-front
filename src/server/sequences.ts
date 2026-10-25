@@ -31,7 +31,8 @@ import {
 } from "@/contenu/mails";
 import { hautDuPaywall } from "@/contenu/haut-du-paywall";
 import { scaleOf } from "@/contenu/niveaux";
-import { RAPPORT_D_AVANCE } from "@/contenu/offres";
+import { SEUIL_PEU_DE_BULLES } from "@/contenu/bulles-du-chat";
+import { bullesDeLAvance, PASSAGES_EN_PREMIUM, RAPPORT_D_AVANCE } from "@/contenu/offres";
 import type { LevelId } from "@/types";
 import { dateDAnniversaire, prochainAnniversaire } from "./anniversaires";
 import { db, schema } from "./db";
@@ -45,11 +46,10 @@ import { alerter } from "./alertes";
 import { auMieux, journal, journalErreur } from "./journal";
 import { LIMITES, rendre, sousLaLimite } from "./limites";
 import { mailDeSequence } from "./mail-sequence";
-import { montrer, rouvrirLaSuite } from "./offres-uniques";
+import { rouvrirLaSuite } from "./offres-uniques";
 import { suiteVendable } from "./paiement/commande";
 import { lienDeParrainage } from "./parrainage";
 import { entetesDeDesinscription, lienDesinscription } from "./relances";
-import { rechargeDejaPayee } from "./achats";
 
 /*
  * Les séquences de mails (la V3 du canvas « BLUSH · Séquences mail », le 17 octobre ; leurs textes dans
@@ -58,7 +58,7 @@ import { rechargeDejaPayee } from "./achats";
  *   noté ici), J+1 « il t’a répondu ? » (rien dit au chat depuis), J+2 le vocal (pas encore écouté), J+4 son prochain pas
  *   (🔥 🤏 🤔), ou après un 🧊, « comment tu vas, vraiment ? » (rien à vendre, le 3114). Des conseils. Puis, après un
  *   🔥 seulement, J+5 le parrainage (src/server/parrainage.ts) : une offre.
- * - S4, les bulles : la réponse écrite à 0 bulle qui attend sa recharge, 2 bulles ou moins, puis à zéro depuis 3 jours.
+ * - S4, les bulles : la réponse écrite à 0 bulle qui attend sa recharge, la dernière bulle, puis à zéro depuis 3 jours.
  *   Des offres.
  * Le lot 3, allumé par BLUSH_MAILS_PROSPECTS (« 1 » en production depuis le 17 octobre : le juriste l’a validé sans case
  * d’accord à l’inscription) :
@@ -173,13 +173,16 @@ export function personnesDe(meta: Meta): Personnes | null {
   return { moi: { prenom: prenom(h.utilisateur.prenom), elle: h.utilisateur.pronom === "elle" }, autre: { prenom: prenom(h.autre.prenom), il: h.autre.pronom === "il" } };
 }
 
-/** A-t-elle pris Premium pour cette conv : Premium d’emblée, ou ③ (Premium pour 5 € de plus) payée après son rapport ? */
+/** A-t-elle pris Premium pour cette conv : Premium d’emblée, ou ③ (Premium pour 6,90 € de plus, ou l’ancien ③) payée après son rapport ? */
 export async function aPrisPremium(storyId: string, userId: string): Promise<boolean> {
   const { rows } = await db().execute<{ premium: boolean }>(sql`
     select exists (
       select 1 from ${schema.achats} a where a.statut = 'paye' and (
         (a.story_id = ${storyId} and a.offre = 'premium')
-        or (a.user_id = ${userId} and a.offre = 'premium_ajout'
+        or (a.user_id = ${userId} and a.offre in (${sql.join(
+          PASSAGES_EN_PREMIUM.map((o) => sql`${o}`),
+          sql`, `,
+        )})
           and a.paye_le >= (select ${schema.stories.debloqueLe} from ${schema.stories} where ${schema.stories.id} = ${storyId})))
     ) as premium`);
   return !!rows[0]?.premium;
@@ -306,17 +309,8 @@ async function candidatsS3(): Promise<Candidat[]> {
 }
 
 /**
- * Le bonus de la première recharge (④) vaut-il pour ce compte ? Aucun pack payé, et ④ montrée (la montrer ici, si le
- * serveur le permet : le mail la montre, la feuille de la recharge la retrouvera), comme le fait la feuille.
- */
-async function bonusDeLaPremiereRecharge(compte: { id: string; email: string }): Promise<boolean> {
-  if (await rechargeDejaPayee(compte.id)) return false;
-  return !!(await montrer(compte, "premiere_recharge"));
-}
-
-/**
  * S4 : la réponse écrite à 0 bulle qui attend sa recharge (depuis 30 minutes à 2 jours : elle a pu recharger d’elle-même
- * avant) ; 2 bulles ou moins, elle qui écrivait au chat cette semaine (pas ces deux dernières heures : elle le voit déjà
+ * avant) ; la dernière bulle (SEUIL_PEU_DE_BULLES ou moins), elle qui écrivait au chat cette semaine (pas ces deux dernières heures : elle le voit déjà
  * dans l’appli) ; ou à zéro depuis 3 à 10 jours, sa dernière bulle dépensée en réponse. Une fois par réponse prête, et
  * une fois par bulles reçues (la dernière recharge, ou les bulles de son rapport) pour les deux autres.
  */
@@ -339,7 +333,7 @@ async function candidatsS4(): Promise<Candidat[]> {
     from ${u0} u
     cross join lateral ${dernier} d
     cross join lateral ${recue} r
-    where u.bulles between 1 and 2 and u.relances_coupees_le is null and not ${MAIL_RECENT}
+    where u.bulles between 1 and ${SEUIL_PEU_DE_BULLES} and u.relances_coupees_le is null and not ${MAIL_RECENT}
       and d.created_at > now() - interval '7 days' and d.created_at <= now() - interval '2 hours'
       and not ${deja("s4_peu", sql`r.id::text`)}`);
   const zero = await db().execute<{ user_id: string; email: string; story_id: string; recue: string; messages: number }>(sql`
@@ -361,7 +355,7 @@ async function candidatsS4(): Promise<Candidat[]> {
       storyId: l.story_id,
       cle: "s4_prete",
       occasion: l.message_id,
-      ecrire: async (p) => ((await verdictHorsModeSobre(l.story_id)) ? mailReponsePrete(p, { bonus: await bonusDeLaPremiereRecharge({ id: l.user_id, email: l.email }) }) : null),
+      ecrire: async (p) => ((await verdictHorsModeSobre(l.story_id)) ? mailReponsePrete(p) : null),
     })),
     ...peu.rows.map((l): Candidat => ({
       userId: l.user_id,
@@ -369,10 +363,7 @@ async function candidatsS4(): Promise<Candidat[]> {
       storyId: l.story_id,
       cle: "s4_peu",
       occasion: l.recue,
-      ecrire: async (p) =>
-        (await verdictHorsModeSobre(l.story_id))
-          ? mailPeuDeBulles(p, { bulles: l.bulles, actif: l.actif, bonus: await bonusDeLaPremiereRecharge({ id: l.user_id, email: l.email }) })
-          : null,
+      ecrire: async (p) => ((await verdictHorsModeSobre(l.story_id)) ? mailPeuDeBulles(p, { bulles: l.bulles, actif: l.actif }) : null),
     })),
     ...zero.rows.map((l): Candidat => ({
       userId: l.user_id,
@@ -499,8 +490,8 @@ async function candidatsS6(): Promise<Candidat[]> {
       and o.expire_le > now() + interval '6 hours' and o.expire_le <= now() + interval '3 days'
       and u.relances_coupees_le is null and not ${MAIL_RECENT}
       and not exists (select 1 from ${e} e where e.user_id = u.id and e.cle = 's6_garde')`);
-  const avance = await db().execute<{ user_id: string; email: string; story_id: string | null; achat: string; paye_le: string }>(sql`
-    select u.id as user_id, u.email, ${DERNIERE_DEBLOQUEE} as story_id, a.id::text as achat, a.paye_le
+  const avance = await db().execute<{ user_id: string; email: string; story_id: string | null; achat: string; paye_le: string; cree_le: string }>(sql`
+    select u.id as user_id, u.email, ${DERNIERE_DEBLOQUEE} as story_id, a.id::text as achat, a.paye_le, a.cree_le
     from ${a} a join ${u0} u on u.id = a.user_id
     where a.offre = 'second' and a.statut = 'paye' and a.utilise_le is null
       and a.paye_le <= now() - interval '7 days' and a.paye_le > now() - interval '60 days'
@@ -532,7 +523,7 @@ async function candidatsS6(): Promise<Candidat[]> {
           storyId: l.story_id,
           cle: "s6_avance",
           occasion: l.achat,
-          ecrire: async () => ((await verdictHorsModeSobre(l.story_id!)) ? mailAvance({ jusqua: aParis(fin).date, mois }) : null),
+          ecrire: async () => ((await verdictHorsModeSobre(l.story_id!)) ? mailAvance({ jusqua: aParis(fin).date, mois, bulles: bullesDeLAvance(new Date(l.cree_le)) }) : null),
         },
       ];
     }),

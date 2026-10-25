@@ -138,16 +138,24 @@ describe("la source d’un compte et le fil du direct", () => {
     expect(l!.source).toBe("instagram");
   });
 
-  it("un achat payé reprend la ville de son paiement ouvert", async () => {
-    const achat = randomUUID();
+  it("un achat payé reprend la ville de son paiement ouvert, et le prix qu’il a payé (pas celui du catalogue d’aujourd’hui)", async () => {
+    const u = await compteDeTest("pilotage-fil-prix");
+    /* Premium payé 14,90 €, avant la grille du 23 octobre 2026 (19,90 € depuis) */
+    const [paye] = await db()
+      .insert(schema.achats)
+      .values({ userId: u.id, offre: "premium", centimes: 1490, bulles: 90, fournisseur: "factice", statut: "paye", payeLe: new Date() })
+      .returning({ id: schema.achats.id });
+    const achat = paye!.id;
     const debut = new Date();
     await noterAuFil(requete(ipNeuve(), SAFARI, LYON), { genre: "paiement", offre: "premium", ref: achat });
     await noterAchatAuFil({ id: achat, offre: "premium" });
     await noterAchatAuFil({ id: randomUUID(), offre: "pack80" });
     const gestes = (await direct()).fil.filter((g) => Date.parse(g.le) >= debut.getTime() - 1000);
     expect(gestes).toContainEqual(expect.objectContaining({ genre: "paiement", ville: "Lyon", offre: "premium" }));
-    expect(gestes).toContainEqual(expect.objectContaining({ genre: "achat", ville: "Lyon", offre: "premium" }));
-    expect(gestes).toContainEqual(expect.objectContaining({ genre: "achat", ville: null, offre: "pack80" }));
+    expect(gestes).toContainEqual({ genre: "achat", ville: "Lyon", offre: "premium", centimes: 1490, le: expect.any(String) });
+    /* Un achat introuvable (ou noté avant que le fil garde sa ref) : sans prix, l’écran dit celui du catalogue */
+    const sansAchat = gestes.find((g) => g.genre === "achat" && g.offre === "pack80");
+    expect(sansAchat).toEqual({ genre: "achat", ville: null, offre: "pack80", le: expect.any(String) });
   });
 });
 

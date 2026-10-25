@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { and, count, eq, gt, sql, type SQL } from "drizzle-orm";
 import type { MOMENTS_CHAT } from "@prompts/lib/schemas";
 import { alerteSobre } from "@prompts/lib/titres";
-import { RAPPORTS_SEULS } from "@/contenu/offres";
+import { PASSAGES_EN_PREMIUM, RAPPORTS_SEULS } from "@/contenu/offres";
 import { jourEnLettres } from "@/lib/format";
 import { GENRES_VENDUS, type EvenementDeVente, type GenreVendu, type OffreDuChat } from "@/types";
 import { db, schema } from "./db";
@@ -68,7 +68,7 @@ export type SituationDeVente = {
   ancienSobre: boolean;
   /** Sa réponse s’est écrite verrouillée : il n’avait plus de bulles, elle attend la recharge. */
   verrouillee: boolean;
-  /** Il a payé le rapport seul (pas Premium) : Premium pour 5 € de plus (③) peut encore se proposer, une fois. */
+  /** Il a payé le rapport seul (pas Premium) : Premium pour 6,90 € de plus (③) peut encore se proposer, une fois. */
   rapportSeul: boolean;
   /** Ses messages à BLUSH sur cette conv ces dernières 48 h, celui-ci compris. */
   messages48h: number;
@@ -215,7 +215,7 @@ async function lireLaSituation(r: ReponseVendue) {
     sobre: !!v && (v.mode_sobre || alerteSobre(v.alerte)),
     ancienSobre: !!v?.mode_sobre && !!v.alerte && !alerteSobre(v.alerte),
     verrouillee: r.verrouillee,
-    rapportSeul: RAPPORTS_SEULS.some((o) => offres.has(o)) && !offres.has("premium") && !offres.has("premium_ajout"),
+    rapportSeul: RAPPORTS_SEULS.some((o) => offres.has(o)) && !offres.has("premium") && !PASSAGES_EN_PREMIUM.some((o) => offres.has(o)),
     messages48h: Math.max(1, recents?.n ?? 0),
     ageDuRapport: rapport ? Math.floor((Date.now() - rapport.le.getTime()) / (JOUR_S * 1000)) : null,
     ajout: r.ajout,
@@ -229,7 +229,7 @@ async function lireLaSituation(r: ReponseVendue) {
 }
 
 /**
- * L’offre posée sous la réponse qui vient de s’écrire, ou null. Premium pour 5 € de plus (③) se montre ici comme une
+ * L’offre posée sous la réponse qui vient de s’écrire, ou null. Premium pour 6,90 € de plus (③) se montre ici comme une
  * offre unique (montrer : une fois par compte, jamais le même jour qu’une autre) ; déjà vue (souvent sur « C’est
  * débloqué »), elle laisse la place à la recharge quand sa réponse attend ou qu’il demande, et à rien sinon. Une offre
  * posée est comptée (« vue »), et ses limites prises. Ne fait jamais échouer la réponse : une erreur, et rien n’est posé.

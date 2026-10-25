@@ -22,9 +22,11 @@ export const CASE_IMPORT = {
    * prix du jour ; puis (« .2 ») le règlement de la roue. Le 21 octobre : la grille redescend (le rapport à 9,90 €,
    * Premium à 14,90 €) ; puis (« .2 ») une réponse du chat en alerte se paie comme les autres, seuls les numéros
    * d’urgence et d’écoute restent sans bulle. Le 22 octobre : « BLUSH est une intelligence artificielle et peut se
-   * tromper » (il disait « Une IA peut se tromper »)
+   * tromper » (il disait « Une IA peut se tromper »). Le 23 octobre : la grille de la marge à 80 % (le rapport à 3 bulles,
+   * Premium à 19,90 € et 25 bulles, les recharges de 10, 25 et 60 bulles, Premium moins cher après le rapport à la place
+   * du bonus de la première recharge, le repli de la roue à +3 bulles)
    */
-  version: "2026-10-22",
+  version: "2026-10-23.1",
   avant: "En continuant, tu acceptes les ",
   lien: "conditions",
   apres: " et que BLUSH lise toute ta conv.",

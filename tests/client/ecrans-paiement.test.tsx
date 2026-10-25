@@ -7,7 +7,7 @@ import { OffreAvantDePartir, restant } from "@/components/paiement/OffreAvantDeP
 import { PiedGratuit } from "@/components/paiement/PiedGratuit";
 import { CEST_QUOI, FEUILLE_BULLE } from "@/contenu/bulles";
 import { CASE_IMPORT, CASE_RENONCIATION, texteRenonciation, type AchatImmediat } from "@/contenu/consentements";
-import { DUREE_SUITE_MS, prixDe } from "@/contenu/offres";
+import { CATALOGUE, DUREE_SUITE_MS, enEuros, prixDe } from "@/contenu/offres";
 import { DEBLOQUE, FEUILLE_FORMULE, OFFRE_GARDE, OFFRE_PREMIUM_AJOUT, OFFRE_SECOND, OFFRE_SUITE, PIED_GRATUIT, RETOUR_PAIEMENT } from "@/contenu/paiement";
 import { jourEnLettres } from "@/lib/format";
 import { commencerPaiement, etatDuPaiement, proposerOffreUnique } from "@/services/api";
@@ -90,13 +90,14 @@ describe("la feuille « Ta formule »", () => {
     render(<FeuilleFormule open onClose={() => {}} autre="Maëlys" chapitres={7} />);
     act(() => void vi.advanceTimersToNextFrame());
     expect(feuille().contains(document.activeElement)).toBe(true);
-    const premium = formule(/^Rapport \+ 60 bulles/);
+    const premium = formule(new RegExp(`^${FEUILLE_FORMULE.premium.titre.replace("+", "\\+")}`));
     expect(premium.getAttribute("aria-checked")).toBe("true");
     expect(formule(/^Le rapport/).getAttribute("aria-checked")).toBe("false");
     const p = FEUILLE_FORMULE.premium;
     for (const texte of [p.offertes, p.note, p.bulles, p.economie, p.badge]) expect(within(premium).getByText(tel(texte))).toBeTruthy();
-    /* Les prix barrés : « au lieu de » pour un lecteur d’écran */
-    expect(premium.textContent).toContain(`${FEUILLE_FORMULE.auLieuDe}${p.barreOffertes}`);
+    /* Le prix barré (le rapport et le pack de 25, à part) : « au lieu de » pour un lecteur d’écran ; ses bulles offertes, celles du rapport, n’en ont pas */
+    expect(premium.textContent).toContain(`${FEUILLE_FORMULE.auLieuDe}${enEuros(CATALOGUE.premium.barre!)}`);
+    expect(premium.textContent!.split(FEUILLE_FORMULE.auLieuDe)).toHaveLength(2);
     expect(premium.textContent).toContain(`${p.rapport} ${p.chapitres(7)}`);
     /* Le badge vient après le titre dans le texte lu */
     expect(premium.textContent!.startsWith(p.titre)).toBe(true);
@@ -106,7 +107,7 @@ describe("la feuille « Ta formule »", () => {
 
   it("au clavier : les flèches passent au rapport seul, qui s’ouvre, et le bouton change de prix", () => {
     render(<FeuilleFormule open onClose={() => {}} autre="Maëlys" chapitres={6} />);
-    const premium = formule(/^Rapport \+ 60 bulles/);
+    const premium = formule(new RegExp(`^${FEUILLE_FORMULE.premium.titre.replace("+", "\\+")}`));
     expect(premium.tabIndex).toBe(0);
     premium.focus();
     fireEvent.keyDown(premium, { key: "ArrowUp" });
@@ -314,10 +315,10 @@ describe("la page du retour", () => {
 
   it("des bulles payées : elles se disent, puis on revient au chat", async () => {
     vi.useFakeTimers({ toFake: ["setTimeout"] });
-    etat.mockResolvedValue(achat({ offre: "pack80", statut: "paye", bulles: 120, conv: null }));
+    etat.mockResolvedValue(achat({ offre: "pack25", statut: "paye", bulles: 25, conv: null }));
     render(<RetourScreen achat="a1" paiement={null} statut={null} />);
     await promesses();
-    expect(screen.getByRole("heading", { level: 1, name: RETOUR_PAIEMENT.recu(120).titre })).toBeTruthy();
+    expect(screen.getByRole("heading", { level: 1, name: RETOUR_PAIEMENT.recu(25).titre })).toBeTruthy();
     expect(screen.getByRole("link", { name: RETOUR_PAIEMENT.continuer }).getAttribute("href")).toBe("/app");
     expect(routeur.replace).not.toHaveBeenCalled();
     act(() => void vi.advanceTimersByTime(1_800));
@@ -338,7 +339,7 @@ describe("la page du retour", () => {
 
   it("refusé : l’échec se dit ; pour des bulles, « Réessayer » ramène où le paiement a commencé", async () => {
     sessionStorage.setItem("blush.paiement.suite.a1", "/app");
-    etat.mockResolvedValue(achat({ offre: "pack30", statut: "echoue", conv: null }));
+    etat.mockResolvedValue(achat({ offre: "pack10", statut: "echoue", conv: null }));
     render(<RetourScreen achat="a1" paiement="pay_1" statut="failed" />);
     await promesses();
     expect(screen.getByRole("heading", { level: 1, name: RETOUR_PAIEMENT.echoue.titre })).toBeTruthy();
@@ -369,7 +370,7 @@ describe("la page du retour", () => {
 });
 
 describe("« C’est débloqué »", () => {
-  const debloque = (offre: "rapport" | "premium" | "second") => render(<EcranDebloque achat="a1" offre={offre} bulles={10} next={null} restants={7} total={8} reprise={2} />);
+  const debloque = (offre: "rapport" | "premium" | "second") => render(<EcranDebloque achat="a1" offre={offre} bulles={3} next={null} restants={7} total={8} reprise={2} />);
   /** Le serveur montre ces offres de la page, et aucune autre. */
   const montre = (...offres: ("premium_ajout" | "second_rapport")[]) =>
     proposer.mockImplementation(async (o) => (offres.includes(o as "premium_ajout") ? { offre: o, fin: null, reste: null, enUnGeste: true } : { offre: null }));
@@ -381,7 +382,7 @@ describe("« C’est débloqué »", () => {
 
   it("après le rapport seul, l’offre ③ du serveur prend la place de la liste : « Ta carte est enregistrée », payée en un geste sans quitter la page", async () => {
     montre("premium_ajout");
-    livre("premium_ajout", 80);
+    livre("passe_premium", CATALOGUE.passe_premium.bulles);
     debloque("rapport");
     /* Tant que le serveur n’a pas répondu, ni la liste ni l’offre : rien ne se remplace sous les yeux */
     expect(screen.queryByText(DEBLOQUE.restants(7))).toBeNull();
@@ -395,11 +396,12 @@ describe("« C’est débloqué »", () => {
     renonciationSous(offre, prendre, "bulles");
     fireEvent.click(prendre);
     await promesses();
-    expect(commencer).toHaveBeenCalledWith("premium_ajout", true);
-    /* Livrée : ses bulles comptées ici, la liste, et la page ne s’est pas quittée */
+    /* L’offre unique montrée est ③ (premium_ajout) ; ce qui s’achète, le passage en Premium */
+    expect(commencer).toHaveBeenCalledWith("passe_premium", true);
+    /* Livrée : ses bulles comptées ici (les 3 du rapport et les 22 de ③ : celles de Premium), la liste, et la page ne s’est pas quittée */
     expect(etat).toHaveBeenCalledWith("a2", null);
-    expect(screen.getByText(tel(DEBLOQUE.phrase(8, 90)))).toBeTruthy();
-    expect(screen.getByText(DEBLOQUE.bulles(90))).toBeTruthy();
+    expect(screen.getByText(tel(DEBLOQUE.phrase(8, CATALOGUE.premium.bulles)))).toBeTruthy();
+    expect(screen.getByText(DEBLOQUE.bulles(CATALOGUE.premium.bulles))).toBeTruthy();
     expect(routeur.push).not.toHaveBeenCalled();
     expect(routeur.replace).not.toHaveBeenCalled();
   });
@@ -463,7 +465,7 @@ describe("« C’est débloqué »", () => {
     expect(screen.queryByRole("region")).toBeNull();
     expect(screen.getByText(DEBLOQUE.avance)).toBeTruthy();
     /* Le 2e rapport ne donne pas de bulles tout de suite : celles du rapport, à son usage */
-    expect(screen.getByText(DEBLOQUE.bulles(10))).toBeTruthy();
+    expect(screen.getByText(DEBLOQUE.bulles(3))).toBeTruthy();
   });
 
   it("après Premium, le 2e rapport refusé : le −50 % gardé 7 jours, sans rien payer ; « Garde-le-moi » le fait garder au serveur, et la liste le dit", async () => {
@@ -490,8 +492,8 @@ describe("« C’est débloqué »", () => {
     await promesses();
     expect(proposer).not.toHaveBeenCalled();
     expect(screen.getByRole("heading", { level: 1, name: DEBLOQUE.titre })).toBeTruthy();
-    expect(screen.getByText(tel(DEBLOQUE.phrase(8, 10)))).toBeTruthy();
-    for (const texte of [DEBLOQUE.restants(7), DEBLOQUE.reprise(2), DEBLOQUE.bulles(10), DEBLOQUE.bullesSous]) expect(screen.getByText(texte)).toBeTruthy();
+    expect(screen.getByText(tel(DEBLOQUE.phrase(8, 3)))).toBeTruthy();
+    for (const texte of [DEBLOQUE.restants(7), DEBLOQUE.reprise(2), DEBLOQUE.bulles(3), DEBLOQUE.bullesSous]) expect(screen.getByText(texte)).toBeTruthy();
     expect(screen.getByRole("link", { name: DEBLOQUE.lire }).getAttribute("href")).toBe("/rapport#chapitre-2");
   });
 });

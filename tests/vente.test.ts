@@ -71,7 +71,7 @@ const rapportSeulPaye = (u: Utilisateur, storyId: string) =>
     storyId,
     offre: "rapport",
     centimes: 990,
-    bulles: 10,
+    bulles: 3,
     fournisseur: "factice",
     statut: "paye",
     payeLe: new Date(),
@@ -109,7 +109,7 @@ async function compteur(evenement: string, genre: GenreVendu): Promise<number> {
 const noter = (evenement: string, genre: string) => geste(requete("/api/chat/vente", { evenement, genre }));
 
 describe("la carte que la réponse du chat porte", () => {
-  it("il demande à acheter, après le rapport seul : Premium pour 5 € de plus, en un geste, montrée comme offre unique et comptée", async () => {
+  it("il demande à acheter, après le rapport seul : Premium pour 6,90 € de plus, en un geste, montrée comme offre unique et comptée", async () => {
     const { u, id } = await parleur("vente-premium", 5);
     await rapportSeulPaye(u, id);
     const vues = await compteur("vue", "premium");
@@ -121,6 +121,23 @@ describe("la carte que la réponse du chat porte", () => {
       .where(and(eq(schema.offresUniques.userId, u.id), eq(schema.offresUniques.offre, "premium_ajout")));
     expect(montree).toBeDefined();
     expect(await compteur("vue", "premium")).toBe(vues + 1);
+  });
+
+  it("déjà passé en Premium (③, celui d’aujourd’hui comme celui d’avant le 23 octobre) : plus de carte Premium, la recharge", async () => {
+    for (const passage of ["passe_premium", "premium_ajout"] as const) {
+      const { u, id } = await parleur(`vente-deja-premium-${passage}`, 5);
+      await rapportSeulPaye(u, id);
+      await db().insert(schema.achats).values({
+        userId: u.id,
+        offre: passage,
+        centimes: CATALOGUE[passage].centimes,
+        bulles: CATALOGUE[passage].bulles,
+        fournisseur: "factice",
+        statut: "paye",
+        payeLe: new Date(),
+      });
+      expect((await dire(`je veux plus de bulles ${FACTICE.achat}`)).offre, passage).toMatchObject({ genre: "bulles" });
+    }
   });
 
   it("il demande, Premium déjà vu ailleurs : la recharge à la place, avec son solde", async () => {
@@ -189,24 +206,24 @@ describe("l’achat payé depuis une carte, et /admin", () => {
     const { u, id } = await parleur("vente-payee", 3);
     await rapportSeulPaye(u, id);
     await dire("je lui dis quoi ?");
-    const r = await commencer(requete("/api/paiement", { offre: "pack30", renonciation: CASE_RENONCIATION.version, geste: true, vente: "bulles" }));
+    const r = await commencer(requete("/api/paiement", { offre: "pack10", renonciation: CASE_RENONCIATION.version, geste: true, vente: "bulles" }));
     expect(r.status).toBe(200);
     const { achat, url } = (await r.json()) as { achat: string; url: string | null };
     /* La carte gardée : payé d’un geste, sans page de paiement */
     expect(url).toBeNull();
     const [ligne] = await db().select().from(schema.achats).where(eq(schema.achats.id, achat));
-    expect(ligne).toMatchObject({ vente: "bulles", offre: "pack30" });
+    expect(ligne).toMatchObject({ vente: "bulles", offre: "pack10" });
     await lancerApres();
     expect((await livrer(achat)).achat?.statut).toBe("paye");
 
     const apres = await statsAdmin(7);
     const ligneDe = (s: typeof avant, g: GenreVendu) => s.pilotage.ventesDuChat.find((v) => v.genre === g)!;
     expect(ligneDe(apres, "bulles").payees - ligneDe(avant, "bulles").payees).toBe(1);
-    expect(ligneDe(apres, "bulles").centimes - ligneDe(avant, "bulles").centimes).toBe(CATALOGUE.pack30.centimes);
+    expect(ligneDe(apres, "bulles").centimes - ligneDe(avant, "bulles").centimes).toBe(CATALOGUE.pack10.centimes);
     const moitie = (s: typeof avant) => s.pilotage.abDuChat.find((g) => g.groupe === "avec")!;
     expect(moitie(apres).comptes - moitie(avant).comptes).toBe(1);
     expect(moitie(apres).acheteurs - moitie(avant).acheteurs).toBe(1);
-    expect(moitie(apres).centimes - moitie(avant).centimes).toBe(990 + CATALOGUE.pack30.centimes);
+    expect(moitie(apres).centimes - moitie(avant).centimes).toBe(990 + CATALOGUE.pack10.centimes);
     expect(apres.pilotage.ventesDuChat.map((v) => v.genre)).toEqual(["bulles", "premium", "autre", "a_jour", "reimport"]);
   });
 

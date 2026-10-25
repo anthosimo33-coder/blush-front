@@ -23,7 +23,7 @@ export function PerleVide({ taille = 16 }: { taille?: number }) {
   );
 }
 
-/** `pleines` perles, puis `vides` places vides, en rangée (« Plus que 2 bulles », l’offre ③). */
+/** `pleines` perles, puis `vides` places vides, en rangée (« Plus que N bulles », l’offre ③). */
 export function Rangee({ pleines, vides = 0, taille = 14 }: { pleines: number; vides?: number; taille?: number }) {
   return (
     <span aria-hidden="true" className="flex items-center gap-[3px]">

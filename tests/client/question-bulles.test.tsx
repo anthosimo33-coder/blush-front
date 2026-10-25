@@ -107,7 +107,7 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-/** L’écran, rendu pour ce compte (la feuille de la recharge demande au serveur si le bonus ④ vaut : ici, non). */
+/** L’écran, rendu pour ce compte. */
 async function ecran(c: Account) {
   page.compte = c;
   await act(async () => void render(<QuestionChat ideas={[]} story={STORY} />));
@@ -223,7 +223,7 @@ describe("à 0 bulle", () => {
     await act(async () => fireEvent.click(screen.getByRole("button", { name: "Recharger pour la lire" })));
     const recharge = await screen.findByRole("dialog", { name: "Recharge tes bulles" });
     expect(within(recharge).getByText("Ta réponse à Léa s’affiche dès que c’est payé.")).toBeTruthy();
-    /* Le pack conseillé (80 bulles, sans le bonus ④ ici) : le chat lit la réponse prête au retour */
-    expect(await payerLaRecharge(recharge)).toMatchObject({ suite: "/app?recharge=80" });
+    /* Le pack conseillé (25 bulles) : le chat lit la réponse prête au retour */
+    expect(await payerLaRecharge(recharge)).toMatchObject({ suite: "/app?recharge=25" });
   });
 });

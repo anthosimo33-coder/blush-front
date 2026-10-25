@@ -2,11 +2,11 @@
 
 import type { Route } from "next";
 import { useRouter } from "next/navigation";
-import { createContext, use, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, use, useMemo, useState, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import { codeDe } from "@/lib/messages-erreur";
 import { attendreLaLivraison, noterLaSuite, versLeRetour } from "@/lib/paiement";
-import { commencerPaiement, noterUnGesteDeVente, proposerOffreUnique } from "@/services/api";
+import { commencerPaiement, noterUnGesteDeVente } from "@/services/api";
 import { CATALOGUE } from "@/contenu/offres";
 import { OFFRE_PREMIUM_AJOUT } from "@/contenu/paiement";
 import { lePack, PACK_CONSEILLE, PACKS, type Pack } from "@/contenu/recharge";
@@ -36,8 +36,6 @@ export type AchatDuChat = {
   recharger: () => void;
   /** Un geste sur une carte (son bouton touché, « Pas maintenant »), compté pour /admin. */
   noter: (evenement: "touchee" | "refusee", genre: GenreVendu) => void;
-  /** Le bonus de la première recharge (④) vaut-il pour ce compte ? Le serveur le montre (une offre unique). */
-  premiereRecharge: () => Promise<boolean>;
 };
 
 /** Le paiement du chat. Sans lui, aucune carte d’achat ne se pose. */
@@ -80,11 +78,6 @@ export function useAchatDuChat({ surBulles, recharger }: { surBulles: (bulles: n
       },
       recharger,
       noter: (evenement, genre) => void noterUnGesteDeVente(evenement, genre).catch(() => {}),
-      premiereRecharge: () =>
-        proposerOffreUnique("premiere_recharge").then(
-          (o) => o.offre === "premiere_recharge",
-          () => false,
-        ),
     }),
     [router, surBulles, recharger],
   );
@@ -176,25 +169,15 @@ function useGeste(achat: AchatDuChat, genre: GenreVendu) {
 }
 
 /**
- * La recharge : les trois packs (le conseillé choisi d’avance, le bonus de la première recharge s’il vaut), payés en un
- * geste avec la carte gardée ; sans elle, la feuille de la recharge. À zéro, sa réponse attend juste au-dessus
+ * La recharge : les trois packs (le conseillé choisi d’avance), payés en un geste avec la carte gardée ; sans elle, la
+ * feuille de la recharge. À zéro, sa réponse attend juste au-dessus
  * (`attend`) : pas de « Pas maintenant ». L’aperçu de l’équipe montre la réponse prête dans la carte (`reponse`, `envoi`).
  */
 function OffreBulles({ offre, achat, attend }: { offre: Extract<OffreDuChat, { genre: "bulles" }>; achat: AchatDuChat; attend: boolean }) {
   const [choisi, setChoisi] = useState<Pack>(PACK_CONSEILLE);
-  const [bonus, setBonus] = useState(false);
   const { etape, refus, accord, payer, ecarter } = useGeste(achat, "bulles");
   const bloque = attend || offre.solde <= 0;
-  /* Le bonus de la première recharge, demandé une fois, comme la feuille de la recharge (seulement pour payer d’ici) */
-  useEffect(() => {
-    if (!offre.enUnGeste) return;
-    let vivant = true;
-    void achat.premiereRecharge().then((oui) => vivant && setBonus(oui));
-    return () => {
-      vivant = false;
-    };
-  }, [achat, offre.enUnGeste]);
-  const pack = lePack(choisi, bonus);
+  const pack = lePack(choisi);
   if (etape === "ecartee") return null;
   if (etape === "payee")
     return (
@@ -211,7 +194,7 @@ function OffreBulles({ offre, achat, attend }: { offre: Extract<OffreDuChat, { g
         <>
           <span role="radiogroup" aria-label={T.bulles.choix} className="grid grid-cols-3 gap-2">
             {PACKS.map((p) => {
-              const l = lePack(p, bonus);
+              const l = lePack(p);
               return (
                 <button
                   key={p}
@@ -261,11 +244,11 @@ function OffreBulles({ offre, achat, attend }: { offre: Extract<OffreDuChat, { g
   );
 }
 
-/** Premium pour qui a pris le rapport seul (l’offre unique ③) : ses bulles en plus, une seule fois. */
+/** Le passage en Premium pour qui a pris le rapport seul (l’offre unique ③) : ses bulles en plus, une seule fois. */
 function OffrePremium({ offre, achat, attend }: { offre: Extract<OffreDuChat, { genre: "premium" }>; achat: AchatDuChat; attend: boolean }) {
   const { etape, refus, accord, payer, ecarter } = useGeste(achat, "premium");
   if (etape === "ecartee") return null;
-  if (etape === "payee") return <Paye texte={T.premium.paye(CATALOGUE.premium_ajout.bulles)} />;
+  if (etape === "payee") return <Paye texte={T.premium.paye(CATALOGUE.passe_premium.bulles)} />;
   return (
     <span className={LARGEUR}>
       <EnTete titre={OFFRE_PREMIUM_AJOUT.badge} />
@@ -278,7 +261,7 @@ function OffrePremium({ offre, achat, attend }: { offre: Extract<OffreDuChat, { 
         <span className="text-legende font-bold leading-[1.35] text-soft">{OFFRE_PREMIUM_AJOUT.texte}</span>
       </span>
       {refus && <LeRefus refus={refus} />}
-      <Button size="md" loading={etape === "occupee"} loadingLabel={T.enCours} onClick={() => payer("premium_ajout")}>
+      <Button size="md" loading={etape === "occupee"} loadingLabel={T.enCours} onClick={() => payer("passe_premium")}>
         {OFFRE_PREMIUM_AJOUT.prendre}
       </Button>
       {offre.enUnGeste && <UnGeste />}

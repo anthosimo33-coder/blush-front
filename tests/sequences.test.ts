@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { GRILLE_DU_23_OCTOBRE, RAPPORT_D_AVANCE } from "@/contenu/offres";
 import type { Utilisateur } from "@/server/auth";
 import { empreinte } from "@/server/chiffrement";
 import * as coffre from "@/server/coffre";
@@ -13,7 +14,7 @@ import { compteDeTest, convPrete, histoireLue } from "./aide/fixtures";
 
 /*
  * Les séquences de mails (src/server/sequences.ts), lot 1 : S3 après l’achat (« il t’a répondu ? », le vocal, le
- * prochain pas ou, après un 🧊, « comment tu vas ? ») et S4 les bulles (la réponse prête, 2 bulles ou moins, à zéro).
+ * prochain pas ou, après un 🧊, « comment tu vas ? ») et S4 les bulles (la réponse prête, la dernière bulle, à zéro).
  * Jamais la nuit, un par jour au plus, une fois par occasion, jamais sur une alerte, jamais à l’équipe, et chaque genre
  * coupé par son lien. Les moments sont fabriqués en base (le déblocage, les bulles, le chat), sans attendre. Les mails
  * partis sont pris au passage (envoyerMail), puis partent comme sans clé de Resend (dans les logs).
@@ -252,18 +253,23 @@ describe("S3 · après l’achat", () => {
     expect(pour(u).map((m) => m.sujet)).toEqual(["ta réponse est prête"]);
   });
 
-  it("Premium : pris d’emblée, ou ③ payée après son rapport", async () => {
-    const { u, conv } = await client("sequence-premium");
-    expect(await aPrisPremium(conv, u.id)).toBe(false);
-    await db()
-      .insert(schema.achats)
-      .values({ userId: u.id, storyId: null, offre: "premium_ajout", centimes: 500, bulles: 80, fournisseur: "factice", statut: "paye", payeLe: new Date() });
-    expect(await aPrisPremium(conv, u.id)).toBe(true);
+  it("Premium : pris d’emblée, ou ③ payée après son rapport (celle d’aujourd’hui, ou celle d’avant le 23 octobre)", async () => {
+    for (const passage of [
+      { offre: "passe_premium", centimes: 690, bulles: 22 },
+      { offre: "premium_ajout", centimes: 500, bulles: 80 },
+    ] as const) {
+      const { u, conv } = await client(`sequence-premium-${passage.offre}`);
+      expect(await aPrisPremium(conv, u.id)).toBe(false);
+      await db()
+        .insert(schema.achats)
+        .values({ userId: u.id, storyId: null, ...passage, fournisseur: "factice", statut: "paye", payeLe: new Date() });
+      expect(await aPrisPremium(conv, u.id), passage.offre).toBe(true);
+    }
   });
 });
 
 describe("S4 · les bulles", () => {
-  it("la réponse prête : avant tout autre mail, la recharge au bouton, et ④ montrée par le mail", async () => {
+  it("la réponse prête : avant tout autre mail, la recharge au bouton, le plus petit pack ; plus de ④ (arrêtée le 23 octobre), ni dite ni montrée", async () => {
     const { u, conv } = await client("sequence-prete");
     await auChat(conv, 2 * HEURE, { role: "blush", verrouillee: true });
     await passer();
@@ -272,21 +278,26 @@ describe("S4 · les bulles", () => {
     expect(m!.sujet).toBe("ta réponse est prête");
     expect(m!.html).toContain("Pour Sophie · prête");
     expect(m!.html).toContain(`/ouvrir/${conv}?m=s4_prete&amp;recharger=1`);
-    expect(m!.html).toContain("avec ta 1re recharge");
+    expect(m!.html).toContain("Ta réponse attend 6,90&nbsp;€");
+    expect(m!.html).not.toContain("1re recharge");
     expect(m!.html).toContain("Plus d’offres comme ça");
-    const [quatre] = await db()
+    const quatre = await db()
       .select({ offre: schema.offresUniques.offre })
       .from(schema.offresUniques)
       .where(and(eq(schema.offresUniques.userId, u.id), eq(schema.offresUniques.offre, "premiere_recharge")));
-    expect(quatre).toEqual({ offre: "premiere_recharge" });
+    expect(quatre).toEqual([]);
   });
 
-  it("2 bulles ou moins, elle qui écrivait cette semaine : une fois par bulles reçues", async () => {
+  it("la dernière bulle, elle qui écrivait cette semaine : une fois par bulles reçues ; à 2, rien encore (le rapport n’en donne que 3)", async () => {
+    const deux = await client("sequence-peu-deux", { debloque: 10 * 24 * HEURE });
+    await bulles(deux.u, 3, 5 * 24 * HEURE, 2);
+    await auChat(deux.conv, 3 * HEURE);
     const { u, conv } = await client("sequence-peu", { debloque: 10 * 24 * HEURE });
-    await bulles(u, 10, 5 * 24 * HEURE, 2);
+    await bulles(u, 3, 5 * 24 * HEURE, 1);
     await auChat(conv, 3 * HEURE);
     await passer();
-    expect(pour(u).map((m) => m.sujet)).toEqual(["il te reste 2\u00a0réponses"]);
+    expect(pour(deux.u)).toEqual([]);
+    expect(pour(u).map((m) => m.sujet)).toEqual(["il te reste 1\u00a0réponse"]);
     expect(pour(u)[0]!.html).toContain("ça repart avec Sophie");
     await db()
       .update(schema.envoisMails)
@@ -368,16 +379,24 @@ describe("S6 · les offres gardées, S7 · après un 🧊", () => {
     expect(m!.html).toContain("Plus d’offres comme ça");
   });
 
-  it("le rapport d’avance payé qui dort depuis une semaine : jusqu’à quand il vaut", async () => {
+  it("le rapport d’avance payé qui dort depuis une semaine : jusqu’à quand il vaut, et les bulles promises à sa commande", async () => {
     const { u } = await client("sequence-avance", { debloque: 10 * 24 * HEURE });
+    /* Commandé avant la grille du 23 octobre 2026 : le rapport d’alors, à 10 bulles */
+    const avant = await client("sequence-avance-avant", { debloque: 10 * 24 * HEURE });
+    const avance = { storyId: null, offre: "second", centimes: 695, bulles: 0, fournisseur: "factice", statut: "paye", payeLe: ilYa(8 * 24 * HEURE) } as const;
     await db()
       .insert(schema.achats)
-      .values({ userId: u.id, storyId: null, offre: "second", centimes: 695, bulles: 0, fournisseur: "factice", statut: "paye", payeLe: ilYa(8 * 24 * HEURE) });
+      .values([
+        { ...avance, userId: u.id },
+        { ...avance, userId: avant.u.id, creeLe: new Date(GRILLE_DU_23_OCTOBRE.getTime() - 60_000) },
+      ]);
     await passer();
     const [m] = pour(u);
     expect(m!.sujet).toBe("t’as un rapport payé qui dort");
     expect(m!.html).toContain("Plus de rappels comme ça");
     expect(m!.texte).toMatch(/jusqu’au \d{1,2} [a-zéû]+ \d{4}/);
+    expect(m!.html).toContain(`avec ${RAPPORT_D_AVANCE.bulles} réponses de BLUSH`);
+    expect(pour(avant.u)[0]!.html).toContain(`avec ${RAPPORT_D_AVANCE.bullesAvantLaGrille} réponses de BLUSH`);
   });
 
   it("trois semaines après un 🧊, sans nouvelle conv : rien de l’ancienne histoire ; avec une nouvelle conv, rien", async () => {

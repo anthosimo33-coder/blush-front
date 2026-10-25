@@ -51,7 +51,7 @@ async function titresDuRapport(rapport: Locator): Promise<string[]> {
 /** Le sommaire du mail « ton rapport est prêt », lu dans son HTML : la pastille du numéro, puis le titre. */
 const sommaireDuMail = (html: string) => [...html.matchAll(/>(\d)<\/div><\/td><td class="encre"[^>]*>([^<]+)</g)].map((m) => `${m[1]} ${m[2]}`);
 
-/** Paie à l’écran la formule `nom` (« Le rapport », « Rapport + 60 bulles ») de la feuille ouverte : « Débloquer » (sans case), puis la carte de test, dans la feuille. */
+/** Paie à l’écran la formule `nom` (« Le rapport », « Rapport + 22 bulles ») de la feuille ouverte : « Débloquer » (sans case), puis la carte de test, dans la feuille. */
 async function payerALecran(page: Page, nom: RegExp): Promise<void> {
   const paiement = page.getByRole("dialog", { name: PAIEMENT });
   await paiement.getByRole("radio", { name: nom }).click();
@@ -83,20 +83,20 @@ test("le rapport seul, payé à l’écran : « C’est débloqué », l’offre
     await expect(ecran.getByRole("heading", { level: 1, name: "C’est débloqué." })).toBeVisible();
     /* Avec l’offre ③, 28 px, sur ordinateur comme sur téléphone (le prototype) */
     await expect(ecran.getByRole("heading", { level: 1, name: "C’est débloqué." })).toHaveCSS("font-size", "28px");
-    await expect(ecran.getByText("Les 8 chapitres sont à toi. Et 10 bulles pour en parler avec BLUSH.")).toBeVisible();
+    await expect(ecran.getByText("Les 8 chapitres sont à toi. Et 3 bulles pour en parler avec BLUSH.")).toBeVisible();
     await expect(page.getByText(/BLUSH\+/)).toHaveCount(0);
-    expect(await compteDe(email)).toMatchObject({ debloquees: 1, bulles: 10 });
+    expect(await compteDe(email)).toMatchObject({ debloquees: 1, bulles: 3 });
     /* La renonciation, donnée en payant, est gardée avec l’achat : sa version, son heure */
     expect(await achatEnBase(await dernierAchat(email))).toMatchObject({ offre: "rapport", statut: "paye", renonciationVersion: RENONCIATION, renonciationLe: expect.any(Date) });
   });
 
-  await test.step("l’offre ③ juste après : Premium pour 5 € de plus, la carte gardée ; « Non merci », puis son repli, le 2e rapport, refusé : la liste", async () => {
+  await test.step("l’offre ③ juste après : Premium pour 6,90 € de plus, la carte gardée ; « Non merci », puis son repli, le 2e rapport, refusé : la liste", async () => {
     const ecran = page.getByRole("main");
-    const offre = ecran.getByRole("region", { name: "Passe en Premium pour 5\u00a0€ de plus" });
+    const offre = ecran.getByRole("region", { name: "Passe en Premium pour 6,90\u00a0€ de plus" });
     await expect(offre).toBeVisible();
-    await expect(offre.getByText("80 bulles en plus, comme en Premium. Seules, elles coûtent 13,90\u00a0€.")).toBeVisible();
+    await expect(offre.getByText("22 bulles en plus, comme en Premium. Premium coûte 10\u00a0€ de plus que le rapport\u00a0: ici, 6,90\u00a0€.")).toBeVisible();
     await expect(offre.getByText("Ta carte est enregistrée\u00a0: un geste et c’est fait.")).toBeVisible();
-    await expect(offre.getByRole("button", { name: "Ajouter 80 bulles · 5\u00a0€" })).toBeVisible();
+    await expect(offre.getByRole("button", { name: "Ajouter 22 bulles · 6,90\u00a0€" })).toBeVisible();
     /* L’offre prend la place de la liste et du bouton du bas : « Non merci » continue la lecture */
     await expect(ecran.getByText("Les 7 chapitres qui restent")).toHaveCount(0);
     await expect(page.getByRole("link", { name: "Lire la suite" })).toHaveCount(0);
@@ -130,13 +130,13 @@ test("le rapport seul, payé à l’écran : « C’est débloqué », l’offre
   });
 });
 
-test("Premium, choisie d’avance : payée à l’écran, 90 bulles ; le 2e rapport à −50 %, pris en un geste : le rapport d’avance dans la liste", async ({ page }, testInfo) => {
+test("Premium, choisie d’avance : payée à l’écran, 25 bulles ; le 2e rapport à −50 %, pris en un geste : le rapport d’avance dans la liste", async ({ page }, testInfo) => {
   const email = emailLibre(testInfo, "premium");
   await lectureFaite(page, testInfo, email);
   await ouvrir(page, "/rapport?paiement=1");
   const paiement = page.getByRole("dialog", { name: PAIEMENT });
-  await expect(paiement.getByRole("radio", { name: /^Rapport \+ 60 bulles/ })).toBeChecked();
-  await payerALecran(page, /^Rapport \+ 60 bulles/);
+  await expect(paiement.getByRole("radio", { name: /^Rapport \+ 22 bulles/ })).toBeChecked();
+  await payerALecran(page, /^Rapport \+ 22 bulles/);
   const ecran = page.getByRole("main");
   await expect(ecran.getByRole("heading", { level: 1, name: "C’est débloqué." })).toBeVisible();
   await expect(ecran.getByRole("region", { name: /Passe en Premium/ })).toHaveCount(0);
@@ -149,10 +149,10 @@ test("Premium, choisie d’avance : payée à l’écran, 90 bulles ; le 2e rapp
   await expect(ecran.getByRole("heading", { level: 1, name: "C’est débloqué." })).toHaveCSS("font-size", "32px");
   await expect(ecran.getByText("Les 7 chapitres qui restent")).toBeVisible();
   await expect(ecran.getByText("Ta lecture reprend au chapitre 2")).toBeVisible();
-  await expect(ecran.getByText("90 bulles pour parler à BLUSH", { exact: true })).toBeVisible();
+  await expect(ecran.getByText("25 bulles pour parler à BLUSH", { exact: true })).toBeVisible();
   await expect(ecran.getByText("1 bulle = 1 réponse · elles n’expirent jamais")).toBeVisible();
   /* Le rapport d’avance ne donne pas de bulles tout de suite */
-  expect(await compteDe(email)).toMatchObject({ debloquees: 1, bulles: 90 });
+  expect(await compteDe(email)).toMatchObject({ debloquees: 1, bulles: 25 });
   expect(await achatEnBase(await dernierAchat(email))).toMatchObject({ offre: "second", statut: "paye" });
   await ecran.getByRole("link", { name: "Lire la suite" }).click();
   await expect(page).toHaveURL(/\/rapport#chapitre-2$/);
@@ -184,14 +184,14 @@ test("la feuille fermée sans payer : l’offre ①, prise à l’écran, la sui
     await payerParCarte(page);
   });
 
-  await test.step("« C’est débloqué » : les 10 bulles, et l’offre ③ (la règle des 24 h ne joue pas après la suite qu’on vient de payer)", async () => {
+  await test.step("« C’est débloqué » : les 3 bulles, et l’offre ③ (la règle des 24 h ne joue pas après la suite qu’on vient de payer)", async () => {
     await expect(page).toHaveURL(/\/rapport\/debloque\?achat=/);
     const ecran = page.getByRole("main");
-    await expect(ecran.getByText("Les 8 chapitres sont à toi. Et 10 bulles pour en parler avec BLUSH.")).toBeVisible();
-    await ecran.getByRole("region", { name: "Passe en Premium pour 5\u00a0€ de plus" }).getByRole("button", { name: "Non merci", exact: true }).click();
+    await expect(ecran.getByText("Les 8 chapitres sont à toi. Et 3 bulles pour en parler avec BLUSH.")).toBeVisible();
+    await ecran.getByRole("region", { name: "Passe en Premium pour 6,90\u00a0€ de plus" }).getByRole("button", { name: "Non merci", exact: true }).click();
     await ecran.getByRole("region", { name: "Ton 2e rapport à −50\u00a0%" }).getByRole("button", { name: "Non merci, je lis la suite" }).click();
-    await expect(ecran.getByText("10 bulles pour parler à BLUSH", { exact: true })).toBeVisible();
-    expect(await compteDe(email)).toMatchObject({ debloquees: 1, bulles: 10 });
+    await expect(ecran.getByText("3 bulles pour parler à BLUSH", { exact: true })).toBeVisible();
+    expect(await compteDe(email)).toMatchObject({ debloquees: 1, bulles: 3 });
     expect(await achatEnBase(await dernierAchat(email))).toMatchObject({ offre: "suite", statut: "paye", renonciationVersion: RENONCIATION });
   });
 });
@@ -238,7 +238,7 @@ test("un compte de l’équipe n’a rien à payer : son rapport est ouvert, et 
   await attendreTaches(email);
   const rapport = await ouvrirLeRapport(page);
   await expect(rapport.getByText("Complet", { exact: true })).toBeVisible();
-  for (const offre of ["rapport", "pack30"] as const) {
+  for (const offre of ["rapport", "pack10"] as const) {
     const r = await page.request.post("/api/paiement", { headers: { origin: URL_APPLI }, data: { offre, renonciation: RENONCIATION } });
     expect([r.status(), await r.json()]).toEqual([409, { erreur: "deja" }]);
   }

@@ -8,10 +8,13 @@ import { CATALOGUE } from "./offres";
  */
 
 /**
- * À partir de combien de bulles (ou moins) la carte « Plus que N bulles » se pose au-dessus du champ, et le compteur
- * passe au rose : 2, comme le prototype (décidé le 13 octobre).
+ * À partir de combien de bulles (ou moins) la carte « Plus que N bulles » se pose au-dessus du champ, le compteur passe
+ * au rose, et le mail S4 « il te reste peu de réponses » part (src/server/sequences.ts) : la dernière bulle. C’était 2,
+ * comme le prototype (décidé le 13 octobre) ; avec le rapport à 3 bulles (le 23 octobre), 2 viendrait dès la première
+ * réponse, deux tiers du solde encore là. La dernière bulle garde son sens pour tous les soldes (3, 10, 25, 60).
+ * TODO(produit): le seuil de la grille du 23 octobre (la dernière bulle), à valider.
  */
-export const SEUIL_PEU_DE_BULLES = 2;
+export const SEUIL_PEU_DE_BULLES = 1;
 
 /** Les places de la rangée de perles de la carte « Plus que N bulles » : les bulles qui restent, pleines, puis des vides. */
 export const PERLES_DE_LA_CARTE = 5;
@@ -33,13 +36,14 @@ export const recu = (depensees: number, restantes: number) => `${depensees} bull
 /** Les cartes au-dessus du champ (BandeauBulles). */
 export const CARTES = {
   /**
-   * La première fois que le compteur se montre : ce qu’il compte. « offertes » quand ce sont les 10 bulles du rapport,
+   * La première fois que le compteur se montre : ce qu’il compte. « offertes » quand ce sont les bulles du rapport (3),
    * comme dans le prototype. TODO(produit): le texte d’un autre solde (Premium, un don, la bêta), sans maquette.
    */
   offertes: (bulles: number) => (bulles === CATALOGUE.rapport.bulles ? `Tes ${bulles} bulles offertes sont là` : `Tes ${bulles} bulles sont là`),
   commentCaMarche: "1 bulle = 1 réponse de BLUSH · comment ça marche",
   fermer: "Fermer",
-  peu: (bulles: number) => `Plus que ${bulles} bulle${bulles > 1 ? "s" : ""}`,
+  /** « Plus qu’une bulle » à la dernière (le seuil, SEUIL_PEU_DE_BULLES), « Plus que N bulles » au-delà. */
+  peu: (bulles: number) => (bulles > 1 ? `Plus que ${bulles} bulles` : "Plus qu’une bulle"),
   /** `ilOuElle` : « Il » ou « Elle », l’autre personne. */
   peuNote: (ilOuElle: string) => `${ilOuElle} va te répondre. Tu auras de quoi lui répondre\u00a0?`,
   prete: (autre: string) => `Ta réponse à ${autre} est écrite`,

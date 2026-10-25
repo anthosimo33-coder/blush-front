@@ -43,8 +43,8 @@ const tous = (p: Personnes): [string, MailDeSequence][] => [
   ["vocal", mailVocal(p, { secondes: 28 })],
   ["pas", mailProchainPas(p, { emoji: "🤏", pas: "Jeudi, propose-lui le ciné, avec une heure.", bulles: 9 })],
   ["glace", mailGlace(p)],
-  ["peu", mailPeuDeBulles(p, { bulles: 2, bonus: true, actif: true })],
-  ["prete", mailReponsePrete(p, { bonus: false })],
+  ["peu", mailPeuDeBulles(p, { bulles: 1, actif: true })],
+  ["prete", mailReponsePrete(p)],
   ["zero", mailZeroBulle(p, { faits: 12, messages: 4365, echanges: 23 })],
   ["endormi", mailEndormi(p, { niveau: "voit", bulles: 9 })],
   ["parfait", mailParfait(p, { bulles: 9 })],
@@ -108,14 +108,20 @@ describe("les mails des séquences", () => {
     expect(mailRepondre(deuxFilles, { bulles: 10 }).bulles[1]).toBe("Léa t’a répondu\u00a0?");
   });
 
-  it("les bulles : le pack conseillé, son bonus de 1re recharge s’il vaut, et une réponse au singulier", () => {
-    expect(mailPeuDeBulles(INES, { bulles: 2, bonus: true, actif: true }).encart).toEqual({
-      gras: "Ta 1re recharge\u00a0: +40 offertes",
-      ligne: "70 bulles + 50 offertes · 13,90\u00a0€ · 120 réponses, 0,12\u00a0€ la réponse",
+  it("les bulles : le pack conseillé (sans offertes, ni « + 0 » ni le total redit), plus de bonus de 1re recharge, et une réponse au singulier", () => {
+    expect(mailPeuDeBulles(INES, { bulles: 1, actif: true }).encart).toEqual({
+      gras: "Le pack conseillé",
+      ligne: "25 bulles · 14,90\u00a0€ · 0,60\u00a0€ la réponse",
     });
-    expect(mailPeuDeBulles(INES, { bulles: 1, bonus: false, actif: false }).encart?.ligne).toBe("70 bulles + 10 offertes · 13,90\u00a0€ · 80 réponses, 0,17\u00a0€ la réponse");
-    expect(mailPeuDeBulles(INES, { bulles: 1, bonus: false, actif: false }).sujet).toBe("il te reste 1\u00a0réponse");
-    expect(mailReponsePrete(INES, { bonus: true }).titre).toBe("Il attend ta réponse. Ta réponse attend 8,90\u00a0€.");
+    expect(mailPeuDeBulles(INES, { bulles: 1, actif: true }).bulles[0]).toBe("plus qu’une bulle");
+    expect(mailPeuDeBulles(INES, { bulles: 2, actif: true }).bulles[0]).toBe("plus que 2\u00a0bulles");
+    expect(mailPeuDeBulles(INES, { bulles: 1, actif: false }).sujet).toBe("il te reste 1\u00a0réponse");
+    expect(mailPeuDeBulles(INES, { bulles: 1, actif: false }).ps).toBe("ps\u00a0: tes bulles expirent jamais");
+    const prete = mailReponsePrete(INES);
+    expect(prete.titre).toBe("Il attend ta réponse. Ta réponse attend 6,90\u00a0€.");
+    expect(prete.encart).toEqual({ gras: "10 bulles · 6,90\u00a0€", ligne: "ou 25 à 14,90\u00a0€" });
+    expect(prete.ps).toBe("ps\u00a0: 10 bulles, c’est 10 réponses comme celle-là");
+    expect(JSON.stringify([mailPeuDeBulles(INES, { bulles: 1, actif: true }), prete])).not.toMatch(/1re recharge|bonus|offertes/);
     expect(mailZeroBulle(INES, { faits: 12, messages: 4365, echanges: 23 }).encart?.ligne).toBe(
       "Sa fiche, 12 choses sur Lucas · vos 4\u00a0365 messages · ton rapport · nos 23 échanges.",
     );
@@ -151,11 +157,11 @@ describe("les mails des séquences", () => {
     const garde = mailGarde(INES, { jour: "vendredi", heure: "18\u00a0h\u00a012" });
     expect(garde.offre).toMatchObject({ prix: "4,95\u00a0€", barre: "9,90\u00a0€", jusqua: "Jusqu’à vendredi, 18\u00a0h\u00a012" });
     expect(garde.sujet).toBe("ton −50\u00a0% saute vendredi");
-    for (const m of [mailAvance({ jusqua: "17 octobre 2027", mois: 11 }), mailApresGlace()]) {
+    for (const m of [mailAvance({ jusqua: "17 octobre 2027", mois: 11, bulles: 3 }), mailApresGlace()]) {
       const d = mailDeSequence(m, { base: "x", liens });
       for (const morceau of ["undefined", "null", "Inès", "Lucas"]) expect(`${d.sujet}${d.texte}${d.html}`).not.toContain(morceau);
     }
-    expect(mailAvance({ jusqua: "17 octobre 2027", mois: 11 }).apercu).toBe("valable encore 11 mois. mais pourquoi attendre\u00a0?");
+    expect(mailAvance({ jusqua: "17 octobre 2027", mois: 11, bulles: 3 }).apercu).toBe("valable encore 11 mois. mais pourquoi attendre\u00a0?");
     /* Après un 🧊 : ni « Ce mail ne cite… » (rien à citer), son lien de désinscription à lui */
     const apres = mailDeSequence(mailApresGlace(), { base: "x", liens });
     expect(apres.html).toContain(">Plus de mails comme ça</a>");
@@ -195,7 +201,7 @@ describe("les mails des séquences", () => {
       prix: "6,90\u00a0€",
       barre: "9,90\u00a0€",
       remise: "−3\u00a0€",
-      inclus: "8 chapitres sur toi et Lucas, ton vocal, et 10 réponses de BLUSH",
+      inclus: "8 chapitres sur toi et Lucas, ton vocal, et 3 réponses de BLUSH",
       jusqua: "Jusqu’à jeudi, 23\u00a0h\u00a059",
       sous: "Après, 9,90\u00a0€. Comme tout le monde.",
     });
@@ -206,7 +212,7 @@ describe("les mails des séquences", () => {
     const elle = mailParrainage(INES, { lien: "https://www.askblush.com/p/abcdefg" });
     expect(elle.titre).toBe("Ta pote mérite de savoir aussi.");
     expect(elle.encart?.ligne).toBe("askblush.com/p/abcdefg");
-    expect(elle.corps).toBe("Elle importe sa conv avec ton lien\u00a0: elle a 10 réponses de BLUSH en plus avec son rapport, et toi 10 bulles offertes.");
+    expect(elle.corps).toBe("Elle importe sa conv avec ton lien\u00a0: elle a 3 réponses de BLUSH en plus avec son rapport, et toi 3 bulles offertes.");
     const lui = mailParrainage(LUCAS, { lien: "https://www.askblush.com/p/abcdefg" });
     expect(lui.titre).toBe("Ton pote mérite de savoir aussi.");
     expect(lui.apercu).toBe("envoie-moi ton pote. vous y gagnez tous les deux.");

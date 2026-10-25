@@ -39,10 +39,10 @@ describe("le mail « ton rapport est prêt »", () => {
     expect(m.html).toContain("Hugo, j’ai fini");
     expect(`${m.sujet}\n${m.texte}`).not.toMatch(/Maëlys|Hugo/);
     expect(m.texte).toContain("8 chapitres, 9 min de lecture");
-    /* Ce qu’il a pris : le rapport (10 réponses), ou Premium (90, dont 30 offertes) */
-    expect(m.html).toContain("Et 10 réponses de BLUSH d’avance<");
+    /* Ce qu’il a pris : le rapport (3 réponses), ou Premium (25, dont les 3 du rapport offertes) */
+    expect(m.html).toContain("Et 3 réponses de BLUSH d’avance<");
     const premium = mailRapport({ base: "x", lien: "x", chapitres: 8, lecture: "9 min", personnes, premium: true, sobre: false });
-    expect(premium.html).toContain("Et 90 réponses de BLUSH d’avance, dont 30 offertes");
+    expect(premium.html).toContain("Et 25 réponses de BLUSH d’avance, dont 3 offertes");
     expect(premium.html).toContain("message après message");
     const s = mailRapport({ base: "https://www.askblush.com", lien: "x", chapitres: 0, lecture: "2 min", personnes, premium: false, sobre: true });
     expect(s.html).not.toContain("tendre");

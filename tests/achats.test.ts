@@ -18,7 +18,8 @@ vi.mock("@/server/alertes", async (original) => ({
   alerter: async (sujet: string) => void etat.alertes.push(sujet),
 }));
 
-import { CATALOGUE, DUREE_SUITE_MS, PREMIERE_RECHARGE } from "@/contenu/offres";
+import { CATALOGUE, DUREE_SUITE_MS } from "@/contenu/offres";
+import type { OffreId, OffreUnique } from "@/types";
 import { commander, livrer, marquerEchoue, offrirLeRapport, premiumLePlusChoisi, reprendre, uneFoisParEvenement, ventesDesFormules, type Achat } from "@/server/achats";
 import type { Utilisateur } from "@/server/auth";
 import { crediter, debiter, deverrouiller, refDuMessage, rendre, reponseVerrouillee, soldeDe } from "@/server/bulles";
@@ -48,6 +49,14 @@ async function commande(...args: Parameters<typeof commander>): Promise<Achat> {
   if (typeof r === "string") throw new Error(`commande refusée : ${r}`);
   return r;
 }
+/**
+ * Une commande passée avant la grille du 23 octobre 2026, encore en attente : écrite en base telle que commander
+ * l’écrivait alors (une offre retirée depuis, ses bulles figées), pour vérifier qu’elle se livre encore, payée après.
+ */
+async function commandeDAvant(u: Utilisateur, offre: OffreId, { centimes, bulles, offreUnique = null }: { centimes: number; bulles: number; offreUnique?: OffreUnique | null }) {
+  const [achat] = await db().insert(schema.achats).values({ userId: u.id, offre, centimes, bulles, offreUnique, fournisseur: "factice" }).returning();
+  return achat!;
+}
 /** Recule l’heure où cette offre unique a été montrée (et sa fin) de `ms`, comme si le temps avait passé. */
 const reculer = (userId: string, offre: string, ms: number) =>
   db()
@@ -76,11 +85,11 @@ describe("les droits", () => {
   it("un client : un rapport débloqué, ou un achat payé, ou l’équipe", async () => {
     const [rien, debloque, payeur, equipe] = [await compteDeTest("client-rien"), await compteDeTest("client-conv"), await compteDeTest("client-achat"), await compteEquipe()];
     await debloquerLaConv(await conv(debloque));
-    const achat = await commande(payeur, "pack30", { fournisseur: "factice" });
+    const achat = await commande(payeur, "pack10", { fournisseur: "factice" });
     expect(await estClient(payeur)).toBe(false);
     await livrer(achat.id);
     expect([await estClient(rien), await estClient(debloque), await estClient(payeur), await estClient(equipe)]).toEqual([false, true, true, true]);
-    expect(await compteAffiche({ ...payeur, bulles: 30 }, { storyDeleted: false })).toEqual({ email: payeur.email, bulles: 30, client: true, equipe: false, storyDeleted: false });
+    expect(await compteAffiche({ ...payeur, bulles: 10 }, { storyDeleted: false })).toEqual({ email: payeur.email, bulles: 10, client: true, equipe: false, storyDeleted: false });
   });
 });
 
@@ -160,7 +169,7 @@ describe("commander", () => {
     const [u, autre, equipe] = [await compteDeTest("commande"), await compteDeTest("commande-autre"), await compteEquipe()];
     const id = await conv(u);
     const achat = await commande(u, "premium", { storyId: id, fournisseur: "factice" });
-    expect(achat).toMatchObject({ userId: u.id, storyId: id, offre: "premium", centimes: CATALOGUE.premium.centimes, bulles: 90, statut: "en_attente", offreUnique: null });
+    expect(achat).toMatchObject({ userId: u.id, storyId: id, offre: "premium", centimes: 1990, bulles: 25, statut: "en_attente", offreUnique: null });
     /* Sans conv, la conv d’un autre, une conv déjà débloquée, ou un compte de l’équipe (tout lui est ouvert) */
     expect(await commander(u, "rapport", { fournisseur: "factice" })).toBe("aucune");
     expect(await commander(autre, "rapport", { storyId: id, fournisseur: "factice" })).toBe("aucune");
@@ -168,10 +177,27 @@ describe("commander", () => {
     await debloquerLaConv(id);
     expect(await commander(u, "rapport", { storyId: id, fournisseur: "factice" })).toBe("deja");
     /* Des bulles seules : sans conv, même donnée */
-    expect(await commande(u, "pack200", { storyId: id, fournisseur: "factice" })).toMatchObject({ storyId: null, centimes: 2390, bulles: 200 });
+    expect(await commande(u, "pack60", { storyId: id, fournisseur: "factice" })).toMatchObject({ storyId: null, centimes: 3490, bulles: 60 });
   });
 
-  it("une offre unique seulement montrée et valable ; Premium pour 5 € de plus, seulement après un rapport payé", async () => {
+  it("une offre retirée de la vente (le 23 octobre : l’ancien ③, les packs de 30, 80 et 200) ne se commande plus, même montrée ; rien n’est écrit", async () => {
+    const u = await compteDeTest("commande-retiree");
+    await livrer((await commande(u, "rapport", { storyId: await conv(u), fournisseur: "factice" })).id);
+    expect(await montrer(u, "premium_ajout")).not.toBeNull();
+    for (const offre of ["premium_ajout", "pack30", "pack80", "pack200"] as const) expect(await commander(u, offre, { fournisseur: "factice" }), offre).toBe("offre");
+    expect((await db().select({ offre: schema.achats.offre }).from(schema.achats).where(eq(schema.achats.userId, u.id))).map((a) => a.offre)).toEqual(["rapport"]);
+  });
+
+  it("une commande d’avant le 23 octobre, encore en attente, se livre à son prix et avec ses bulles figées, puis se reprend telle quelle", async () => {
+    const u = await compteDeTest("commande-d-avant");
+    const pack = await commandeDAvant(u, "pack80", { centimes: 1390, bulles: 80 });
+    expect(await livrer(pack.id)).toMatchObject({ effet: "livre", achat: { offre: "pack80", centimes: 1390, bulles: 80 } });
+    expect(await soldeDe(u.id)).toBe(80);
+    expect((await reprendre(pack.id, "rembourse")).effet).toBe("repris");
+    expect(await soldeDe(u.id)).toBe(0);
+  });
+
+  it("une offre unique seulement montrée et valable ; Premium pour 6,90 € de plus, seulement après un rapport payé", async () => {
     const u = await compteDeTest("commande-unique");
     const id = await conv(u);
     expect(await commander(u, "suite", { storyId: id, fournisseur: "factice" })).toBe("offre");
@@ -179,50 +205,51 @@ describe("commander", () => {
     /* La suite montrée pour cette conv ne se prend pas pour une autre */
     expect(await commander(u, "suite", { storyId: await conv(u), fournisseur: "factice" })).toBe("offre");
     const suite = await commande(u, "suite", { storyId: id, fournisseur: "factice" });
-    expect(suite).toMatchObject({ centimes: 690, bulles: 10, offreUnique: "suite" });
-    expect(await commander(u, "premium_ajout", { fournisseur: "factice" })).toBe("offre");
+    expect(suite).toMatchObject({ centimes: 690, bulles: 3, offreUnique: "suite" });
+    expect(await commander(u, "passe_premium", { fournisseur: "factice" })).toBe("offre");
     await livrer(suite.id);
     /*
      * Montrée juste après le paiement, alors que la suite l’a été il y a moins de 24 h : les offres de « C’est débloqué »
      * suivent la suite qu’on vient de payer (décidé le 13 octobre ; avant, ③ attendait le lendemain)
      */
     expect(await montrer(u, "premium_ajout")).not.toBeNull();
-    expect(await commande(u, "premium_ajout", { fournisseur: "factice" })).toMatchObject({ centimes: 500, bulles: 80, offreUnique: "premium_ajout", storyId: null });
+    /* ③ : les bulles qui manquent au rapport seul pour Premium (22), à 6,90 € */
+    expect(await commande(u, "passe_premium", { fournisseur: "factice" })).toMatchObject({ centimes: 690, bulles: 22, offreUnique: "premium_ajout", storyId: null });
   });
 
-  it("le pack conseillé à la première recharge : +40 bulles, si l’offre est montrée", async () => {
+  it("plus de bonus de la première recharge (arrêté le 23 octobre) : même une ④ montrée avant, le pack conseillé donne ses 25 bulles", async () => {
     const u = await compteDeTest("commande-recharge");
-    expect(await commande(u, "pack80", { fournisseur: "factice" })).toMatchObject({ bulles: 80, offreUnique: null });
+    /* Une ④ montrée avant l’arrêt : sa ligne n’a pas de fin, elle reste « valable » en base */
     await montrer(u, "premiere_recharge");
-    const achat = await commande(u, "pack80", { fournisseur: "factice" });
-    expect(achat).toMatchObject({ bulles: 80 + PREMIERE_RECHARGE.bonus, offreUnique: "premiere_recharge" });
-    /* Seulement sur le pack conseillé */
-    expect(await commande(u, "pack30", { fournisseur: "factice" })).toMatchObject({ bulles: 30, offreUnique: null });
+    const achat = await commande(u, "pack25", { fournisseur: "factice" });
+    expect(achat).toMatchObject({ centimes: 1490, bulles: 25, offreUnique: null });
     await livrer(achat.id);
-    expect(await offreValable(u.id, "premiere_recharge")).toBeNull();
-    expect(await commande(u, "pack80", { fournisseur: "factice" })).toMatchObject({ bulles: 80, offreUnique: null });
+    expect(await soldeDe(u.id)).toBe(25);
   });
 });
 
 describe("une offre unique commandée deux fois", () => {
-  it("payées toutes les deux : la première profite de l’offre, la seconde ③ n’est pas livrée, la seconde recharge n’a pas son bonus", async () => {
+  it("payées toutes les deux : la première profite de l’offre, la seconde ③ n’est pas livrée ; deux recharges d’avant avec le bonus ④, la seconde sans lui", async () => {
+    /* Deux commandes du pack de 80 d’avant le 23 octobre, le bonus ④ figé dans chacune (120 bulles), payées après */
     const u = await compteDeTest("unique-double");
     await montrer(u, "premiere_recharge");
-    const [une, deux] = [await commande(u, "pack80", { fournisseur: "factice" }), await commande(u, "pack80", { fournisseur: "factice" })];
-    expect([une.bulles, deux.bulles]).toEqual([80 + PREMIERE_RECHARGE.bonus, 80 + PREMIERE_RECHARGE.bonus]);
-    expect((await livrer(une.id)).effet).toBe("livre");
-    /* Le pack est payé au prix normal : il est livré, sans le bonus déjà pris */
+    const [une, deux] = [
+      await commandeDAvant(u, "pack80", { centimes: 1390, bulles: 120, offreUnique: "premiere_recharge" }),
+      await commandeDAvant(u, "pack80", { centimes: 1390, bulles: 120, offreUnique: "premiere_recharge" }),
+    ];
+    expect(await livrer(une.id)).toMatchObject({ effet: "livre", achat: { bulles: 120 } });
+    /* Le pack est payé au prix normal : il est livré, sans le bonus déjà pris (les 80 bulles du pack, tel qu’il se vendait) */
     expect(await livrer(deux.id)).toMatchObject({ effet: "livre", achat: { bulles: 80 } });
-    expect(await soldeDe(u.id)).toBe(80 + PREMIERE_RECHARGE.bonus + 80);
+    expect(await soldeDe(u.id)).toBe(120 + 80);
 
     const v = await compteDeTest("unique-double-ajout");
     await livrer((await commande(v, "rapport", { storyId: await conv(v), fournisseur: "factice" })).id);
     await montrer(v, "premium_ajout");
-    const [a, b] = [await commande(v, "premium_ajout", { fournisseur: "factice" }), await commande(v, "premium_ajout", { fournisseur: "factice" })];
+    const [a, b] = [await commande(v, "passe_premium", { fournisseur: "factice" }), await commande(v, "passe_premium", { fournisseur: "factice" })];
     const effets = await Promise.all([livrer(a.id), livrer(b.id)]);
-    /* 80 bulles pour 5 € une seule fois : l’autre paiement reste en attente, à rembourser (l’alerte part de la route du webhook) */
+    /* Premium pour 6,90 € une seule fois : l’autre paiement reste en attente, à rembourser (l’alerte part de la route du webhook) */
     expect(effets.map((l) => l.effet).sort()).toEqual(["livre", "offre"]);
-    expect(await soldeDe(v.id)).toBe(10 + 80);
+    expect(await soldeDe(v.id)).toBe(CATALOGUE.rapport.bulles + CATALOGUE.passe_premium.bulles);
     expect([(await achatEnBase(a.id)).statut, (await achatEnBase(b.id)).statut].sort()).toEqual(["en_attente", "paye"]);
   });
 });
@@ -249,17 +276,17 @@ describe("livrer et reprendre", () => {
     const [a, b] = await Promise.all([livrer(achat.id), livrer(achat.id)]);
     expect([a.effet, b.effet]).toEqual(["deja", "deja"]);
     expect(etat.apres).toHaveLength(apres);
-    expect(await soldeDe(u.id)).toBe(10);
-    expect(await mouvements(u.id)).toEqual([{ delta: 10, raison: "achat", ref: achat.id }]);
+    expect(await soldeDe(u.id)).toBe(3);
+    expect(await mouvements(u.id)).toEqual([{ delta: 3, raison: "achat", ref: achat.id }]);
     etat.apres.length = 0;
   });
 
   it("deux livraisons du même achat en même temps : une seule livre", async () => {
     const u = await compteDeTest("livrer-course");
-    const achat = await commande(u, "pack80", { fournisseur: "factice" });
+    const achat = await commande(u, "pack25", { fournisseur: "factice" });
     const effets = (await Promise.all([livrer(achat.id), livrer(achat.id), livrer(achat.id)])).map((l) => l.effet);
     expect(effets.filter((e) => e === "livre")).toHaveLength(1);
-    expect(await soldeDe(u.id)).toBe(80);
+    expect(await soldeDe(u.id)).toBe(25);
   });
 
   it("reprendre, rejoué deux fois : la conv re-verrouillée, les bulles reprises (sous zéro s’il le faut), l’équipe prévenue une fois", async () => {
@@ -309,19 +336,19 @@ describe("livrer et reprendre", () => {
     expect((await reprise).effet).toBe("repris");
     expect((await achatEnBase(a.id)).statut).toBe("paye");
     expect(await rapportOuvertEnBase(id)).toBe(true);
-    expect(await soldeDe(u.id)).toBe(10);
+    expect(await soldeDe(u.id)).toBe(3);
   });
 
   it("un achat jamais livré : repris sans rien reprendre ; un paiement refusé ne passe qu’un achat en attente", async () => {
     const u = await compteDeTest("reprendre-rien");
-    const [a, b] = [await commande(u, "pack30", { fournisseur: "factice" }), await commande(u, "pack30", { fournisseur: "factice" })];
+    const [a, b] = [await commande(u, "pack10", { fournisseur: "factice" }), await commande(u, "pack10", { fournisseur: "factice" })];
     expect((await reprendre(a.id, "conteste")).effet).toBe("rien");
     expect(await mouvements(u.id)).toEqual([]);
     expect(await marquerEchoue(b.id)).toBe(true);
     expect(await marquerEchoue(b.id)).toBe(false);
     /* Un paiement qui réussit après un refus (une nouvelle tentative) livre quand même */
     expect((await livrer(b.id)).effet).toBe("livre");
-    expect(await soldeDe(u.id)).toBe(30);
+    expect(await soldeDe(u.id)).toBe(10);
     expect((await livrer("00000000-0000-4000-8000-000000000000")).effet).toBe("inconnu");
   });
 

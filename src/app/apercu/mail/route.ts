@@ -25,6 +25,7 @@ import {
   type Personnes,
 } from "@/contenu/mails";
 import { hautDuPaywall } from "@/contenu/haut-du-paywall";
+import { CATALOGUE, RAPPORT_D_AVANCE } from "@/contenu/offres";
 import { mailAttente } from "@/server/mail-attente";
 import { mailCode } from "@/server/mail-code";
 import { mailRapport } from "@/server/mail-rapport";
@@ -34,22 +35,25 @@ import { AUTRE } from "../ecriture/exemple";
 
 export const dynamic = "force-dynamic";
 
+/** Le solde d’un acheteur type dans les aperçus : les bulles du rapport, moins la réponse qu’il a déjà demandée. */
+const BULLES_D_UN_ACHETEUR = CATALOGUE.rapport.bulles - 1;
+
 /** Les mails des séquences (src/server/sequences.ts), par leur `?type=` : leur texte pour ces personnes, et ce qu’ils sont pour la désinscription. */
 const SEQUENCES: Record<string, { mail: (p: Personnes) => MailDeSequence; quoi: "conseils" | "offres" }> = {
-  repondre: { mail: (p) => mailRepondre(p, { bulles: 10 }), quoi: "conseils" },
+  repondre: { mail: (p) => mailRepondre(p, { bulles: CATALOGUE.rapport.bulles }), quoi: "conseils" },
   vocal: { mail: (p) => mailVocal(p, { secondes: 28 }), quoi: "conseils" },
-  pas: { mail: (p) => mailProchainPas(p, { emoji: "🤏", pas: "Jeudi, propose-lui le ciné dont il t’a parlé, avec une heure.", bulles: 9 }), quoi: "conseils" },
+  pas: { mail: (p) => mailProchainPas(p, { emoji: "🤏", pas: "Jeudi, propose-lui le ciné dont il t’a parlé, avec une heure.", bulles: BULLES_D_UN_ACHETEUR }), quoi: "conseils" },
   glace: { mail: (p) => mailGlace(p), quoi: "conseils" },
-  peu: { mail: (p) => mailPeuDeBulles(p, { bulles: 2, bonus: true, actif: true }), quoi: "offres" },
-  prete: { mail: (p) => mailReponsePrete(p, { bonus: true }), quoi: "offres" },
+  peu: { mail: (p) => mailPeuDeBulles(p, { bulles: 1, actif: true }), quoi: "offres" },
+  prete: { mail: (p) => mailReponsePrete(p), quoi: "offres" },
   zero: { mail: (p) => mailZeroBulle(p, { faits: 12, messages: 4365, echanges: 23 }), quoi: "offres" },
-  endormi: { mail: (p) => mailEndormi(p, { niveau: "voit", bulles: 9 }), quoi: "conseils" },
-  parfait: { mail: (p) => mailParfait(p, { bulles: 9 }), quoi: "conseils" },
+  endormi: { mail: (p) => mailEndormi(p, { niveau: "voit", bulles: BULLES_D_UN_ACHETEUR }), quoi: "conseils" },
+  parfait: { mail: (p) => mailParfait(p, { bulles: BULLES_D_UN_ACHETEUR }), quoi: "conseils" },
   couple: { mail: (p) => mailTemperature(p, { niveau: "va", mois: 1 }), quoi: "conseils" },
   garde: { mail: (p) => mailGarde(p, { jour: "vendredi", heure: "18\u00a0h\u00a012" }), quoi: "offres" },
-  avance: { mail: () => mailAvance({ jusqua: "17 octobre 2027", mois: 11 }), quoi: "offres" },
+  avance: { mail: () => mailAvance({ jusqua: "17 octobre 2027", mois: 11, bulles: RAPPORT_D_AVANCE.bulles }), quoi: "offres" },
   apres: { mail: () => mailApresGlace(), quoi: "offres" },
-  anniv: { mail: (p) => mailAnniversaire(p, { jour: "jeudi", date: "jeudi 23", aime: "Le ciné, les ramen", bulles: 9 }), quoi: "conseils" },
+  anniv: { mail: (p) => mailAnniversaire(p, { jour: "jeudi", date: "jeudi 23", aime: "Le ciné, les ramen", bulles: BULLES_D_UN_ACHETEUR }), quoi: "conseils" },
   parrainage: { mail: (p) => mailParrainage(p, { lien: "https://www.askblush.com/p/abcdefg" }), quoi: "offres" },
   haut: {
     mail: (p) =>

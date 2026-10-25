@@ -503,20 +503,20 @@ describe("à 0 bulle : la réponse verrouillée", () => {
     await fluxDe(await envoyer("je dis quoi ?"));
     await lancerApres();
     const v = await derniereVerrouillee(u.id);
-    const achat = await commander(u, "pack30", { fournisseur: "factice" });
+    const achat = await commander(u, "pack10", { fournisseur: "factice" });
     if (typeof achat === "string") throw new Error(`commande refusée : ${achat}`);
     expect((await livrer(achat.id)).effet).toBe("livre");
-    expect(await soldeDe(u.id)).toBe(CATALOGUE.pack30.bulles);
+    expect(await soldeDe(u.id)).toBe(CATALOGUE.pack10.bulles);
 
     const lue = await lire(v.id);
     expect(lue.status).toBe(200);
     const r = (await lue.json()) as BlushAnswer;
     expect(r.verrouillee).toBeUndefined();
     expect(r.bubbles.length).toBeGreaterThan(0);
-    expect(r.bulles).toEqual({ depensees: 0, restantes: CATALOGUE.pack30.bulles });
-    expect(await soldeDe(u.id)).toBe(CATALOGUE.pack30.bulles);
+    expect(r.bulles).toEqual({ depensees: 0, restantes: CATALOGUE.pack10.bulles });
+    expect(await soldeDe(u.id)).toBe(CATALOGUE.pack10.bulles);
     /* Le journal : l’achat seul, aucun débit ; la réponse n’attend plus, offerte */
-    expect((await journalDe(u.id)).map((m) => [m.raison, m.delta])).toEqual([["achat", CATALOGUE.pack30.bulles]]);
+    expect((await journalDe(u.id)).map((m) => [m.raison, m.delta])).toEqual([["achat", CATALOGUE.pack10.bulles]]);
     const [ligne] = await db()
       .select({ cout: schema.chatMessages.cout, verrouillee: schema.chatMessages.verrouillee })
       .from(schema.chatMessages)
@@ -527,16 +527,32 @@ describe("à 0 bulle : la réponse verrouillée", () => {
     const encore = (await (await lire(v.id)).json()) as BlushAnswer;
     expect(encore.bulles).toBeUndefined();
     expect(textesDe(encore)).toEqual(textesDe(r));
-    expect(await soldeDe(u.id)).toBe(CATALOGUE.pack30.bulles);
+    expect(await soldeDe(u.id)).toBe(CATALOGUE.pack10.bulles);
+  });
+
+  it("une recharge retirée de la vente (le pack de 80, commandé avant le 23 octobre) payée après elle la paie aussi", async () => {
+    const { u } = await parleur("verrou-recharge-retiree", 0);
+    const [avant] = await db()
+      .insert(schema.achats)
+      .values({ userId: u.id, offre: "pack80", centimes: 1390, bulles: 80, fournisseur: "factice" })
+      .returning({ id: schema.achats.id });
+    await fluxDe(await envoyer("je dis quoi ?"));
+    await lancerApres();
+    const v = await derniereVerrouillee(u.id);
+    expect((await livrer(avant!.id)).effet).toBe("livre");
+    const r = (await (await lire(v.id)).json()) as BlushAnswer;
+    expect(r.verrouillee).toBeUndefined();
+    expect(r.bulles).toEqual({ depensees: 0, restantes: 80 });
+    expect(await soldeDe(u.id)).toBe(80);
   });
 
   it("une recharge payée avant la réponse verrouillée ne la paie pas : des bulles venues d’ailleurs, son coût est débité", async () => {
     const { u } = await parleur("verrou-recharge-avant", 0);
-    const achat = await commander(u, "pack30", { fournisseur: "factice" });
+    const achat = await commander(u, "pack10", { fournisseur: "factice" });
     if (typeof achat === "string") throw new Error(`commande refusée : ${achat}`);
     await livrer(achat.id);
     /* Les bulles de ce pack, parties ailleurs : le solde revient à 0 */
-    await crediter(u.id, -CATALOGUE.pack30.bulles, "remboursement", `test:depense:${u.id}`);
+    await crediter(u.id, -CATALOGUE.pack10.bulles, "remboursement", `test:depense:${u.id}`);
     await fluxDe(await envoyer("je dis quoi ?"));
     await lancerApres();
     const v = await derniereVerrouillee(u.id);

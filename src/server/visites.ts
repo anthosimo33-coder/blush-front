@@ -269,7 +269,10 @@ export async function noterAuFil(req: Request, geste: { genre: Exclude<GenreFil,
   );
 }
 
-/** Note un achat payé au fil du direct (depuis le webhook, sans connexion à situer) : la ville de son paiement ouvert, s’il y en a un. */
+/**
+ * Note un achat payé au fil du direct (depuis le webhook, sans connexion à situer) : la ville de son paiement ouvert,
+ * s’il y en a un, et l’achat en `ref`, d’où le fil tire le prix payé (src/server/direct.ts).
+ */
 export async function noterAchatAuFil(achat: { id: string; offre: OffreId }): Promise<void> {
   await auMieux(async () => {
     const f = schema.filDirect;
@@ -280,6 +283,6 @@ export async function noterAchatAuFil(achat: { id: string; offre: OffreId }): Pr
       .limit(1);
     await db()
       .insert(f)
-      .values({ genre: "achat", ville: ouvert?.ville ?? null, offre: achat.offre });
+      .values({ genre: "achat", ville: ouvert?.ville ?? null, offre: achat.offre, ref: achat.id });
   }, "achat du fil non noté");
 }

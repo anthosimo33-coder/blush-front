@@ -16,7 +16,8 @@ import { estEquipe } from "./droits";
  * L’équipe ne paie rien : aucune ne lui est montrée. La relance par mail (②) n’est pas montrée par ici : elle s’envoie
  * deux heures après la ① (src/server/relances.ts), qui seule ne l’arrête pas (elle la suit par définition). Pour le
  * reste, elle compte comme les autres : ni ③ ni ④ dans les 24 h d’une relance, ni de relance dans les 24 h de l’une
- * d’elles, et pas de ① dans les 24 h d’une relance partie après une commande laissée en attente.
+ * d’elles, et pas de ① dans les 24 h d’une relance partie après une commande laissée en attente. ④ (le bonus de la
+ * première recharge) est arrêtée le 23 octobre 2026 : plus jamais montrée (proposerOffreUnique), ses lignes restent.
  * Seule exception à la règle des 24 h : les offres de « C’est débloqué » (OFFRES_DU_MERCI), qui se suivent sur la même
  * page juste après un paiement, une offre puis son repli si elle est refusée (décidé le 13 octobre).
  */
@@ -35,7 +36,7 @@ const DUREES: Record<OffreUnique, number | null> = {
 };
 
 /**
- * Les offres de « C’est débloqué », juste après le paiement d’un rapport : ③ Premium pour 5 € de plus et ⑤ le 2e rapport
+ * Les offres de « C’est débloqué », juste après le paiement d’un rapport : ③ Premium pour 6,90 € de plus et ⑤ le 2e rapport
  * à −50 % (l’une, puis l’autre en repli), puis ⑥ le −50 % gardé quand ⑤ est refusée. Entre elles, et après la suite (①)
  * qui vient d’être payée, la règle des 24 h ne joue pas. Chacune reste une fois par compte, et compte pour les autres
  * (② la relance, ④ la première recharge) comme n’importe quelle offre unique.

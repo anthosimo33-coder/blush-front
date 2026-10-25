@@ -1,11 +1,10 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useId, useState } from "react";
+import { useId, useState } from "react";
 import { apresLaLivraison } from "@/lib/paiement";
 import { useAuPaiement } from "@/lib/presence";
 import { useCompte } from "@/lib/requetes";
-import { proposerOffreUnique } from "@/services/api";
 import { RadioGroup } from "@/components/ui/controls";
 import { Tag } from "@/components/ui/messages";
 import { Sheet } from "@/components/ui/surfaces";
@@ -13,21 +12,16 @@ import { PayerDansLaFeuille } from "@/components/paiement/integre/PayerDansLaFeu
 import { CATALOGUE } from "@/contenu/offres";
 import { lePack, PACK_CONSEILLE, PACKS, RECHARGE, type Pack } from "@/contenu/recharge";
 import type { GenreVendu } from "@/types";
-import { Grappe } from "./perles";
 import { LigneOfferte, Option } from "./pieces";
 
 /*
- * La recharge (le prototype validé des bulles, 12 octobre) : trois packs, le conseillé choisi d’avance et ouvert, et le
- * bonus de la première recharge (④) quand le serveur le montre (POST /api/paiement/offre : une fois par compte, jamais
- * le même jour qu’une autre offre unique). Puis le paiement dans la feuille (PayerDansLaFeuille, comme les autres
+ * La recharge (le prototype validé des bulles, 12 octobre) : trois packs, le conseillé choisi d’avance et ouvert (le
+ * bonus de la première recharge, ④, est arrêté le 23 octobre 2026). Puis le paiement dans la feuille (PayerDansLaFeuille, comme les autres
  * feuilles qui font payer : Apple Pay, Google Pay ou la carte de Whop, sans quitter BLUSH ; la page de Whop en repli),
  * la renonciation (une ligne sous le bouton, que le geste de payer donne), et ce qu’on dit quand rien ne part. Payé : les
  * packs s’effacent derrière « C’est payé », puis on revient où la recharge a été ouverte (`suite`). Sans la case de
  * renonciation (retirée le 13 octobre), la feuille a les marges du prototype, sauf ses écarts sur un écran bas.
  */
-
-/** Le bonus ④ : pas encore demandé au serveur, montré par lui, ou pas pour ce compte. */
-type Bonus = "inconnu" | "oui" | "non";
 
 /**
  * La feuille de la recharge. `reponsePrete` : ouverte depuis une réponse écrite à 0 bulle (floutée), elle le rappelle
@@ -53,26 +47,10 @@ export function FeuilleRecharge({
   const titre = useId();
   useAuPaiement(open);
   const [choisi, setChoisi] = useState<Pack>(PACK_CONSEILLE);
-  const [bonus, setBonus] = useState<Bonus>("inconnu");
-
-  /* Ouverte : le serveur dit si le bonus de la première recharge vaut pour ce compte (une fois demandé, il reste su) */
-  useEffect(() => {
-    if (!open || bonus !== "inconnu") return;
-    let vivant = true;
-    proposerOffreUnique("premiere_recharge").then(
-      (o) => vivant && setBonus(o.offre === "premiere_recharge" ? "oui" : "non"),
-      () => vivant && setBonus("non"),
-    );
-    return () => {
-      vivant = false;
-    };
-  }, [open, bonus]);
-
-  const premiere = bonus === "oui";
   /* Un solde sous zéro (des bulles reprises après un remboursement) : la feuille le dit, avec ce que le pack en fera */
   const compte = useCompte().data;
   const dette = compte && !compte.equipe && compte.bulles < 0 ? compte.bulles : null;
-  const packs = Object.fromEntries(PACKS.map((p) => [p, lePack(p, premiere)])) as Record<Pack, ReturnType<typeof lePack>>;
+  const packs = Object.fromEntries(PACKS.map((p) => [p, lePack(p)])) as Record<Pack, ReturnType<typeof lePack>>;
   const router = useRouter();
   /* Payé : « C’est payé » prend la place des packs, le temps de la livraison ; la feuille ne se ferme plus */
   const [paye, setPaye] = useState(false);
@@ -86,7 +64,7 @@ export function FeuilleRecharge({
   };
 
   return (
-    /* Un écran bas (375 × 667) : le titre, le bonus et les écarts se resserrent pour tenir sans défiler, bonus ④, réponse prête et ligne de la renonciation compris, avec la marge des textes plus larges de Chrome sous Linux et Android */
+    /* Un écran bas (375 × 667) : le titre et les écarts se resserrent pour tenir sans défiler, réponse prête et ligne de la renonciation compris, avec la marge des textes plus larges de Chrome sous Linux et Android */
     <Sheet
       open={open}
       onClose={paye || occupe ? () => {} : onClose}
@@ -103,23 +81,11 @@ export function FeuilleRecharge({
           {RECHARGE.dette(dette, dette + packs[choisi].total)}
         </p>
       )}
-      {premiere && (
-        <div
-          data-bonus=""
-          className="flex items-center gap-3 rounded-[20px] bg-[linear-gradient(120deg,#FFE6F2_0%,#EFE4FF_55%,#E2F0FF_100%)] px-4 py-3 [@media(max-height:700px)]:py-2"
-        >
-          <Grappe taille={42} />
-          <p className="m-0 flex flex-col gap-0.5">
-            <span className="text-detail font-black">{RECHARGE.bonus}</span>
-            <span className="text-legende font-extrabold text-soft">{RECHARGE.bonusNote}</span>
-          </p>
-        </div>
-      )}
       <RadioGroup label={RECHARGE.choix} className={paye ? "hidden" : "flex flex-col gap-3 [@media(max-height:700px)]:gap-2"}>
         {PACKS.map((p) => {
           const pack = packs[p];
-          /* Le prix de la bulle en vert quand il baisse (le bonus, le grand pack) ; en gris pour le repère et le conseillé seul */
-          const vert = p === "pack200" || (p === PACK_CONSEILLE && premiere);
+          /* Le prix de la bulle en vert sur le grand pack, où il baisse ; en gris pour les autres */
+          const vert = p === PACKS[PACKS.length - 1];
           return (
             <Option
               key={p}
@@ -154,8 +120,6 @@ export function FeuilleRecharge({
            */
           livre={(e) => {
             setPaye(false);
-            /* Une recharge payée : le bonus de la première ne vaut plus, il se redemande à la prochaine ouverture (la feuille reste montée) */
-            setBonus("inconnu");
             onClose();
             router.replace(apresLaLivraison(e));
           }}

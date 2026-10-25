@@ -2,8 +2,10 @@ import type { LevelId } from "@/types";
 import { NB_CHAPITRES, titreDAttente } from "./chapitres";
 import type { GenreDuHaut, HautDuPaywall } from "./haut-du-paywall";
 import { scaleOf } from "./niveaux";
-import { CATALOGUE, COUT_EN_BULLES, PARRAINAGE, prixDe, RAPPORT_D_AVANCE } from "./offres";
-import { lePack, PACK_CONSEILLE } from "./recharge";
+import { SEUIL_PEU_DE_BULLES } from "./bulles-du-chat";
+import { CATALOGUE, COUT_EN_BULLES, PARRAINAGE, prixDe } from "./offres";
+import { OFFERTES_PREMIUM } from "./paiement";
+import { lePack, PACK_CONSEILLE, PACKS } from "./recharge";
 
 /*
  * Les textes des mails des séquences (src/server/sequences.ts), la V3 du canvas « BLUSH · Séquences mail » (17 octobre) :
@@ -78,7 +80,7 @@ const PIED = "Ce mail ne cite aucun de vos messages.";
 
 /**
  * S3 J0, « ton rapport est prêt » (src/server/mail-rapport.ts) : ses bulles, et les réponses de BLUSH qu’elle a d’avance,
- * selon ce qu’elle a pris : le rapport (10), ou Premium (90, dont 30 offertes) et sa promesse.
+ * selon ce qu’elle a pris : le rapport (3), ou Premium (25, dont les 3 du rapport offertes) et sa promesse.
  */
 export function mailRapportPret(p: Personnes, { chapitres, premium }: { chapitres: number; premium: boolean }) {
   const { nom, Il } = lAutre(p);
@@ -88,7 +90,7 @@ export function mailRapportPret(p: Personnes, { chapitres, premium }: { chapitre
     titre: `Tout ce que tu te demandais sur ${nom}.`,
     encart: premium
       ? {
-          gras: `Et ${CATALOGUE.premium.bulles} réponses de BLUSH d’avance, dont ${CATALOGUE.pack30.bulles} offertes`,
+          gras: `Et ${CATALOGUE.premium.bulles} réponses de BLUSH d’avance, dont ${OFFERTES_PREMIUM} offertes`,
           ligne: `${Il} t’écrit\u00a0? Tu colles son message, je t’aide à répondre, message après message. 1 réponse = 1 bulle.`,
         }
       : { gras: `Et ${CATALOGUE.rapport.bulles} réponses de BLUSH d’avance`, ligne: `${Il} t’écrit\u00a0? Tu colles son message, je te dis quoi répondre. 1 réponse = 1 bulle.` },
@@ -209,53 +211,60 @@ export function mailParrainage(p: Personnes, { lien }: { lien: string }): MailDe
 
 /* ———— S4 · Les bulles ———— */
 
-/** Le pack conseillé, avec le bonus de la 1re recharge (④) quand il vaut : « 70 bulles + 50 offertes · 13,90 € · 120 réponses ». */
-function packConseille(bonus: boolean) {
-  const { titre, offertes, total, prix } = lePack(PACK_CONSEILLE, bonus);
+/**
+ * Le pack conseillé : « 25 bulles · 14,90 € · 0,60 € la réponse » ; avec des bulles offertes, elles suivent son titre et
+ * le total des réponses se dit (« 70 bulles + 10 offertes · … · 80 réponses, … »).
+ */
+function packConseille() {
+  const { titre, offertes, total, prix } = lePack(PACK_CONSEILLE);
   const parReponse = `${(CATALOGUE[PACK_CONSEILLE].centimes / 100 / total).toFixed(2).replace(".", ",")}\u00a0€`;
-  return { prix, total, ligne: `${titre} + ${offertes} offertes · ${prix} · ${total} réponses, ${parReponse} la réponse` };
+  const debut = offertes ? `${titre} + ${offertes} offertes · ${prix} · ${total} réponses, ` : `${titre} · ${prix} · `;
+  return { prix, total, ligne: `${debut}${parReponse} la réponse` };
 }
 
-/** Le bonus de la 1re recharge, en bulles : ce que ④ ajoute au pack conseillé. */
-const BONUS = lePack(PACK_CONSEILLE, true).offertes - lePack(PACK_CONSEILLE, false).offertes;
+/** Le plus petit pack de la recharge, celui qu’attend une réponse prête. */
+const PETIT_PACK = PACKS[0];
 
-/** S4, 2 bulles ou moins : le pack conseillé. `actif` : elle a écrit au chat ces deux derniers jours. */
-export function mailPeuDeBulles(p: Personnes, { bulles, bonus, actif }: { bulles: number; bonus: boolean; actif: boolean }): MailDeSequence {
+/** S4, la dernière bulle (SEUIL_PEU_DE_BULLES ou moins) : le pack conseillé. `actif` : elle a écrit au chat ces deux derniers jours. */
+export function mailPeuDeBulles(p: Personnes, { bulles, actif }: { bulles: number; actif: boolean }): MailDeSequence {
   const { il, nom } = lAutre(p);
   return {
     sujet: `il te reste ${nBulles(bulles, "réponse")}`,
     apercu: "et la conv, elle, est pas finie.",
     texte: `Il te reste ${nBulles(bulles)}. Recharge maintenant, et t’es tranquille pour des semaines.`,
-    bulles: [`plus que ${nBulles(bulles)}`, actif ? `et vu comme ça repart avec ${nom}, ça va pas suffire 👀` : `et ${nom} a pas fini de t’écrire 👀`],
+    bulles: [
+      bulles > 1 ? `plus que ${nBulles(bulles)}` : "plus qu’une bulle",
+      actif ? `et vu comme ça repart avec ${nom}, ça va pas suffire 👀` : `et ${nom} a pas fini de t’écrire 👀`,
+    ],
     titre: "Tomber à sec au mauvais moment, c’est non.",
     corps: `Le pire moment pour plus avoir de bulles, c’est quand ${il} t’écrit un truc important à minuit. Recharge maintenant, t’es tranquille pour des semaines.`,
-    encart: { gras: bonus ? `Ta 1re recharge\u00a0: +${BONUS} offertes` : "Le pack conseillé", ligne: packConseille(bonus).ligne },
+    encart: { gras: "Le pack conseillé", ligne: packConseille().ligne },
     boutons: [{ libelle: `Recharger avant qu’${il} écrive` }],
     mini: "Paiement unique, pas d’abonnement · Apple Pay ou carte",
-    ps: bonus ? "ps\u00a0: tes bulles expirent jamais. le bonus, lui, c’est que sur ta 1re recharge" : "ps\u00a0: tes bulles expirent jamais",
+    ps: "ps\u00a0: tes bulles expirent jamais",
     pied: PIED,
   };
 }
 
 /** S4, la réponse écrite à 0 bulle qui attend sa recharge : dessinée floue, et le plus petit pack. */
-export function mailReponsePrete(p: Personnes, { bonus }: { bonus: boolean }): MailDeSequence {
+export function mailReponsePrete(p: Personnes): MailDeSequence {
   const { il, Il, nom } = lAutre(p);
-  const conseille = packConseille(bonus);
+  const conseille = packConseille();
   return {
     sujet: "ta réponse est prête",
     apercu: "elle attend que toi.",
     texte: "Ta réponse est prête. Il te manque juste des bulles\u00a0: recharge, elle s’affiche tout de suite.",
     bulles: ["j’ai ta réponse", "elle est bonne. genre vraiment bonne 😏", "il te manque juste des bulles"],
     floue: `Pour ${nom} · prête`,
-    titre: `${Il} attend ta réponse. Ta réponse attend ${prixDe("pack30")}.`,
+    titre: `${Il} attend ta réponse. Ta réponse attend ${prixDe(PETIT_PACK)}.`,
     corps: `Je l’ai écrite pour ce qu’${il} vient de te dire, avec tout ce que je sais de vous deux. Tu recharges, elle s’affiche, tu copies, t’envoies.`,
     encart: {
-      gras: `${CATALOGUE.pack30.bulles} bulles · ${prixDe("pack30")}`,
-      ligne: bonus ? `ou ${conseille.total} avec ta 1re recharge à ${conseille.prix}` : `ou ${conseille.total} à ${conseille.prix}`,
+      gras: `${CATALOGUE[PETIT_PACK].bulles} bulles · ${prixDe(PETIT_PACK)}`,
+      ligne: `ou ${conseille.total} à ${conseille.prix}`,
     },
     boutons: [{ libelle: "Afficher ma réponse" }],
     mini: "Paiement unique · Apple Pay ou carte",
-    ps: `ps\u00a0: ${CATALOGUE.pack30.bulles} bulles, c’est ${CATALOGUE.pack30.bulles} réponses comme celle-là`,
+    ps: `ps\u00a0: ${CATALOGUE[PETIT_PACK].bulles} bulles, c’est ${CATALOGUE[PETIT_PACK].bulles} réponses comme celle-là`,
     pied: "Ce mail ne contient pas ta réponse\u00a0: le flou est un dessin.",
   };
 }
@@ -390,14 +399,14 @@ export function mailGarde(p: Personnes, { jour, heure }: { jour: string; heure: 
   };
 }
 
-/** S6, le rapport d’avance (⑤) payé qui dort : jusqu’à quand il vaut (« 17 octobre 2027 »), et dans combien de mois. */
-export function mailAvance({ jusqua, mois }: { jusqua: string; mois: number }): MailDeSequence {
+/** S6, le rapport d’avance (⑤) payé qui dort : jusqu’à quand il vaut (« 17 octobre 2027 »), dans combien de mois, et ses bulles (celles promises à sa commande, bullesDeLAvance). */
+export function mailAvance({ jusqua, mois, bulles }: { jusqua: string; mois: number; bulles: number }): MailDeSequence {
   return {
     sujet: "t’as un rapport payé qui dort",
     apercu: `valable encore ${mois} mois. mais pourquoi attendre\u00a0?`,
     texte: `Ton rapport d’avance est déjà payé, pour la conv de ton choix, jusqu’au ${jusqua}. Importe-la, je l’ouvre sans rien te redemander.`,
     bulles: ["petit rappel", "t’as un rapport déjà payé", "et je sais qu’il y a une conv que tu veux que je lise"],
-    encart: { gras: "Rapport d’avance · déjà payé", ligne: `Pour la conv de ton choix, avec ${RAPPORT_D_AVANCE.bulles} réponses de BLUSH. Valable jusqu’au ${jusqua}.` },
+    encart: { gras: "Rapport d’avance · déjà payé", ligne: `Pour la conv de ton choix, avec ${bulles} réponses de BLUSH. Valable jusqu’au ${jusqua}.` },
     titre: "Déjà payé. Juste là. Pour qui\u00a0?",
     corps: "Un nouveau crush, une conv qui s’est éteinte, ton ex\u00a0: importe-la, je l’ouvre sans rien te redemander.",
     boutons: [{ libelle: "Importer une conv" }],
@@ -654,7 +663,7 @@ export const NOMS_DES_MAILS = {
   s3_pas: "S3 J+4 · le prochain pas (ou 🧊)",
   s3_parrainage: "S3 J+5 · le parrainage",
   s4_prete: "S4 · ta réponse est prête",
-  s4_peu: "S4 · 2 bulles ou moins",
+  s4_peu: SEUIL_PEU_DE_BULLES > 1 ? `S4 · ${nBulles(SEUIL_PEU_DE_BULLES)} ou moins` : "S4 · la dernière bulle",
   s4_zero: "S4 · à zéro depuis 3 jours",
   s5_endormi: "S5 J+7 · t’en es où\u00a0?",
   s5_parfait: "S5 J+21 · parfait, ou abandonné\u00a0?",

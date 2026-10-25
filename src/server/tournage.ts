@@ -3,7 +3,6 @@ import { and, count, desc, eq, inArray, isNotNull, isNull, max, ne, or, sql } fr
 import type { Devinette, Objectif, Pronom } from "@prompts/lib/conv";
 import { enAlerteSobre } from "@prompts/lib/titres";
 import { CASE_IMPORT } from "@/contenu/consentements";
-import { CATALOGUE } from "@/contenu/offres";
 import { NOM_TOURNAGE_MAX, PRENOM_MAX } from "@/lib/limites";
 import { mentionne, renommer } from "@/lib/renommer";
 import type { ExportApp } from "@/types";
@@ -51,8 +50,11 @@ import { etatDesTaches, planifier } from "./taches";
 /** Une conv de tournage : son nom (la campagne), et la conv qu’on rejoue. */
 export type Tournage = { id: string; nom: string; storyId: string };
 
-/** Les bulles d’une prise, comme celles d’un rapport acheté : une fois par conv de tournage et par compte. */
-export const BULLES_DU_TOURNAGE = CATALOGUE.rapport.bulles;
+/**
+ * Les bulles d’une prise : une fois par conv de tournage et par compte. 10, comme le rapport d’avant la grille du
+ * 23 octobre 2026 : de quoi filmer le chat, sans suivre les 3 bulles du rapport vendu (une prise ne se vend pas).
+ */
+export const BULLES_DU_TOURNAGE = 10;
 
 const t = schema.tournages;
 const s = schema.stories;

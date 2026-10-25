@@ -9,7 +9,7 @@ import type { Pronom } from "@/types";
 
 /*
  * Ce qui se pose au-dessus du champ du chat, selon les bulles (le prototype validé des bulles, 12 octobre) : la première
- * apparition du compteur expliquée (« Tes 10 bulles offertes sont là »), bientôt finies (« Plus que N bulles »), une
+ * apparition du compteur expliquée (« Tes 3 bulles offertes sont là »), bientôt finies (« Plus que N bulles »), une
  * réponse prête qui attend la recharge, ou plus de bulles. Une carte à la fois : l’accueil choisit laquelle (etatDuBandeau).
  */
 

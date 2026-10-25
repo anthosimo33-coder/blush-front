@@ -48,7 +48,7 @@ const PASTILLES = {
 /**
  * Le retour du paiement, au dessin de l’appli : l’achat relu chaque seconde (GET /api/paiement/[achat], qui vérifie
  * chez Whop si le webhook tarde), puis la page qui suit. Un rapport : « C’est débloqué ». Des bulles (un pack, l’offre
- * ③) : elles se disent (« +80 bulles »), puis on revient là où le paiement a commencé (le chat). Refusé, annulé chez Whop
+ * ③) : elles se disent (« +22 bulles »), puis on revient là où le paiement a commencé (le chat). Refusé, annulé chez Whop
  * (`statut`, de son adresse), remboursé ou introuvable : on le dit, avec « Réessayer » ou le retour au rapport.
  */
 export function RetourScreen({ achat, paiement, statut }: { achat: string | null; paiement: string | null; statut: StatutDuRetour | null }) {

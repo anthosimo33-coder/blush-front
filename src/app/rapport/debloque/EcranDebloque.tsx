@@ -34,14 +34,14 @@ import { ancreDuChapitre } from "../ancres";
  * octobre ; le serveur les montre, chacune une fois par compte, juste après le paiement : src/server/offres-uniques.ts).
  * - Après Premium : ⑤ le 2e rapport à −50 % (un rapport d’avance, sur un billet), puis, refusée, ⑥ le −50 % gardé 7
  *   jours pour la conv suivante (« Garde-le-moi », rien à payer).
- * - Après le rapport seul (la suite ①, le −50 % gardé) : ③ Premium pour 5 € de plus, puis, refusée, ⑤ le 2e rapport.
+ * - Après le rapport seul (la suite ①, le −50 % gardé) : ③ Premium pour 6,90 € de plus, puis, refusée, ⑤ le 2e rapport.
  * - Après un rapport d’avance utilisé : rien, la liste.
  * Une offre prise ne mène à aucune autre. Elles se paient en un geste avec la carte gardée du paiement d’avant, sans
  * quitter la page (le serveur paie, la page attend la livraison) ; sans carte gardée, dans la feuille (PayerDansLaFeuille).
  * Sur un écran court (375 × 667), l’en-tête se resserre pour que l’offre tienne sans défiler.
  */
 
-/** Les perles posées devant les bulles reçues, dans l’offre ③ : une rangée, pas leur nombre. */
+/** Les perles posées devant les bulles reçues, dans l’offre ③ : une par bulle reçue, jusqu’à une rangée de ce nombre (jamais plus de perles que le chiffre à côté). */
 const PERLES_RECUES = 5;
 /** Le temps de voir le tampon « À toi » sur le billet, avant la liste. */
 const TAMPON_MS = 1_500;
@@ -383,15 +383,15 @@ export function EcranDebloque({
               {OFFRE_PREMIUM_AJOUT.titre}
             </h2>
             <p className="m-0 text-note font-extrabold leading-[1.45] text-grey">{OFFRE_PREMIUM_AJOUT.texte}</p>
-            {/* Les bulles reçues, et les 80 de plus, pour l’œil : le texte au-dessus les dit */}
+            {/* Les bulles reçues, et celles que ③ ajoute, pour l’œil : le texte au-dessus les dit */}
             <span aria-hidden="true" className="flex items-center justify-center gap-3 rounded-2xl bg-[linear-gradient(135deg,#FFF2F8,#F6EFFF)] py-3">
-              <Rangee pleines={PERLES_RECUES} taille={13} />
+              <Rangee pleines={Math.min(PERLES_RECUES, recu.bulles)} taille={13} />
               <span className="text-detail font-black text-soft">{recu.bulles}</span>
               <span className="text-[22px] font-black text-elle-ink">+</span>
               <Grappe taille={40} />
               <span className="text-detail font-black text-elle-ink">{OFFRE_PREMIUM_AJOUT.plus}</span>
             </span>
-            <Prendre offre="premium_ajout" libelle={OFFRE_PREMIUM_AJOUT.prendre} quoi="bulles" enUnGeste={montree.enUnGeste} geste={geste} ici={ici} livre={livre} />
+            <Prendre offre="passe_premium" libelle={OFFRE_PREMIUM_AJOUT.prendre} quoi="bulles" enUnGeste={montree.enUnGeste} geste={geste} ici={ici} livre={livre} />
             <Button variant="link" onClick={() => void refuser("premium_ajout")}>
               {OFFRE_PREMIUM_AJOUT.non}
             </Button>

@@ -131,9 +131,10 @@ type PaiementDansLaFeuille = { mode: "whop"; compte: string; bacASable: boolean 
 
 /**
  * Ce que le compte a d’avance pour une conv pas encore débloquée : un rapport d’avance (le 2e rapport à −50 %, payé sur
- * « C’est débloqué », valable un an) et le −50 % gardé (7 jours), chacun avec sa fin (une date ISO), ou null.
+ * « C’est débloqué », valable un an, et les bulles qu’il donnera, celles promises à sa commande) et le −50 % gardé
+ * (7 jours), chacun avec sa fin (une date ISO), ou null.
  */
-export type Avoirs = { avance: { fin: string } | null; garde: { fin: string } | null };
+export type Avoirs = { avance: { fin: string; bulles: number } | null; garde: { fin: string } | null };
 
 /**
  * La roue du paywall de ce compte (src/server/roue.ts) : à tourner, refusée, gagnée (la case et son lot, sa fin, une
@@ -219,10 +220,15 @@ export type GesteDeLEquipe =
   | { action: "debloquer"; convs: number | null }
   | { action: "inviter"; invites: number; restent: number; plafond: boolean; refusees: number; prestataire: boolean };
 
-/** Un geste du fil d’/admin en direct : une ville (null : inconnue), quand, et ce qui va avec (la source d’une arrivée, l’offre d’un paiement ou d’un achat). */
+/**
+ * Un geste du fil d’/admin en direct : une ville (null : inconnue), quand, et ce qui va avec (la source d’une arrivée,
+ * l’offre d’un paiement ou d’un achat, et le prix payé d’un achat : `centimes`, absent pour un achat noté au fil avant
+ * que le fil garde son achat, avec la grille du 23 octobre 2026, qui se dit alors au prix du catalogue).
+ */
 export type GesteDuFil =
   | { genre: Extract<GenreFil, "arrivee">; ville: string | null; le: string; source: SourceVisite }
-  | { genre: Extract<GenreFil, "paiement" | "achat">; ville: string | null; le: string; offre: OffreId }
+  | { genre: Extract<GenreFil, "paiement">; ville: string | null; le: string; offre: OffreId }
+  | { genre: Extract<GenreFil, "achat">; ville: string | null; le: string; offre: OffreId; centimes?: number }
   | { genre: Extract<GenreFil, "import" | "partage">; ville: string | null; le: string };
 
 /**

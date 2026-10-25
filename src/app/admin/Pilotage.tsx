@@ -67,7 +67,7 @@ const MOMENTS_DES_COUPS: Record<OffreUnique, string> = {
   suite: "feuille du paiement fermée sans payer",
   relance_mail: "deux heures après",
   premium_ajout: "juste après le paiement",
-  premiere_recharge: "à la première recharge",
+  premiere_recharge: "à la première recharge, arrêté le 23 octobre",
   second_rapport: "juste après le paiement",
   garde_second: "le 2e rapport refusé, juste après",
 };

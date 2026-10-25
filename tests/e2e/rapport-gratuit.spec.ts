@@ -55,9 +55,9 @@ test("compte gratuit : le chapitre 1 se lit en entier, les sept autres sont ferm
     await expect(fermes.nth(3)).toContainText(/^5Maëlys, /);
   });
 
-  await test.step("ni chat ni question : « Lire la suite · 9,90 € », et les 10 bulles offertes avec le rapport", async () => {
+  await test.step("ni chat ni question : « Lire la suite · 9,90 € », et les 3 bulles offertes avec le rapport", async () => {
     await expect(rapport.getByRole("button", { name: "Lire la suite · 9,90\u00a0€" })).toBeVisible();
-    await expect(rapport.getByRole("button", { name: /^10 bulles offertes avec ton rapport/ })).toContainText("1 bulle = 1 réponse de BLUSH, sur tout ce que tu veux");
+    await expect(rapport.getByRole("button", { name: /^3 bulles offertes avec ton rapport/ })).toContainText("1 bulle = 1 réponse de BLUSH, sur tout ce que tu veux");
     await expect(page.getByRole("link", { name: "Parler à BLUSH" })).toHaveCount(0);
     await expect(page.getByRole("link", { name: /Poser ma question à BLUSH|Ta question/ })).toHaveCount(0);
   });
@@ -89,7 +89,7 @@ test("compte gratuit : le paiement, ses deux formules, la renonciation sous le b
   const paiement = page.getByRole("dialog", { name: PAIEMENT });
 
   await test.step("les bulles offertes, expliquées d’un toucher : « C’est quoi une bulle ? », que « Compris » ferme", async () => {
-    await rapport.getByRole("button", { name: /^10 bulles offertes avec ton rapport/ }).click();
+    await rapport.getByRole("button", { name: /^3 bulles offertes avec ton rapport/ }).click();
     const bulle = page.getByRole("dialog", { name: "C’est quoi une bulle\u00a0?" });
     await expect(bulle.getByText("Sur tout ce que tu veux. Elles n’expirent jamais.")).toBeVisible();
     await feuilleSurOrdinateur(page, bulle, { titre: 26 });
@@ -107,25 +107,24 @@ test("compte gratuit : le paiement, ses deux formules, la renonciation sous le b
     const offres = paiement.getByRole("radiogroup", { name: "Ta formule" }).getByRole("radio");
     await expect(offres).toHaveCount(2);
     const seul = offres.filter({ hasText: /^Le rapport/ });
-    const premium = offres.filter({ hasText: /^Rapport \+ 60 bulles/ });
+    const premium = offres.filter({ hasText: /^Rapport \+ 22 bulles/ });
     await expect(premium).toBeChecked();
     for (const texte of [
-      "+30 offertes",
-      "Soit 90 bulles en tout",
-      "14,90\u00a0€",
-      "23,80\u00a0€",
+      "+3 offertes",
+      "Soit 25 bulles en tout",
+      "19,90\u00a0€",
+      "24,80\u00a0€",
       "Le rapport · 7 chapitres",
-      "60 bulles",
-      "+ 30 bulles offertes",
-      "8,90\u00a0€",
-      "Économise 8,90\u00a0€ · la bulle à 0,06\u00a0€",
+      "22 bulles",
+      "+ 3 bulles offertes",
+      "Économise 4,90\u00a0€ · la bulle à 0,45\u00a0€",
       "Premium",
     ])
       await expect(premium).toContainText(texte);
     await expect(seul).not.toBeChecked();
-    await expect(seul).toContainText("+ 10 bulles offertes");
+    await expect(seul).toContainText("+ 3 bulles offertes");
     await expect(seul).toContainText("9,90\u00a0€");
-    await expect(paiement.getByRole("button", { name: "Débloquer · 14,90\u00a0€" })).toBeVisible();
+    await expect(paiement.getByRole("button", { name: "Débloquer · 19,90\u00a0€" })).toBeVisible();
     await expect(paiement.getByText("Paiement unique, pas d’abonnement · Apple Pay ou carte")).toBeVisible();
     await expect(paiement.getByText(/BLUSH\+|semaine/)).toHaveCount(0);
 
@@ -171,7 +170,7 @@ test("compte gratuit : le paiement, ses deux formules, la renonciation sous le b
     await expect(offre.getByText("6,90\u00a0€", { exact: true })).toBeVisible();
     await expect(offre.getByText("au lieu de 9,90\u00a0€", { exact: true })).toBeAttached();
     await expect(offre.getByText("−3\u00a0€", { exact: true })).toBeVisible();
-    await expect(offre.getByRole("listitem")).toHaveText(["7 chapitres", "Ton vocal", "10 bulles offertes"]);
+    await expect(offre.getByRole("listitem")).toHaveText(["7 chapitres", "Ton vocal", "3 bulles offertes"]);
     await expect(offre.getByRole("button", { name: "Je le prends · 6,90\u00a0€" })).toBeVisible();
     await offre.getByRole("button", { name: "Non merci" }).click();
     await expect(offre).toBeHidden();
@@ -196,7 +195,7 @@ test("compte gratuit : le paiement, ses deux formules, la renonciation sous le b
     await page.goto("/rapport/question");
     const question = page.getByRole("dialog", { name: PAIEMENT });
     await expect(question).toBeVisible();
-    await expect(question.getByRole("radio", { name: /^Rapport \+ 60 bulles/ })).toContainText("Le rapport · 7 chapitres");
+    await expect(question.getByRole("radio", { name: /^Rapport \+ 22 bulles/ })).toContainText("Le rapport · 7 chapitres");
     await fermerLaFeuille(page);
     await expect(page).toHaveURL(/\/rapport$/);
     await expect(page.getByRole("main").getByRole("heading", { level: 1, name: "Noé & Maëlys" })).toBeVisible();

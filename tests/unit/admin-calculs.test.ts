@@ -200,6 +200,8 @@ describe("le direct", () => {
     [{ genre: "import", ville: "Lyon", le: "" }, "a importé une conv", null],
     [{ genre: "paiement", ville: "Lyon", le: "", offre: "premium" }, "ouvre le paiement · Premium", null],
     [{ genre: "achat", ville: "Lyon", le: "", offre: "pack80" }, "a pris 80 bulles", `13,90${NB}€`],
+    /* Le prix payé, pas celui du catalogue d’aujourd’hui : Premium payé 14,90 € avant la grille du 23 octobre 2026 */
+    [{ genre: "achat", ville: "Lyon", le: "", offre: "premium", centimes: 1490 }, "a pris Premium", `14,90${NB}€`],
     [{ genre: "achat", ville: "Lyon", le: "", offre: "suite" }, "a pris Le rapport, offre unique", `6,90${NB}€`],
     [{ genre: "partage", ville: "Lyon", le: "" }, "a partagé son verdict", null],
   ])("le geste %o : « %s »", (g, quoi, prix) => {
