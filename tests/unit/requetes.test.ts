@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import {
   DEMANDE_PLAN,
@@ -11,8 +12,9 @@ import {
   type Requete,
 } from "@prompts/lib/contextes";
 import { lire, rendre, type Histoire } from "@prompts/lib/conv";
-import { Plan05, Sortie04 } from "@prompts/lib/schemas";
+import { Plan05, Sortie04, Sortie05, type Rapport, type Verdict } from "@prompts/lib/schemas";
 import { profil } from "@prompts/lib/style";
+import { memoireDeSecours } from "@/server/secours";
 import { chapitre, memoire } from "../aide/fabriques";
 
 /*
@@ -103,6 +105,8 @@ function bienFermees(t: string): boolean {
   return pile.length === 0;
 }
 const textes = (req: Requete) => req.blocs.flatMap((b) => ("texte" in b ? [b.texte] : []));
+/** L’empreinte d’un texte : de quoi le figer à l’octet sans le recopier (le dépôt est public). */
+const empreinte = (t: string) => createHash("sha256").update(t).digest("hex").slice(0, 16);
 
 describe("le rapport (prompt 05) : le plan, puis deux moitiés", () => {
   const demandes = { plan: DEMANDE_PLAN, premiere: demandeMoitie(plan, "1 à 4"), seconde: demandeMoitie(plan, "5 à 8"), sobre: null };
@@ -319,6 +323,114 @@ describe("le chat (prompt 10) : la mémoire à la place de la conv", () => {
         },
       }
     `);
+  });
+});
+
+/*
+ * Le chat sur une mémoire de secours (src/server/secours.ts) : tirée du verdict et du rapport sans appel au modèle, elle
+ * garde leur alerte dans son état, mais son « où on en est » (la thèse, le verdict court, la tendance) ne la dit pas.
+ * C’est la ligne de l’alerte, que rendreMemoire écrit dans <memoire>, qui la donne au modèle, au chat comme à la mise à
+ * jour de la mémoire : sans elle, le chat répondrait sur son ton de tous les jours à quelqu’un en danger, ou parlerait
+ * séduction avec un mineur. Son texte n’est pas recopié ici (le dépôt est public) : on la reconnaît à la valeur qu’elle
+ * porte et à sa place, la même mémoire sans alerte servant de témoin.
+ */
+describe("le chat d’une mémoire de secours : l’alerte du verdict est dans ce qu’il lit", () => {
+  /* Avec une alerte « mineur », le verdict est vide (seul le mode sobre reste) et le rapport est le rapport doux */
+  const vide = {
+    emoji: null,
+    court: null,
+    titre: null,
+    sous_titre: null,
+    preuves: [],
+    confiance: null,
+    confiance_texte: null,
+    niveau: null,
+    niveau_pourquoi: null,
+    tendance: null,
+    prochain_pas: null,
+  };
+  const doux = Sortie05.parse({
+    alerte: "mineur",
+    mode_sobre: true,
+    decouvertes: [],
+    these: "Deux collégiens qui s’écrivent tard le soir.",
+    chapitres: null,
+    sobre: {
+      intro: "On en parle.",
+      titre: "Doucement",
+      faits: "Vous avez treize ans.",
+      preuves: [],
+      reassurance: "Rien de grave.",
+      gestes: ["En parler à un adulte"],
+      brouillon: null,
+    },
+  });
+  /** De quoi tirer la mémoire de secours : le verdict, et le rapport s’il est écrit. */
+  type Sources = { verdict: Verdict; rapport: Rapport | null };
+  const cas: Record<"danger" | "detresse" | "mineur", Sources> = {
+    danger: { verdict: Sortie04.parse({ ...verdict, alerte: "danger" }), rapport: null },
+    detresse: { verdict: Sortie04.parse({ ...verdict, alerte: "detresse" }), rapport: null },
+    mineur: { verdict: Sortie04.parse({ ...verdict, ...vide, alerte: "mineur", mode_sobre: true }), rapport: doux },
+  };
+  /* La même mémoire de secours, sans alerte : le témoin */
+  const sansAlerte = ({ verdict: v, rapport: r }: Sources): Sources => ({ verdict: { ...v, alerte: null }, rapport: r && { ...r, alerte: null } });
+  const secours = (sources: Sources) => memoireDeSecours({ ...sources, lignes: rendu.lignes, suivant: lu.messages.length + 1, jour: "2026-10-01" });
+  const enChat = (sources: Sources) => {
+    const m = secours(sources);
+    return requeteChat({
+      h,
+      aujourdhui: Date.UTC(2026, 9, 1),
+      chiffres: rendu.chiffres,
+      fin: rendu.fin,
+      etat: m.etat,
+      lignes: new Map(m.lignes),
+      style: profil(h, lu.messages).bloc,
+      fil: [],
+      dit: "je lui réponds quoi ?",
+    });
+  };
+  const enMaj = (sources: Sources) => {
+    const m = secours(sources);
+    return requeteMemoireMaj(h, Date.UTC(2026, 9, 1), m.etat, new Map(m.lignes), ["<nouveau>\n</nouveau>"]);
+  };
+  /* Les lignes de la mémoire et de la fiche dans le premier bloc, de <memoire> à </fiche> comprises */
+  const memoireDe = (r: Requete) => {
+    const l = textes(r)[0]!.split("\n");
+    return l.slice(l.indexOf("<memoire>"), l.indexOf("</fiche>") + 1);
+  };
+
+  for (const [alerte, sources] of Object.entries(cas))
+    it(`${alerte} : une ligne de plus dans <memoire>, qui porte l’alerte, juste avant « où on en est » ; le reste de la requête ne bouge pas`, () => {
+      const ouOnEnEst = secours(sources).etat.memoire.ou_on_en_est;
+      expect(ouOnEnEst).not.toBe("");
+      expect(ouOnEnEst).not.toContain(alerte);
+      for (const [requete, place] of [
+        [enChat, 2],
+        [enMaj, 1],
+      ] as const) {
+        const [avec, temoin] = [requete(sources), requete(sansAlerte(sources))];
+        const [m, t] = [memoireDe(avec), memoireDe(temoin)];
+        /* Au chat, après l’ouverture de <memoire> et la fin de la conv importée ; à la mise à jour, juste après l’ouverture */
+        expect(m).toHaveLength(t.length + 1);
+        expect(m[place]).toMatch(new RegExp(` : ${alerte}$`));
+        expect(m.toSpliced(place, 1)).toEqual(t);
+        expect(t[place]).toContain(ouOnEnEst);
+        /* Rien d’autre ne change : ni les autres blocs, ni le reste du premier (l’histoire, les chiffres, l’aide) */
+        expect(textes(avec)[0]!.replace(`${m[place]}\n`, "")).toBe(textes(temoin)[0]);
+        expect(textes(avec).slice(1)).toEqual(textes(temoin).slice(1));
+        expect(avec.blocs.map((b) => "cache" in b && b.cache)).toEqual(temoin.blocs.map((b) => "cache" in b && b.cache));
+      }
+    });
+
+  /*
+   * Sans alerte, la mémoire que lisent le chat et sa mise à jour reste celle d’avant la ligne de l’alerte, à l’octet :
+   * ces empreintes ont été prises sur main (8345105) avant elle.
+   */
+  it("sans alerte : la mémoire que lisent le chat et sa mise à jour ne change pas d’un octet", () => {
+    const sans = sansAlerte(cas.danger);
+    expect(empreinte(memoireDe(enChat(sans)).join("\n"))).toBe("6790117e23af6ae3");
+    expect(empreinte(memoireDe(enMaj(sans)).join("\n"))).toBe("ff45b1bb742a0f39");
+    expect(empreinte(memoireDe(enChat(sansAlerte(cas.mineur))).join("\n"))).toBe("5ecf96e36380c1f1");
   });
 });
 

@@ -2,6 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { and, asc, eq, sql } from "drizzle-orm";
 import { describe, expect, it, vi } from "vitest";
 import type { Requete } from "@prompts/lib/contextes";
+import { origineDeLAlerte } from "@prompts/lib/memoire";
 
 /* after() de Next ne vit que dans une requête : ici, ce qui devait partir après la réponse est gardé, et lancé à la main */
 const etat = vi.hoisted(() => ({ apres: [] as (() => unknown)[], alertes: [] as string[][] }));
@@ -11,15 +12,17 @@ vi.mock("@/server/alertes", async (original) => ({
   alerter: async (sujet: string, lignes: string[]) => void etat.alertes.push([sujet, ...lignes]),
 }));
 
+import { garderUneMemoireDeSecours } from "@/server/analyse";
 import { repondre } from "@/server/chat";
 import { db, schema } from "@/server/db";
 import { donneesMemoire, modifierMemoire } from "@/server/depot";
 import { ficheDe } from "@/server/donnees";
 import { fusionnerFaits } from "@/server/fiche";
 import { fournisseurFactice, refusFactice, type RequeteFactice } from "@/server/ia/factice";
+import { FACTICE } from "@/server/ia/factice-valeurs";
 import { executerChaine, memoireAssuree, RELANCES_MEMOIRE_MAX } from "@/server/pipeline";
 import { planifier } from "@/server/taches";
-import { retenir, sansAttendre } from "@/server/memoire-groupee";
+import { majQuiAttend, retenir, sansAttendre } from "@/server/memoire-groupee";
 import { echange } from "./aide/fabriques";
 import { avecFactice, compteDeTest, debloquerLaConv, histoireLue, ligneEnBase } from "./aide/fixtures";
 
@@ -170,5 +173,333 @@ describe("le chat avant la vraie mémoire", () => {
       .where(and(eq(schema.tasks.storyId, imp.id), eq(schema.tasks.kind, "memoire_maj")));
     expect(maj).toEqual([{ status: "fini" }]);
     expect((await donneesMemoire(imp.id))!.secours).toBe(true);
+  });
+});
+
+/*
+ * L’alerte de leur histoire (danger, detresse, mineur) reste dans la mémoire, et le chat la lit sur sa ligne de
+ * <memoire> (rendreMemoire, prompts/lib/memoire.ts) : celle du verdict, que la création de la mémoire ne reprend pas
+ * toujours (le modèle factice n’en lève jamais à la création), et celle d’une réponse du chat, qu’il ne relirait plus
+ * au-delà de ses derniers échanges. Le texte de la ligne n’est pas recopié ici (le dépôt est public) : on la reconnaît à
+ * l’alerte qu’elle porte, dans <memoire>.
+ */
+describe("l’alerte dans la mémoire, que le chat lit", () => {
+  type Alerte = "danger" | "detresse" | "mineur";
+  /** Le modèle factice, son verdict avec cette alerte ; pour la règle de l’âge, son rapport doux suit (FACTICE.alerte). */
+  const avecAlerte = (alerte: Alerte) => (req: RequeteFactice) => {
+    if (req.tache === "04-verdict") return { ...(fournisseurFactice(req) as object), alerte };
+    return fournisseurFactice(alerte === "mineur" ? { ...req, blocs: [...req.blocs, { texte: FACTICE.alerte }] } : req);
+  };
+  /** Le modèle factice dont les réponses du chat sortent avec cette alerte (une question, pas une nouvelle). */
+  const chatEnAlerte = (alerte: Alerte) => (req: RequeteFactice) => (req.tache === "10-chat" ? { ...(fournisseurFactice(req) as object), alerte } : fournisseurFactice(req));
+  /** Les lignes de <memoire> que le chat a lues à sa dernière réponse, celles qui portent une alerte. */
+  async function alertesLues(storyId: string, f: (req: RequeteFactice) => unknown = fournisseurFactice): Promise<string[]> {
+    const lues: Requete[] = [];
+    const [ligne, memoire] = [await ligneEnBase(storyId), (await donneesMemoire(storyId))!];
+    await avecFactice(
+      (req: RequeteFactice) => {
+        if (req.tache === "10-chat") lues.push(req);
+        return f(req);
+      },
+      () => repondre(ligne, memoire, "je lui réponds quoi ?"),
+    );
+    const texte = lues.at(-1)!.blocs.flatMap((b) => ("texte" in b ? [b.texte] : []))[0]!;
+    const l = texte.split("\n");
+    return l.slice(l.indexOf("<memoire>"), l.indexOf("</memoire>")).filter((x) => / : (danger|detresse|mineur)$/.test(x));
+  }
+
+  it.each(["danger", "mineur"] as const)("un verdict « %s » : la vraie mémoire garde son alerte, même si sa création l’oublie, et le chat la lit", async (alerte) => {
+    const u = await compteDeTest(`alerte-memoire-${alerte}`, "debloque");
+    const imp = await avecFactice(avecAlerte(alerte), () => histoireLue(u, "06-elle-hesite.txt"));
+    const m = (await donneesMemoire(imp.id))!;
+    /* La vraie, écrite par le modèle (factice) sans alerte : le code y a remis celle du verdict */
+    expect(m.secours).toBeUndefined();
+    expect(m.etat.memoire.ou_on_en_est).not.toBe("");
+    expect(m.etat.alerte).toBe(alerte);
+    expect(await alertesLues(imp.id)).toEqual([expect.stringMatching(new RegExp(` : ${alerte}$`))]);
+  });
+
+  it("sans alerte : la mémoire n’en a pas, et le chat n’en lit aucune", async () => {
+    const u = await compteDeTest("alerte-memoire-sans", "debloque");
+    const imp = await histoireLue(u, "06-elle-hesite.txt");
+    expect((await donneesMemoire(imp.id))!.etat.alerte).toBeNull();
+    expect(await alertesLues(imp.id)).toEqual([]);
+  });
+
+  it("une réponse du chat en alerte, sur une question : notée dans la mémoire, que la vraie garde en remplaçant celle de secours", async () => {
+    const u = await compteDeTest("alerte-memoire-chat", "debloque");
+    const imp = await avecFactice(memoireEnPanne, () => histoireLue(u, "06-elle-hesite.txt"));
+    expect((await donneesMemoire(imp.id))!).toMatchObject({ secours: true, etat: { alerte: null } });
+
+    /* « elle a 14 ans » : une question, que la règle de l’âge met en alerte. La mémoire la note, une mise à jour l’attend */
+    await alertesLues(imp.id, chatEnAlerte("mineur"));
+    expect((await donneesMemoire(imp.id))!.etat.alerte).toBe("mineur");
+    expect(await majQuiAttend(imp.id)).toBe(true);
+    /* La réponse suivante, sans alerte à elle, la lit encore ; une alerte « detresse » ne cache pas la règle de l’âge */
+    expect(await alertesLues(imp.id)).toEqual([expect.stringMatching(/ : mineur$/)]);
+    await alertesLues(imp.id, chatEnAlerte("detresse"));
+    expect((await donneesMemoire(imp.id))!.etat.alerte).toBe("mineur");
+
+    /* La vraie mémoire, passé la pause, remplace celle de secours : sa création n’a pas d’alerte, celle du chat reste */
+    await vieillir(imp.id);
+    etat.apres.length = 0;
+    await memoireAssuree(await ligneEnBase(imp.id));
+    await lancerLaSuite();
+    const reelle = (await donneesMemoire(imp.id))!;
+    expect(reelle.secours).toBeUndefined();
+    expect(reelle.etat.alerte).toBe("mineur");
+  });
+});
+
+/*
+ * La mémoire tranche l’alerte venue du chat (prompts/lib/memoire.ts, appliquerMaj) : notée tout de suite, la mise à
+ * jour suivante la confirme ou l’efface (une vanne, un âge mal lu) ; celle de la lecture (le verdict, le rapport, la
+ * création) ne s’efface jamais, quoi que rende la mise à jour. Le modèle factice joue la décision ; la ligne de l’alerte
+ * se reconnaît à l’alerte qu’elle porte, sans recopier son texte (le dépôt est public).
+ */
+describe("l’alerte venue du chat, tranchée par la mise à jour", () => {
+  type Alerte = "danger" | "detresse" | "mineur";
+  type Decision = "confirmee" | "effacee";
+  const avecAlerte = (alerte: Alerte) => (req: RequeteFactice) => {
+    if (req.tache === "04-verdict") return { ...(fournisseurFactice(req) as object), alerte };
+    return fournisseurFactice(alerte === "mineur" ? { ...req, blocs: [...req.blocs, { texte: FACTICE.alerte }] } : req);
+  };
+  const chatEnAlerte = (alerte: Alerte) => (req: RequeteFactice) => (req.tache === "10-chat" ? { ...(fournisseurFactice(req) as object), alerte } : fournisseurFactice(req));
+  /** Les lignes de <memoire> qui portent une alerte, dans le premier bloc d’une requête. */
+  const lignesDAlerte = (req: Requete, alerte: Alerte) => {
+    const l = (req.blocs.flatMap((b) => ("texte" in b ? [b.texte] : []))[0] ?? "").split("\n");
+    return l.slice(l.indexOf("<memoire>"), l.indexOf("</memoire>")).filter((x) => x.includes(` : ${alerte}`));
+  };
+  /** La réponse suivante du chat, et les lignes d’alerte qu’elle a lues dans <memoire>. */
+  async function auChat(storyId: string, alerte: Alerte, f: (req: RequeteFactice) => unknown = fournisseurFactice) {
+    const lues: Requete[] = [];
+    await avecFactice(
+      (req: RequeteFactice) => {
+        if (req.tache === "10-chat") lues.push(req);
+        return f(req);
+      },
+      async () => repondre(await ligneEnBase(storyId), (await donneesMemoire(storyId))!, "je lui réponds quoi ?"),
+    );
+    return lignesDAlerte(lues.at(-1)!, alerte);
+  }
+  /**
+   * La mise à jour qui attend, lancée sans attendre le calme, avec cette décision (et « rien de neuf » si demandé) ; les
+   * lignes d’alerte qu’elle a lues dans <memoire>.
+   */
+  async function trancher(storyId: string, alerte: Alerte, alerte_du_chat: Decision, { rienDeNeuf = false } = {}) {
+    const lues: Requete[] = [];
+    expect(await sansAttendre(storyId)).toBe(true);
+    await avecFactice(
+      (req: RequeteFactice) => {
+        if (req.tache !== "07-memoire" || req.partie !== "mise à jour") return fournisseurFactice(req);
+        lues.push(req);
+        return {
+          ...(fournisseurFactice(req) as object),
+          alerte_du_chat,
+          ...(rienDeNeuf ? { rien_de_neuf: true, ou_on_en_est: null, moments_ajoutes: [], faits_ajoutes: [] } : {}),
+        };
+      },
+      () => executerChaine(storyId),
+    );
+    expect(lues).toHaveLength(1);
+    return lignesDAlerte(lues[0]!, alerte);
+  }
+
+  it("effacée (une vanne, sur « rien de neuf ») : elle disparaît de la mémoire, et le chat ne la lit plus", async () => {
+    const u = await compteDeTest("alerte-chat-effacee", "debloque");
+    const imp = await histoireLue(u, "06-elle-hesite.txt");
+    expect(await auChat(imp.id, "danger", chatEnAlerte("danger"))).toEqual([]);
+    const notee = (await donneesMemoire(imp.id))!.etat;
+    expect(notee.alerte).toBe("danger");
+    expect(origineDeLAlerte(notee)).toBe("chat");
+    /* La réponse suivante la lit telle quelle, sans sa provenance */
+    expect(await auChat(imp.id, "danger")).toEqual([expect.stringMatching(/ : danger$/)]);
+    /* La mise à jour lit l’alerte avec sa provenance : la ligne porte « danger », et dit plus que celle du chat */
+    const [ligne] = await trancher(imp.id, "danger", "effacee", { rienDeNeuf: true });
+    expect(ligne).toMatch(/ : danger\b/);
+    expect(ligne).not.toMatch(/ : danger$/);
+    const apres = (await donneesMemoire(imp.id))!.etat;
+    expect(apres.alerte).toBeNull();
+    expect("alerte_lue" in apres).toBe(false);
+    expect(await auChat(imp.id, "danger")).toEqual([]);
+  });
+
+  it("confirmée : elle reste, devient lue, et une mise à jour suivante ne l’efface plus", async () => {
+    const u = await compteDeTest("alerte-chat-confirmee", "debloque");
+    const imp = await histoireLue(u, "06-elle-hesite.txt");
+    await auChat(imp.id, "detresse", chatEnAlerte("detresse"));
+    await trancher(imp.id, "detresse", "confirmee");
+    const confirmee = (await donneesMemoire(imp.id))!.etat;
+    expect(confirmee.alerte).toBe("detresse");
+    expect(origineDeLAlerte(confirmee)).toBe("lecture");
+    /* Le chat la lit toujours ; la mise à jour suivante la lit sans provenance, et son effacement ne compte pas */
+    expect(await auChat(imp.id, "detresse")).toEqual([expect.stringMatching(/ : detresse$/)]);
+    await retenir(imp.id, echange(1, { dit: "on se voit samedi" }), { neuf: true, maintenant: false });
+    expect(await trancher(imp.id, "detresse", "effacee")).toEqual([expect.stringMatching(/ : detresse$/)]);
+    expect((await donneesMemoire(imp.id))!.etat.alerte).toBe("detresse");
+  });
+
+  it("une alerte de la lecture n’est jamais effacée, même si la mise à jour le demande ; une mémoire en base sans provenance est lue", async () => {
+    const u = await compteDeTest("alerte-lecture-gardee", "debloque");
+    const imp = await avecFactice(avecAlerte("danger"), () => histoireLue(u, "06-elle-hesite.txt"));
+    const enBase = (await donneesMemoire(imp.id))!.etat;
+    expect(enBase.alerte).toBe("danger");
+    expect("alerte_lue" in enBase).toBe(false);
+    expect(origineDeLAlerte(enBase)).toBe("lecture");
+    await retenir(imp.id, echange(1, { dit: "mdr t’inquiète c’était pour rire" }), { neuf: true, maintenant: false });
+    expect(await trancher(imp.id, "danger", "effacee", { rienDeNeuf: true })).toEqual([expect.stringMatching(/ : danger$/)]);
+    expect((await donneesMemoire(imp.id))!.etat).toEqual(enBase);
+    await retenir(imp.id, echange(2, { dit: "on s’est vus hier" }), { neuf: true, maintenant: false });
+    await trancher(imp.id, "danger", "effacee");
+    expect((await donneesMemoire(imp.id))!.etat.alerte).toBe("danger");
+    expect(await auChat(imp.id, "danger")).toEqual([expect.stringMatching(/ : danger$/)]);
+  });
+
+  it("la règle de l’âge d’abord : « mineur » venu du chat passe la « detresse » du verdict ; effacé, la « detresse » revient", async () => {
+    const u = await compteDeTest("alerte-chat-sur-lecture", "debloque");
+    const imp = await avecFactice(avecAlerte("detresse"), () => histoireLue(u, "06-elle-hesite.txt"));
+    expect((await donneesMemoire(imp.id))!.etat.alerte).toBe("detresse");
+    await auChat(imp.id, "mineur", chatEnAlerte("mineur"));
+    expect((await donneesMemoire(imp.id))!.etat).toMatchObject({ alerte: "mineur", alerte_lue: "detresse" });
+    /* Une « detresse » du chat ne la cache pas, et ne change rien */
+    await auChat(imp.id, "detresse", chatEnAlerte("detresse"));
+    expect((await donneesMemoire(imp.id))!.etat).toMatchObject({ alerte: "mineur", alerte_lue: "detresse" });
+    await trancher(imp.id, "mineur", "effacee");
+    const apres = (await donneesMemoire(imp.id))!.etat;
+    expect(apres.alerte).toBe("detresse");
+    expect(origineDeLAlerte(apres)).toBe("lecture");
+    expect(await auChat(imp.id, "detresse")).toEqual([expect.stringMatching(/ : detresse$/)]);
+  });
+
+  it("sans alerte : une mise à jour n’écrit aucune provenance, et une décision sans alerte ne change rien", async () => {
+    const u = await compteDeTest("alerte-aucune-maj", "debloque");
+    const imp = await histoireLue(u, "06-elle-hesite.txt");
+    await retenir(imp.id, echange(1, { dit: "on s’est vus hier" }), { neuf: true, maintenant: false });
+    await trancher(imp.id, "danger", "effacee");
+    const apres = (await donneesMemoire(imp.id))!.etat;
+    expect(apres.alerte).toBeNull();
+    expect("alerte_lue" in apres).toBe(false);
+    expect(await auChat(imp.id, "danger")).toEqual([]);
+  });
+
+  it("deux alertes venues du chat : la première effacée, la suivante s’affiche et attend son tour ; aucune ne se perd", async () => {
+    const u = await compteDeTest("alerte-chat-deux", "debloque");
+    const imp = await histoireLue(u, "06-elle-hesite.txt");
+    await auChat(imp.id, "detresse", chatEnAlerte("detresse"));
+    await auChat(imp.id, "danger", chatEnAlerte("danger"));
+    expect((await donneesMemoire(imp.id))!.etat).toMatchObject({ alerte: "danger", alertes_vues: [{ alerte: "danger" }, { alerte: "detresse" }] });
+    await trancher(imp.id, "danger", "effacee");
+    const apres = (await donneesMemoire(imp.id))!.etat;
+    expect(apres.alerte).toBe("detresse");
+    expect(origineDeLAlerte(apres)).toBe("chat");
+    expect(await auChat(imp.id, "detresse")).toEqual([expect.stringMatching(/ : detresse$/)]);
+  });
+
+  /*
+   * La course : une mise à jour déjà prise (ses échanges lus) quand une réponse du chat lève l’alerte ne l’a pas relue.
+   * Elle ne la tranche pas, quoi que rende le modèle ; celle qu’ouvre l’échange de l’alerte la tranche
+   */
+  it("notée après la prise d’une mise à jour : celle-là ne la tranche pas, la suivante, qui a son échange, la tranche", async () => {
+    const u = await compteDeTest("alerte-chat-course", "debloque");
+    const imp = await histoireLue(u, "06-elle-hesite.txt");
+    const prise = await retenir(imp.id, echange(1, { dit: "on s’est vus hier" }), { neuf: true, maintenant: false });
+    /* Une exécution l’a prise (un essai compté) : l’échange suivant ne la rejoint plus, il en ouvre une autre */
+    await db().update(schema.tasks).set({ attempts: 1 }).where(eq(schema.tasks.id, prise.id!));
+    await auChat(imp.id, "danger", chatEnAlerte("danger"));
+    expect(origineDeLAlerte((await donneesMemoire(imp.id))!.etat)).toBe("chat");
+    /* Les deux partent : la première, sans l’échange de l’alerte, rend « effacee » ; la seconde, avec, rend « confirmee » */
+    const lues: Requete[] = [];
+    expect(await sansAttendre(imp.id)).toBe(true);
+    await avecFactice(
+      (req: RequeteFactice) => {
+        if (req.tache !== "07-memoire" || req.partie !== "mise à jour") return fournisseurFactice(req);
+        lues.push(req);
+        return { ...(fournisseurFactice(req) as object), alerte_du_chat: lues.length === 1 ? "effacee" : "confirmee" };
+      },
+      () => executerChaine(imp.id),
+    );
+    expect(lues).toHaveLength(2);
+    /* La première lit l’alerte sans sa provenance, la seconde avec */
+    expect(lignesDAlerte(lues[0]!, "danger")).toEqual([expect.stringMatching(/ : danger$/)]);
+    expect(lignesDAlerte(lues[1]!, "danger")).toEqual([expect.stringMatching(/ : danger\b/)]);
+    expect(lignesDAlerte(lues[1]!, "danger")).not.toEqual(lignesDAlerte(lues[0]!, "danger"));
+    const apres = (await donneesMemoire(imp.id))!.etat;
+    expect(apres.alerte).toBe("danger");
+    expect(origineDeLAlerte(apres)).toBe("lecture");
+  });
+
+  it("une réponse en alerte sur une mémoire lue avant qu’une mise à jour efface la précédente : notée quand même, sur la mémoire relue", async () => {
+    const u = await compteDeTest("alerte-chat-perimee", "debloque");
+    const imp = await histoireLue(u, "06-elle-hesite.txt");
+    await auChat(imp.id, "danger", chatEnAlerte("danger"));
+    const lueAvant = (await donneesMemoire(imp.id))!;
+    expect(origineDeLAlerte(lueAvant.etat)).toBe("chat");
+    /* Pendant que le chat écrit sa réponse, la mise à jour efface la première (une vanne) */
+    await trancher(imp.id, "danger", "effacee", { rienDeNeuf: true });
+    expect((await donneesMemoire(imp.id))!.etat.alerte).toBeNull();
+    /* La réponse, partie sur la mémoire lue avant, lève « danger » pour de bon */
+    await avecFactice(chatEnAlerte("danger"), async () => repondre(await ligneEnBase(imp.id), lueAvant, "là il m’a vraiment menacé"));
+    const apres = (await donneesMemoire(imp.id))!.etat;
+    expect(apres.alerte).toBe("danger");
+    expect(origineDeLAlerte(apres)).toBe("chat");
+    expect(await majQuiAttend(imp.id)).toBe(true);
+  });
+});
+
+/*
+ * Une mémoire de secours écrite avant le rapport (débloqué, pas encore écrit) n’a que l’alerte du verdict : celle du
+ * rapport s’y porte quand il s’écrit, lue (src/server/analyse.ts, porterLAlerteDuRapport), et une mise à jour ne
+ * l’efface donc pas, même si une réponse du chat la voit ensuite. L’échec pour de bon de la vraie mémoire la porte aussi,
+ * si l’écriture du rapport l’a manquée.
+ */
+describe("l’alerte du rapport sur la mémoire de secours écrite avant lui", () => {
+  /** Le modèle factice, son plan du rapport en « danger » (pas son verdict), et la création de la mémoire en panne. */
+  const rapportEnDanger = (req: RequeteFactice) => {
+    const sortie = memoireEnPanne(req);
+    if (req.tache !== "05-rapport" || req.partie !== "plan") return sortie;
+    const etape = sortie as { plan: object };
+    return { ...etape, plan: { ...etape.plan, alerte: "danger" } };
+  };
+  const chatEnDanger = (req: RequeteFactice) => (req.tache === "10-chat" ? { ...(fournisseurFactice(req) as object), alerte: "danger" } : fournisseurFactice(req));
+
+  /** Une conv lue sans accès, puis débloquée : la mémoire de secours d’abord (le verdict seul), puis le rapport en « danger ». */
+  async function secoursPuisRapport(nom: string) {
+    const u = await compteDeTest(nom);
+    const imp = await histoireLue(u, "06-elle-hesite.txt");
+    await debloquerLaConv(imp.id);
+    const avant = (await memoireAssuree(await ligneEnBase(imp.id)))!;
+    expect(avant).toMatchObject({ secours: true, etat: { alerte: null } });
+    await planifier(imp.id, "rapport_plan");
+    await avecFactice(rapportEnDanger, () => executerChaine(imp.id));
+    return imp;
+  }
+
+  it("portée quand le rapport s’écrit : lue, et un « danger » du chat effacé par la mise à jour ne l’efface pas", async () => {
+    const imp = await secoursPuisRapport("alerte-rapport-secours");
+    const secours = (await donneesMemoire(imp.id))!;
+    expect(secours.secours).toBe(true);
+    expect(secours.etat.alerte).toBe("danger");
+    expect(origineDeLAlerte(secours.etat)).toBe("lecture");
+    /* Le chat lève le même « danger » : rien à noter, il est lu ; la mise à jour qui dit « effacee » n’y change rien */
+    await avecFactice(chatEnDanger, async () => repondre(await ligneEnBase(imp.id), (await donneesMemoire(imp.id))!, "je lui réponds quoi ?"));
+    expect(origineDeLAlerte((await donneesMemoire(imp.id))!.etat)).toBe("lecture");
+    expect(await sansAttendre(imp.id)).toBe(true);
+    await avecFactice(
+      (req: RequeteFactice) =>
+        req.tache === "07-memoire" && req.partie === "mise à jour" ? { ...(fournisseurFactice(req) as object), alerte_du_chat: "effacee" } : memoireEnPanne(req),
+      () => executerChaine(imp.id),
+    );
+    expect((await donneesMemoire(imp.id))!.etat.alerte).toBe("danger");
+  });
+
+  it("manquée à l’écriture du rapport (la mémoire de secours arrivée juste après) : l’échec pour de bon de la vraie la porte", async () => {
+    const imp = await secoursPuisRapport("alerte-rapport-course");
+    /* Comme si la mémoire de secours s’était écrite juste après le rapport, sans son alerte */
+    expect(await modifierMemoire(imp.id, (m) => ({ ...m, etat: { ...m.etat, alerte: null } }), { essais: 1 })).toBe("ecrite");
+    const portee = await garderUneMemoireDeSecours(imp.id);
+    expect(portee).toMatchObject({ secours: true, etat: { alerte: "danger" } });
+    expect(origineDeLAlerte(portee!.etat)).toBe("lecture");
+    /* Déjà portée : rien ne change */
+    expect(await garderUneMemoireDeSecours(imp.id)).toEqual(portee);
   });
 });

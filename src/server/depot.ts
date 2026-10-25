@@ -88,8 +88,9 @@ export async function ecrireSurCeQuiAEteLu<T>(
 /**
  * Modifie la mémoire de la conv sans rien effacer de ce qu’une autre écriture vient d’y mettre : la modification se fait
  * sur la mémoire lue, et ne s’écrit que si sa version n’a pas changé ; sinon elle se refait sur la nouvelle, au plus
- * `essais` fois. Deux écrivains : la mise à jour après le chat (src/server/analyse.ts, memoireMaj : elle appelle le
- * modèle, 20 à 60 s) et la fiche corrigée à la main (PUT /api/fiche).
+ * `essais` fois. Ses écrivains : la mise à jour après le chat (src/server/analyse.ts, memoireMaj : elle appelle le
+ * modèle, 20 à 60 s), la fiche corrigée à la main (PUT /api/fiche), et le chat, qui y note l’alerte d’une réponse
+ * (src/server/chat.ts, noterLAlerte).
  */
 export function modifierMemoire(
   storyId: string,

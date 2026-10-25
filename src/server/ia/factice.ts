@@ -187,6 +187,7 @@ export function fournisseurFactice(req: RequeteFactice): SortieFactice {
     return { plan: null, chapitres: moitie(req.partie === "chapitres 1 à 4").map((n) => chapitre(n, preuve(p.length ? n % p.length : 0))) } satisfies z.infer<typeof Etape05>;
   if (req.tache === "07-memoire" && req.partie === "mise à jour")
     return {
+      alerte_du_chat: null,
       alerte: null,
       rien_de_neuf: false,
       ou_on_en_est: "Ils se sont vus hier, d’après lui.",

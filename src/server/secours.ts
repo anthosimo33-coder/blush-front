@@ -1,4 +1,4 @@
-import type { MemoireFaite } from "@prompts/lib/memoire";
+import { alerteRetenue, reunirLesAlertes, type MemoireFaite } from "@prompts/lib/memoire";
 import type { Rapport, Verdict } from "@prompts/lib/schemas";
 import { lignesGardees, type DonneesMemoire } from "./stockage/types";
 
@@ -21,7 +21,10 @@ export type SourcesDuSecours = { verdict: Verdict; rapport: Rapport | null; lign
 /**
  * La mémoire de secours. Où ils en sont : la thèse du rapport, le verdict court et sa tendance ; les moments et les
  * manières de chacun : ce que les chapitres du rapport datent ou attribuent à l’un ou à l’autre ; le conseil en cours :
- * le prochain pas du verdict ; leur niveau : celui du verdict. Les preuves qui ne sont pas dans `lignes` tombent.
+ * le prochain pas du verdict ; leur niveau : celui du verdict. Les preuves qui ne sont pas dans `lignes` tombent. Son
+ * alerte : celle du verdict ou du rapport, la règle de l’âge d’abord (alerteRetenue : un rapport en « detresse » ne cache
+ * pas un verdict « mineur ») ; « où on en est » ne la dit pas, sa ligne dans <memoire> la donne au chat et à la mise à
+ * jour de la mémoire (rendreMemoire, prompts/lib/memoire.ts).
  */
 export function memoireDeSecours({ verdict, rapport, lignes, suivant, jour }: SourcesDuSecours): DonneesMemoire {
   const preuves = (ids: string[]) => ids.filter((id) => lignes.has(id));
@@ -35,7 +38,7 @@ export function memoireDeSecours({ verdict, rapport, lignes, suivant, jour }: So
   const manieres = (cote: "toi" | "autre") => items.flatMap((i) => (i.cote === cote && i.texte ? [{ texte: i.texte, preuves: preuves(i.preuves) }] : [])).slice(0, MANIERES_MAX);
   const ouOnEnEst = [...new Set([rapport?.these, verdict.court ?? verdict.titre, verdict.tendance].flatMap((t) => (t?.trim() ? [t.trim()] : [])))].join(" ");
   const etat: MemoireFaite = {
-    alerte: rapport?.alerte ?? verdict.alerte,
+    alerte: alerteRetenue(verdict.alerte, rapport?.alerte),
     rien_de_neuf: false,
     memoire: {
       ou_on_en_est: ouOnEnEst,
@@ -54,15 +57,19 @@ export function memoireDeSecours({ verdict, rapport, lignes, suivant, jour }: So
 
 /**
  * La vraie mémoire, à la place d’une mémoire de secours. Elle garde ce qu’il a corrigé lui-même dans sa fiche entre-temps :
- * ses corrections, les faits qu’il a ajoutés (s’ils n’y sont pas déjà), sans ceux qu’il a retirés. Ce que le chat a
- * appris pendant le secours, lui, se perd : la vraie mémoire lit la conv entière et le rapport, et le fil du chat garde
- * les derniers échanges. Le prochain identifiant libre ne recule jamais (les messages ajoutés en ont déjà pris).
+ * ses corrections, les faits qu’il a ajoutés (s’ils n’y sont pas déjà), sans ceux qu’il a retirés. Et l’alerte de la
+ * mémoire de secours (reunirLesAlertes, la règle de l’âge d’abord) : celle du verdict et du rapport reste lue, et celles
+ * qu’une réponse du chat y a notées restent à trancher, par la mise à jour qui relit leur échange.
+ * Ce que le chat a appris d’autre pendant le secours, lui, se perd : la vraie mémoire lit la conv entière et le rapport,
+ * et le fil du chat garde les derniers échanges. Le prochain identifiant libre ne recule jamais (les messages ajoutés en
+ * ont déjà pris).
  */
 export function remplacerLeSecours(secours: DonneesMemoire, reelle: DonneesMemoire): DonneesMemoire {
   const suivant = Math.max(secours.suivant, reelle.suivant);
+  const etat = reunirLesAlertes(reelle.etat, secours.etat);
   const editions = secours.editions;
-  if (!editions) return { ...reelle, suivant };
-  const reels = reelle.etat.fiche.faits.filter((f) => !editions.supprimees.includes(f.texte));
+  if (!editions) return { ...reelle, etat, suivant };
+  const reels = etat.fiche.faits.filter((f) => !editions.supprimees.includes(f.texte));
   const ajoutes = secours.etat.fiche.faits.filter((f) => editions.parToi.includes(f.texte) && !reels.some((r) => r.texte === f.texte));
-  return { ...reelle, etat: { ...reelle.etat, fiche: { ...reelle.etat.fiche, faits: [...reels, ...ajoutes] } }, suivant, editions };
+  return { ...reelle, etat: { ...etat, fiche: { ...etat.fiche, faits: [...reels, ...ajoutes] } }, suivant, editions };
 }

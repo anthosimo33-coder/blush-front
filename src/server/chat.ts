@@ -5,7 +5,7 @@ import type { QueryResult } from "pg";
 import { blocAjout, type Ajout } from "@prompts/lib/ajouts";
 import { requeteChat, type Fil } from "@prompts/lib/contextes";
 import { parIdentifiant } from "@prompts/lib/ligne";
-import type { Echange } from "@prompts/lib/memoire";
+import { noterAlerteDuChat, type Echange } from "@prompts/lib/memoire";
 import { introuvables, preuvesChat } from "@prompts/lib/preuves";
 import { Sortie10, type ReponseChat } from "@prompts/lib/schemas";
 import { alerteSobre } from "@prompts/lib/titres";
@@ -18,6 +18,7 @@ import { messagesAffiches } from "./ecrans/messages";
 import * as coffre from "./coffre";
 import { CLES, compter } from "./compteurs";
 import { db, schema, uneLigne } from "./db";
+import { modifierMemoire } from "./depot";
 import { contexteDe, histoireDe, metaDe, type Ligne } from "./histoires";
 import { reponseMasquee } from "./historique";
 import { editionsBornees, type DonneesMemoire } from "./stockage/types";
@@ -63,13 +64,43 @@ const texteDe = (r: ReponseChat) => [resume(r), r.pourquoi ?? ""].join(" ");
 
 /**
  * Ce qu’un échange demande à la mémoire (retenir, src/server/memoire-groupee.ts). Des messages ajoutés, une nouvelle, un
- * message reçu, une suite, ou un niveau qui bouge : il ouvre une mise à jour (`neuf`). Un niveau atteint, ou plus de
+ * message reçu, une suite, un niveau qui bouge, ou une réponse en alerte (une question comme « elle a 14 ans, je lui dis
+ * quoi ? » : la mise à jour note ce qui l’a levée) : il ouvre une mise à jour (`neuf`). Un niveau atteint, ou plus de
  * messages ajoutés que le fil n’en garde : elle part sans attendre que le chat se calme (`maintenant`).
  */
-export const pourLaMemoire = (sortie: Pick<ReponseChat, "type" | "niveau_atteint">, ajoutes: number) => ({
-  neuf: ajoutes > 0 || ["nouvelle", "message_recu", "suite"].includes(sortie.type) || !!sortie.niveau_atteint,
+export const pourLaMemoire = (sortie: Pick<ReponseChat, "type" | "niveau_atteint" | "alerte">, ajoutes: number) => ({
+  neuf: ajoutes > 0 || ["nouvelle", "message_recu", "suite"].includes(sortie.type) || !!sortie.niveau_atteint || !!sortie.alerte,
   maintenant: !!sortie.niveau_atteint || ajoutes > LIGNES_DANS_LE_FIL,
 });
+
+/**
+ * L’alerte d’une réponse du chat (`reponse` : son identifiant), notée dans sa mémoire : le chat ne relit que ses derniers
+ * échanges (ECHANGES_DANS_LE_FIL), et sa mémoire porte l’alerte sur sa ligne de <memoire> (rendreMemoire). Elle y est
+ * notée comme venue du chat, avec cette réponse (noterAlerteDuChat : la règle de l’âge d’abord, et une autre venue du
+ * chat qui attend reste à côté) : seule la mise à jour qui relit l’échange (retenu avec `levee`, pourLaMemoire en ouvre
+ * une) la confirme ou l’efface (une vanne, une erreur de lecture) ; celle de la lecture reste dessous, et ne s’efface
+ * jamais. Toujours sur la mémoire relue ici, jamais sur celle que le chat a lue avant d’écrire : une mise à jour peut
+ * l’avoir effacée entre-temps, et une vraie alerte ne doit pas se perdre. Rien n’est écrit quand rien ne change. Une
+ * mise à jour qui écrit entre-temps la fait recommencer, sans rien perdre. Son échec ne fait pas échouer la réponse,
+ * déjà partie : il reste au journal.
+ */
+async function noterLAlerte(storyId: string, alerte: ReponseChat["alerte"], reponse: number) {
+  await auMieux(
+    async () => {
+      const notee = await modifierMemoire(
+        storyId,
+        (avant) => {
+          const etat = noterAlerteDuChat(avant.etat, alerte, reponse);
+          return etat === avant.etat ? null : { ...avant, etat };
+        },
+        { essais: 3 },
+      );
+      if (notee === "occupee" || notee === "absente") journal("chat : l’alerte n’est pas notée dans la mémoire", { histoire: storyId, raison: notee }, "alerte");
+    },
+    "chat : l’alerte n’est pas notée dans la mémoire",
+    { histoire: storyId },
+  );
+}
 
 /** Ce qu’il écrit quand il envoie des messages sans un mot : la demande qu’on a testée sur les évals. */
 const DEMANDE_PAR_DEFAUT = "ça veut dire quoi ? je lui réponds quoi ?";
@@ -405,14 +436,18 @@ export async function repondre(
   /*
    * L’échange est retenu pour la mise à jour de la mémoire (pourLaMemoire, retenir) : elle part quand le chat se calme,
    * ou tout de suite (`majMemoire` : la chaîne repart après la réponse). Verrouillée, elle n’apprend que ce qu’il a dit :
-   * rien de la réponse ne doit ressortir ailleurs (sa fiche) avant d’être payé. Celle du garde-fou ne lui apprend rien
+   * rien de la réponse ne doit ressortir ailleurs (sa fiche) avant d’être payé. Celle du garde-fou ne lui apprend rien.
+   * En alerte, l’échange dit laquelle cette réponse a levée (`levee`) : la mise à jour qui le relit la tranche
    */
   const echange: Echange = {
     date: jour.iso,
     dit,
     reponse: verrouillee ? [] : sortie.lecture.map((b) => b.texte).concat(sortie.a_envoyer ?? []),
     ...(nouvelles.length ? { lignes: nouvelles } : {}),
+    ...(alerte && sortie.alerte ? { levee: { alerte: sortie.alerte, reponse: blushId } } : {}),
   };
+  /* L’alerte, notée dans sa mémoire avant l’échange suivant (verrouillée comme payée : rien de ce qui se paie n’y passe), sur la mémoire relue */
+  if (alerte) await noterLAlerte(story.id, sortie.alerte, blushId);
   const majMemoire = !fuite && (await retenir(story.id, echange, pourLaMemoire(sortie, nouvelles.length))).part;
 
   /* Le vocal, fait après la réponse : l’échange enregistré le reprend (l’historique le réécoute), puis il part */
