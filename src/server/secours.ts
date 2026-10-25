@@ -58,8 +58,8 @@ export function memoireDeSecours({ verdict, rapport, lignes, suivant, jour }: So
 /**
  * La vraie mémoire, à la place d’une mémoire de secours. Elle garde ce qu’il a corrigé lui-même dans sa fiche entre-temps :
  * ses corrections, les faits qu’il a ajoutés (s’ils n’y sont pas déjà), sans ceux qu’il a retirés. Et l’alerte de la
- * mémoire de secours (reunirLesAlertes, la règle de l’âge d’abord) : celle du verdict et du rapport reste lue, et celle
- * qu’une réponse du chat y a notée reste à trancher par la mise à jour suivante.
+ * mémoire de secours (reunirLesAlertes, la règle de l’âge d’abord) : celle du verdict et du rapport reste lue, et celles
+ * qu’une réponse du chat y a notées restent à trancher, par la mise à jour qui relit leur échange.
  * Ce que le chat a appris d’autre pendant le secours, lui, se perd : la vraie mémoire lit la conv entière et le rapport,
  * et le fil du chat garde les derniers échanges. Le prochain identifiant libre ne recule jamais (les messages ajoutés en
  * ont déjà pris).

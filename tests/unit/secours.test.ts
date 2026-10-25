@@ -3,7 +3,7 @@ import { appliquerMaj, noterAlerteDuChat, origineDeLAlerte } from "@prompts/lib/
 import { Sortie04, Sortie05, type Rapport, type Verdict } from "@prompts/lib/schemas";
 import { memoireDeSecours, remplacerLeSecours } from "@/server/secours";
 import type { DonneesMemoire } from "@/server/stockage/types";
-import { chapitre, maj, memoire } from "../aide/fabriques";
+import { chapitre, echange, maj, memoire } from "../aide/fabriques";
 
 /*
  * La mémoire de secours (src/server/secours.ts) : ce que le chat lit quand la vraie mémoire manque, tiré du verdict et du
@@ -165,21 +165,27 @@ describe("la vraie mémoire, à la place de celle de secours", () => {
 
   /*
    * Une alerte qu’une réponse du chat a notée pendant le secours (noterAlerteDuChat) reste à trancher : la vraie mémoire,
-   * qui ne l’a pas lue, ne la confirme pas ; la mise à jour suivante la confirmera ou l’effacera, et celle de la lecture
-   * reste dessous
+   * qui ne l’a pas lue, ne la confirme pas ; la mise à jour qui relit l’échange la confirmera ou l’effacera, et celle de
+   * la lecture reste dessous. Deux venues du chat attendent ensemble
    */
-  it("garde à trancher l’alerte venue du chat pendant le secours, la sienne lue dessous", () => {
+  it("garde à trancher les alertes venues du chat pendant le secours, la sienne lue dessous", () => {
     const base = memoireDeSecours({ verdict: verdict(), rapport: null, lignes: LIGNES, suivant: 1, jour: "2026-10-13" });
-    const vue = { ...base, etat: noterAlerteDuChat(base.etat, "mineur") };
+    const vue = { ...base, etat: noterAlerteDuChat(base.etat, "mineur", 41) };
     const reelleEn = (alerte: DonneesMemoire["etat"]["alerte"]): DonneesMemoire => ({ ...reelle, etat: { ...reelle.etat, alerte } });
+    /* L’échange retenu avec la réponse qui l’a levée, tel que la mise à jour le relit */
+    const leve = echange(1, { levee: { alerte: "mineur", reponse: 41 } });
     expect(origineDeLAlerte(vue.etat)).toBe("chat");
     for (const lue of [null, "detresse", "danger"] as const) {
       const m = remplacerLeSecours(vue, reelleEn(lue));
       expect(m.etat.alerte).toBe("mineur");
       expect(origineDeLAlerte(m.etat)).toBe("chat");
-      /* Effacée par la mise à jour : il reste l’alerte de la vraie mémoire */
-      expect(appliquerMaj(m.etat, maj({ alerte_du_chat: "effacee" })).alerte).toBe(lue);
+      /* Sans l’échange qui l’a levée, la mise à jour n’y touche pas ; avec lui, effacée, il reste l’alerte de la vraie mémoire */
+      expect(appliquerMaj(m.etat, maj({ alerte_du_chat: "effacee" })).alerte).toBe("mineur");
+      expect(appliquerMaj(m.etat, maj({ alerte_du_chat: "effacee" }), [leve]).alerte).toBe(lue);
     }
+    /* Une « detresse » puis un « danger » venus du chat pendant le secours : la vraie les garde tous les deux à trancher */
+    const deux = { ...base, etat: noterAlerteDuChat(noterAlerteDuChat(base.etat, "detresse", 41), "danger", 43) };
+    expect(remplacerLeSecours(deux, reelle).etat).toMatchObject({ alerte: "danger", alertes_vues: [{ alerte: "danger" }, { alerte: "detresse" }] });
     /* Une alerte de la lecture des deux côtés reste lue */
     const lue = { ...base, etat: { ...base.etat, alerte: "detresse" as const } };
     expect(remplacerLeSecours(lue, reelleEn("danger")).etat).toMatchObject({ alerte: "danger" });

@@ -12,6 +12,7 @@ vi.mock("@/server/alertes", async (original) => ({
   alerter: async (sujet: string, lignes: string[]) => void etat.alertes.push([sujet, ...lignes]),
 }));
 
+import { garderUneMemoireDeSecours } from "@/server/analyse";
 import { repondre } from "@/server/chat";
 import { db, schema } from "@/server/db";
 import { donneesMemoire, modifierMemoire } from "@/server/depot";
@@ -379,5 +380,126 @@ describe("l’alerte venue du chat, tranchée par la mise à jour", () => {
     expect(apres.alerte).toBeNull();
     expect("alerte_lue" in apres).toBe(false);
     expect(await auChat(imp.id, "danger")).toEqual([]);
+  });
+
+  it("deux alertes venues du chat : la première effacée, la suivante s’affiche et attend son tour ; aucune ne se perd", async () => {
+    const u = await compteDeTest("alerte-chat-deux", "debloque");
+    const imp = await histoireLue(u, "06-elle-hesite.txt");
+    await auChat(imp.id, "detresse", chatEnAlerte("detresse"));
+    await auChat(imp.id, "danger", chatEnAlerte("danger"));
+    expect((await donneesMemoire(imp.id))!.etat).toMatchObject({ alerte: "danger", alertes_vues: [{ alerte: "danger" }, { alerte: "detresse" }] });
+    await trancher(imp.id, "danger", "effacee");
+    const apres = (await donneesMemoire(imp.id))!.etat;
+    expect(apres.alerte).toBe("detresse");
+    expect(origineDeLAlerte(apres)).toBe("chat");
+    expect(await auChat(imp.id, "detresse")).toEqual([expect.stringMatching(/ : detresse$/)]);
+  });
+
+  /*
+   * La course : une mise à jour déjà prise (ses échanges lus) quand une réponse du chat lève l’alerte ne l’a pas relue.
+   * Elle ne la tranche pas, quoi que rende le modèle ; celle qu’ouvre l’échange de l’alerte la tranche
+   */
+  it("notée après la prise d’une mise à jour : celle-là ne la tranche pas, la suivante, qui a son échange, la tranche", async () => {
+    const u = await compteDeTest("alerte-chat-course", "debloque");
+    const imp = await histoireLue(u, "06-elle-hesite.txt");
+    const prise = await retenir(imp.id, echange(1, { dit: "on s’est vus hier" }), { neuf: true, maintenant: false });
+    /* Une exécution l’a prise (un essai compté) : l’échange suivant ne la rejoint plus, il en ouvre une autre */
+    await db().update(schema.tasks).set({ attempts: 1 }).where(eq(schema.tasks.id, prise.id!));
+    await auChat(imp.id, "danger", chatEnAlerte("danger"));
+    expect(origineDeLAlerte((await donneesMemoire(imp.id))!.etat)).toBe("chat");
+    /* Les deux partent : la première, sans l’échange de l’alerte, rend « effacee » ; la seconde, avec, rend « confirmee » */
+    const lues: Requete[] = [];
+    expect(await sansAttendre(imp.id)).toBe(true);
+    await avecFactice(
+      (req: RequeteFactice) => {
+        if (req.tache !== "07-memoire" || req.partie !== "mise à jour") return fournisseurFactice(req);
+        lues.push(req);
+        return { ...(fournisseurFactice(req) as object), alerte_du_chat: lues.length === 1 ? "effacee" : "confirmee" };
+      },
+      () => executerChaine(imp.id),
+    );
+    expect(lues).toHaveLength(2);
+    /* La première lit l’alerte sans sa provenance, la seconde avec */
+    expect(lignesDAlerte(lues[0]!, "danger")).toEqual([expect.stringMatching(/ : danger$/)]);
+    expect(lignesDAlerte(lues[1]!, "danger")).toEqual([expect.stringMatching(/ : danger\b/)]);
+    expect(lignesDAlerte(lues[1]!, "danger")).not.toEqual(lignesDAlerte(lues[0]!, "danger"));
+    const apres = (await donneesMemoire(imp.id))!.etat;
+    expect(apres.alerte).toBe("danger");
+    expect(origineDeLAlerte(apres)).toBe("lecture");
+  });
+
+  it("une réponse en alerte sur une mémoire lue avant qu’une mise à jour efface la précédente : notée quand même, sur la mémoire relue", async () => {
+    const u = await compteDeTest("alerte-chat-perimee", "debloque");
+    const imp = await histoireLue(u, "06-elle-hesite.txt");
+    await auChat(imp.id, "danger", chatEnAlerte("danger"));
+    const lueAvant = (await donneesMemoire(imp.id))!;
+    expect(origineDeLAlerte(lueAvant.etat)).toBe("chat");
+    /* Pendant que le chat écrit sa réponse, la mise à jour efface la première (une vanne) */
+    await trancher(imp.id, "danger", "effacee", { rienDeNeuf: true });
+    expect((await donneesMemoire(imp.id))!.etat.alerte).toBeNull();
+    /* La réponse, partie sur la mémoire lue avant, lève « danger » pour de bon */
+    await avecFactice(chatEnAlerte("danger"), async () => repondre(await ligneEnBase(imp.id), lueAvant, "là il m’a vraiment menacé"));
+    const apres = (await donneesMemoire(imp.id))!.etat;
+    expect(apres.alerte).toBe("danger");
+    expect(origineDeLAlerte(apres)).toBe("chat");
+    expect(await majQuiAttend(imp.id)).toBe(true);
+  });
+});
+
+/*
+ * Une mémoire de secours écrite avant le rapport (débloqué, pas encore écrit) n’a que l’alerte du verdict : celle du
+ * rapport s’y porte quand il s’écrit, lue (src/server/analyse.ts, porterLAlerteDuRapport), et une mise à jour ne
+ * l’efface donc pas, même si une réponse du chat la voit ensuite. L’échec pour de bon de la vraie mémoire la porte aussi,
+ * si l’écriture du rapport l’a manquée.
+ */
+describe("l’alerte du rapport sur la mémoire de secours écrite avant lui", () => {
+  /** Le modèle factice, son plan du rapport en « danger » (pas son verdict), et la création de la mémoire en panne. */
+  const rapportEnDanger = (req: RequeteFactice) => {
+    const sortie = memoireEnPanne(req);
+    if (req.tache !== "05-rapport" || req.partie !== "plan") return sortie;
+    const etape = sortie as { plan: object };
+    return { ...etape, plan: { ...etape.plan, alerte: "danger" } };
+  };
+  const chatEnDanger = (req: RequeteFactice) => (req.tache === "10-chat" ? { ...(fournisseurFactice(req) as object), alerte: "danger" } : fournisseurFactice(req));
+
+  /** Une conv lue sans accès, puis débloquée : la mémoire de secours d’abord (le verdict seul), puis le rapport en « danger ». */
+  async function secoursPuisRapport(nom: string) {
+    const u = await compteDeTest(nom);
+    const imp = await histoireLue(u, "06-elle-hesite.txt");
+    await debloquerLaConv(imp.id);
+    const avant = (await memoireAssuree(await ligneEnBase(imp.id)))!;
+    expect(avant).toMatchObject({ secours: true, etat: { alerte: null } });
+    await planifier(imp.id, "rapport_plan");
+    await avecFactice(rapportEnDanger, () => executerChaine(imp.id));
+    return imp;
+  }
+
+  it("portée quand le rapport s’écrit : lue, et un « danger » du chat effacé par la mise à jour ne l’efface pas", async () => {
+    const imp = await secoursPuisRapport("alerte-rapport-secours");
+    const secours = (await donneesMemoire(imp.id))!;
+    expect(secours.secours).toBe(true);
+    expect(secours.etat.alerte).toBe("danger");
+    expect(origineDeLAlerte(secours.etat)).toBe("lecture");
+    /* Le chat lève le même « danger » : rien à noter, il est lu ; la mise à jour qui dit « effacee » n’y change rien */
+    await avecFactice(chatEnDanger, async () => repondre(await ligneEnBase(imp.id), (await donneesMemoire(imp.id))!, "je lui réponds quoi ?"));
+    expect(origineDeLAlerte((await donneesMemoire(imp.id))!.etat)).toBe("lecture");
+    expect(await sansAttendre(imp.id)).toBe(true);
+    await avecFactice(
+      (req: RequeteFactice) =>
+        req.tache === "07-memoire" && req.partie === "mise à jour" ? { ...(fournisseurFactice(req) as object), alerte_du_chat: "effacee" } : memoireEnPanne(req),
+      () => executerChaine(imp.id),
+    );
+    expect((await donneesMemoire(imp.id))!.etat.alerte).toBe("danger");
+  });
+
+  it("manquée à l’écriture du rapport (la mémoire de secours arrivée juste après) : l’échec pour de bon de la vraie la porte", async () => {
+    const imp = await secoursPuisRapport("alerte-rapport-course");
+    /* Comme si la mémoire de secours s’était écrite juste après le rapport, sans son alerte */
+    expect(await modifierMemoire(imp.id, (m) => ({ ...m, etat: { ...m.etat, alerte: null } }), { essais: 1 })).toBe("ecrite");
+    const portee = await garderUneMemoireDeSecours(imp.id);
+    expect(portee).toMatchObject({ secours: true, etat: { alerte: "danger" } });
+    expect(origineDeLAlerte(portee!.etat)).toBe("lecture");
+    /* Déjà portée : rien ne change */
+    expect(await garderUneMemoireDeSecours(imp.id)).toEqual(portee);
   });
 });

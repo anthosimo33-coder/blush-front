@@ -2,7 +2,7 @@ import "server-only";
 import { eq, sql } from "drizzle-orm";
 import { chiffrer as chiffresDe, lire, rendre } from "@prompts/lib/conv";
 import { DEMANDE_PLAN, demandeMoitie, requeteMemoireCreation, requeteMemoireMaj, requeteRapport, requeteVerdict, requeteVocal } from "@prompts/lib/contextes";
-import { alerteRetenue, appliquerMaj, estFaite, rapportCourt, rendreNouveaux } from "@prompts/lib/memoire";
+import { alerteRetenue, appliquerMaj, aTrancher, estFaite, rapportCourt, rendreNouveaux, reunirLesAlertes } from "@prompts/lib/memoire";
 import { preuvesChapitres, preuvesMaj, preuvesMemoire, preuvesPlan, preuvesRapport, preuvesVerdict, preuvesVocal } from "@prompts/lib/preuves";
 import { Etape05, Maj07, Sortie04, Sortie05, Sortie06, Sortie07, verdictNormalise, type Chapitre, type Plan, type Rapport, type Verdict } from "@prompts/lib/schemas";
 import { profil } from "@prompts/lib/style";
@@ -352,8 +352,32 @@ async function garderRapport(story: Ligne, brut: Rapport, lignes: Map<string, st
     .insert(schema.reports)
     .values({ storyId: story.id, data })
     .onConflictDoUpdate({ target: schema.reports.storyId, set: { data, partiel: null, updatedAt: new Date() } });
+  /* Son alerte, sur la mémoire de secours écrite avant lui : lue, comme celle du verdict (porterLAlerteDuRapport) */
+  await auMieux(() => porterLAlerteDuRapport(story.id, r.alerte), "rapport : son alerte n’est pas portée sur la mémoire de secours", { histoire: story.id });
   /* La première fois seulement (pas à une relance) : le mail « ton rapport est prêt » */
   if (!avant?.pret) await prevenirRapportPret(story, donnees);
+}
+
+/**
+ * L’alerte du rapport, portée sur une mémoire de secours écrite avant lui (le rapport débloqué, pas encore écrit : elle
+ * n’a que celle du verdict). Lue, comme celle du verdict (reunirLesAlertes) : une mise à jour ne l’efface pas, même si une
+ * réponse du chat l’a vue entre-temps (elle est alors confirmée). Rien sur une vraie mémoire (sa création a lu le rapport),
+ * ni sans alerte. À l’écriture du rapport, et à l’échec pour de bon de la vraie mémoire (garderUneMemoireDeSecours), au
+ * cas où la mémoire de secours serait arrivée juste après. Vrai si elle l’a changée.
+ */
+async function porterLAlerteDuRapport(storyId: string, alerte: Rapport["alerte"]): Promise<boolean> {
+  if (!alerte) return false;
+  const portee = await modifierMemoire(
+    storyId,
+    (avant) => {
+      if (!avant.secours) return null;
+      const etat = reunirLesAlertes(avant.etat, { alerte });
+      return etat === avant.etat ? null : { ...avant, etat };
+    },
+    { essais: 3 },
+  );
+  if (portee === "occupee") journal("rapport : son alerte n’est pas portée sur la mémoire de secours", { histoire: storyId, raison: portee }, "alerte");
+  return portee === "ecrite";
 }
 
 /**
@@ -491,12 +515,18 @@ async function memoire(story: LigneComplete) {
 /**
  * Écrit une mémoire de secours (src/server/secours.ts) quand l’histoire n’en a aucune, et rend sa mémoire : le chat
  * répond toujours. Tirée du verdict, et du rapport s’il est écrit, avec les messages qu’ils citent tant que la conv est
- * là. Rien sans verdict, ni sans rapport écrit ou débloqué (le chat s’ouvre avec lui). Une mémoire déjà là n’est jamais
- * touchée. Après un échec de la vraie (src/server/pipeline.ts), au premier message du chat, à un ajout à sa fiche, et
- * avant une mise à jour qui ne trouverait rien à mettre à jour.
+ * là. Rien sans verdict, ni sans rapport écrit ou débloqué (le chat s’ouvre avec lui). Une vraie mémoire déjà là n’est
+ * jamais touchée ; une de secours écrite avant le rapport reçoit son alerte, si son écriture ne la lui a pas portée
+ * (porterLAlerteDuRapport). Après un échec de la vraie (src/server/pipeline.ts), au premier message du chat, à un ajout à
+ * sa fiche, et avant une mise à jour qui ne trouverait rien à mettre à jour.
  */
 export async function garderUneMemoireDeSecours(storyId: string): Promise<DonneesMemoire | null> {
   const deja = await donneesMemoire(storyId);
+  if (deja?.secours) {
+    const ligne = await ligneRapport(storyId);
+    const alerte = ligne?.data ? coffre.lire("reports.data", ligne.data).sortie.alerte : null;
+    if (await porterLAlerteDuRapport(storyId, alerte)) return donneesMemoire(storyId);
+  }
   if (deja) return deja;
   const [[story], v, ligne] = await Promise.all([db().select().from(schema.stories).where(eq(schema.stories.id, storyId)), donneesVerdict(storyId), ligneRapport(storyId)]);
   if (!story || !v) return null;
@@ -531,9 +561,10 @@ function banqueDuSecours(story: LigneComplete): { lignes: Map<string, string>; s
  * Après des échanges qui apportent du neuf (retenus ensemble jusqu’à ce que le chat se calme : src/server/memoire-groupee.ts),
  * ou un ajout à sa fiche : la mémoire se met à jour, en un seul appel pour tous (ou dit « rien de neuf », le cas le plus
  * fréquent). Elle tranche aussi l’alerte qu’une réponse du chat a notée (venue du chat : confirmée ou effacée,
- * prompts/lib/memoire.ts, appliquerMaj), jamais celle de la lecture. Elle n’écrit que sur la mémoire qu’elle a lue : si la
- * fiche a été corrigée entre-temps (la mise à jour prend 20 à 60 s), elle recommence sur la nouvelle, pour ne rien
- * effacer de ce que l’utilisateur vient d’écrire.
+ * prompts/lib/memoire.ts, appliquerMaj), seulement si un de ses échanges relit cette réponse (aTrancher) : notée après
+ * qu’elle est partie, l’alerte attend la mise à jour qui a son échange. Jamais celle de la lecture. Elle n’écrit que sur
+ * la mémoire qu’elle a lue : si la fiche a été corrigée entre-temps (la mise à jour prend 20 à 60 s), elle recommence
+ * sur la nouvelle, pour ne rien effacer de ce que l’utilisateur vient d’écrire.
  */
 async function memoireMaj(story: Ligne, t: Tache) {
   const echanges = entreeDe(t);
@@ -547,7 +578,9 @@ async function memoireMaj(story: Ligne, t: Tache) {
     async (avant) => {
       const nouveau = rendreNouveaux(echanges, h, avant.suivant);
       const lignes = new Map([...avant.lignes, ...nouveau.lignes]);
-      const req = requeteMemoireMaj(h, aujourdhuiParis().t, avant.etat, lignes, nouveau.blocs, editionsBornees(avant.editions));
+      /* Sur la mémoire relue à chaque essai : la ligne de l’alerte et la décision suivent les mêmes échanges */
+      const trancher = aTrancher(avant.etat, echanges);
+      const req = requeteMemoireMaj(h, aujourdhuiParis().t, avant.etat, lignes, nouveau.blocs, editionsBornees(avant.editions), { trancher });
       /* La mise à jour ne renvoie que ce qui change ; le code l’applique à la mémoire */
       const maj = await appelVerifie(req, Maj07, {
         preuves: (m) => (m.rien_de_neuf ? [] : preuvesMaj(m)),
@@ -557,7 +590,7 @@ async function memoireMaj(story: Ligne, t: Tache) {
         partie: "mise à jour",
       });
       /* « Rien de neuf » ne s’écrit pas, sauf s’il tranche une alerte venue du chat : appliquerMaj rend alors un autre état */
-      const etat = appliquerMaj(avant.etat, maj);
+      const etat = appliquerMaj(avant.etat, maj, echanges);
       if (etat === avant.etat) return null;
       return {
         etat,
