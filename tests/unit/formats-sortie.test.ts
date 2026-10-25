@@ -10,7 +10,8 @@ import { Etape05, Maj07, Plan05, Sortie01, Sortie04, Sortie05, Sortie06, Sortie0
  * un format qui bouge sans qu’on le veuille change ce qu’il écrit, et refait le cache. Les empreintes ont été prises
  * avant que Maj07 ne soit tiré de Sortie07 (prompts b4e222c), et n’ont pas changé ; celle de Sortie04, le 13 octobre, avec les
  * titres des chapitres fermés (`titres`) ; celle de Sortie10, le 22 octobre 2026, avec le moment de vendre (`moment`,
- * `prenom_autre`). Jamais le texte du schéma : le dépôt
+ * `prenom_autre`) ; celle de Maj07, le 25 octobre, avec la décision sur l’alerte venue du chat (`alerte_du_chat`).
+ * Jamais le texte du schéma : le dépôt
  * est public. Un format changé exprès (un prompt qui change) : on met son empreinte à jour, dans le même commit.
  */
 const empreinte = (x: unknown) => createHash("sha256").update(JSON.stringify(x)).digest("hex").slice(0, 16);
@@ -28,7 +29,7 @@ describe("les formats de sortie du modèle", () => {
       Sortie05: "8326ad353f380708 8029cb7516323c09",
       Sortie06: "43e1e4810a387ca3 8e5ccdecad19d7b2",
       Sortie07: "baa87f7849f5699d db6539af1af82272",
-      Maj07: "7c8474e94c2e59cc 0f3034d663ff7079",
+      Maj07: "024d798cd41d9c03 e01492cb9296be48",
       Sortie10: "21c4fb952cb4be94 7060f5a3c7dd862f",
     });
   });

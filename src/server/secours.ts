@@ -1,4 +1,4 @@
-import { alerteRetenue, type MemoireFaite } from "@prompts/lib/memoire";
+import { alerteRetenue, reunirLesAlertes, type MemoireFaite } from "@prompts/lib/memoire";
 import type { Rapport, Verdict } from "@prompts/lib/schemas";
 import { lignesGardees, type DonneesMemoire } from "./stockage/types";
 
@@ -58,14 +58,15 @@ export function memoireDeSecours({ verdict, rapport, lignes, suivant, jour }: So
 /**
  * La vraie mémoire, à la place d’une mémoire de secours. Elle garde ce qu’il a corrigé lui-même dans sa fiche entre-temps :
  * ses corrections, les faits qu’il a ajoutés (s’ils n’y sont pas déjà), sans ceux qu’il a retirés. Et l’alerte de la
- * mémoire de secours, celle qu’une réponse du chat y a notée comprise (alerteRetenue : une alerte ne s’efface jamais).
+ * mémoire de secours (reunirLesAlertes, la règle de l’âge d’abord) : celle du verdict et du rapport reste lue, et celle
+ * qu’une réponse du chat y a notée reste à trancher par la mise à jour suivante.
  * Ce que le chat a appris d’autre pendant le secours, lui, se perd : la vraie mémoire lit la conv entière et le rapport,
  * et le fil du chat garde les derniers échanges. Le prochain identifiant libre ne recule jamais (les messages ajoutés en
  * ont déjà pris).
  */
 export function remplacerLeSecours(secours: DonneesMemoire, reelle: DonneesMemoire): DonneesMemoire {
   const suivant = Math.max(secours.suivant, reelle.suivant);
-  const etat = { ...reelle.etat, alerte: alerteRetenue(reelle.etat.alerte, secours.etat.alerte) };
+  const etat = reunirLesAlertes(reelle.etat, secours.etat);
   const editions = secours.editions;
   if (!editions) return { ...reelle, etat, suivant };
   const reels = etat.fiche.faits.filter((f) => !editions.supprimees.includes(f.texte));

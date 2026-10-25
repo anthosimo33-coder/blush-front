@@ -46,6 +46,7 @@ export const memoire = ({
 /** Une mise à jour de la mémoire (prompt 07, Maj07) : rien ne change, sauf ce que `m` donne. */
 export const maj = (m: Partial<Maj> = {}): Maj =>
   Maj07.parse({
+    alerte_du_chat: null,
     alerte: null,
     rien_de_neuf: false,
     ou_on_en_est: null,

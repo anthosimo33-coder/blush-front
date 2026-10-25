@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
+import { appliquerMaj, noterAlerteDuChat, origineDeLAlerte } from "@prompts/lib/memoire";
 import { Sortie04, Sortie05, type Rapport, type Verdict } from "@prompts/lib/schemas";
 import { memoireDeSecours, remplacerLeSecours } from "@/server/secours";
 import type { DonneesMemoire } from "@/server/stockage/types";
-import { chapitre, memoire } from "../aide/fabriques";
+import { chapitre, maj, memoire } from "../aide/fabriques";
 
 /*
  * La mémoire de secours (src/server/secours.ts) : ce que le chat lit quand la vraie mémoire manque, tiré du verdict et du
@@ -145,8 +146,8 @@ describe("la vraie mémoire, à la place de celle de secours", () => {
   });
 
   /*
-   * Une alerte ne s’efface jamais : celle de la mémoire de secours (du verdict, ou notée par une réponse du chat) reste
-   * quand la vraie la remplace sans l’avoir lue, la règle de l’âge d’abord (alerteRetenue)
+   * L’alerte de la mémoire de secours (du verdict, ou notée par une réponse du chat) reste quand la vraie la remplace
+   * sans l’avoir lue, la règle de l’âge d’abord (reunirLesAlertes)
    */
   it("garde l’alerte de la mémoire de secours, celle que le chat y a notée comprise, sans cacher la règle de l’âge", () => {
     const base = memoireDeSecours({ verdict: verdict(), rapport: null, lignes: LIGNES, suivant: 1, jour: "2026-10-13" });
@@ -160,5 +161,28 @@ describe("la vraie mémoire, à la place de celle de secours", () => {
     expect(remplacerLeSecours(corrigee, reelleEn("detresse")).etat.alerte).toBe("mineur");
     /* Sans alerte de part et d’autre : la vraie, telle quelle */
     expect(remplacerLeSecours(enAlerte(null), reelle).etat).toEqual(reelle.etat);
+  });
+
+  /*
+   * Une alerte qu’une réponse du chat a notée pendant le secours (noterAlerteDuChat) reste à trancher : la vraie mémoire,
+   * qui ne l’a pas lue, ne la confirme pas ; la mise à jour suivante la confirmera ou l’effacera, et celle de la lecture
+   * reste dessous
+   */
+  it("garde à trancher l’alerte venue du chat pendant le secours, la sienne lue dessous", () => {
+    const base = memoireDeSecours({ verdict: verdict(), rapport: null, lignes: LIGNES, suivant: 1, jour: "2026-10-13" });
+    const vue = { ...base, etat: noterAlerteDuChat(base.etat, "mineur") };
+    const reelleEn = (alerte: DonneesMemoire["etat"]["alerte"]): DonneesMemoire => ({ ...reelle, etat: { ...reelle.etat, alerte } });
+    expect(origineDeLAlerte(vue.etat)).toBe("chat");
+    for (const lue of [null, "detresse", "danger"] as const) {
+      const m = remplacerLeSecours(vue, reelleEn(lue));
+      expect(m.etat.alerte).toBe("mineur");
+      expect(origineDeLAlerte(m.etat)).toBe("chat");
+      /* Effacée par la mise à jour : il reste l’alerte de la vraie mémoire */
+      expect(appliquerMaj(m.etat, maj({ alerte_du_chat: "effacee" })).alerte).toBe(lue);
+    }
+    /* Une alerte de la lecture des deux côtés reste lue */
+    const lue = { ...base, etat: { ...base.etat, alerte: "detresse" as const } };
+    expect(remplacerLeSecours(lue, reelleEn("danger")).etat).toMatchObject({ alerte: "danger" });
+    expect(origineDeLAlerte(remplacerLeSecours(lue, reelleEn("danger")).etat)).toBe("lecture");
   });
 });

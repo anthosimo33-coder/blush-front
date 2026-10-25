@@ -530,8 +530,10 @@ function banqueDuSecours(story: LigneComplete): { lignes: Map<string, string>; s
 /**
  * Après des échanges qui apportent du neuf (retenus ensemble jusqu’à ce que le chat se calme : src/server/memoire-groupee.ts),
  * ou un ajout à sa fiche : la mémoire se met à jour, en un seul appel pour tous (ou dit « rien de neuf », le cas le plus
- * fréquent). Elle n’écrit que sur la mémoire qu’elle a lue : si la fiche a été corrigée entre-temps (la mise à jour prend
- * 20 à 60 s), elle recommence sur la nouvelle, pour ne rien effacer de ce que l’utilisateur vient d’écrire.
+ * fréquent). Elle tranche aussi l’alerte qu’une réponse du chat a notée (venue du chat : confirmée ou effacée,
+ * prompts/lib/memoire.ts, appliquerMaj), jamais celle de la lecture. Elle n’écrit que sur la mémoire qu’elle a lue : si la
+ * fiche a été corrigée entre-temps (la mise à jour prend 20 à 60 s), elle recommence sur la nouvelle, pour ne rien
+ * effacer de ce que l’utilisateur vient d’écrire.
  */
 async function memoireMaj(story: Ligne, t: Tache) {
   const echanges = entreeDe(t);
@@ -554,8 +556,9 @@ async function memoireMaj(story: Ligne, t: Tache) {
         etiquette: "memoire_maj",
         partie: "mise à jour",
       });
-      if (maj.rien_de_neuf) return null;
+      /* « Rien de neuf » ne s’écrit pas, sauf s’il tranche une alerte venue du chat : appliquerMaj rend alors un autre état */
       const etat = appliquerMaj(avant.etat, maj);
+      if (etat === avant.etat) return null;
       return {
         etat,
         lignes: lignesGardees(etat, lignes),

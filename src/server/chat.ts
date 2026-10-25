@@ -5,7 +5,7 @@ import type { QueryResult } from "pg";
 import { blocAjout, type Ajout } from "@prompts/lib/ajouts";
 import { requeteChat, type Fil } from "@prompts/lib/contextes";
 import { parIdentifiant } from "@prompts/lib/ligne";
-import { alerteRetenue, type Echange } from "@prompts/lib/memoire";
+import { noterAlerteDuChat, type Echange } from "@prompts/lib/memoire";
 import { introuvables, preuvesChat } from "@prompts/lib/preuves";
 import { Sortie10, type ReponseChat } from "@prompts/lib/schemas";
 import { alerteSobre } from "@prompts/lib/titres";
@@ -76,9 +76,11 @@ export const pourLaMemoire = (sortie: Pick<ReponseChat, "type" | "niveau_atteint
 /**
  * L’alerte d’une réponse du chat, notée dans sa mémoire : le chat ne relit que ses derniers échanges (ECHANGES_DANS_LE_FIL),
  * et sa mémoire porte l’alerte sur sa ligne de <memoire> (rendreMemoire). Seulement quand elle change ce que la mémoire
- * garde (alerteRetenue : jamais effacée, la règle de l’âge d’abord). Sur la mémoire lue, comme la mise à jour : une
- * mise à jour qui écrit entre-temps la fait recommencer, sans rien perdre. Son échec ne fait pas échouer la réponse, déjà
- * partie : il reste au journal.
+ * garde (noterAlerteDuChat : la règle de l’âge d’abord). Elle y est notée comme venue du chat : la mise à jour
+ * suivante, qui relit l’échange (pourLaMemoire en ouvre une), la confirme ou l’efface (une vanne, un âge mal lu) ; celle
+ * de la lecture reste dessous, et ne s’efface jamais. Sur la mémoire lue, comme la mise à jour : une mise à jour qui
+ * écrit entre-temps la fait recommencer, sans rien perdre. Son échec ne fait pas échouer la réponse, déjà partie : il
+ * reste au journal.
  */
 async function noterLAlerte(storyId: string, alerte: ReponseChat["alerte"]) {
   await auMieux(
@@ -86,8 +88,8 @@ async function noterLAlerte(storyId: string, alerte: ReponseChat["alerte"]) {
       const notee = await modifierMemoire(
         storyId,
         (avant) => {
-          const retenue = alerteRetenue(avant.etat.alerte, alerte);
-          return retenue === avant.etat.alerte ? null : { ...avant, etat: { ...avant.etat, alerte: retenue } };
+          const etat = noterAlerteDuChat(avant.etat, alerte);
+          return etat === avant.etat ? null : { ...avant, etat };
         },
         { essais: 3 },
       );
@@ -441,7 +443,7 @@ export async function repondre(
     ...(nouvelles.length ? { lignes: nouvelles } : {}),
   };
   /* L’alerte, notée dans sa mémoire avant l’échange suivant : verrouillée comme payée, rien de ce qui se paie n’y passe */
-  if (alerte && alerteRetenue(memoire.etat.alerte, sortie.alerte) !== memoire.etat.alerte) await noterLAlerte(story.id, sortie.alerte);
+  if (alerte && noterAlerteDuChat(memoire.etat, sortie.alerte) !== memoire.etat) await noterLAlerte(story.id, sortie.alerte);
   const majMemoire = !fuite && (await retenir(story.id, echange, pourLaMemoire(sortie, nouvelles.length))).part;
 
   /* Le vocal, fait après la réponse : l’échange enregistré le reprend (l’historique le réécoute), puis il part */
