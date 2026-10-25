@@ -1,4 +1,5 @@
 import type { EtapeVisite, GenreVendu, OffreId, SourceVisite } from "@/types";
+import { CATALOGUE, prixDe } from "./offres";
 
 /*
  * Le pilotage (/admin) : les repères et les noms que le serveur et l’écran partagent. La marge se calcule ici, d’une
@@ -32,7 +33,8 @@ export function margeApresIA(centimes: number, dollars: number): number | null {
 
 /**
  * Les offres réunies par ce qu’elles vendent, pour « Ce qui se vend » : les deux formules (le rapport seul compte aussi
- * son −50 % gardé), la suite (①), le 2e rapport (⑤, un rapport d’avance), et les bulles.
+ * son −50 % gardé), la suite (①), le 2e rapport (⑤, un rapport d’avance), et les bulles (les packs, et ③ : le passage en
+ * Premium après le rapport, comme l’ancien ③ ; les offres retirées de la vente le 23 octobre gardent leur groupe).
  */
 export const GROUPES_D_OFFRES = ["premium", "rapport", "suite", "second", "bulles"] as const;
 export type GroupeDOffres = (typeof GROUPES_D_OFFRES)[number];
@@ -42,6 +44,10 @@ export const GROUPE_DE_L_OFFRE: Record<OffreId, GroupeDOffres> = {
   suite: "suite",
   rapport_garde: "rapport",
   second: "second",
+  passe_premium: "bulles",
+  pack10: "bulles",
+  pack25: "bulles",
+  pack60: "bulles",
   premium_ajout: "bulles",
   pack30: "bulles",
   pack80: "bulles",
@@ -49,10 +55,18 @@ export const GROUPE_DE_L_OFFRE: Record<OffreId, GroupeDOffres> = {
 };
 export const NOMS_DES_GROUPES: Record<GroupeDOffres, string> = { premium: "Premium", rapport: "Le rapport", suite: "Offre unique", second: "2e rapport", bulles: "Bulles" };
 
+/**
+ * ③, le passage en Premium après le rapport seul, dans /admin (ses coups de pouce, sa carte du chat). Ses compteurs
+ * (montrée, prise, posée, payée) réunissent l’ancien ③ et le nouveau, qui partagent l’offre unique et le genre de la
+ * carte (une seule fois par compte) : son nom dit l’ancien, sur une période à cheval sur le 23 octobre 2026. Les
+ * centimes, eux, sont ceux payés.
+ */
+export const NOM_DU_PASSAGE_EN_PREMIUM = `Premium pour ${prixDe("passe_premium")} de plus (${CATALOGUE.premium_ajout.bulles} bulles pour ${CATALOGUE.premium_ajout.centimes / 100}\u00a0€ avant le 23 octobre)`;
+
 /** Le nom de chaque carte d’achat du chat (src/server/vente.ts), dans /admin. */
 export const NOMS_DES_VENTES: Record<GenreVendu, string> = {
   bulles: "Recharge",
-  premium: "Premium pour 5\u00a0€",
+  premium: NOM_DU_PASSAGE_EN_PREMIUM,
   autre: "Une autre conv",
   a_jour: "Le rapport à jour",
   reimport: "Le réimport (ancien doux)",

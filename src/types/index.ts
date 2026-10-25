@@ -24,34 +24,52 @@ type Side = "toi" | "elle" | "pareil";
 /**
  * Les offres du catalogue (src/contenu/offres.ts) : ce qu’on achète, une fois (achats.offre). Le rapport d’une conv seul
  * ou avec des bulles (les deux formules, la suite de l’offre unique ①, et le rapport à −50 % que le repli de « C’est
- * débloqué » a gardé), des bulles en plus après le rapport (③), le 2e rapport à −50 % (un rapport d’avance, pour la conv
- * de son choix), et les recharges.
+ * débloqué » a gardé), le passage en Premium après le rapport (③), le 2e rapport à −50 % (un rapport d’avance, pour la
+ * conv de son choix), et les recharges. Puis celles retirées de la vente le 23 octobre 2026 (l’ancien ③, « 80 bulles en
+ * plus », et les packs de 30, 80 et 200 bulles) : écrites dans des achats passés, elles restent au catalogue (leur titre,
+ * /admin, une commande encore en attente qui se livre), sans plus se vendre. /admin les liste dans cet ordre.
  */
-export const OFFRES = ["rapport", "premium", "suite", "rapport_garde", "premium_ajout", "second", "pack30", "pack80", "pack200"] as const;
+export const OFFRES = [
+  "rapport",
+  "premium",
+  "suite",
+  "rapport_garde",
+  "passe_premium",
+  "second",
+  "pack10",
+  "pack25",
+  "pack60",
+  "premium_ajout",
+  "pack30",
+  "pack80",
+  "pack200",
+] as const;
 export type OffreId = (typeof OFFRES)[number];
 /** Les deux formules de la feuille du paiement : le rapport seul, ou Premium (choisie d’avance). */
 export const FORMULES = ["rapport", "premium"] as const satisfies readonly OffreId[];
 export type Formule = (typeof FORMULES)[number];
 /**
  * Les offres uniques, chacune une fois par compte au plus, décidée par le serveur (src/server/offres-uniques.ts) : ① la
- * suite moins chère pendant 5 minutes, ② le mail de relance, ③ Premium pour 5 € de plus après le paiement, ④ le bonus
- * de la première recharge, ⑤ le 2e rapport à −50 % après le paiement, et ⑥ son repli : le −50 % gardé 7 jours pour la
- * conv suivante.
+ * suite moins chère pendant 5 minutes, ② le mail de relance, ③ Premium pour 6,90 € de plus après le paiement, ④ le bonus
+ * de la première recharge (arrêté le 23 octobre 2026 : plus jamais montré, gardé pour les lignes passées), ⑤ le 2e
+ * rapport à −50 % après le paiement, et ⑥ son repli : le −50 % gardé 7 jours pour la conv suivante.
  */
 export const OFFRES_UNIQUES = ["suite", "relance_mail", "premium_ajout", "premiere_recharge", "second_rapport", "garde_second"] as const;
 export type OffreUnique = (typeof OFFRES_UNIQUES)[number];
 /**
  * Les offres uniques que l’écran demande à montrer (POST /api/paiement/offre) : ① en fermant la feuille sans payer, ③ et
- * ⑤ sur « C’est débloqué », ④ en ouvrant la recharge, ⑥ quand « C’est débloqué » garde le −50 % refusé (« Garde-le-moi »).
+ * ⑤ sur « C’est débloqué », ⑥ quand « C’est débloqué » garde le −50 % refusé (« Garde-le-moi »). ④ y reste pour un onglet
+ * ouvert avant son arrêt (le 23 octobre 2026), qui la demande encore en ouvrant la recharge : le serveur ne la montre plus.
  */
 export const OFFRES_PROPOSEES = ["suite", "premium_ajout", "premiere_recharge", "second_rapport", "garde_second"] as const satisfies readonly OffreUnique[];
 export type OffreProposee = (typeof OFFRES_PROPOSEES)[number];
 /**
  * Les lots de la roue du paywall (src/contenu/roue.ts, src/server/roue.ts), un tour par compte : des bulles en plus
- * (10, 20, 30), une remise sur la formule (−10 %, −15 %), le 2e rapport à −50 % gardé 30 jours, ou Premium au prix du
- * rapport. Chacun vaut 15 minutes, sur la formule payée ensuite.
+ * (3, 5, 10), une remise sur la formule (−10 %, −15 %), le 2e rapport à −50 % gardé 30 jours, ou Premium au prix du
+ * rapport. Chacun vaut 15 minutes, sur la formule payée ensuite. Les lots de +20 et +30 bulles ne sont plus sur la roue
+ * depuis le 23 octobre 2026 : écrits dans roue.lot et achats.lot_roue, ils gardent leur sens (une commande en attente).
  */
-export const LOTS_DE_LA_ROUE = ["bulles10", "bulles20", "bulles30", "moins10", "moins15", "second50", "premium_prix"] as const;
+export const LOTS_DE_LA_ROUE = ["bulles3", "bulles5", "bulles10", "bulles20", "bulles30", "moins10", "moins15", "second50", "premium_prix"] as const;
 export type LotDeLaRoue = (typeof LOTS_DE_LA_ROUE)[number];
 /** Ce que le compte fait de la roue (POST /api/roue) : la tourner, ou n’en pas vouloir. */
 export const GESTES_DE_LA_ROUE = ["tourner", "refuser"] as const;
@@ -462,7 +480,7 @@ export type BlushAnswer = {
  * vend à quelqu’un qui a déjà payé. Les prix et les packs viennent du catalogue (src/contenu/offres.ts, recharge.ts).
  * - `bulles` : une recharge. `solde` : ce qu’il lui en reste (à zéro, sa réponse attend, verrouillée, et se lit dès la
  *   recharge) ;
- * - `premium` : Premium pour qui a pris le rapport seul (l’offre unique ③, montrée par le serveur avec la carte) ;
+ * - `premium` : le passage en Premium pour qui a pris le rapport seul (l’offre unique ③, montrée par le serveur avec la carte) ;
  * - `autre` : une conv avec quelqu’un d’autre (`prenom`, s’il l’a dit), importée d’abord, puis payée sur son paywall ;
  * - `a_jour` : la conv de la même personne (`prenom`) réimportée, pour un rapport qui lit aussi ce qui a suivi son
  *   rapport (`depuis` : le jour de ce rapport, en lettres, ou null sans rapport écrit) ;

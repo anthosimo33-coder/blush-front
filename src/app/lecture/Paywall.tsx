@@ -339,7 +339,7 @@ function Paiement({
                     {FEUILLE_FORMULE.avance.titre}
                   </span>
                 }
-                note={<span className="text-elle-ink">{FEUILLE_FORMULE.avance.note}</span>}
+                note={<span className="text-elle-ink">{FEUILLE_FORMULE.avance.note(avoirs.avance.bulles)}</span>}
                 prix={FEUILLE_FORMULE.avance.prix}
               />
             )}
@@ -374,7 +374,13 @@ function Paiement({
               prix={enEuros(premium.centimes)}
               barre={barrePremium ? enEuros(barrePremium) : undefined}
             >
-              <LigneCadeau perle titre={PAYWALL.premium.offertes(CATALOGUE.premium.bulles)} barre={PAYWALL.premium.barreOffertes} valeur={PAYWALL.gratuit} />
+              {/* « 0 € » ne suit que le prix barré de ses offertes : seul, il se lirait comme le prix de toutes ses réponses */}
+              <LigneCadeau
+                perle
+                titre={PAYWALL.premium.offertes(CATALOGUE.premium.bulles)}
+                barre={PAYWALL.premium.barreOffertes ?? undefined}
+                valeur={PAYWALL.premium.barreOffertes ? PAYWALL.gratuit : undefined}
+              />
               {lotSurPremium && <LigneCadeau lot={lotSurPremium} valeur={valeurDuLot(lotSurPremium, "premium")} />}
             </Formule>
           </RadioGroup>
@@ -470,8 +476,8 @@ function Formule({
   );
 }
 
-/** Un cadeau de la formule, sur fond rose : les bulles offertes (la perle, leur prix barré, « 0 € »), ou le lot de la roue. */
-function LigneCadeau({ lot, perle, titre, barre, valeur }: { lot?: LotDeLaRoue; perle?: boolean; titre?: string; barre?: string; valeur: string }) {
+/** Un cadeau de la formule, sur fond rose : les bulles offertes (la perle, leur prix barré et « 0 € » s’il y en a un), ou le lot de la roue (sa valeur). */
+function LigneCadeau({ lot, perle, titre, barre, valeur }: { lot?: LotDeLaRoue; perle?: boolean; titre?: string; barre?: string; valeur?: string }) {
   return (
     <span className="flex items-center gap-2.5 rounded-[11px] bg-[#FFF0F6] px-2.5 py-1.5 text-legende font-black">
       {perle ? <Perle taille={14} /> : <Icon name="sparkle" size={14} stroke={2.4} className="text-elle-ink" />}
@@ -482,7 +488,7 @@ function LigneCadeau({ lot, perle, titre, barre, valeur }: { lot?: LotDeLaRoue; 
           {barre}
         </s>
       )}
-      <span className="text-elle-ink">{valeur}</span>
+      {valeur && <span className="text-elle-ink">{valeur}</span>}
     </span>
   );
 }

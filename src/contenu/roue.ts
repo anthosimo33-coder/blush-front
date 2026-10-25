@@ -5,9 +5,10 @@ import { CATALOGUE, enEuros } from "./offres";
  * La roue du paywall (décidée le 16 octobre, façon e-commerce) : juste avant le paywall, un tour par compte, et on gagne à
  * chaque fois. Huit cases, chacune avec sa chance, réglées pour que chaque lot reste rentable (le calcul du 16 octobre :
  * TVA 20 %, frais de Whop 10 %, 1,50 € d’IA par rapport, la bulle à 0,05 € toutes utilisées au pire : la pire marge
- * reste 30 %, le gros lot ; un tour coûte 0,30 € en moyenne, 0,64 € au pire). Aux prix du 21 octobre (le rapport à
- * 9,90 €), le gros lot « Premium au prix du rapport » n’a presque plus de marge quand toutes ses bulles servent : il reste
- * plafonné par GROS_LOTS_PAR_JOUR. Le tirage se fait sur le serveur
+ * reste 30 %, le gros lot ; un tour coûte 0,30 € en moyenne, 0,64 € au pire). Avec la grille du 23 octobre (le rapport à
+ * 3 bulles, la bulle comptée 0,095 €), les lots de bulles passent à l’échelle du nouveau rapport (+3, +5, +10 au lieu de
+ * +10, +20, +30), aux mêmes cases et aux mêmes chances ; le gros lot « Premium au prix du rapport » (25 bulles pour 9,90 €)
+ * reste plafonné par GROS_LOTS_PAR_JOUR. Le tirage se fait sur le serveur
  * (src/server/roue.ts), jamais dans le navigateur, et les chances sont écrites dans le règlement (les conditions, « Le
  * jeu de la roue »). Le lot vaut DUREE_DU_CADEAU_MS, sur la formule payée ensuite (prixAvecLot, bullesDuLot) ; le serveur
  * le fige dans l’achat à la commande, comme le prix (src/server/achats.ts).
@@ -20,16 +21,18 @@ export type CaseDeLaRoue = { lot: LotDeLaRoue; haut: string; bas: string; chance
 
 /**
  * Les huit cases, dans le sens des aiguilles d’une montre depuis l’aiguille (la case 0 est en haut, la roue au repos
- * tournée d’une case : le gros lot sous l’aiguille). Les chances font 10 000 en tout ; deux cases donnent +10 bulles.
+ * tournée d’une case : le gros lot sous l’aiguille). Les chances font 10 000 en tout ; deux cases donnent +3 bulles.
+ * roue.case_tiree garde le rang de la case : l’ordre ne change pas (le 23 octobre, seuls les lots de bulles ont changé
+ * sur place, sous des noms qui disent leur nombre : bulles10 garde son sens, +10, dans les lignes d’avant).
  */
 export const CASES_DE_LA_ROUE: readonly CaseDeLaRoue[] = [
-  { lot: "bulles20", haut: "+20", bas: "bulles", chance: 1800, couleur: "rose" },
+  { lot: "bulles5", haut: "+5", bas: "bulles", chance: 1800, couleur: "rose" },
   { lot: "moins10", haut: "−10\u00a0%", bas: "ta formule", chance: 1100, couleur: "blanc" },
-  { lot: "bulles10", haut: "+10", bas: "bulles", chance: 2000, couleur: "rose" },
+  { lot: "bulles3", haut: "+3", bas: "bulles", chance: 2000, couleur: "rose" },
   { lot: "second50", haut: "−50\u00a0%", bas: "2e rapport", chance: 2500, couleur: "blanc" },
-  { lot: "bulles30", haut: "+30", bas: "bulles", chance: 450, couleur: "rose" },
+  { lot: "bulles10", haut: "+10", bas: "bulles", chance: 450, couleur: "rose" },
   { lot: "moins15", haut: "−15\u00a0%", bas: "ta formule", chance: 100, couleur: "blanc" },
-  { lot: "bulles10", haut: "+10", bas: "bulles", chance: 2000, couleur: "rose" },
+  { lot: "bulles3", haut: "+3", bas: "bulles", chance: 2000, couleur: "rose" },
   { lot: "premium_prix", haut: "Premium", bas: "au prix du rapport", chance: 50, couleur: "opale" },
 ];
 
@@ -43,21 +46,24 @@ export const DUREE_DU_CADEAU_MS = 15 * 60 * 1000;
 export const DUREE_DU_SECOND_GAGNE_MS = 30 * 24 * 3600 * 1000;
 
 /**
- * Les gros lots, limités par jour (heure de Paris) : au-delà de GROS_LOTS_PAR_JOUR, la case tombe sur +10 bulles. Le
+ * Les gros lots, limités par jour (heure de Paris) : au-delà de GROS_LOTS_PAR_JOUR, la case tombe sur +3 bulles. Le
  * règlement le dit (« dans la limite de … par jour »).
  * TODO(produit): le plafond à régler avec les premiers chiffres (10 par jour par lot, pour commencer).
  */
 export const GROS_LOTS: readonly LotDeLaRoue[] = ["moins15", "premium_prix"];
 export const GROS_LOTS_PAR_JOUR = 10;
 
-/** La case où tombe un gros lot au-delà de son plafond du jour : +10 bulles. */
-export const CASE_DE_REPLI = CASES_DE_LA_ROUE.findIndex((c) => c.lot === "bulles10");
+/** La case où tombe un gros lot au-delà de son plafond du jour : +3 bulles (la première des deux). */
+export const CASE_DE_REPLI = CASES_DE_LA_ROUE.findIndex((c) => c.lot === "bulles3");
 
 /** La remise d’un lot sur la formule (0,10 pour −10 %), ou 0. */
 const remiseDe = (lot: LotDeLaRoue | null) => (lot === "moins10" ? 0.1 : lot === "moins15" ? 0.15 : 0);
 
+/** Les bulles de chaque lot de bulles, ceux d’avant le 23 octobre (+20, +30) compris : une commande d’avant les porte encore. */
+const BULLES_DES_LOTS: Partial<Record<LotDeLaRoue, number>> = { bulles3: 3, bulles5: 5, bulles10: 10, bulles20: 20, bulles30: 30 };
+
 /** Les bulles qu’un lot ajoute à la formule, ou 0. */
-export const bullesDuLot = (lot: LotDeLaRoue | null) => (lot === "bulles10" ? 10 : lot === "bulles20" ? 20 : lot === "bulles30" ? 30 : 0);
+export const bullesDuLot = (lot: LotDeLaRoue | null) => (lot ? (BULLES_DES_LOTS[lot] ?? 0) : 0);
 
 /** Les offres où un lot de la roue s’applique : les deux formules du paywall. */
 const FORMULES_DE_LA_ROUE: readonly OffreId[] = ["rapport", "premium"];
@@ -101,16 +107,29 @@ export const ROUE = {
   partir: "Tu peux partir et revenir\u00a0: le cadeau tient jusqu’à la fin du minuteur.",
   /** Le nom de la roue, pour un lecteur d’écran (les cases, dans l’ordre). */
   description:
-    "La roue des cadeaux\u00a0: 20 bulles, 10\u00a0% de moins, 10 bulles, ton 2e rapport à moins 50\u00a0%, 30 bulles, 15\u00a0% de moins, 10 bulles, Premium au prix du rapport",
+    "La roue des cadeaux\u00a0: 5 bulles, 10\u00a0% de moins, 3 bulles, ton 2e rapport à moins 50\u00a0%, 10 bulles, 15\u00a0% de moins, 3 bulles, Premium au prix du rapport",
   /** Le titre de la feuille, pour un lecteur d’écran. */
   feuille: "La roue des cadeaux",
 };
 
 /**
  * Ce que chaque lot dit : « Gagné » (`titre`, `detail`), le bandeau du paywall (`bandeau`, suivi du minuteur), et sa
- * ligne dans la formule (`ligne`).
+ * ligne dans la formule (`ligne`). Les lots de +20 et +30 bulles ne sont plus sur la roue (le 23 octobre) : gardés pour
+ * un lot gagné juste avant, encore valable.
  */
 export const GAINS: Record<LotDeLaRoue, { titre: string; detail: string; bandeau: string; ligne: string }> = {
+  bulles3: {
+    titre: "+3 bulles",
+    detail: "3 réponses de BLUSH en plus. Elles s’ajoutent toutes seules à ta formule.",
+    bandeau: "Ton cadeau\u00a0: +3 bulles",
+    ligne: "+3 bulles de la roue",
+  },
+  bulles5: {
+    titre: "+5 bulles",
+    detail: "5 réponses de BLUSH en plus. Elles s’ajoutent toutes seules à ta formule.",
+    bandeau: "Ton cadeau\u00a0: +5 bulles",
+    ligne: "+5 bulles de la roue",
+  },
   bulles10: {
     titre: "+10 bulles",
     detail: "10 réponses de BLUSH en plus. Elles s’ajoutent toutes seules à ta formule.",
@@ -155,7 +174,7 @@ export const GAINS: Record<LotDeLaRoue, { titre: string; detail: string; bandeau
   },
 };
 
-/** Les chances de chaque lot en pourcentage, pour le règlement : « 40 % » (les deux cases de +10 bulles ensemble). */
+/** Les chances de chaque lot en pourcentage, pour le règlement : « 40 % » (les deux cases de +3 bulles ensemble). */
 export function chancesDesLots(): { lot: LotDeLaRoue; titre: string; pourcent: string }[] {
   const total = new Map<LotDeLaRoue, number>();
   for (const c of CASES_DE_LA_ROUE) total.set(c.lot, (total.get(c.lot) ?? 0) + c.chance);

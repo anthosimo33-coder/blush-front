@@ -1,7 +1,7 @@
 import "server-only";
 import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, ne, sql } from "drizzle-orm";
 import { alerteSobre } from "@prompts/lib/titres";
-import { bullesDe, CATALOGUE, PREMIERE_RECHARGE, RAPPORT_D_AVANCE, RAPPORTS_SEULS } from "@/contenu/offres";
+import { bullesDeLAvance, CATALOGUE, RAPPORT_D_AVANCE, RAPPORTS_SEULS } from "@/contenu/offres";
 import { bullesDuLot, DUREE_DU_SECOND_GAGNE_MS, lotSAppliqueA, prixAvecLot } from "@/contenu/roue";
 import type { GenreVendu, OffreId } from "@/types";
 import type { AchatDuCompte } from "@/types/api";
@@ -37,7 +37,7 @@ const a = schema.achats;
 /** Le délai de rétractation d’un rapport d’avance pas encore utilisé : 14 jours après son achat (les conditions, « livraison »). */
 const RETRACTATION_MS = 14 * 24 * 3600e3;
 
-/** Pourquoi une commande est refusée : la conv manque (ou n’est pas à lui), son rapport est déjà ouvert, l’offre n’est pas (plus) proposée, la conv est en alerte, ou trop de paiements attendent déjà. */
+/** Pourquoi une commande est refusée : la conv manque (ou n’est pas à lui), son rapport est déjà ouvert, l’offre n’est pas (plus) proposée ou plus en vente, la conv est en alerte, ou trop de paiements attendent déjà. */
 export type RefusDeCommande = "aucune" | "deja" | "offre" | "sobre" | "trop";
 
 /**
@@ -58,28 +58,13 @@ export async function convEnAlerte(storyId: string): Promise<boolean> {
  */
 const EN_ATTENTE_MAX = 10;
 
-/** Les recharges : les packs de bulles du catalogue (ni un rapport, ni une offre unique). */
-const PACKS_DE_BULLES = (Object.keys(CATALOGUE) as OffreId[]).filter((o) => !CATALOGUE[o].conv && !CATALOGUE[o].unique);
-
-/**
- * Ce compte a-t-il déjà payé une recharge (un pack, même repris ensuite) ? Alors le bonus de la première recharge (④) ne
- * vaut plus : ni montré (proposerOffreUnique), ni donné à la commande, même montré avant.
- */
-export async function rechargeDejaPayee(userId: string): Promise<boolean> {
-  const [l] = await db()
-    .select({ id: a.id })
-    .from(a)
-    .where(and(eq(a.userId, userId), isNotNull(a.payeLe), inArray(a.offre, PACKS_DE_BULLES)))
-    .limit(1);
-  return !!l;
-}
-
 /**
  * Le droit d’acheter cette offre, puis l’achat écrit « en_attente », au prix et avec les bulles du catalogue, figés
  * (jamais un prix venu du navigateur). Une offre qui débloque un rapport s’achète pour une conv du compte, pas encore
  * débloquée (`storyId`) ; une offre unique, seulement montrée et encore valable (src/server/offres-uniques.ts) ; le
- * paiement en plus (③), après un rapport payé. Le pack conseillé prend le bonus de la première recharge (④) s’il est
- * montré et valable, et qu’aucune recharge n’a encore été payée. Une formule (le rapport, Premium) prend le lot de la
+ * passage en Premium (③), après un rapport seul payé. Une offre retirée de la vente (l’ancien ③, les packs d’avant le
+ * 23 octobre 2026) ne se commande plus (« offre ») ; commandée avant, elle se livre encore (livrer ne regarde que
+ * l’achat). Le bonus de la première recharge (④) est arrêté le même jour. Une formule (le rapport, Premium) prend le lot de la
  * roue gagné et encore valable (src/server/roue.ts) : son prix (prixAvecLot) et ses bulles (bullesDuLot), figés eux
  * aussi, et le lot noté sur l’achat, pris à la livraison. `renonciation` : la renonciation au délai de rétractation
  * donnée avec la commande (sa version et son heure), gardée avec l’achat. `vente` : la carte du chat d’où il se paie
@@ -96,6 +81,8 @@ export async function commander(
   }: { storyId?: string | null; fournisseur: FournisseurPaiement; renonciation?: Consentement; vente?: GenreVendu | null },
 ): Promise<Achat | RefusDeCommande> {
   const c = CATALOGUE[offre];
+  /* Un onglet ouvert avant la grille du 23 octobre peut encore l’envoyer (z.enum(OFFRES) l’accepte : les achats passés la portent) */
+  if (!c.enVente) return "offre";
   const [attente] = await db()
     .select({ n: sql<number>`count(*)::int` })
     .from(a)
@@ -115,7 +102,7 @@ export async function commander(
     const montree = await offreValable(compte.id, c.unique);
     if (!montree || (c.conv && montree.storyId && montree.storyId !== storyId)) return "offre";
   }
-  if (offre === "premium_ajout") {
+  if (offre === "passe_premium") {
     const [rapport] = await db()
       .select({ id: a.id })
       .from(a)
@@ -123,8 +110,6 @@ export async function commander(
       .limit(1);
     if (!rapport) return "offre";
   }
-  /* ④ : montré et valable, et toujours la première recharge (un autre pack payé depuis l’a passée : la feuille ne le montre plus) */
-  const premiere = offre === PREMIERE_RECHARGE.offre && !!(await offreValable(compte.id, "premiere_recharge")) && !(await rechargeDejaPayee(compte.id));
   /* Le lot de la roue, sur une formule seulement (et Premium au prix du rapport, sur Premium seulement) */
   const gagne = c.conv && !c.unique ? await lotValable(compte.id) : null;
   const lot = gagne && lotSAppliqueA(gagne, offre) ? gagne : null;
@@ -135,9 +120,9 @@ export async function commander(
       storyId: c.conv ? storyId : null,
       offre,
       centimes: prixAvecLot(offre, lot).centimes,
-      bulles: bullesDe(offre, { premiereRecharge: premiere }) + bullesDuLot(lot),
+      bulles: c.bulles + bullesDuLot(lot),
       lotRoue: lot,
-      offreUnique: c.unique ?? (premiere ? "premiere_recharge" : null),
+      offreUnique: c.unique,
       fournisseur,
       renonciationVersion: renonciation?.version ?? null,
       renonciationLe: renonciation?.le ?? null,
@@ -174,7 +159,8 @@ export type Livraison = { effet: "livre" | "deja" | "annule" | "inconnu" | "offr
  * (le webhook du remboursement arrivé avant celui du paiement) n’est pas livré. Une offre unique ne profite qu’à un
  * achat : deux commandes passées tant qu’elle valait (deux onglets, un nouvel essai), payées toutes les deux, n’en
  * livrent qu’une à son prix réduit. L’autre n’est pas livrée (« offre », l’achat reste en attente : à rembourser), sauf
- * la première recharge, payée au prix normal du pack : livrée sans son bonus. Une fois la conv débloquée, la chaîne du
+ * la première recharge (④, une commande d’avant son arrêt le 23 octobre 2026), payée au prix normal du pack : livrée
+ * sans son bonus. Une fois la conv débloquée, la chaîne du
  * rapport repart après la réponse (reparerLaChaine, comme au déblocage d’avant).
  */
 export async function livrer(achatId: string, paiement: Paiement = {}): Promise<Livraison> {
@@ -198,7 +184,8 @@ export async function livrer(achatId: string, paiement: Paiement = {}): Promise<
         .returning({ offre: o.offre });
       if (!prise.length) {
         if (achat.offreUnique !== "premiere_recharge") return { effet: "offre", achat, debloquee: false };
-        bulles = bullesDe(achat.offre);
+        /* Les bulles du pack seul, tel qu’il se vendait (le pack de 80, retiré, garde les siennes au catalogue) */
+        bulles = CATALOGUE[achat.offre].bulles;
       }
     }
     /*
@@ -354,10 +341,10 @@ const avanceValable = (userId: string) =>
     gt(a.payeLe, sql`now() - make_interval(secs => ${RAPPORT_D_AVANCE.dureeMs / 1000})`),
   );
 
-/** Le rapport d’avance que la prochaine conv de ce compte utiliserait (le plus ancien encore valable), et sa fin ; ou null. */
-export async function avanceDuCompte(userId: string): Promise<{ achat: string; fin: Date } | null> {
-  const [l] = await db().select({ id: a.id, payeLe: a.payeLe }).from(a).where(avanceValable(userId)).orderBy(asc(a.payeLe)).limit(1);
-  return l?.payeLe ? { achat: l.id, fin: new Date(l.payeLe.getTime() + RAPPORT_D_AVANCE.dureeMs) } : null;
+/** Le rapport d’avance que la prochaine conv de ce compte utiliserait (le plus ancien encore valable), sa fin, et les bulles qu’il donnera (bullesDeLAvance) ; ou null. */
+export async function avanceDuCompte(userId: string): Promise<{ achat: string; fin: Date; bulles: number } | null> {
+  const [l] = await db().select({ id: a.id, payeLe: a.payeLe, creeLe: a.creeLe }).from(a).where(avanceValable(userId)).orderBy(asc(a.payeLe)).limit(1);
+  return l?.payeLe ? { achat: l.id, fin: new Date(l.payeLe.getTime() + RAPPORT_D_AVANCE.dureeMs), bulles: bullesDeLAvance(l.creeLe) } : null;
 }
 
 /** Pourquoi un rapport d’avance ne s’utilise pas : aucun n’est valable (« offre »), la conv manque (« aucune »), ou son rapport est déjà ouvert (« deja »). */
@@ -365,7 +352,8 @@ export type RefusDAvance = "offre" | "aucune" | "deja" | "sobre";
 
 /**
  * Utilise le rapport d’avance de ce compte (le plus ancien encore valable) pour cette conv, à lui et pas encore
- * débloquée, dans une transaction : l’achat garde la conv (storyId), l’heure (utiliseLe), les bulles du rapport, qu’il
+ * débloquée, dans une transaction : l’achat garde la conv (storyId), l’heure (utiliseLe), les bulles que son billet
+ * promettait à sa commande (bullesDeLAvance : 10 avant la grille du 23 octobre 2026, celles du rapport depuis), qu’il
  * crédite, et la renonciation au délai de rétractation que ce geste donne ; la conv s’ouvre, et sa chaîne repart après
  * la réponse, comme après une livraison. Ensuite, l’achat vit comme un rapport payé : remboursé ou contesté, il
  * re-verrouille sa conv et reprend ses bulles (reprendre). L’achat se verrouille avant la conv, dans l’ordre de livrer
@@ -376,8 +364,9 @@ export async function utiliserAvance(compte: Pick<Utilisateur, "id" | "email">, 
   /* Une conv en alerte ne se paie pas, même d’avance : son rapport doux est offert */
   if (await convEnAlerte(storyId)) return "sobre";
   const r = await db().transaction(async (tx): Promise<Achat | RefusDAvance> => {
-    const [avance] = await tx.select({ id: a.id }).from(a).where(avanceValable(compte.id)).orderBy(asc(a.payeLe)).limit(1).for("update");
+    const [avance] = await tx.select({ id: a.id, creeLe: a.creeLe }).from(a).where(avanceValable(compte.id)).orderBy(asc(a.payeLe)).limit(1).for("update");
     if (!avance) return "offre";
+    const bulles = bullesDeLAvance(avance.creeLe);
     /* La conv lue sous son verrou : un paiement livré au même moment l’a ouverte avant, ou attend la fin de celle-ci */
     const [s] = await tx
       .select({ debloqueLe: schema.stories.debloqueLe })
@@ -388,11 +377,11 @@ export async function utiliserAvance(compte: Pick<Utilisateur, "id" | "email">, 
     if (s.debloqueLe) return "deja";
     const [utilise] = await tx
       .update(a)
-      .set({ storyId, utiliseLe: sql`now()`, bulles: RAPPORT_D_AVANCE.bulles, renonciationVersion: renonciation.version, renonciationLe: renonciation.le })
+      .set({ storyId, utiliseLe: sql`now()`, bulles, renonciationVersion: renonciation.version, renonciationLe: renonciation.le })
       .where(eq(a.id, avance.id))
       .returning();
     await ouvrirLaConv(tx, compte.id, storyId);
-    await mouvementDans(tx, compte.id, RAPPORT_D_AVANCE.bulles, "achat", avance.id);
+    await mouvementDans(tx, compte.id, bulles, "achat", avance.id);
     return utilise!;
   });
   if (typeof r !== "string") {

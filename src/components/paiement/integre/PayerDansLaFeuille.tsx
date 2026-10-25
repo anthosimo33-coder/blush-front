@@ -5,7 +5,7 @@ import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { BrandingElement, PaymentElement, Payments, usePayments, useWhop, WhopElements } from "@whop/elements-react";
 import type { PaymentRequestResource, WalletButtonArt } from "@whop/elements/payments";
 import type { AchatImmediat } from "@/contenu/consentements";
-import { enEuros } from "@/contenu/offres";
+import { CATALOGUE, enEuros } from "@/contenu/offres";
 import { DANS_LA_FEUILLE, FEUILLE_FORMULE } from "@/contenu/paiement";
 import { cn } from "@/lib/cn";
 import { marquerJalon } from "@/lib/jalons";
@@ -52,7 +52,7 @@ type Proprietes = {
   centimes: number;
   /** Ce qu’on paie, en une ligne : sous le total du portefeuille, et au-dessus de la carte (« Premium »). */
   titre: string;
-  /** Le bouton qui paie sans portefeuille (il ouvre la carte), et sur la page de Whop : « Débloquer · 14,90 € ». */
+  /** Le bouton qui paie sans portefeuille (il ouvre la carte), et sur la page de Whop : « Débloquer · 19,90 € ». */
   libelle: string;
   /** La ligne de la renonciation sous le bouton : le rapport, ou des bulles ; null pour une offre livrée à son usage (le rapport d’avance), sans renonciation. */
   quoi: AchatImmediat | null;
@@ -300,7 +300,8 @@ function CestPaye({ offre }: { offre: OffreId }) {
       <CheckBurst size={72} pop />
       <p className="m-0 mt-2 text-[24px] font-black leading-[1.1] tracking-[-0.02em]">{DANS_LA_FEUILLE.paye.titre}</p>
       <p className="m-0 flex items-center gap-2 text-corps font-extrabold text-soft">
-        {offre === "second" || offre.startsWith("pack") || offre === "premium_ajout" ? DANS_LA_FEUILLE.paye.bulles : DANS_LA_FEUILLE.paye.rapport}
+        {/* Ce qui n’ouvre aucun rapport (des bulles, ③, le rapport d’avance) : les bulles ; le reste, le rapport */}
+        {CATALOGUE[offre].conv ? DANS_LA_FEUILLE.paye.rapport : DANS_LA_FEUILLE.paye.bulles}
         <TypingDots />
       </p>
     </div>

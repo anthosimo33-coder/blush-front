@@ -27,7 +27,7 @@ describe("le retour de chez Whop par « Retour »", () => {
 
 describe("où reprendre une fois l’achat livré (suiteDuPaiement)", () => {
   it("une recharge revient avec les bulles que le serveur a livrées, pas celles que la feuille avait comptées", () => {
-    /* La feuille a compté 80 (le bonus ④ pas encore su) ; l’achat livré en a donné 120 : le mot dira « +120 bulles » */
+    /* La feuille a compté 80 ; l’achat livré en a donné 120 (une commande d’avant le 23 octobre, avec le bonus ④) : le mot dira « +120 bulles » */
     sessionStorage.setItem("blush.paiement.suite.a1", "/app?recharge=80");
     expect(suiteDuPaiement("a1", 120)).toBe("/app?recharge=120");
     expect(suiteDuPaiement("a1")).toBe("/app?recharge=80");

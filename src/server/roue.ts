@@ -11,7 +11,7 @@ import { fournisseur } from "./paiement/fournisseur";
 
 /*
  * La roue du paywall (src/contenu/roue.ts) : un tour par compte, tiré ici, jamais dans le navigateur. Le compte la
- * tourne (une case, tirée avec sa chance ; un gros lot au-delà de son plafond du jour tombe sur +10 bulles), ou n’en
+ * tourne (une case, tirée avec sa chance ; un gros lot au-delà de son plafond du jour tombe sur +3 bulles), ou n’en
  * veut pas (« Je ne veux pas de cadeau ») ; dans les deux cas, elle ne revient plus. Le lot vaut 15 minutes
  * (DUREE_DU_CADEAU_MS) : la commande d’une formule passée dans ce temps le prend (commander, src/server/achats.ts), et la
  * livraison le marque pris, une fois (livrer). Ni l’équipe (qui ne paie rien), ni un site sans paiement ne la voient.
@@ -58,7 +58,7 @@ function caseAuHasard(): number {
  * Le compte tourne la roue, ou la refuse : une fois. Déjà tournée (ou refusée), rien ne change, la même réponse revient
  * (une page rechargée retrouve sa case et son minuteur). Tournée, la case est tirée ici (`forcee` : la case imposée par
  * un test, avec le faux Whop seulement, voir la route) ; un gros lot qui a déjà atteint son plafond du jour (heure de
- * Paris) tombe sur +10 bulles. Le compte est verrouillé le temps de décider : deux tours en même temps n’en font qu’un.
+ * Paris) tombe sur +3 bulles (CASE_DE_REPLI). Le compte est verrouillé le temps de décider : deux tours en même temps n’en font qu’un.
  */
 export async function jouer(compte: Compte, geste: "tourner" | "refuser", { forcee = null }: { forcee?: number | null } = {}): Promise<RoueDuCompte> {
   if (estEquipe(compte) || !fournisseur()) return { etat: "aucune" };

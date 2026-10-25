@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { Logo } from "@/components/brand/Logo";
 import { DoneCheck, NoteIcone } from "@/components/ui/feedback";
 import { CATALOGUE, prixDe } from "@/contenu/offres";
+import { NOM_DU_PASSAGE_EN_PREMIUM } from "@/contenu/pilotage";
 import { cn } from "@/lib/cn";
 import { NBSP } from "@/lib/format";
 import type { Bulles, Chiffre, Montant, Periode, StatsAdmin, Ventes } from "@/server/stats";
@@ -413,8 +414,8 @@ function Entonnoir({ a, verdicts }: { a: StatsAdmin["achats"]; verdicts: number 
 export const NOMS_OFFRES_UNIQUES: Record<OffreUnique, [string, string]> = {
   suite: ["1", `Le rapport à ${prixDe("suite")}, offre unique de 5 minutes`],
   relance_mail: ["2", "Le mail «\u00a0Ton rapport t’attend\u00a0»"],
-  premium_ajout: ["3", "Premium pour 5\u00a0€ de plus"],
-  premiere_recharge: ["4", "+40 bulles, première recharge"],
+  premium_ajout: ["3", NOM_DU_PASSAGE_EN_PREMIUM],
+  premiere_recharge: ["4", "+40 bulles, première recharge (arrêtée le 23 octobre)"],
   second_rapport: ["5", `Le 2e rapport à ${prixDe("second")}`],
   garde_second: ["6", "Le −50\u00a0% gardé 7 jours"],
 };

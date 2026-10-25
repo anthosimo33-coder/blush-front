@@ -48,12 +48,12 @@ const chargerLaRecharge = () => import("@/components/bulles/FeuilleRecharge");
 const WINDOW_W = 720;
 
 /*
- * La première apparition du compteur de bulles est expliquée (la carte « Tes 10 bulles offertes sont là »), une fois sur
+ * La première apparition du compteur de bulles est expliquée (la carte « Tes 3 bulles offertes sont là »), une fois sur
  * cet appareil : fermée, ou une première réponse arrivée. Au rendu serveur, et sans stockage, elle ne se montre pas.
  */
 const BULLES_EXPLIQUEES = drapeauLocal("blush.bulles.expliquees", { defaut: false, indisponible: true, serveur: true });
 
-/** Combien de temps reste le mot qui suit une recharge (« +120 bulles, ta réponse est là »). */
+/** Combien de temps reste le mot qui suit une recharge (« +25 bulles, ta réponse est là »). */
 const MOT_DE_LA_RECHARGE_MS = 2600;
 
 /* L’heure d’ouverture de l’écran, lue dans le navigateur seulement : rien au rendu serveur, donc pas d’écart à l’hydratation */

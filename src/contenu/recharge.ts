@@ -1,41 +1,41 @@
 import type { OffreId } from "@/types";
-import { CATALOGUE, enEuros, PREMIERE_RECHARGE, prixDe } from "./offres";
+import { CATALOGUE, enEuros, prixDe } from "./offres";
 
 /*
  * Les textes de la recharge (FeuilleRecharge, src/components/bulles/FeuilleRecharge.tsx) : trois packs, le conseillé
- * choisi d’avance, et le bonus de la première recharge (④) quand le serveur le montre. Repris tels quels du prototype
- * validé des bulles (12 octobre) ; les prix et les bulles viennent du catalogue (src/contenu/offres.ts), jamais recopiés.
+ * choisi d’avance. Repris du prototype validé des bulles (12 octobre) ; les prix et les bulles viennent du catalogue
+ * (src/contenu/offres.ts), jamais recopiés. Le bonus de la première recharge (④, +40 bulles sur le pack conseillé) est
+ * arrêté le 23 octobre 2026 : plus rien n’est offert ni montré.
  */
 
-/** Les packs de la recharge, dans l’ordre de la feuille. */
-export const PACKS = ["pack30", "pack80", "pack200"] as const satisfies readonly OffreId[];
+/** Les packs de la recharge, dans l’ordre de la feuille (la grille du 23 octobre). */
+export const PACKS = ["pack10", "pack25", "pack60"] as const satisfies readonly OffreId[];
 export type Pack = (typeof PACKS)[number];
 
-/** Le pack conseillé, choisi d’avance : celui du bonus de la première recharge. */
-export const PACK_CONSEILLE: Pack = PREMIERE_RECHARGE.offre;
-
-/** Les bulles offertes de chaque pack (« 70 bulles +10 offertes ») : le reste des bulles du catalogue est payé. */
-const OFFERTES: Record<Pack, number> = { pack30: 0, pack80: 10, pack200: 50 };
-
-/** Le prix d’une bulle, arrondi au centime (« 0,12 € la bulle »). */
-const prixDUneBulle = (centimes: number, bulles: number) => `${enEuros(Math.round(centimes / bulles))} la bulle`;
+/** Le pack conseillé, choisi d’avance (décidé le 23 octobre : celui de 25 bulles). */
+export const PACK_CONSEILLE: Pack = "pack25";
 
 /**
- * Ce que la feuille montre d’un pack : son titre (les bulles payées), les offertes (le bonus ④ compris s’il vaut), le
- * total, et sa note. `bonus` : le bonus de la première recharge vaut pour ce compte (le serveur l’a montré).
+ * Les bulles offertes de chaque pack (« 70 bulles +10 offertes ») : le reste des bulles du catalogue est payé. Aucune
+ * dans la grille du 23 octobre (10, 25 et 60 bulles, toutes payées).
+ * Le prix à la bulle baisse avec la taille du pack (0,69 €, 0,60 €, 0,58 €) : le petit pack à 6,90 € (décidé le 23 octobre) pour que le conseillé ne revienne pas plus cher que lui.
  */
-export function lePack(pack: Pack, bonus: boolean) {
+const OFFERTES: Record<Pack, number> = { pack10: 0, pack25: 0, pack60: 0 };
+
+/** Le prix d’une bulle, arrondi au centime (« 0,60 € la bulle »). */
+const prixDUneBulle = (centimes: number, bulles: number) => `${enEuros(Math.round(centimes / bulles))} la bulle`;
+
+/** Ce que la feuille montre d’un pack : son titre (les bulles payées), les offertes, le total, et sa note. */
+export function lePack(pack: Pack) {
   const { bulles, centimes } = CATALOGUE[pack];
-  const enPlus = bonus && pack === PREMIERE_RECHARGE.offre ? PREMIERE_RECHARGE.bonus : 0;
-  const offertes = OFFERTES[pack] + enPlus;
-  const total = bulles + enPlus;
+  const offertes = OFFERTES[pack];
   return {
-    titre: `${bulles - OFFERTES[pack]} bulles`,
+    titre: `${bulles - offertes} bulles`,
     offertes,
-    total,
+    total: bulles,
     prix: prixDe(pack),
-    /* Le premier pack, sans offertes, sert de repère : le prix de la bulle seul */
-    note: offertes ? `${total} bulles · ${prixDUneBulle(centimes, total)}` : prixDUneBulle(centimes, total),
+    /* Un pack sans offertes : le prix de la bulle seul */
+    note: offertes ? `${bulles} bulles · ${prixDUneBulle(centimes, bulles)}` : prixDUneBulle(centimes, bulles),
     tag: offertes ? `+${offertes} offertes` : null,
   };
 }
@@ -45,9 +45,6 @@ export const RECHARGE = {
   /** Sous le titre : rien n’attend, ou une réponse prête qui attend la recharge (ouverte depuis elle). */
   sousTitre: "Elles n’expirent jamais.",
   reponsePrete: (autre: string) => `Ta réponse à ${autre} s’affiche dès que c’est payé.`,
-  /** Le bonus de la première recharge (④), en tête de la feuille quand le serveur le montre. */
-  bonus: `Ta 1re recharge\u00a0: +${PREMIERE_RECHARGE.bonus} offertes`,
-  bonusNote: "Sur le pack conseillé · une seule fois",
   /** Le nom du choix des packs, pour un lecteur d’écran. */
   choix: "Ton pack",
   payer: (prix: string) => `Payer · ${prix}`,

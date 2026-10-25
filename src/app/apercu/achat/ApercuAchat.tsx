@@ -131,7 +131,7 @@ const SCENES: Record<Parcours, { tape?: string; reponse: BlushAnswer; solde: num
     solde: 6,
     reponse: {
       kind: "bubbles",
-      bubbles: [{ text: "le pack du milieu, c’est le bon plan" }, { text: "et t’as un bonus à ta première recharge" }],
+      bubbles: [{ text: "trois packs juste en dessous" }, { text: "celui du milieu, c’est celui que je te conseille" }],
       offre: { genre: "bulles", solde: 5, enUnGeste: true },
       ...cout(1, 5),
     },
@@ -160,7 +160,6 @@ export function ApercuAchat({ parcours }: { parcours: Parcours }) {
         ),
       recharger: () => {},
       noter: () => {},
-      premiereRecharge: async () => parcours === "demande",
     };
   }, [parcours, compte, scene]);
   return (

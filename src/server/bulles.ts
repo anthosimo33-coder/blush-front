@@ -1,7 +1,6 @@
 import "server-only";
 import { and, eq, gt, gte, inArray, sql } from "drizzle-orm";
-import { COUT_EN_BULLES } from "@/contenu/offres";
-import { PACKS } from "@/contenu/recharge";
+import { COUT_EN_BULLES, PACKS_DE_BULLES } from "@/contenu/offres";
 import type { BlushAnswer } from "@/types";
 import type { Utilisateur } from "./auth";
 import { db, schema } from "./db";
@@ -164,8 +163,9 @@ export async function reponseVerrouillee(userId: string, ex: Pick<Executeur, "se
 }
 
 /*
- * Une recharge (un pack de bulles, src/contenu/recharge.ts) payée par ce compte depuis que la réponse `messageId` s’est
- * écrite, et toujours payée (une recharge remboursée ou contestée ne compte plus) : elle paie cette réponse
+ * Une recharge (un pack de bulles, PACKS_DE_BULLES : ceux retirés de la vente compris, une commande d’avant payée après)
+ * payée par ce compte depuis que la réponse `messageId` s’est écrite, et toujours payée (une recharge remboursée ou
+ * contestée ne compte plus) : elle paie cette réponse
  * (deverrouiller). Les deux heures comparées dans la base, à la microseconde
  */
 async function rechargeDepuis(tx: Pick<Executeur, "select">, userId: string, messageId: number): Promise<boolean> {
@@ -175,7 +175,7 @@ async function rechargeDepuis(tx: Pick<Executeur, "select">, userId: string, mes
   const [r] = await tx
     .select({ id: a.id })
     .from(a)
-    .where(and(eq(a.userId, userId), eq(a.statut, "paye"), inArray(a.offre, [...PACKS]), gt(a.payeLe, ecrite)))
+    .where(and(eq(a.userId, userId), eq(a.statut, "paye"), inArray(a.offre, PACKS_DE_BULLES), gt(a.payeLe, ecrite)))
     .limit(1);
   return !!r;
 }

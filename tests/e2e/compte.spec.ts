@@ -93,26 +93,26 @@ test("tes bulles suivent le compte : 0 et la suite à lire, le rapport débloqu�
   });
 
   let achat = "";
-  await test.step("« Recharger » : 30 bulles au faux Whop, et l’on revient sur Mon compte, le solde et l’achat à jour", async () => {
+  await test.step("« Recharger » : 10 bulles au faux Whop, et l’on revient sur Mon compte, le solde et l’achat à jour", async () => {
     await bulles.getByRole("button", { name: /^Recharger/ }).click();
     const recharge = page.getByRole("dialog", { name: "Recharge tes bulles" });
     await expect(recharge).toBeVisible();
     await feuilleSurOrdinateur(page, recharge);
-    await recharge.getByRole("radio", { name: /^30 bulles/ }).click();
-    await recharge.getByRole("button", { name: "Payer · 8,90\u00a0€" }).click();
+    await recharge.getByRole("radio", { name: /^10 bulles/ }).click();
+    await recharge.getByRole("button", { name: "Payer · 6,90\u00a0€" }).click();
     await payerParCarte(page);
     /* Payé dans la feuille, sans quitter Mon compte : le solde se relit une fois l’achat livré */
-    await expect(bulles.getByText("Tes bulles\u00a0: 40", { exact: true })).toBeVisible({ timeout: 2 * RESEAU });
+    await expect(bulles.getByText("Tes bulles\u00a0: 20", { exact: true })).toBeVisible({ timeout: 2 * RESEAU });
     await expect(page).toHaveURL(/\/compte$/);
     /* Livré, la feuille se ferme d’elle-même (UI-1) : elle ne reste pas sur « C’est payé », modale, par-dessus la page */
     await expect(recharge).toBeHidden();
     achat = await dernierAchat(email);
     const achats = main.getByRole("region", { name: "Tes achats" });
-    await expect(achats.getByText("30 bulles", { exact: true })).toBeVisible();
-    await expect(achats.getByText(/^\d{1,2} \S+ \d{4} · \+30 bulles$/)).toBeVisible();
-    await expect(achats.getByText("8,90\u00a0€")).toBeVisible();
+    await expect(achats.getByText("10 bulles", { exact: true })).toBeVisible();
+    await expect(achats.getByText(/^\d{1,2} \S+ \d{4} · \+10 bulles$/)).toBeVisible();
+    await expect(achats.getByText("6,90\u00a0€")).toBeVisible();
     await expect(achats.getByText("Payé")).toBeVisible();
-    expect(await compteDe(email)).toMatchObject({ bulles: 40 });
+    expect(await compteDe(email)).toMatchObject({ bulles: 20 });
   });
 
   await test.step("remboursé (depuis Whop) : l’achat le dit, ses bulles sont reprises", async () => {

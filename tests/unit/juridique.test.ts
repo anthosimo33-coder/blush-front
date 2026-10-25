@@ -65,7 +65,7 @@ describe("l’accord de l’import", () => {
      * L’accord de l’import fait aussi accepter les conditions : leur changement change sa version.
      */
     expect({ version: CASE_IMPORT.version, texte: texteCaseImport() }).toEqual({
-      version: "2026-10-22",
+      version: "2026-10-23.1",
       texte: "En continuant, tu acceptes les conditions et que BLUSH lise toute ta conv.",
     });
     expect({
@@ -81,14 +81,14 @@ describe("l’accord de l’import", () => {
       avance: "En débloquant, tu as ton rapport tout de suite et tu renonces au délai de rétractation.",
       lien: "/conditions#livraison",
     });
-    expect(CONDITIONS.maj).toContain("22 octobre 2026");
+    expect(CONDITIONS.maj).toContain("23 octobre 2026");
     /*
      * Les conditions que l’accord fait accepter (celles de l’éditeur d’aujourd’hui : son médiateur et sa loi applicable
      * en font partie) : leur empreinte est figée avec la version de l’accord. Un texte des conditions changé fait échouer
      * ce test : changez CASE_IMPORT.version (une date), puis ici la version et l’empreinte.
      */
     const empreinteDesConditions = createHash("sha256").update(JSON.stringify(PARTIES_CONDITIONS)).digest("hex").slice(0, 16);
-    expect({ version: CASE_IMPORT.version, conditions: empreinteDesConditions }).toEqual({ version: "2026-10-22", conditions: "24e7c8f54e7ccfb2" });
+    expect({ version: CASE_IMPORT.version, conditions: empreinteDesConditions }).toEqual({ version: "2026-10-23.1", conditions: "7b417365ccd71059" });
   });
 
   it("l’accord de l’import dit les conditions et toute la conv, sans case, sans âge, sans détailler l’intime", () => {
@@ -220,11 +220,11 @@ describe("les conditions", () => {
      * les conditions (et la version de l’accord de l’import qui les cite, plus haut) ne le disent pas
      */
     const n = (b: number) => `${b} bulle${b > 1 ? "s" : ""}`;
-    const { rapport, premium, pack30, pack80, pack200 } = CATALOGUE;
+    const { rapport, premium, pack10, pack25, pack60 } = CATALOGUE;
     for (const attendu of [
       `Le rapport d’une conv, ${prixDe("rapport")}\u00a0: tous ses chapitres, et ${n(rapport.bulles)}.`,
       `Premium, ${prixDe("premium")}\u00a0: le rapport de cette conv, et ${n(premium.bulles)}.`,
-      `Une recharge de bulles\u00a0: ${n(pack30.bulles)} pour ${prixDe("pack30")}, ${pack80.bulles} pour ${prixDe("pack80")}, ${pack200.bulles} pour ${prixDe("pack200")}.`,
+      `Une recharge de bulles\u00a0: ${n(pack10.bulles)} pour ${prixDe("pack10")}, ${pack25.bulles} pour ${prixDe("pack25")}, ${pack60.bulles} pour ${prixDe("pack60")}.`,
       `Une réponse écrite\u00a0: ${n(COUT_EN_BULLES.reponse)}.`,
       `Une réponse en vocal\u00a0: ${n(COUT_EN_BULLES.vocal)}.`,
       `Une réponse à un message avec des captures ou un export\u00a0: ${n(COUT_EN_BULLES.ajout)}.`,

@@ -1,3 +1,4 @@
+import { prixDe } from "./offres";
 import { CIBLE_DE_MARGE } from "./pilotage";
 
 /*
@@ -53,7 +54,7 @@ export const AIDES_DU_PILOTAGE = {
     quoi: "La part des visiteurs qui achètent au moins une fois sur la période.",
     calcul:
       "Les comptes qui ont payé au moins un achat sur la période, divisés par les visiteurs de la même période. Un compte qui achète deux fois compte une fois\u00a0; un visiteur revenu deux jours compte deux fois\u00a0: le taux est plutôt prudent.",
-    repere: "Entre 2 et 4\u00a0% est bon pour un achat sous 15\u00a0€ venu des réseaux.",
+    repere: "Entre 2 et 4\u00a0% est bon pour un achat sous 20\u00a0€ venu des réseaux.",
     siCaBouge: "S’il baisse, regarde quelle étape du tunnel a lâché, puis quelle source a changé.",
   },
   panier: {
@@ -61,7 +62,7 @@ export const AIDES_DU_PILOTAGE = {
     de: "le revenu par acheteur",
     quoi: "Ce qu’un acheteur dépense en moyenne sur la période, recharges de bulles comprises.",
     calcul: "Le payé TTC de la période (remboursements non retirés), divisé par les comptes qui ont payé au moins un achat.",
-    repere: "Au-dessus de 9,90\u00a0€, Premium et les recharges font leur travail. Le plafond naturel est autour de 15\u00a0€.",
+    repere: "Au-dessus de 9,90\u00a0€, Premium et les recharges font leur travail. Le plafond naturel est autour de 20\u00a0€.",
     siCaBouge: "S’il baisse\u00a0: Premium est moins choisi sur la feuille du paiement, ou les coups de pouce ne se montrent plus.",
   },
   marge: {
@@ -118,7 +119,7 @@ export const AIDES_DU_PILOTAGE = {
   ventesDuChat: {
     titre: "La vente dans le chat",
     de: "la vente dans le chat",
-    quoi: "Les cartes d’achat que le chat pose sous les réponses de BLUSH (une recharge, Premium pour 5\u00a0€, une autre conv, le rapport à jour, le réimport d’un ancien rapport doux), ce que les gens en font, et ce qu’elles rapportent. En bas, le test A/B\u00a0: une moitié des comptes reçoit aussi les propositions spontanées, l’autre seulement ce qu’elle demande.",
+    quoi: `Les cartes d’achat que le chat pose sous les réponses de BLUSH (une recharge, Premium pour ${prixDe("passe_premium")} de plus, une autre conv, le rapport à jour, le réimport d’un ancien rapport doux), ce que les gens en font, et ce qu’elles rapportent. En bas, le test A/B\u00a0: une moitié des comptes reçoit aussi les propositions spontanées, l’autre seulement ce qu’elle demande.`,
     calcul:
       "Le modèle repère le moment (il demande à acheter, parle de quelqu’un d’autre, envoie du neuf)\u00a0; le code choisit la carte (src/server/vente.ts), une spontanée par jour au plus (jamais la recharge, que le bandeau des bulles propose déjà), rien de spontané sur une réponse en alerte ni pendant 3\u00a0jours après un «\u00a0Pas maintenant\u00a0». «\u00a0Posées\u00a0», «\u00a0Touchées\u00a0», «\u00a0Pas maintenant\u00a0»\u00a0: comptées par jour de Paris. «\u00a0Payées\u00a0»\u00a0: les achats payés depuis la carte (la recharge, Premium), sur la période, même remboursés depuis\u00a0; une autre conv ou un réimport se paie plus tard sur son paywall, et ne compte que dans le test. Le test\u00a0: les comptes qui ont écrit au chat sur la période, partagés en deux moitiés fixes, et tout ce qu’ils ont payé sur la période.",
     repere:
@@ -148,7 +149,7 @@ export const AIDES_DU_PILOTAGE = {
     titre: "Ce qui se vend",
     de: "ce qui se vend",
     quoi: "Le payé de la période, par offre.",
-    calcul: "Les achats payés sur la période, TTC, remboursements non retirés. «\u00a0Bulles\u00a0» réunit les packs et les 80 bulles en plus après le rapport.",
+    calcul: "Les achats payés sur la période, TTC, remboursements non retirés. «\u00a0Bulles\u00a0» réunit les packs et le passage en Premium après le rapport.",
     repere: "Premium au-dessus de la moitié\u00a0: la feuille du paiement fait son travail.",
     siCaBouge: "Si le rapport seul passe devant Premium, regarde ce que montre la feuille du paiement.",
   },

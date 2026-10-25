@@ -1,6 +1,7 @@
 import { connect, createServer, type AddressInfo } from "node:net";
 import { describe, expect, it } from "vitest";
 import { centile, convInventee, lireOptions, nouveauBocal, rapportMarkdown, relaisLent, resume, routeDe, type Mesures, type Options } from "../../scripts/charge.mjs";
+import { CATALOGUE } from "@/contenu/offres";
 import { depuisFichier } from "@/server/import";
 
 /*
@@ -29,8 +30,9 @@ describe("les options du test de charge", () => {
     expect(() => lireOptions(["--parcours", "beaucoup"])).toThrow(/--parcours attend un nombre/);
     expect(() => lireOptions(["--parcours"])).toThrow(/--parcours attend un nombre/);
     expect(() => lireOptions(["--parcours", "0"])).toThrow(/entre 1 et 2000/);
-    /* Le rapport donne 10 bulles : au-delà, le chat demanderait une recharge */
-    expect(() => lireOptions(["--messages", "11"])).toThrow(/entre 0 et 10/);
+    /* Le rapport donne ses bulles (3) : au-delà, le chat demanderait une recharge */
+    expect(() => lireOptions(["--messages", String(CATALOGUE.rapport.bulles + 1)])).toThrow(new RegExp(`entre 0 et ${CATALOGUE.rapport.bulles}\\b`));
+    expect(lireOptions(["--messages", String(CATALOGUE.rapport.bulles)])).toMatchObject({ messages: CATALOGUE.rapport.bulles });
     expect(() => lireOptions(["--latence", "501"])).toThrow(/entre 0 et 500/);
   });
 });

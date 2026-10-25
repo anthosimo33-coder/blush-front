@@ -259,28 +259,28 @@ test("à 0 bulle, l’écran de « Ta question » : la réponse est prête, sans
     await expect(compteur(page, 0)).toBeVisible();
   });
 
-  await test.step("« Recharger pour la lire » ouvre la recharge, qui la rappelle (avec le bonus de la première recharge, ④)", async () => {
+  await test.step("« Recharger pour la lire » ouvre la recharge, qui la rappelle (plus de bonus de la première recharge, ④, depuis le 23 octobre)", async () => {
     await conv.getByRole("button", { name: "Recharger pour la lire" }).click();
     await expect(recharge.getByText("Ta réponse à Maëlys s’affiche dès que c’est payé.")).toBeVisible();
     await feuilleSurOrdinateur(page, recharge, { titre: 26 });
-    await expect(recharge.getByText("Ta 1re recharge\u00a0: +40 offertes")).toBeVisible();
-    /* Sa plus haute version (le bonus ④, la ligne de la renonciation sous « Payer ») tient sur un petit iPhone sans défiler */
-    await tientEnPetitEcran(page, "la recharge, bonus ④ compris");
+    await expect(recharge.getByText(/1re recharge/)).toHaveCount(0);
+    /* Sa plus haute version (la réponse prête, la ligne de la renonciation sous « Payer ») tient sur un petit iPhone sans défiler */
+    await tientEnPetitEcran(page, "la recharge, réponse prête comprise");
   });
 
   await test.step("payée dans la feuille : la livraison mène au chat, qui lit la réponse prête", async () => {
-    await recharge.getByRole("button", { name: "Payer · 13,90\u00a0€" }).click();
+    await recharge.getByRole("button", { name: "Payer · 14,90\u00a0€" }).click();
     await payerParCarte(page);
     await page.waitForURL((u) => u.pathname === "/app" && !u.search.includes("recharge"), { timeout: 2 * RESEAU });
-    await expect(page.getByRole("status").filter({ hasText: "+120 bulles, ta réponse est là" })).toBeVisible();
+    await expect(page.getByRole("status").filter({ hasText: "+25 bulles, ta réponse est là" })).toBeVisible();
     const fil = filDuChat(page);
     await expect(fil.getByText(QUESTION)).toBeVisible();
     await expect(fil.getByText(PREMIERE_BULLE)).toHaveCount(1);
     await expect(fil.locator("[data-verrouillee]")).toHaveCount(0);
-    /* La recharge la paie : ni reçu, ni débit, le compteur à l’ancien solde + 120 */
+    /* La recharge la paie : ni reçu, ni débit, le compteur à l’ancien solde + 25 */
     await expect(fil.locator("[data-recu]")).toHaveCount(0);
-    await expect(compteur(page, 120)).toBeVisible();
-    expect(await compteDe(email)).toMatchObject({ bulles: 120 });
+    await expect(compteur(page, 25)).toBeVisible();
+    expect(await compteDe(email)).toMatchObject({ bulles: 25 });
   });
 });
 

@@ -503,13 +503,13 @@ export const STATES = [
       await page.waitForTimeout(700);
     },
     note: "Une fois par compte, au bout de 5 secondes sur le paywall ou à la moitié de la page (jamais sur la carte qu’on remplit). La case est tirée par le serveur, chacune avec sa chance (le règlement, dans les conditions).",
-    changement: "Nouveau (16 octobre)\u00a0: «\u00a0Découvrir mon cadeau\u00a0» ou «\u00a0Je ne veux pas de cadeau\u00a0».",
+    changement: "La grille du 23 octobre 2026\u00a0: les cases de bulles passent à +5, +3 et +10 (c’étaient +20, +10 et +30), aux mêmes chances.",
   },
   {
     id: "P1c",
     section: "paywall",
     title: "Paywall",
-    state: "Gagné\u00a0: +20 bulles, gardées 15 minutes",
+    state: "Gagné\u00a0: +5 bulles, gardées 15 minutes",
     route: "/lecture",
     compte: "paywall",
     sheet: true,
@@ -538,13 +538,14 @@ export const STATES = [
       await page.waitForTimeout(700);
     },
     note: "Le titre est une trouvaille du code qui nomme l’autre. La note des avis et les témoignages n’apparaissent qu’avec de vrais avis.",
-    changement: "Le paywall prime (G3)\u00a0: les cadeaux de Premium à 0\u00a0€, la note des avis, la discrétion.",
+    changement:
+      "La grille du 23 octobre 2026\u00a0: Premium à 19,90\u00a0€ pour 25 réponses, dont les 3 du rapport offertes (sans prix barré au paywall, ni «\u00a00\u00a0€\u00a0» sur la ligne rose\u00a0: le barré de 24,80\u00a0€ est sur la feuille «\u00a0Ta formule\u00a0»)\u00a0; le rapport à 9,90\u00a0€ avec 3 réponses.",
   },
   {
     id: "P2b",
     section: "paywall",
     title: "Paywall",
-    state: "Avec le cadeau de la roue (+20 bulles)",
+    state: "Avec le cadeau de la roue (+5 bulles)",
     route: "/lecture",
     compte: "paywall",
     wait: 900,
@@ -652,7 +653,7 @@ export const STATES = [
     full: true,
     ref: "09-rapport-apercu-gratuit",
     changement:
-      "Le bas de l’aperçu au dessin du prototype des bulles (PiedGratuit)\u00a0: «\u00a0Lire la suite · 9,90\u00a0€\u00a0» et les 10 bulles offertes. Les chapitres fermés portent les titres que le verdict écrit pour leur histoire, comme dans le prototype (ici ceux du modèle factice, inventés)\u00a0; le rapport débloqué les garde.",
+      "Le bas de l’aperçu au dessin du prototype des bulles (PiedGratuit)\u00a0: «\u00a0Lire la suite · 9,90\u00a0€\u00a0» et les 3 bulles offertes. Les chapitres fermés portent les titres que le verdict écrit pour leur histoire, comme dans le prototype (ici ceux du modèle factice, inventés)\u00a0; le rapport débloqué les garde.",
   },
   {
     id: "09a",
@@ -672,7 +673,7 @@ export const STATES = [
     route: "/rapport",
     compte: "gratuit",
     sheet: true,
-    steps: click(/^10 bulles offertes avec ton rapport/),
+    steps: click(/^3 bulles offertes avec ton rapport/),
     note: "Ouverte de la ligne rose du bas de l’aperçu\u00a0: «\u00a0Compris\u00a0» la ferme.",
   },
   {
@@ -686,7 +687,8 @@ export const STATES = [
     wait: 900,
     ref: "10-paiement",
     note: "La case de renonciation (que le prototype n’avait pas) sous «\u00a0C’est quoi une bulle\u00a0?\u00a0». Sur un écran court (375 × 667), les marges de Premium se resserrent pour que la feuille tienne sans défiler.",
-    changement: "La feuille «\u00a0Ta formule\u00a0» du prototype des bulles remplace l’ancien paiement, partout où il s’ouvre.",
+    changement:
+      "La grille du 23 octobre 2026\u00a0: Premium «\u00a0Rapport + 22 bulles\u00a0», +3 offertes, 19,90\u00a0€ barré 24,80\u00a0€, «\u00a0Économise 4,90\u00a0€ · la bulle à 0,45\u00a0€\u00a0»\u00a0; le rapport, + 3 bulles offertes.",
   },
   {
     id: "10r",
@@ -724,8 +726,9 @@ export const STATES = [
     route: "/rapport?paiement=1",
     compte: "gratuit",
     steps: payerLaFormule(/^Le rapport/),
-    note: "Payé au faux Whop. Animé (la gerbe). L’offre ③ prend la place de la liste et du bouton du bas\u00a0; la case de renonciation, que le prototype n’avait pas, au-dessus de «\u00a0Ajouter 80 bulles\u00a0».",
-    changement: "Au dessin du prototype\u00a0: les bulles reçues, l’offre ③ et ses perles. Sans la ligne du prix, absente du prototype.",
+    note: "Payé au faux Whop. Animé (la gerbe). L’offre ③ prend la place de la liste et du bouton du bas\u00a0; la case de renonciation, que le prototype n’avait pas, au-dessus de «\u00a0Ajouter 22 bulles\u00a0».",
+    changement:
+      "La grille du 23 octobre 2026\u00a0: ③ devient «\u00a0Passe en Premium pour 6,90\u00a0€ de plus\u00a0», +22 bulles (c’était 80 bulles pour 5\u00a0€), son texte dit l’écart entre Premium et le rapport (10\u00a0€), sans prix barré\u00a0; devant les bulles reçues, autant de perles que leur chiffre (3, au lieu d’une rangée de 5).",
   },
   {
     id: "10c",
@@ -734,7 +737,7 @@ export const STATES = [
     state: "Premium",
     route: "/rapport?paiement=1",
     compte: "gratuit",
-    steps: payerLaFormule(/Rapport \+ 60 bulles/),
+    steps: payerLaFormule(/Rapport \+ 22 bulles/),
     note: "Payé au faux Whop. Animé (la gerbe). Les bulles reçues dans l’anneau rose de leur perle.",
   },
   {
@@ -781,7 +784,7 @@ export const STATES = [
     steps: async (page) => {
       /* Pas d’écran de recharge dans ce lot : la commande de la feuille part en pack (la version de la renonciation est celle de l’écran) */
       await surLaPageDuFauxWhop(page);
-      await page.route("**/api/paiement", (route) => route.continue({ postData: JSON.stringify({ ...JSON.parse(route.request().postData() ?? "{}"), offre: "pack80" }) }));
+      await page.route("**/api/paiement", (route) => route.continue({ postData: JSON.stringify({ ...JSON.parse(route.request().postData() ?? "{}"), offre: "pack25" }) }));
       const feuille = page.getByRole("dialog");
       await feuille.getByRole("button", { name: /^Débloquer/ }).click();
       await page.getByRole("button", { name: "Payer", exact: true }).click();
@@ -1121,7 +1124,7 @@ export const STATES = [
     state: "Les bulles offertes",
     route: "/app",
     compte: "rapport",
-    bulles: 10,
+    bulles: 3,
     sheet: true,
     note: "Le compteur de bulles à côté du bouton du compte, et sa première apparition expliquée au-dessus du champ (fermée, ou à la première réponse). «\u00a0comment ça marche\u00a0» ouvre «\u00a0C’est quoi une bulle\u00a0?\u00a0». Le dessin et les textes du prototype des bulles.",
   },
@@ -1129,13 +1132,14 @@ export const STATES = [
     id: "13l",
     section: "quotidien",
     title: "Accueil",
-    state: "Plus que 2 bulles",
+    state: "Plus qu’une bulle",
     route: "/app",
     compte: "rapport",
-    bulles: 3,
+    bulles: 2,
     sheet: true,
     steps: ecrire(SA_REPONSE),
-    note: "«\u00a01 bulle · il t’en reste 2\u00a0» sous la réponse (ce que le serveur a débité), le compteur rose, et la carte à 2 bulles ou moins (comme le prototype), avec «\u00a0Recharger\u00a0».",
+    note: "«\u00a01 bulle · il t’en reste 1\u00a0» sous la réponse (ce que le serveur a débité), le compteur rose, et la carte à la dernière bulle, avec «\u00a0Recharger\u00a0».",
+    changement: "Le 23 octobre 2026\u00a0: la carte et le compteur rose à la dernière bulle (c’était 2 ou moins, comme le prototype\u00a0: le rapport ne donne plus que 3 bulles).",
   },
   {
     id: "13m",
@@ -1152,15 +1156,17 @@ export const STATES = [
     id: "13n",
     section: "quotidien",
     title: "Accueil",
-    state: "La recharge (première fois)",
+    state: "La recharge",
     route: "/app",
     compte: "rapport",
     sheet: true,
     steps: async (page) => {
       await ecrire(QUOI_ENVOYER)(page);
-      await click("Recharger pour la lire", { wait: 1100 })(page);
+      /* Depuis le 22 octobre, la carte de la recharge du chat prend la place de « Recharger pour la lire » sous la réponse prête */
+      await click(/^Recharger (pour la lire|mes bulles)$/, { wait: 1100 })(page);
     },
-    note: "La recharge\u00a0: 30, 70 + 10 offertes (conseillé, choisi), 150 + 50 offertes. Le bonus de la première recharge (+40 sur le pack conseillé) quand le serveur le montre (une fois par compte, jamais le jour d’une autre offre unique). La case de renonciation avant de payer (absente du prototype, demandée par la loi). Payée, l’accueil lit la réponse prête et dit «\u00a0+120 bulles, ta réponse est là\u00a0».",
+    note: "La recharge\u00a0: 10, 25 (conseillé, choisi) et 60 bulles, le prix de la bulle sous chacune. La case de renonciation avant de payer (absente du prototype, demandée par la loi). Payée, l’accueil lit la réponse prête et dit «\u00a0+25 bulles, ta réponse est là\u00a0».",
+    changement: "La grille du 23 octobre 2026\u00a0: 10, 25 et 60 bulles (c’était 30, 70 + 10 offertes et 150 + 50 offertes), plus de bonus de la première recharge.",
   },
   {
     id: "13o",
@@ -1245,10 +1251,10 @@ export const STATES = [
     bulles: 10,
     full: true,
     steps: async (page) => {
-      /* Une recharge de 30 bulles, payée dans la feuille depuis Mon compte, qui y revient */
-      await click("Recharger 30, 80 ou 200 bulles")(page);
+      /* Une recharge de 10 bulles, payée dans la feuille depuis Mon compte, qui y revient */
+      await click("Recharger 10, 25 ou 60 bulles")(page);
       const feuille = page.getByRole("dialog");
-      await feuille.getByRole("radio", { name: /^30 bulles/ }).click();
+      await feuille.getByRole("radio", { name: /^10 bulles/ }).click();
       await feuille.getByRole("button", { name: /^Payer/ }).click();
       await payerParCarte(page);
       await page.waitForURL((u) => u.pathname === "/compte");

@@ -5,7 +5,7 @@ import * as coffre from "@/server/coffre";
 import { empreinte } from "@/server/chiffrement";
 import { db, schema } from "@/server/db";
 import { plafondsDesMails } from "@/server/limites";
-import type { OffreId } from "@/types";
+import { OFFRES, type OffreId } from "@/types";
 import { compteDeTest, convRattachee } from "./aide/fixtures";
 
 /*
@@ -90,8 +90,9 @@ describe("les chiffres de l’argent (/admin)", () => {
     await achat("pack80", 990, { statut: "paye", payeLe: maintenant });
     await achat("rapport", 990, { statut: "rembourse", payeLe: maintenant, annuleLe: maintenant });
     await achat("premium", 1490, { statut: "conteste", payeLe: maintenant, annuleLe: maintenant });
-    /* Il y a trois jours : un pack payé (dans les 7 jours, pas aujourd’hui) ; il y a dix jours : rien sur 7 jours */
+    /* Il y a trois jours : un pack payé (dans les 7 jours, pas aujourd’hui), d’avant le 23 octobre, et un d’aujourd’hui (compté à part) ; il y a dix jours : rien sur 7 jours */
     await achat("pack200", 1990, { statut: "paye", payeLe: ilYa(3), creeLe: ilYa(3) });
+    await achat("pack25", 1490, { statut: "paye", payeLe: ilYa(3), creeLe: ilYa(3) });
     await achat("pack30", 490, { statut: "paye", payeLe: ilYa(10), creeLe: ilYa(10) });
     /* Jamais payés : une commande en attente, une échouée, une annulée sans avoir été payée (rien à reprendre) */
     await achat("rapport", 990);
@@ -103,15 +104,16 @@ describe("les chiffres de l’argent (/admin)", () => {
     expect(ecart((s) => s.ventes.jour.payes)).toEqual({ n: 5, centimes: 990 * 4 + 1490 });
     expect(ecart((s) => s.ventes.jour.rembourses)).toEqual({ n: 1, centimes: 990 });
     expect(ecart((s) => s.ventes.jour.contestes)).toEqual({ n: 1, centimes: 1490 });
-    expect(ecart((s) => s.ventes.semaine.payes)).toEqual({ n: 6, centimes: 990 * 4 + 1490 + 1990 });
+    expect(ecart((s) => s.ventes.semaine.payes)).toEqual({ n: 7, centimes: 990 * 4 + 1490 + 1990 + 1490 });
     expect(ecart((s) => s.ventes.semaine.rembourses)).toEqual({ n: 1, centimes: 990 });
-    /* Par offre, dans l’ordre du catalogue */
+    /* Par offre, dans l’ordre du catalogue (OFFRES : celles en vente, puis celles retirées) */
     const parOffre = (s: typeof avant, offre: OffreId) => s.ventes.semaine.parOffre.find((o) => o.offre === offre) ?? { n: 0, centimes: 0 };
     for (const [offre, n, centimes] of [
       ["rapport", 3, 2970],
       ["premium", 1, 1490],
       ["pack80", 1, 990],
       ["pack200", 1, 1990],
+      ["pack25", 1, 1490],
       ["pack30", 0, 0],
       ["suite", 0, 0],
     ] as const)
@@ -120,13 +122,8 @@ describe("les chiffres de l’argent (/admin)", () => {
         centimes,
       });
     const ordre = apres.ventes.semaine.parOffre.map((o) => o.offre);
-    expect(ordre).toEqual(
-      [...ordre].sort(
-        (a, b) =>
-          ["rapport", "premium", "suite", "premium_ajout", "pack30", "pack80", "pack200"].indexOf(a) -
-          ["rapport", "premium", "suite", "premium_ajout", "pack30", "pack80", "pack200"].indexOf(b),
-      ),
-    );
+    expect(ordre).toEqual([...ordre].sort((a, b) => OFFRES.indexOf(a) - OFFRES.indexOf(b)));
+    expect(ordre.indexOf("pack25")).toBeLessThan(ordre.indexOf("pack80"));
 
     /* L’entonnoir de la période : les commandes d’un rapport créées dans les 7 jours (pas les recharges), et ce qu’elles sont devenues */
     const a = (s: typeof avant) => s.achats;

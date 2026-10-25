@@ -246,7 +246,7 @@ describe("les Elements de Whop", () => {
 
 describe("les avoirs du compte, dans la feuille et sous l’aperçu", () => {
   it("un rapport d’avance : en tête et choisi d’avance, « Débloquer · 0 € » sans payer, puis « C’est débloqué »", async () => {
-    sait({ avance: { fin: "2027-10-13T12:00:00.000Z" } });
+    sait({ avance: { fin: "2027-10-13T12:00:00.000Z", bulles: 3 } });
     avance.mockResolvedValueOnce({ achat: "a9" });
     await ouvrir();
     const enTete = within(formule()).getAllByRole("radio")[0]!;
@@ -276,7 +276,7 @@ describe("les avoirs du compte, dans la feuille et sous l’aperçu", () => {
   });
 
   it("le bas de l’aperçu gratuit le dit : le rapport d’avance, ou le prix à −50 %", async () => {
-    sait({ avance: { fin: "2027-10-13T12:00:00.000Z" } });
+    sait({ avance: { fin: "2027-10-13T12:00:00.000Z", bulles: 3 } });
     const { unmount } = render(<PiedGratuit ouvrirPaiement={() => {}} expliquer={() => {}} />);
     await promesses();
     expect(screen.getByRole("button", { name: PIED_GRATUIT.lireAvance })).toBeTruthy();

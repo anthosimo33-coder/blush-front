@@ -63,7 +63,7 @@ export function Option({
       role="radio"
       aria-checked={on}
       onClick={choisir}
-      /* Sous 400 px de large, la ligne se resserre (les marges, les écarts, le prix) : « 150 bulles », son tag et « 23,90 € » tiennent sur une ligne, même avec les textes plus larges de Chrome sous Linux */
+      /* Sous 400 px de large, la ligne se resserre (les marges, les écarts, le prix) : « 60 bulles » et « 34,90 € » tiennent sur une ligne, même avec les textes plus larges de Chrome sous Linux */
       className={cn("lift relative flex flex-col gap-2.5 rounded-[20px] bg-white px-4 py-3.5 text-left text-ink max-[399px]:px-3", on ? "shadow-selected" : "shadow-soft")}
     >
       {badge && <span className="absolute -top-[13px] right-4">{badge}</span>}

@@ -81,8 +81,9 @@ function LigneDuLot({ pastille, children, droite, rose = false }: { pastille: Re
 }
 
 /**
- * La carte Premium, comme un lot sur une fiche produit : son badge sur le bord, « +30 offertes » à côté du titre, et,
- * choisie, ce qu’elle contient ligne à ligne, les bulles offertes sur une bande rose à 0 € (leur prix seules, barré).
+ * La carte Premium, comme un lot sur une fiche produit : son badge sur le bord, « +3 offertes » à côté du titre, et,
+ * choisie, ce qu’elle contient ligne à ligne, les bulles offertes sur une bande rose à 0 € (leur prix seules, barré, quand
+ * un pack les vend seules : FEUILLE_FORMULE.premium.barreOffertes).
  * Une option du groupe (role="radio"), comme Option ; son badge vient après son titre dans le texte lu.
  */
 function CartePremium({ on, choisir, chapitres }: { on: boolean; choisir: () => void; chapitres: number }) {
@@ -125,7 +126,7 @@ function CartePremium({ on, choisir, chapitres }: { on: boolean; choisir: () => 
               pastille={<Cadeau taille={15} className="text-elle-ink" />}
               droite={
                 <>
-                  <Barre className="text-micro font-extrabold text-grey">{p.barreOffertes}</Barre>
+                  {p.barreOffertes && <Barre className="text-micro font-extrabold text-grey">{p.barreOffertes}</Barre>}
                   <span className="rounded-lg bg-elle-ink px-2 py-0.5 text-legende font-black text-white">{p.gratuit}</span>
                 </>
               }
@@ -251,7 +252,7 @@ export function FeuilleFormule({
                       {FEUILLE_FORMULE.avance.titre}
                     </span>
                   }
-                  note={<span className="text-elle-ink">{FEUILLE_FORMULE.avance.note}</span>}
+                  note={<span className="text-elle-ink">{FEUILLE_FORMULE.avance.note(avoirs.avance.bulles)}</span>}
                   prix={FEUILLE_FORMULE.avance.prix}
                 />
               )}

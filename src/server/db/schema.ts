@@ -499,7 +499,7 @@ export const achats = pgTable(
     devise: text("devise", { enum: ["eur"] })
       .notNull()
       .default("eur"),
-    /** Les bulles qu’il donne, figées à la commande (le bonus de la première recharge compris). */
+    /** Les bulles qu’il donne, figées à la commande (le lot de la roue compris, et le bonus de la première recharge d’avant le 23 octobre 2026). */
     bulles: integer("bulles").notNull(),
     /** L’offre unique dont il profite (src/server/offres-uniques.ts), prise à la livraison, ou null. */
     offreUnique: text("offre_unique", { enum: OFFRES_UNIQUES }),
@@ -770,7 +770,8 @@ export const mesuresNavigateur = pgTable(
 /**
  * Le fil d’/admin en direct (GENRES_FIL) : une ville et un geste. `source` : d’où vient une arrivée ; `offre` : celle
  * d’un paiement ouvert ou d’un achat payé ; `ref` : l’achat d’un paiement ouvert, pour retrouver sa ville quand il est
- * payé (le webhook n’a pas de connexion à situer). Ni compte, ni conv. Gardé PRESENCES_GARDEES_JOURS.
+ * payé (le webhook n’a pas de connexion à situer), ou celui d’un achat payé, pour dire son prix payé (depuis le
+ * 23 octobre 2026). Ni compte, ni conv. Gardé PRESENCES_GARDEES_JOURS.
  */
 export const filDirect = pgTable(
   "fil_direct",

@@ -19,7 +19,7 @@
  * Ctrl-C arrête proprement (le rapport de ce qui a été mesuré, le nettoyage) ; un second Ctrl-C coupe tout.
  * Le modèle est factice : ce test mesure le serveur et la base, jamais l’IA ; ni Vercel ni Neon (README).
  * Lancé par tsx (comme scripts/acces.mts) : il lit les réglages des tests et les constantes de src (le jeton du CAPTCHA,
- * la version de la case de l’import) là où ils sont écrits, sans les recopier.
+ * la version de la case de l’import, les bulles du rapport) là où ils sont écrits, sans les recopier.
  */
 import { spawn, execFile } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
@@ -29,8 +29,12 @@ import { cpus, loadavg, platform, release } from "node:os";
 import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import postgres from "postgres";
+import { CATALOGUE } from "../src/contenu/offres.ts";
 
 const RACINE = fileURLToPath(new URL("..", import.meta.url));
+
+/** Les bulles que le rapport donne (le catalogue) : les messages au chat d’un parcours, au plus, et le solde attendu. */
+const BULLES_DU_RAPPORT = CATALOGUE.rapport.bulles;
 
 /* ———— Les réglages ———— */
 
@@ -41,7 +45,7 @@ const AIDE = `usage : npm run charge -- [options]
   --parcours N    parcours en même temps (${DEFAUTS.parcours})
   --montee S      la montée en charge : les N premiers parcours partent étalés sur S secondes (${DEFAUTS.montee})
   --duree S       pendant S secondes, chaque parcours fini en relance un (0 : chacun une fois) (${DEFAUTS.duree})
-  --messages M    messages au chat par parcours, 10 au plus : les bulles du rapport (${DEFAUTS.messages})
+  --messages M    messages au chat par parcours, ${BULLES_DU_RAPPORT} au plus : les bulles du rapport (${DEFAUTS.messages})
   --delai S       une requête sans réponse en S secondes est une erreur (${DEFAUTS.delai})
   --sondage MS    l’écart entre deux relectures d’un état (le verdict, la livraison, le rapport), comme l’écran (${DEFAUTS.sondage})
   --lente MS      une requête active depuis plus de MS ms dans la base est notée lente (${DEFAUTS.lente})
@@ -62,7 +66,7 @@ export function lireOptions(argv) {
     parcours: [1, 2000],
     montee: [0, 3600],
     duree: [0, 86400],
-    messages: [0, 10],
+    messages: [0, BULLES_DU_RAPPORT],
     delai: [1, 600],
     sondage: [100, 60000],
     lente: [1, 600000],
@@ -363,7 +367,7 @@ export function rapportMarkdown(m) {
     l.push("");
   }
   const anomalies = m.parcours.filter((p) => p.anomalie);
-  if (anomalies.length) l.push(`Bulles incohérentes (le solde après le chat n’est pas 10 − les messages) : ${anomalies.length} parcours.`, "");
+  if (anomalies.length) l.push(`Bulles incohérentes (le solde après le chat n’est pas ${BULLES_DU_RAPPORT} − les messages) : ${anomalies.length} parcours.`, "");
   if (m.chevauchements)
     l.push(
       `Deux étapes d’une même conv ont tourné en même temps (prendre, src/server/taches.ts, ne le permet jamais : deux mises à jour de la mémoire en perdraient une, un vocal se ferait deux fois) : ${m.chevauchements} conv(s).`,
@@ -893,10 +897,10 @@ async function main() {
         restantes = d?.bulles?.restantes ?? null;
       }
       const compte = await etape("solde", async () => exiger("solde", await c.requete("GET", "/api/compte")));
-      /* Le rapport donne 10 bulles, une réponse écrite en coûte une */
-      if (compte.bulles !== 10 - options.messages || (options.messages && restantes !== compte.bulles)) {
+      /* Le rapport donne ses bulles (3), une réponse écrite en coûte une */
+      if (compte.bulles !== BULLES_DU_RAPPORT - options.messages || (options.messages && restantes !== compte.bulles)) {
         p.anomalie = true;
-        compterErreur("solde", `bulles ${compte.bulles} (attendu ${10 - options.messages})`);
+        compterErreur("solde", `bulles ${compte.bulles} (attendu ${BULLES_DU_RAPPORT - options.messages})`);
       }
       noter("parcours entier", performance.now() - debut);
       p.ok = true;

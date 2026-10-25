@@ -17,11 +17,19 @@ const prixCourt = (centimes: number) => (centimes % 100 ? enEuros(centimes) : `$
 /** Les chapitres qu’ouvre le rapport payé, quand l’écran ne compte pas ceux du rapport écrit (un rapport écrit peut en avoir moins). */
 export const CHAPITRES_A_DEBLOQUER = NB_CHAPITRES - CHAPITRES_OFFERTS;
 
-/* Premium, comme un « 2 achetés, 1 offert » : les bulles offertes sont celles du plus petit pack, vendu à part (leur prix, barré) */
 const PREMIUM = CATALOGUE.premium;
-const OFFERTES_PREMIUM = CATALOGUE.pack30.bulles;
+/**
+ * Les bulles offertes de Premium : celles du rapport, offertes avec lui comme avec le rapport seul (« + 3 bulles
+ * offertes »), le reste payé. Jusqu’au 22 octobre, c’étaient celles du plus petit pack, vendu à part (un « 2 achetés,
+ * 1 offert ») ; avec la grille du 23 octobre, le plus petit pack (6,90 €) vaudrait plus que l’économie de Premium sur
+ * son prix barré (4,90 €) : elles ne disent plus que ce qui est vrai, sans prix barré (aucun pack ne vend 3 bulles).
+ * TODO(produit): la ligne « offertes » de Premium à trancher (celles du rapport, aucune, ou une autre présentation).
+ */
+export const OFFERTES_PREMIUM = CATALOGUE.rapport.bulles;
 const PAYEES_PREMIUM = PREMIUM.bulles - OFFERTES_PREMIUM;
-/** Ce que coûte une bulle de Premium au-delà du rapport seul : 5 € de plus pour 80 bulles de plus, au centime près. */
+/** Le prix de ses bulles offertes vendues seules (barré, avant « 0 € ») : aucun, aucun pack ne vend les 3 bulles du rapport. */
+const BARRE_OFFERTES_PREMIUM: string | null = null;
+/** Ce que coûte une bulle de Premium au-delà du rapport seul : 10 € de plus pour 22 bulles de plus, au centime près. */
 const BULLE_PREMIUM = Math.round((PREMIUM.centimes - CATALOGUE.rapport.centimes) / (PREMIUM.bulles - CATALOGUE.rapport.bulles));
 
 /** Le bas de l’aperçu gratuit (PiedGratuit) : « Lire la suite », son prix, et les bulles offertes avec le rapport. */
@@ -82,8 +90,8 @@ export const PAYWALL = {
     note: (autre: string) => `Le rapport, puis BLUSH t’aide à répondre à ${autre}`,
     /** Ses réponses, dont celles offertes (les bulles d’un lot de la roue ont leur ligne à elles). */
     offertes: (reponses: number) => `${reponses} réponses, dont ${OFFERTES_PREMIUM} offertes`,
-    /** Ce que coûteraient ses bulles offertes, seules (le plus petit pack), barré, puis « 0 € ». */
-    barreOffertes: prixDe("pack30"),
+    /** Ce que coûteraient ses bulles offertes, seules, barré avant « 0 € » ; null : rien de barré (aucun pack ne vend celles du rapport). */
+    barreOffertes: BARRE_OFFERTES_PREMIUM,
     /**
      * Son badge quand elle s’est vraiment payée plus souvent que le rapport seul ces 30 derniers jours (le serveur le
      * compte : premiumLePlusChoisi) ; sinon, « Conseillé ».
@@ -224,15 +232,16 @@ export const FEUILLE_FORMULE = {
     bulles: `${PAYEES_PREMIUM} bulles`,
     plus: `+ ${OFFERTES_PREMIUM} bulles`,
     offertesMot: PIECES.offertes,
-    /** Ce que coûteraient ses bulles offertes, seules (le plus petit pack), barré, puis « 0 € ». */
-    barreOffertes: prixDe("pack30"),
+    /** Ce que coûteraient ses bulles offertes, seules, barré avant « 0 € » ; null : rien de barré. */
+    barreOffertes: BARRE_OFFERTES_PREMIUM,
     gratuit: PIECES.gratuit,
     economie: `Économise ${enEuros((PREMIUM.barre ?? PREMIUM.centimes) - PREMIUM.centimes)} · la bulle à ${enEuros(BULLE_PREMIUM)}`,
   },
   /** Un rapport d’avance (⑤ payé) : la suite sans rien payer, choisie d’avance. */
   avance: {
     titre: "Ton rapport d’avance",
-    note: `Déjà payé · + ${RAPPORT_D_AVANCE.bulles} bulles offertes`,
+    /** Les bulles qu’il donnera, celles que son billet promettait (Avoirs, bullesDeLAvance). */
+    note: (bulles: number) => `Déjà payé · + ${bulles} bulles offertes`,
     prix: prixCourt(0),
     debloquer: `Débloquer · ${prixCourt(0)}`,
   },
@@ -280,14 +289,25 @@ export const OFFRE_SUITE = {
   souci: FEUILLE_FORMULE.souci,
 };
 
-/** L’offre unique ③ (sur « C’est débloqué ») : Premium pour 5 € de plus, juste après le rapport seul. */
+/** Le passage en Premium (③, l’offre du catalogue). */
+const PASSE = CATALOGUE.passe_premium;
+/** Ce que Premium coûte de plus que le rapport, aux prix du paywall (10 €) : ce que ③ fait payer moins cher. */
+const ECART_PREMIUM_RAPPORT = CATALOGUE.premium.centimes - CATALOGUE.rapport.centimes;
+
+/**
+ * L’offre unique ③ (sur « C’est débloqué », et dans le chat) : Premium pour 6,90 € de plus, après le rapport seul. Son
+ * texte dit un fait que le paywall montre (Premium et le rapport, aux prix du jour), comme l’ancien ③ disait le prix
+ * du pack de 80 bulles (« Seules, elles coûtent 13,90 € ») ; aucun prix barré n’est dessiné : ce passage ne s’est
+ * jamais vendu 10 €.
+ * TODO(produit): textes de la grille du 23 octobre, à valider (le titre, le texte, le bouton).
+ */
 export const OFFRE_PREMIUM_AJOUT = {
   badge: "Une seule fois, ici",
-  titre: `Passe en Premium pour ${prixCourt(CATALOGUE.premium_ajout.centimes)} de plus`,
-  texte: `${CATALOGUE.premium_ajout.bulles} bulles en plus, comme en Premium. Seules, elles coûtent ${prixDe("pack80")}.`,
-  plus: `+ ${CATALOGUE.premium_ajout.bulles}`,
+  titre: `Passe en Premium pour ${prixCourt(PASSE.centimes)} de plus`,
+  texte: `${PASSE.bulles} bulles en plus, comme en Premium. Premium coûte ${prixCourt(ECART_PREMIUM_RAPPORT)} de plus que le rapport\u00a0: ici, ${prixCourt(PASSE.centimes)}.`,
+  plus: `+ ${PASSE.bulles}`,
   carte: "Ta carte est enregistrée\u00a0: un geste et c’est fait.",
-  prendre: `Ajouter ${CATALOGUE.premium_ajout.bulles} bulles · ${prixCourt(CATALOGUE.premium_ajout.centimes)}`,
+  prendre: `Ajouter ${PASSE.bulles} bulles · ${prixCourt(PASSE.centimes)}`,
   /* Refusée, son repli suit (le 2e rapport à −50 %) : « je lis la suite » n’est plus vrai */
   non: "Non merci",
   souci: FEUILLE_FORMULE.souci,

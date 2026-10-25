@@ -56,7 +56,7 @@ test("un nouveau venu : la lecture du code, le paywall, payé, puis la vraie lec
     await expect(ecran.getByRole("heading", { level: 1 })).toBeVisible({ timeout: RESEAU });
     /* Le 21 octobre : plus à l’arrivée, mais au bout de 5 s (ou à la moitié de la page), et jamais sur la carte */
     await expect(page.getByRole("dialog", { name: ROUE })).toHaveCount(0);
-    await ecran.getByRole("button", { name: "Débloquer · 14,90\u00a0€" }).click();
+    await ecran.getByRole("button", { name: "Débloquer · 19,90\u00a0€" }).click();
     const carte = page.getByRole("dialog", { name: CARTE });
     await expect(carte).toBeVisible();
     await page.waitForTimeout(6_000);
@@ -68,7 +68,7 @@ test("un nouveau venu : la lecture du code, le paywall, payé, puis la vraie lec
     await refuserLaRoue(page);
   });
 
-  await test.step("le paywall prime : les deux formules aux prix du 16 octobre, Premium choisie d’avance", async () => {
+  await test.step("le paywall prime : les deux formules aux prix du 23 octobre, Premium choisie d’avance", async () => {
     const ecran = page.getByRole("main");
     /* Sur téléphone, la première section est rangée comme une fiche produit (22 octobre) : les messages lus et la note passent dans l’en-tête des aperçus du rapport */
     const telephone = page.viewportSize()!.width < 1024;
@@ -77,28 +77,30 @@ test("un nouveau venu : la lecture du code, le paywall, payé, puis la vraie lec
     await expect(ecran.getByText(telephone ? /^.+ messages lus · 8 chapitres \+ ton vocal$/ : /^Ton rapport · .+ messages lus$/)).toBeVisible();
     await expect(ecran.getByRole("radio", { name: /^Le rapport/ })).toContainText("9,90\u00a0€");
     const premium = ecran.getByRole("radio", { name: /Premium/ });
-    await expect(premium).toContainText("14,90\u00a0€");
-    /* La formule « après » (17 octobre) : ni prix barré ni écart écrit, ses réponses dont les offertes */
-    await expect(premium).not.toContainText("23,80");
-    await expect(premium).not.toContainText("pour 5");
-    await expect(premium).toContainText("90 réponses, dont 30 offertes");
+    await expect(premium).toContainText("19,90\u00a0€");
+    /* La formule « après » (17 octobre) : ni prix barré ni écart écrit, ses réponses dont les offertes (celles du rapport, sans prix barré) */
+    await expect(premium).not.toContainText("24,80");
+    await expect(premium).not.toContainText("pour 6");
+    await expect(premium).toContainText("25 réponses, dont 3 offertes");
+    /* Sans prix barré sur ses offertes, pas de « 0 € » : il se lirait comme le prix de ses 25 réponses */
+    await expect(premium).not.toContainText(/(?<![\d,])0\u00a0€/);
     /* Le nom du rapport : l’en-tête des aperçus sur téléphone, la carte du paiement sur ordinateur */
     await expect(ecran.getByText("Ton rapport sur Maëlys", { exact: true }).filter({ visible: true })).toHaveCount(1);
     /* Retirée le 22 octobre : la ligne « Paiement unique · … jamais prévenue » sous le bouton */
     await expect(ecran.getByText(/^Paiement unique · /)).toHaveCount(0);
     await expect(premium).toHaveAttribute("aria-checked", "true");
-    await expect(ecran.getByRole("button", { name: "Débloquer · 14,90\u00a0€" })).toBeVisible();
+    await expect(ecran.getByRole("button", { name: "Débloquer · 19,90\u00a0€" })).toBeVisible();
     await expect(ecran.getByText(/Tu économises|Ton verdict arrive/)).toHaveCount(0);
     await expect(
       telephone ? ecran.getByText("654 avis", { exact: true }).filter({ visible: true }) : ecran.getByText(/4,8 · 654 avis · déjà 1,2\u00a0million de messages lus$/),
     ).toBeVisible();
-    await paieEnPetitEcran(page, "Débloquer · 14,90\u00a0€");
+    await paieEnPetitEcran(page, "Débloquer · 19,90\u00a0€");
     expect(await verdictsEcrits(email)).toBe(0);
   });
 
   await test.step("l’onglet quitté puis retrouvé pendant qu’on remplit sa carte : l’offre ① attend, et vient une fois la carte refermée sans payer", async () => {
     /* Le 21 octobre, elle couvrait la carte 19 s après « Débloquer » : jamais pendant le paiement */
-    await page.getByRole("main").getByRole("button", { name: "Débloquer · 14,90\u00a0€" }).click();
+    await page.getByRole("main").getByRole("button", { name: "Débloquer · 19,90\u00a0€" }).click();
     const carte = page.getByRole("dialog", { name: CARTE });
     await expect(carte).toBeVisible();
     await quitterPuisRevenir(page);
@@ -129,8 +131,8 @@ test("un nouveau venu : la lecture du code, le paywall, payé, puis la vraie lec
     await expect(page).toHaveURL(/\/rapport\/debloque\?achat=/, { timeout: RESEAU });
     const debloque = page.getByRole("main");
     await expect(debloque.getByRole("heading", { level: 1, name: "C’est débloqué." })).toBeVisible();
-    await expect(debloque.getByText("Les 8 chapitres sont à toi. Et 10 bulles pour en parler avec BLUSH.")).toBeVisible();
-    expect(await compteDe(email)).toMatchObject({ debloquees: 1, bulles: 10 });
+    await expect(debloque.getByText("Les 8 chapitres sont à toi. Et 3 bulles pour en parler avec BLUSH.")).toBeVisible();
+    expect(await compteDe(email)).toMatchObject({ debloquees: 1, bulles: 3 });
   });
 
   await test.step("l’offre ③ passée, « Continuer » : la vraie lecture, puis son verdict", async () => {
@@ -176,24 +178,24 @@ test("la roue tournée : « Gagné », le lot (−10 %) sur les prix du paywall 
     await expect(page.getByRole("dialog")).toHaveCount(0);
   });
 
-  await test.step("le paywall : le bandeau du cadeau, Premium à 13,41 € ; l’onglet quitté puis retrouvé, pas d’offre ①", async () => {
+  await test.step("le paywall : le bandeau du cadeau, Premium à 17,91 € ; l’onglet quitté puis retrouvé, pas d’offre ①", async () => {
     const ecran = page.getByRole("main");
     await expect(ecran.getByRole("status").filter({ hasText: "Ton cadeau\u00a0: −10\u00a0% sur ta formule" })).toBeVisible();
     const premium = ecran.getByRole("radio", { name: /Premium/ });
-    await expect(premium).toContainText("13,41\u00a0€");
-    await expect(premium).toContainText("−1,49\u00a0€");
+    await expect(premium).toContainText("17,91\u00a0€");
+    await expect(premium).toContainText("−1,99\u00a0€");
     await quitterPuisRevenir(page);
     await page.waitForTimeout(1000);
     await expect(page.getByRole("dialog", { name: OFFRE_SUITE })).toHaveCount(0);
   });
 
-  await test.step("payé au prix du lot : 13,41 €, 90 bulles, le lot pris", async () => {
-    await page.getByRole("main").getByRole("button", { name: "Débloquer · 13,41\u00a0€" }).click();
+  await test.step("payé au prix du lot : 17,91 €, 25 bulles, le lot pris", async () => {
+    await page.getByRole("main").getByRole("button", { name: "Débloquer · 17,91\u00a0€" }).click();
     await payerParCarte(page);
     await expect(page).toHaveURL(/\/rapport\/debloque\?achat=/, { timeout: RESEAU });
-    expect(await compteDe(email)).toMatchObject({ debloquees: 1, bulles: 90 });
+    expect(await compteDe(email)).toMatchObject({ debloquees: 1, bulles: 25 });
     const achats = await sql()<{ centimes: number; lot_roue: string | null }[]>`
       select a.centimes, a.lot_roue from achats a join users u on u.id = a.user_id where u.email = ${email.toLowerCase()} and a.statut = 'paye'`;
-    expect(achats).toEqual([{ centimes: 1341, lot_roue: "moins10" }]);
+    expect(achats).toEqual([{ centimes: 1791, lot_roue: "moins10" }]);
   });
 });

@@ -33,8 +33,10 @@ export async function direct(): Promise<Direct> {
           left join presences p on p.minute = m group by m order by m`,
     ),
     lignes<{ minute: string; n: string }>(sql`select minute, count(*) as n from presences where minute >= ${DEBUT_DU_JOUR} group by minute order by n desc, minute desc limit 1`),
-    lignes<{ genre: GenreFil; ville: string | null; source: SourceVisite | null; offre: OffreId | null; le: string }>(
-      sql`select genre, ville, source, offre, le from fil_direct where le > now() - interval '24 hours' order by le desc, id desc limit ${GESTES_DU_FIL}`,
+    /* Un achat avec le prix payé, retrouvé par sa ref (pas celui du catalogue, qui a pu changer depuis, ou un lot de la roue) */
+    lignes<LigneDuFil>(
+      sql`select f.genre, f.ville, f.source, f.offre, f.le, (select a.centimes from achats a where f.genre = 'achat' and a.id::text = f.ref) as centimes
+          from fil_direct f where f.le > now() - interval '24 hours' order by f.le desc, f.id desc limit ${GESTES_DU_FIL}`,
     ),
     lignes<{ visiteurs: string; achats: string; centimes: string }>(
       sql`select (select count(*) from visites where jour = ${aujourdhuiParis().iso}) as visiteurs,
@@ -70,10 +72,14 @@ export async function direct(): Promise<Direct> {
   };
 }
 
+/** Une ligne du fil lue en base, et le prix payé de son achat (null : pas un achat, ou un achat sans ref). */
+type LigneDuFil = { genre: GenreFil; ville: string | null; source: SourceVisite | null; offre: OffreId | null; le: string; centimes: number | null };
+
 /** Une ligne du fil, sous la forme de son genre ; null : une ligne incomplète (une arrivée sans source, un achat sans offre). */
-function gesteDuFil(l: { genre: GenreFil; ville: string | null; source: SourceVisite | null; offre: OffreId | null; le: string }): GesteDuFil | null {
+function gesteDuFil(l: LigneDuFil): GesteDuFil | null {
   const base = { ville: l.ville, le: iso(l.le) };
   if (l.genre === "arrivee") return l.source ? { genre: l.genre, ...base, source: l.source } : null;
-  if (l.genre === "paiement" || l.genre === "achat") return l.offre ? { genre: l.genre, ...base, offre: l.offre } : null;
+  if (l.genre === "paiement") return l.offre ? { genre: l.genre, ...base, offre: l.offre } : null;
+  if (l.genre === "achat") return l.offre ? { genre: l.genre, ...base, offre: l.offre, ...(l.centimes !== null && { centimes: n(l.centimes) }) } : null;
   return { genre: l.genre, ...base };
 }

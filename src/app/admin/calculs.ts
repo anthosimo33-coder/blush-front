@@ -1,4 +1,4 @@
-import { CATALOGUE, prixDe } from "@/contenu/offres";
+import { CATALOGUE, enEuros } from "@/contenu/offres";
 import { NOMS_DES_SOURCES, type GroupeDOffres } from "@/contenu/pilotage";
 import type { Pilotage } from "@/server/stats";
 import { ETAPES_VISITE, type EtapeVisite, type Jalon, type SourceVisite } from "@/types";
@@ -249,7 +249,7 @@ function arrivee(source: SourceVisite): string {
   return `arrive ${/^[aeiouyhéè]/i.test(nom) ? "d’" : "de "}${nom}`;
 }
 
-/** Ce qu’a fait la personne d’un geste du fil, et le prix d’un achat (à part, en pastille). */
+/** Ce qu’a fait la personne d’un geste du fil, et le prix payé d’un achat (à part, en pastille ; sans lui, celui du catalogue). */
 export function texteDuGeste(g: GesteDuFil): { ville: string; quoi: string; prix: string | null } {
   const ville = g.ville ?? "Ville inconnue";
   switch (g.genre) {
@@ -260,7 +260,7 @@ export function texteDuGeste(g: GesteDuFil): { ville: string; quoi: string; prix
     case "paiement":
       return { ville, quoi: `ouvre le paiement · ${CATALOGUE[g.offre].titre}`, prix: null };
     case "achat":
-      return { ville, quoi: `a pris ${CATALOGUE[g.offre].titre}`, prix: prixDe(g.offre) };
+      return { ville, quoi: `a pris ${CATALOGUE[g.offre].titre}`, prix: enEuros(g.centimes ?? CATALOGUE[g.offre].centimes) };
     case "partage":
       return { ville, quoi: "a partagé son verdict", prix: null };
   }

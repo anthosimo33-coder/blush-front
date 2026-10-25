@@ -1,8 +1,9 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AchatDuChatContext, OffreDuChatCarte, useAchatDuChat } from "@/app/app/accueil/achat";
-import { CATALOGUE, PREMIERE_RECHARGE, prixDe } from "@/contenu/offres";
+import { CATALOGUE, prixDe } from "@/contenu/offres";
 import { OFFRE_PREMIUM_AJOUT } from "@/contenu/paiement";
+import { PACK_CONSEILLE, PACKS } from "@/contenu/recharge";
 import { VENTE_DU_CHAT } from "@/contenu/vente-du-chat";
 import { commencerPaiement, etatDuPaiement, noterUnGesteDeVente, proposerOffreUnique } from "@/services/api";
 import type { OffreDuChat } from "@/types";
@@ -10,7 +11,7 @@ import { ErreurApi } from "@/types/erreurs-api";
 
 /*
  * Les cartes d’achat du chat (src/app/app/accueil/achat.tsx), avec le vrai paiement de l’accueil (useAchatDuChat) et un
- * serveur simulé : la recharge payée en un geste (le pack conseillé, le bonus de la première recharge), la banque qui dit
+ * serveur simulé : la recharge payée en un geste (le pack conseillé ; plus de bonus de la première recharge), la banque qui dit
  * non, la feuille de la recharge sans carte gardée, Premium qui part sur la page du paiement, les cartes qui mènent à
  * l’import, et « Pas maintenant ».
  */
@@ -56,30 +57,32 @@ beforeEach(() => {
 describe("la recharge dans le chat", () => {
   it("en un geste : le pack conseillé, payé sans quitter la conv, puis les bulles livrées", async () => {
     commencer.mockResolvedValue({ achat: "a1", checkout: null, url: null, paiement: null });
-    etat.mockResolvedValue({ achat: "a1", offre: "pack80", statut: "paye", bulles: CATALOGUE.pack80.bulles, conv: null });
+    etat.mockResolvedValue({ achat: "a1", offre: PACK_CONSEILLE, statut: "paye", bulles: CATALOGUE[PACK_CONSEILLE].bulles, conv: null });
     render(<Chat offre={{ genre: "bulles", solde: 2, enUnGeste: true }} />);
     expect(screen.getByText(VENTE_DU_CHAT.bulles.reste(2))).toBeTruthy();
-    expect(screen.getByRole("radio", { checked: true }).textContent).toContain(String(CATALOGUE.pack80.bulles));
-    await act(async () => fireEvent.click(screen.getByRole("button", { name: VENTE_DU_CHAT.bulles.recharger(prixDe("pack80")) })));
-    expect(commencer).toHaveBeenCalledWith("pack80", true, { geste: true, vente: "bulles" });
+    expect(screen.getByRole("radio", { checked: true }).textContent).toBe(`${CATALOGUE.pack25.bulles}${prixDe("pack25")}${VENTE_DU_CHAT.bulles.conseille}`);
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: VENTE_DU_CHAT.bulles.recharger(prixDe("pack25")) })));
+    expect(commencer).toHaveBeenCalledWith("pack25", true, { geste: true, vente: "bulles" });
     expect(noter).toHaveBeenCalledWith("touchee", "bulles");
-    expect(surBulles).toHaveBeenCalledWith(CATALOGUE.pack80.bulles);
-    expect(screen.getByRole("status").textContent).toBe(VENTE_DU_CHAT.bulles.paye(CATALOGUE.pack80.bulles, 2 + CATALOGUE.pack80.bulles));
+    expect(surBulles).toHaveBeenCalledWith(CATALOGUE.pack25.bulles);
+    expect(screen.getByRole("status").textContent).toBe(VENTE_DU_CHAT.bulles.paye(CATALOGUE.pack25.bulles, 2 + CATALOGUE.pack25.bulles));
   });
 
-  it("le bonus de la première recharge, quand le serveur le montre : sur le pack conseillé", async () => {
-    proposer.mockResolvedValue({ offre: "premiere_recharge", fin: null, reste: null, enUnGeste: true });
+  it("plus de bonus de la première recharge (arrêté le 23 octobre) : rien n’est demandé au serveur, chaque pack donne ses bulles", async () => {
     render(<Chat offre={{ genre: "bulles", solde: 1, enUnGeste: true }} />);
     await act(async () => {});
-    expect(proposer).toHaveBeenCalledWith("premiere_recharge");
-    expect(screen.getByRole("radio", { checked: true }).textContent).toContain(String(CATALOGUE.pack80.bulles + PREMIERE_RECHARGE.bonus));
+    expect(proposer).not.toHaveBeenCalled();
+    expect(screen.getAllByRole("radio").map((r) => r.textContent)).toEqual(
+      PACKS.map((p) => `${CATALOGUE[p].bulles}${prixDe(p)}${p === PACK_CONSEILLE ? VENTE_DU_CHAT.bulles.conseille : ""}`),
+    );
   });
 
   it("la banque dit non : rien n’est débité, il réessaie ; un autre pack se choisit", async () => {
     commencer.mockRejectedValueOnce(new ErreurApi("carte", 402));
     render(<Chat offre={{ genre: "bulles", solde: 0, enUnGeste: true }} attend />);
-    fireEvent.click(screen.getByRole("radio", { name: new RegExp(String(CATALOGUE.pack30.bulles)) }));
-    await act(async () => fireEvent.click(screen.getByRole("button", { name: VENTE_DU_CHAT.bulles.recharger(prixDe("pack30")) })));
+    /* Le petit pack, le premier */
+    fireEvent.click(screen.getAllByRole("radio")[0]!);
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: VENTE_DU_CHAT.bulles.recharger(prixDe("pack10")) })));
     expect(screen.getByRole("alert").textContent).toBe(VENTE_DU_CHAT.refus.carte);
     /* Sa réponse attend au-dessus : pas de « Pas maintenant » */
     expect(screen.queryByRole("button", { name: VENTE_DU_CHAT.pasMaintenant })).toBeNull();
@@ -106,7 +109,7 @@ describe("Premium, et les cartes qui mènent à l’import", () => {
     commencer.mockResolvedValue({ achat: "a2", checkout: null, url: "/paiement/factice?achat=a2", paiement: null });
     render(<Chat offre={{ genre: "premium", enUnGeste: false }} />);
     await act(async () => fireEvent.click(screen.getByRole("button", { name: OFFRE_PREMIUM_AJOUT.prendre })));
-    expect(commencer).toHaveBeenCalledWith("premium_ajout", true, { geste: true, vente: "premium" });
+    expect(commencer).toHaveBeenCalledWith("passe_premium", true, { geste: true, vente: "premium" });
     expect(routeur.push).toHaveBeenCalledWith("/paiement/factice?achat=a2");
     expect(screen.getByRole("button", { name: VENTE_DU_CHAT.enCours })).toBeTruthy();
   });
