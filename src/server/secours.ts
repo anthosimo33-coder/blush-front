@@ -21,7 +21,9 @@ export type SourcesDuSecours = { verdict: Verdict; rapport: Rapport | null; lign
 /**
  * La mémoire de secours. Où ils en sont : la thèse du rapport, le verdict court et sa tendance ; les moments et les
  * manières de chacun : ce que les chapitres du rapport datent ou attribuent à l’un ou à l’autre ; le conseil en cours :
- * le prochain pas du verdict ; leur niveau : celui du verdict. Les preuves qui ne sont pas dans `lignes` tombent.
+ * le prochain pas du verdict ; leur niveau : celui du verdict. Les preuves qui ne sont pas dans `lignes` tombent. Son
+ * alerte : celle du rapport, sinon celle du verdict ; « où on en est » ne la dit pas, sa ligne dans <memoire> la donne
+ * au chat et à la mise à jour de la mémoire (rendreMemoire, prompts/lib/memoire.ts).
  */
 export function memoireDeSecours({ verdict, rapport, lignes, suivant, jour }: SourcesDuSecours): DonneesMemoire {
   const preuves = (ids: string[]) => ids.filter((id) => lignes.has(id));
