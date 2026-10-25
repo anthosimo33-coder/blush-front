@@ -1,14 +1,15 @@
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
 import { describe, expect, it, vi } from "vitest";
 import { executerChaine } from "@/server/pipeline";
 import { CLES, compter, estUnRobot } from "@/server/compteurs";
 import { db, schema } from "@/server/db";
 import { definirQui } from "@/server/histoires";
 import { mailRapport } from "@/server/mail-rapport";
-import { statsAdmin } from "@/server/stats";
+import { minuitDeParis, statsAdmin } from "@/server/stats";
 import { planifier } from "@/server/taches";
 import { definirPause } from "@/server/temps";
 import { compteDeTest, convRattachee, moiDans } from "./aide/fixtures";
+import { midiDHier } from "./aide/jours";
 
 describe("les robots d’aperçu ne sont pas des visites", () => {
   it("reconnaît WhatsApp, iMessage et Slack, pas un iPhone", () => {
@@ -111,7 +112,7 @@ describe("le tableau de bord", () => {
     await db().insert(schema.verdicts).values({ storyId: lue.id, data: meta });
     await db().insert(schema.reports).values({ storyId: lue.id, data: meta });
     const hier = await convRattachee(u, "02-reciproque.txt");
-    const midiHier = new Date(Date.now() - 86400e3);
+    const midiHier = midiDHier();
     await db().update(schema.stories).set({ createdAt: midiHier }).where(eq(schema.stories.id, hier.id));
     /* Une prise du tournage, aujourd’hui, avec son verdict : elle ne compte pas */
     const [prise] = await db().insert(schema.stories).values({ userId: u.id, messageCount: 1, meta, tournageLe: new Date() }).returning({ id: schema.stories.id });
@@ -125,5 +126,19 @@ describe("le tableau de bord", () => {
     });
     expect(d(-1)).toEqual({ imports: 1, verdicts: 1, rapports: 1 });
     expect(d(-2)).toEqual({ imports: 1, verdicts: 0, rapports: 0 });
+  });
+});
+
+describe("les jours de Paris du tableau de bord", () => {
+  it("la semaine commence à minuit à Paris, même juste après un changement d’heure", async () => {
+    /* L’instant que rend minuitDeParis, lu à l’heure de Paris */
+    const minuit = async (jours: number, maintenant: string) =>
+      (await db().execute<{ t: string }>(sql`select (${minuitDeParis(jours, `timestamptz '${maintenant}'`)} at time zone 'Europe/Paris')::text as t`)).rows[0]!.t;
+    /* Le 27 octobre 2026, deux jours après le passage à l’heure d’hiver : la semaine part du 21 à minuit ; 144 h plus tôt, il était 1 h */
+    expect(await minuit(6, "2026-10-27 12:00+01")).toBe("2026-10-21 00:00:00");
+    /* Le 1er avril 2026, après le passage à l’heure d’été : du 26 mars à minuit ; 144 h plus tôt, c’était le 25 à 23 h */
+    expect(await minuit(6, "2026-04-01 12:00+02")).toBe("2026-03-26 00:00:00");
+    /* Le 25 octobre 2026 à 23 h 30, le jour de 25 h : il a commencé à minuit, 24 h 30 plus tôt */
+    expect(await minuit(0, "2026-10-25 23:30+01")).toBe("2026-10-25 00:00:00");
   });
 });

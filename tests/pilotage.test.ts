@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { and, eq, gte } from "drizzle-orm";
+import { and, eq, gte, inArray } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { POST as postJalon } from "@/app/api/jalon/route";
 import { POST as postPresence } from "@/app/api/presence/route";
@@ -246,6 +246,23 @@ describe("la purge garde peu", () => {
         .from(schema.selsDesVisites)
         .where(and(eq(schema.selsDesVisites.jour, aujourdhuiParis().iso), gte(schema.selsDesVisites.jour, "2001-01-02"))),
     ).toHaveLength(1);
+  });
+
+  it("le sel de la veille reste, même le soir du passage à l’heure d’hiver", async () => {
+    const jours = ["2026-10-23", "2026-10-24"];
+    const restent = async () =>
+      (await db().select({ jour: schema.selsDesVisites.jour }).from(schema.selsDesVisites).where(inArray(schema.selsDesVisites.jour, jours))).map((l) => l.jour);
+    await db()
+      .insert(schema.selsDesVisites)
+      .values(jours.map((jour) => ({ jour, sel: "x" })))
+      .onConflictDoNothing();
+    try {
+      /* Le 25 octobre 2026 à 23 h 30 à Paris : il y a 24 h, c’était encore le 25, et le sel du 24 partait avec celui du 23 */
+      await purger(new Date("2026-10-25T23:30:00+01:00"));
+      expect(await restent()).toEqual(["2026-10-24"]);
+    } finally {
+      await db().delete(schema.selsDesVisites).where(inArray(schema.selsDesVisites.jour, jours));
+    }
   });
 });
 

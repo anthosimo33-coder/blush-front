@@ -7,6 +7,7 @@ import { prixDe } from "@/contenu/offres";
 import { CIBLE_DE_MARGE, EUROS_PAR_DOLLAR, NOMS_DES_GROUPES, NOMS_DES_SOURCES, NOMS_DES_VENTES, SOURCE_INCONNUE, margeApresIA } from "@/contenu/pilotage";
 import { cn } from "@/lib/cn";
 import { NBSP } from "@/lib/format";
+import { jourDeParisAvant } from "@/lib/jours";
 import type { Delivrabilite as ChiffresDeDelivrabilite } from "@/server/delivrabilite";
 import type { SanteDesNavigateurs } from "@/server/navigateur";
 import type { Periode, Pilotage as Chiffres, StatsAdmin } from "@/server/stats";
@@ -85,9 +86,6 @@ function quand(le: string): string {
   const jour = d.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", timeZone: PARIS });
   return `${jour.charAt(0).toUpperCase()}${jour.slice(1)}, ${d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: PARIS })}`;
 }
-
-/** Le jour de Paris d’un instant (AAAA-MM-JJ). */
-const jourDeParis = (t: number) => new Date(t).toLocaleDateString("sv-SE", { timeZone: PARIS });
 
 /**
  * `direct` : le direct lu par la page (null : pas lu, la carte le lit) ; `base` : /admin, ou l’aperçu de l’équipe ;
@@ -367,7 +365,7 @@ function ChiffresCles({ s }: { s: StatsAdmin }) {
   const ecartPanier = ecartEnValeur(parAcheteur, parAcheteurAvant, (v) => euros(v));
   const ecartMarge = ecartEnPoints(marge, margeAvant);
   /* Le suivi des visites a commencé pendant la période : elle n’en a qu’une partie */
-  const debut = jourDeParis(Date.parse(s.le) - s.jours * 86400e3);
+  const debut = jourDeParisAvant(s.jours, new Date(s.le));
   const depuis =
     p.suiviDepuis && p.suiviDepuis > debut
       ? `comptés depuis le ${new Date(`${p.suiviDepuis}T12:00:00Z`).toLocaleDateString("fr-FR", { day: "numeric", month: "long", timeZone: "UTC" })}`

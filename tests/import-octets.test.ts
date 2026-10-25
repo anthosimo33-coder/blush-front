@@ -26,6 +26,7 @@ import { empreinte } from "@/server/chiffrement";
 import { db, schema } from "@/server/db";
 import { compteDe, LIMITES } from "@/server/limites";
 import { aujourdhuiParis } from "@/server/temps";
+import { jourDeParisAvant } from "@/lib/jours";
 import { lotVideo } from "./aide/fabriques";
 import { convDeTest } from "./aide/fichiers";
 import { creees } from "./aide/nettoyage";
@@ -41,7 +42,7 @@ const KO = Math.ceil(convDeTest(CONV).size / 1024);
 const JOUR = aujourdhuiParis().iso;
 const TOUS = `brouillons:ko:${JOUR}`;
 /* La veille : ses alertes ne retiennent pas celles du jour */
-const HIER = `brouillons:ko:${aujourdhuiParis(new Date(Date.now() - 86400e3)).iso}`;
+const HIER = `brouillons:ko:${jourDeParisAvant(1)}`;
 const cles = new Set([TOUS, `${TOUS}:alerte:0.8`, `${TOUS}:alerte:1`, `${HIER}:alerte:1`]);
 const empreintes = () => [...cles].map((c) => empreinte(`limite:${c}`));
 

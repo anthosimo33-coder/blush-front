@@ -1,5 +1,6 @@
 import "server-only";
 import { and, isNotNull, isNull, lt, not, or } from "drizzle-orm";
+import { jourDeParisAvant } from "@/lib/jours";
 import { alerter } from "./alertes";
 import { purgerLaListe } from "./attente";
 import { db, schema } from "./db";
@@ -8,7 +9,6 @@ import { PREDICATS } from "./depot";
 import { journalErreur } from "./journal";
 import { purgerLOAuth } from "./mcp/acces";
 import { NAVIGATEUR_GARDE_JOURS } from "./navigateur";
-import { aujourdhuiParis } from "./temps";
 import { PRESENCES_GARDEES_JOURS, VISITES_GARDEES_JOURS } from "./visites";
 
 /*
@@ -136,7 +136,7 @@ export async function purger(maintenant = new Date()) {
   await etape("sels des visites", async () => {
     await db()
       .delete(schema.selsDesVisites)
-      .where(lt(schema.selsDesVisites.jour, aujourdhuiParis(il_y_a(1)).iso));
+      .where(lt(schema.selsDesVisites.jour, jourDeParisAvant(1, maintenant)));
   });
   if (echecs.length)
     await alerter(

@@ -10,6 +10,7 @@ import { LIMITES, plafondsDesMails } from "@/server/limites";
 import { desinscrire, envoyerLesRelances, lienDesinscription, lienDesinscriptionUnClic } from "@/server/relances";
 import { aPrisPremium, ECART_ENTRE_DEUX_MAILS_MS, envoyerLesSequences, groupeDuJ6, heureCalme } from "@/server/sequences";
 import type { LevelId } from "@/types";
+import { jourDeParisAvant } from "@/lib/jours";
 import { compteDeTest, convPrete, histoireLue } from "./aide/fixtures";
 
 /*
@@ -426,11 +427,9 @@ describe("S8 · son anniversaire", () => {
       .values({ storyId: conv, data: coffre.ecrire("memories.data", { ...memoire, etat: { ...memoire.etat, fiche: { ...memoire.etat.fiche, faits } } }) });
   }
 
-  /** Le jour et le mois à Paris, dans `jours` jours : « 23/10 ». */
+  /** Le jour et le mois à Paris, dans `jours` jours du calendrier (jamais `jours` × 24 h, faux autour d’un changement d’heure) : « 23/10 ». */
   const dansJours = (jours: number) => {
-    const [, m, j] = new Intl.DateTimeFormat("fr-CA", { timeZone: "Europe/Paris", year: "numeric", month: "2-digit", day: "2-digit" })
-      .format(new Date(Date.now() + jours * 24 * HEURE))
-      .split("-");
+    const [, m, j] = jourDeParisAvant(-jours).split("-");
     return `${j}/${m}`;
   };
 
