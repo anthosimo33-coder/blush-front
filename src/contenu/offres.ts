@@ -141,10 +141,9 @@ export const RAPPORT_D_AVANCE = { offre: "second", dureeMs: 365 * 24 * 3600 * 10
 /**
  * L’heure de la mise en ligne de la grille du 23 octobre 2026 (le rapport à 3 bulles) : un rapport d’avance commandé
  * avant s’est vendu sous les conditions d’alors (le rapport à 10 bulles : son billet, les conditions, Mon compte).
- * TODO(produit): à remplacer par l’heure de la mise en ligne, à la fusion : d’ici là, une heure posée au 24 octobre
- * 2026 (celle de ce chantier). Trop tôt, une avance vendue entre les deux avec 10 bulles n’en donnerait que 3.
+ * Posée à la fusion, le 25 octobre 2026 à 23 h (heure d’hiver, +01:00), juste avant la mise en ligne.
  */
-export const GRILLE_DU_23_OCTOBRE = new Date("2026-10-24T12:00:00+02:00");
+export const GRILLE_DU_23_OCTOBRE = new Date("2026-10-25T23:00:00+01:00");
 
 /** Les bulles que donne à son usage un rapport d’avance commandé à cette heure : celles que son billet promettait. */
 export const bullesDeLAvance = (commandeLe: Date) => (commandeLe < GRILLE_DU_23_OCTOBRE ? RAPPORT_D_AVANCE.bullesAvantLaGrille : RAPPORT_D_AVANCE.bulles);
