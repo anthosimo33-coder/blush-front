@@ -2,7 +2,7 @@ import "server-only";
 import { eq, sql } from "drizzle-orm";
 import { chiffrer as chiffresDe, lire, rendre } from "@prompts/lib/conv";
 import { DEMANDE_PLAN, demandeMoitie, requeteMemoireCreation, requeteMemoireMaj, requeteRapport, requeteVerdict, requeteVocal } from "@prompts/lib/contextes";
-import { appliquerMaj, estFaite, rapportCourt, rendreNouveaux } from "@prompts/lib/memoire";
+import { alerteRetenue, appliquerMaj, estFaite, rapportCourt, rendreNouveaux } from "@prompts/lib/memoire";
 import { preuvesChapitres, preuvesMaj, preuvesMemoire, preuvesPlan, preuvesRapport, preuvesVerdict, preuvesVocal } from "@prompts/lib/preuves";
 import { Etape05, Maj07, Sortie04, Sortie05, Sortie06, Sortie07, verdictNormalise, type Chapitre, type Plan, type Rapport, type Verdict } from "@prompts/lib/schemas";
 import { profil } from "@prompts/lib/style";
@@ -451,9 +451,11 @@ async function vocalTache(story: LigneComplete) {
 }
 
 /**
- * La mémoire, créée d’après la conv, le verdict et le rapport. Une mémoire de secours écrite entre-temps (le chat a
- * répondu avant elle, ou elle repart après un échec) lui laisse la place (remplacerLeSecours) ; une vraie déjà là reste
- * telle quelle. Ensuite, la conv brute est effacée.
+ * La mémoire, créée d’après la conv, le verdict et le rapport. Son alerte : celle du verdict ou du rapport, que le
+ * modèle ne reprend pas toujours à la création, la règle de l’âge d’abord (alerteRetenue), comme le code impose déjà
+ * leurs titres : le chat la lit sur sa ligne de <memoire>. Une mémoire de secours écrite entre-temps (le chat a répondu
+ * avant elle, ou elle repart après un échec) lui laisse la place (remplacerLeSecours) ; une vraie déjà là reste telle
+ * quelle. Ensuite, la conv brute est effacée.
  */
 async function memoire(story: LigneComplete) {
   const { rendu, lu } = relire(story);
@@ -468,7 +470,9 @@ async function memoire(story: LigneComplete) {
     etiquette: "memoire",
   });
   if (!estFaite(etat)) throw new ErreurTache("memoire_vide");
-  const donnees = { etat, lignes: lignesGardees(etat, rendu.lignes), suivant: lu.messages.length + 1 };
+  /* Sans alerte au verdict, au rapport ni à la création, aucune : la mémoire reste celle que le modèle a écrite */
+  const gardee = { ...etat, alerte: alerteRetenue(etat.alerte, r.alerte, v.sortie.alerte) };
+  const donnees = { etat: gardee, lignes: lignesGardees(gardee, rendu.lignes), suivant: lu.messages.length + 1 };
   const [neuve] = await db()
     .insert(schema.memories)
     .values({ storyId: story.id, data: coffre.ecrire("memories.data", donnees) })

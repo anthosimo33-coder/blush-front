@@ -17,9 +17,10 @@ import { donneesMemoire, modifierMemoire } from "@/server/depot";
 import { ficheDe } from "@/server/donnees";
 import { fusionnerFaits } from "@/server/fiche";
 import { fournisseurFactice, refusFactice, type RequeteFactice } from "@/server/ia/factice";
+import { FACTICE } from "@/server/ia/factice-valeurs";
 import { executerChaine, memoireAssuree, RELANCES_MEMOIRE_MAX } from "@/server/pipeline";
 import { planifier } from "@/server/taches";
-import { retenir, sansAttendre } from "@/server/memoire-groupee";
+import { majQuiAttend, retenir, sansAttendre } from "@/server/memoire-groupee";
 import { echange } from "./aide/fabriques";
 import { avecFactice, compteDeTest, debloquerLaConv, histoireLue, ligneEnBase } from "./aide/fixtures";
 
@@ -170,5 +171,80 @@ describe("le chat avant la vraie mémoire", () => {
       .where(and(eq(schema.tasks.storyId, imp.id), eq(schema.tasks.kind, "memoire_maj")));
     expect(maj).toEqual([{ status: "fini" }]);
     expect((await donneesMemoire(imp.id))!.secours).toBe(true);
+  });
+});
+
+/*
+ * L’alerte de leur histoire (danger, detresse, mineur) reste dans la mémoire, et le chat la lit sur sa ligne de
+ * <memoire> (rendreMemoire, prompts/lib/memoire.ts) : celle du verdict, que la création de la mémoire ne reprend pas
+ * toujours (le modèle factice n’en lève jamais à la création), et celle d’une réponse du chat, qu’il ne relirait plus
+ * au-delà de ses derniers échanges. Le texte de la ligne n’est pas recopié ici (le dépôt est public) : on la reconnaît à
+ * l’alerte qu’elle porte, dans <memoire>.
+ */
+describe("l’alerte dans la mémoire, que le chat lit", () => {
+  type Alerte = "danger" | "detresse" | "mineur";
+  /** Le modèle factice, son verdict avec cette alerte ; pour la règle de l’âge, son rapport doux suit (FACTICE.alerte). */
+  const avecAlerte = (alerte: Alerte) => (req: RequeteFactice) => {
+    if (req.tache === "04-verdict") return { ...(fournisseurFactice(req) as object), alerte };
+    return fournisseurFactice(alerte === "mineur" ? { ...req, blocs: [...req.blocs, { texte: FACTICE.alerte }] } : req);
+  };
+  /** Le modèle factice dont les réponses du chat sortent avec cette alerte (une question, pas une nouvelle). */
+  const chatEnAlerte = (alerte: Alerte) => (req: RequeteFactice) => (req.tache === "10-chat" ? { ...(fournisseurFactice(req) as object), alerte } : fournisseurFactice(req));
+  /** Les lignes de <memoire> que le chat a lues à sa dernière réponse, celles qui portent une alerte. */
+  async function alertesLues(storyId: string, f: (req: RequeteFactice) => unknown = fournisseurFactice): Promise<string[]> {
+    const lues: Requete[] = [];
+    const [ligne, memoire] = [await ligneEnBase(storyId), (await donneesMemoire(storyId))!];
+    await avecFactice(
+      (req: RequeteFactice) => {
+        if (req.tache === "10-chat") lues.push(req);
+        return f(req);
+      },
+      () => repondre(ligne, memoire, "je lui réponds quoi ?"),
+    );
+    const texte = lues.at(-1)!.blocs.flatMap((b) => ("texte" in b ? [b.texte] : []))[0]!;
+    const l = texte.split("\n");
+    return l.slice(l.indexOf("<memoire>"), l.indexOf("</memoire>")).filter((x) => / : (danger|detresse|mineur)$/.test(x));
+  }
+
+  it.each(["danger", "mineur"] as const)("un verdict « %s » : la vraie mémoire garde son alerte, même si sa création l’oublie, et le chat la lit", async (alerte) => {
+    const u = await compteDeTest(`alerte-memoire-${alerte}`, "debloque");
+    const imp = await avecFactice(avecAlerte(alerte), () => histoireLue(u, "06-elle-hesite.txt"));
+    const m = (await donneesMemoire(imp.id))!;
+    /* La vraie, écrite par le modèle (factice) sans alerte : le code y a remis celle du verdict */
+    expect(m.secours).toBeUndefined();
+    expect(m.etat.memoire.ou_on_en_est).not.toBe("");
+    expect(m.etat.alerte).toBe(alerte);
+    expect(await alertesLues(imp.id)).toEqual([expect.stringMatching(new RegExp(` : ${alerte}$`))]);
+  });
+
+  it("sans alerte : la mémoire n’en a pas, et le chat n’en lit aucune", async () => {
+    const u = await compteDeTest("alerte-memoire-sans", "debloque");
+    const imp = await histoireLue(u, "06-elle-hesite.txt");
+    expect((await donneesMemoire(imp.id))!.etat.alerte).toBeNull();
+    expect(await alertesLues(imp.id)).toEqual([]);
+  });
+
+  it("une réponse du chat en alerte, sur une question : notée dans la mémoire, que la vraie garde en remplaçant celle de secours", async () => {
+    const u = await compteDeTest("alerte-memoire-chat", "debloque");
+    const imp = await avecFactice(memoireEnPanne, () => histoireLue(u, "06-elle-hesite.txt"));
+    expect((await donneesMemoire(imp.id))!).toMatchObject({ secours: true, etat: { alerte: null } });
+
+    /* « elle a 14 ans » : une question, que la règle de l’âge met en alerte. La mémoire la note, une mise à jour l’attend */
+    await alertesLues(imp.id, chatEnAlerte("mineur"));
+    expect((await donneesMemoire(imp.id))!.etat.alerte).toBe("mineur");
+    expect(await majQuiAttend(imp.id)).toBe(true);
+    /* La réponse suivante, sans alerte à elle, la lit encore ; une alerte « detresse » ne cache pas la règle de l’âge */
+    expect(await alertesLues(imp.id)).toEqual([expect.stringMatching(/ : mineur$/)]);
+    await alertesLues(imp.id, chatEnAlerte("detresse"));
+    expect((await donneesMemoire(imp.id))!.etat.alerte).toBe("mineur");
+
+    /* La vraie mémoire, passé la pause, remplace celle de secours : sa création n’a pas d’alerte, celle du chat reste */
+    await vieillir(imp.id);
+    etat.apres.length = 0;
+    await memoireAssuree(await ligneEnBase(imp.id));
+    await lancerLaSuite();
+    const reelle = (await donneesMemoire(imp.id))!;
+    expect(reelle.secours).toBeUndefined();
+    expect(reelle.etat.alerte).toBe("mineur");
   });
 });

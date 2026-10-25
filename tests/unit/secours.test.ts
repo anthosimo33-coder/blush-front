@@ -106,10 +106,13 @@ describe("la mémoire de secours", () => {
     expect(m.lignes).toEqual([]);
   });
 
-  it("garde l’alerte du rapport, sinon celle du verdict", () => {
+  it("garde l’alerte du verdict ou du rapport, la règle de l’âge d’abord : un rapport en « detresse » ne cache pas un verdict « mineur »", () => {
     const sources = { lignes: LIGNES, suivant: 1, jour: "2026-10-13" };
     expect(memoireDeSecours({ ...sources, verdict: verdict({ alerte: "danger" }), rapport: null }).etat.alerte).toBe("danger");
     expect(memoireDeSecours({ ...sources, verdict: verdict(), rapport: rapport({ alerte: "detresse" }) }).etat.alerte).toBe("detresse");
+    expect(memoireDeSecours({ ...sources, verdict: verdict({ alerte: "mineur", mode_sobre: true }), rapport: rapport({ alerte: "detresse" }) }).etat.alerte).toBe("mineur");
+    expect(memoireDeSecours({ ...sources, verdict: verdict({ alerte: "detresse" }), rapport: rapport({ alerte: "mineur" }) }).etat.alerte).toBe("mineur");
+    expect(memoireDeSecours({ ...sources, verdict: verdict(), rapport: rapport() }).etat.alerte).toBeNull();
   });
 });
 
@@ -139,5 +142,23 @@ describe("la vraie mémoire, à la place de celle de secours", () => {
     expect(m.etat.fiche.faits.map((f) => f.texte)).toEqual(["Elle a un chat", "Elle part à Lyon"]);
     expect(m.editions).toEqual(secours.editions);
     expect(m.etat.memoire).toEqual(reelle.etat.memoire);
+  });
+
+  /*
+   * Une alerte ne s’efface jamais : celle de la mémoire de secours (du verdict, ou notée par une réponse du chat) reste
+   * quand la vraie la remplace sans l’avoir lue, la règle de l’âge d’abord (alerteRetenue)
+   */
+  it("garde l’alerte de la mémoire de secours, celle que le chat y a notée comprise, sans cacher la règle de l’âge", () => {
+    const base = memoireDeSecours({ verdict: verdict(), rapport: null, lignes: LIGNES, suivant: 1, jour: "2026-10-13" });
+    const enAlerte = (alerte: DonneesMemoire["etat"]["alerte"]): DonneesMemoire => ({ ...base, etat: { ...base.etat, alerte } });
+    const reelleEn = (alerte: DonneesMemoire["etat"]["alerte"]): DonneesMemoire => ({ ...reelle, etat: { ...reelle.etat, alerte } });
+    expect(remplacerLeSecours(enAlerte("mineur"), reelle).etat.alerte).toBe("mineur");
+    expect(remplacerLeSecours(enAlerte("danger"), reelleEn("detresse")).etat.alerte).toBe("danger");
+    expect(remplacerLeSecours(enAlerte(null), reelleEn("danger")).etat.alerte).toBe("danger");
+    /* Avec ses corrections de fiche aussi */
+    const corrigee = { ...enAlerte("mineur"), editions: { parToi: [], supprimees: [] } };
+    expect(remplacerLeSecours(corrigee, reelleEn("detresse")).etat.alerte).toBe("mineur");
+    /* Sans alerte de part et d’autre : la vraie, telle quelle */
+    expect(remplacerLeSecours(enAlerte(null), reelle).etat).toEqual(reelle.etat);
   });
 });
