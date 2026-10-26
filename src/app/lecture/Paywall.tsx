@@ -6,6 +6,7 @@ import { AVIS_DU_HAUT, TEMOIGNAGES, TESTIMONIALS } from "@/contenu/landing";
 import { CATALOGUE, enEuros, FORMULE_CHOISIE } from "@/contenu/offres";
 import { DANS_LA_FEUILLE, FEUILLE_FORMULE, MESSAGES_LUS, NOTE_DES_AVIS, OFFRE_SUITE, PAYWALL } from "@/contenu/paiement";
 import { hautDuPaywall } from "@/contenu/haut-du-paywall";
+import { QUI_COINCE } from "@/contenu/mesures";
 import { bullesDuLot, DUREE_DU_CADEAU_MS, GAINS, lotSAppliqueA, prixAvecLot } from "@/contenu/roue";
 import { cn } from "@/lib/cn";
 import { useMomentVenu } from "@/lib/hooks";
@@ -33,6 +34,7 @@ import { Icon } from "@/components/ui/icons";
 import { Tag } from "@/components/ui/messages";
 import { Toast } from "@/components/ui/surfaces";
 import { ApercusDuRapport } from "./ApercusDuRapport";
+import { FeuilleQuiCoince } from "./FeuilleQuiCoince";
 import { CarteDuHaut, PreuveDuHaut, TitreDuHaut } from "./HautDuPaywall";
 import type { ApercuDuPaywall, Formule, Goal, LotDeLaRoue, OffreId, Story, Testimonial } from "@/types";
 import type { RoueDuCompte } from "@/types/api";
@@ -305,7 +307,22 @@ function Paiement({
   const [paye, setPaye] = useState(false);
   /* Dans le paiement : la carte ouverte, Apple Pay, un paiement en route (PayerDansLaFeuille, surOuvert) */
   const [ouvert, setOuvert] = useState(false);
-  const enRoute = paye || ouvert;
+  /* « Qu’est-ce qui coince ? » (proposition, FeuilleQuiCoince) : posée une fois par visite, la carte refermée sans payer */
+  const [coince, setCoince] = useState<"ouverte" | "merci" | null>(null);
+  const coinceDemandee = useRef(false);
+  const refermee = () => {
+    if (coinceDemandee.current) return;
+    coinceDemandee.current = true;
+    setCoince("ouverte");
+  };
+  /* Son merci, deux secondes et demie */
+  useEffect(() => {
+    if (coince !== "merci") return;
+    const minuteur = setTimeout(() => setCoince(null), 2500);
+    return () => clearTimeout(minuteur);
+  }, [coince]);
+  /* La question ouverte retient l’offre ① et la roue, comme la carte qu’on remplit */
+  const enRoute = paye || ouvert || coince === "ouverte";
   useEffect(() => surEnRoute(enRoute), [enRoute, surEnRoute]);
   const { suiteMontree, passee, setPassee, fermer } = useOffreSuite({ sans: !!avoirs?.avance || !!garde || sansOffre, enRoute, directe: offreDirecte });
   /* Le rapport déjà débloqué ailleurs (un autre onglet, 409 « deja ») : relu, la vraie lecture reprend ici */
@@ -402,11 +419,21 @@ function Paiement({
             quand={{ deja: relire }}
             surPaye={setPaye}
             surOuvert={setOuvert}
+            surRefermee={refermee}
             fleche
             jalons
           />
         )}
       </div>
+      <FeuilleQuiCoince
+        open={coince === "ouverte" && !suiteMontree}
+        onClose={() => setCoince(null)}
+        onMerci={() => setCoince("merci")}
+        offre={offre}
+        centimes={prix.centimes}
+        relire={relire}
+      />
+      {coince === "merci" && <Toast className="fixed inset-x-4 top-3 z-[95] lg:left-1/2 lg:right-auto lg:w-[420px] lg:-translate-x-1/2">{QUI_COINCE.merci}</Toast>}
       {suiteMontree && (
         <OffreAvantDePartir fin={suiteMontree} chapitres={NB_CHAPITRES} suite="/lecture" onRefus={() => {}} onPassee={() => setPassee(true)} onClosed={fermer} jalons />
       )}

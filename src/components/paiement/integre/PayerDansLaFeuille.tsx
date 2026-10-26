@@ -73,6 +73,8 @@ type Proprietes = {
    * couvrir la carte qu’on est en train de remplir.
    */
   surOuvert?: (ouvert: boolean) => void;
+  /** La carte refermée sans payer (pas pendant un paiement en route) : le paywall y pose sa question (FeuilleQuiCoince). */
+  surRefermee?: () => void;
   /** Livré : où mener (sans lui, apresLaLivraison : « C’est débloqué » pour un rapport, la suite pour des bulles). */
   livre?: (e: EtatAchat) => void;
   /** La flèche du bouton principal, comme celui qu’il remplace. */
@@ -477,7 +479,10 @@ function AvecWhop({ compte, email, ...p }: Proprietes & { compte: string; email:
   };
   /* Refermée sans payer (pas pendant un paiement en route : la feuille reste alors ouverte d’elle-même) */
   const refermerLaCarte = () => {
-    if (!parcours.occupe) jalonSi(p.jalons, "ferme");
+    if (!parcours.occupe) {
+      jalonSi(p.jalons, "ferme");
+      p.surRefermee?.();
+    }
     setCarte(false);
   };
 
@@ -563,7 +568,10 @@ function AvecLeFauxWhop(p: Proprietes) {
     setCarte(true);
   };
   const refermerLaCarte = () => {
-    if (!parcours.occupe) jalonSi(p.jalons, "ferme");
+    if (!parcours.occupe) {
+      jalonSi(p.jalons, "ferme");
+      p.surRefermee?.();
+    }
     setCarte(false);
   };
   return (

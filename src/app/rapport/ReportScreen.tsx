@@ -29,6 +29,7 @@ import { EnTeteRapport } from "./EnTeteRapport";
 import { PartageEtConfidentialite } from "./PartageVerdict";
 import { ecritureInachevee, phaseDuRapport, type PhaseDuRapport } from "./phase";
 import { FeuilleSommaire, ReadingBar, Sommaire } from "./Sommaire";
+import { NoteDuRapport } from "./NoteDuRapport";
 import { EchecEcriture, Suite, Writing } from "./Suite";
 import { useReprise } from "./useReprise";
 import { VocalDuRapport } from "./Vocal";
@@ -269,6 +270,9 @@ function ReportBody({ payload, phase, story, openPaywall }: { payload: ReportPay
       ))}
 
       <Suite phase={phase} fermes={locked} ouvrirPaiement={ouvrirPaiement} />
+
+      {/* Proposition (NoteDuRapport) : le rapport écrit, sa note en un toucher */}
+      {phase.nom === "complet" && <NoteDuRapport autre={other.pronoun ?? "elle"} />}
 
       {/* Le rapport débloqué et prêt : le chat reste à portée, en bas à droite */}
       {debloque && !ecritureInachevee(phase) && <ChatBubble />}
