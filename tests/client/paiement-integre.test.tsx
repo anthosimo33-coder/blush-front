@@ -236,6 +236,18 @@ describe("les Elements de Whop", () => {
     expect(routeur.replace).not.toHaveBeenCalled();
   });
 
+  it("l’offre ① avec Apple Pay : rien sur la carte gardée sous le bouton ; la feuille de la carte le dit toujours", async () => {
+    whop.portefeuille = { applePay: true, googlePay: false };
+    render(<OffreAvantDePartir fin={Date.now() + 300_000} chapitres={7} onRefus={() => {}} onPassee={() => {}} onClosed={() => {}} />);
+    await promesses();
+    await promesses();
+    const offre = () => screen.getByRole("dialog", { name: OFFRE_SUITE.titre });
+    expect(within(offre()).getByRole("button", { name: DANS_LA_FEUILLE.portefeuille.apple_pay })).toBeTruthy();
+    expect(within(offre()).queryByText(tel(DANS_LA_FEUILLE.garder))).toBeNull();
+    fireEvent.click(within(offre()).getByRole("button", { name: DANS_LA_FEUILLE.avecCarte }));
+    expect(within(carte()).getByText(tel(DANS_LA_FEUILLE.garder))).toBeTruthy();
+  });
+
   it("une autre formule choisie : le portefeuille montre son prix", async () => {
     whop.portefeuille = { applePay: true, googlePay: false };
     await ouvrir();

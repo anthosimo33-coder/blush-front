@@ -78,8 +78,8 @@ type Proprietes = {
   /** La flèche du bouton principal, comme celui qu’il remplace. */
   fleche?: boolean;
   /**
-   * Sans la ligne de la carte gardée sous le portefeuille (le paywall, décidé le 16 octobre) : la feuille de la carte la
-   * dit toujours avant son bouton, et les conditions aussi.
+   * Sans la ligne de la carte gardée sous le portefeuille (le paywall, décidé le 16 octobre ; l’offre unique, le 26) : la
+   * feuille de la carte la dit toujours avant son bouton, et les conditions aussi.
    */
   sansCarteGardee?: boolean;
   /** Les jalons du tunnel d’/admin (src/lib/jalons.ts), du bouton touché à l’issue du paiement : seulement le paywall. */
