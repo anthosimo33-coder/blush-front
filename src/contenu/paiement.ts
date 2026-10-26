@@ -397,9 +397,10 @@ export const RETOUR_PAIEMENT = {
 
 /**
  * Le paiement dans la feuille (src/components/paiement/integre : les Elements de Whop, sans quitter BLUSH) : le bouton
- * du portefeuille (Apple Pay, Google Pay), la carte dans sa feuille, ce qu’on dit de la carte gardée, et chaque étape.
- * TODO(produit): textes nouveaux (le paiement dans la feuille, 13 octobre) ; la ligne de la carte gardée, à faire relire
- * par un juriste (le consentement que demande l’enregistrement d’un moyen de paiement).
+ * du portefeuille (Apple Pay, Google Pay), la carte dans sa feuille, et chaque étape.
+ * TODO(produit): textes nouveaux (le paiement dans la feuille, 13 octobre) ; la carte gardée chez Whop ne se dit plus
+ * sous les boutons (retirée le 26 octobre), seulement dans les conditions : à faire relire par un juriste (le consentement
+ * que demande l’enregistrement d’un moyen de paiement).
  */
 export const DANS_LA_FEUILLE = {
   /** Le nom du bouton du portefeuille, pour un lecteur d’écran (son dessin est celui d’Apple, ou de Google). */
@@ -412,8 +413,6 @@ export const DANS_LA_FEUILLE = {
     test: "Carte de test · rien n’est débité",
     refuser: "Simuler un refus",
   },
-  /* Garder le moyen de paiement (setupFutureUsage) demande de le dire avant le geste qui paie */
-  garder: "Whop garde ta carte\u00a0: tes prochains achats se paient en un geste.",
   paye: { titre: "C’est payé.", rapport: "J’ouvre ton rapport…", bulles: "J’ajoute tes bulles…" },
   carteRefusee: "Ta banque a dit non. Rien n’a été débité\u00a0: essaie une autre carte.",
   /** Les Elements de Whop ne se chargent pas (le réseau, un bloqueur) : on paie sur sa page, comme avant. */

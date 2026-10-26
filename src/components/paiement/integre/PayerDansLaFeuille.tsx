@@ -33,8 +33,8 @@ import { APPARENCE, chargerWhop } from "./whop";
  * donne un jeton de confirmation (ctok_…) : le serveur paie l’achat au prix du catalogue (POST /api/paiement), le
  * navigateur finit une étape s’il en reste une (une 3-D Secure : handleNextAction), puis attend la livraison, que seul le
  * webhook (ou la vérification du serveur) fait. Payé : « C’est payé », puis « C’est débloqué » (un rapport) ou la suite
- * (des bulles). Le moyen de paiement est gardé chez Whop (setupFutureUsage, la ligne qui le dit sous le bouton) : les
- * offres de « C’est débloqué » se paient ensuite en un geste.
+ * (des bulles). Le moyen de paiement est gardé chez Whop (setupFutureUsage, que disent les conditions) : les offres de
+ * « C’est débloqué » se paient ensuite en un geste.
  * Le faux Whop (BLUSH_PAIEMENT_FACTICE, en local et dans les tests) a sa carte de test, au même endroit. Sans paiement
  * dans la feuille (pas de Whop, son script qui ne se charge pas, un compte sans email), le bouton d’avant : la page de
  * Whop (usePaiement).
@@ -77,11 +77,6 @@ type Proprietes = {
   livre?: (e: EtatAchat) => void;
   /** La flèche du bouton principal, comme celui qu’il remplace. */
   fleche?: boolean;
-  /**
-   * Sans la ligne de la carte gardée sous le portefeuille (le paywall, décidé le 16 octobre ; l’offre unique, le 26) : la
-   * feuille de la carte la dit toujours avant son bouton, et les conditions aussi.
-   */
-  sansCarteGardee?: boolean;
   /** Les jalons du tunnel d’/admin (src/lib/jalons.ts), du bouton touché à l’issue du paiement : seulement le paywall. */
   jalons?: boolean;
   /** La carte du chat d’où ce paiement part (src/server/vente.ts), notée avec l’achat pour /admin. */
@@ -310,8 +305,7 @@ function CestPaye({ offre }: { offre: OffreId }) {
 
 /**
  * Les boutons, une fois prêts : celui du portefeuille et « Payer par carte » (`portefeuille`), ou un seul, qui ouvre la
- * carte ; dessous, la renonciation, et, sous le portefeuille qui paie d’un geste, la carte gardée (la feuille de la carte
- * le dit avant son propre bouton).
+ * carte ; dessous, la renonciation.
  */
 function Boutons({
   p,
@@ -350,7 +344,6 @@ function Boutons({
         </Button>
       )}
       {p.quoi && <MentionRenonciation quoi={p.quoi} etat={parcours.renonciation} />}
-      {portefeuille && !p.sansCarteGardee && <p className="m-0 text-center text-micro font-extrabold leading-[1.45] text-pale">{DANS_LA_FEUILLE.garder}</p>}
     </div>
   );
 }
@@ -547,7 +540,6 @@ function CarteDeWhop({
           {DANS_LA_FEUILLE.carte.payer(enEuros(centimes))}
         </Button>
         {quoi && <MentionRenonciation quoi={quoi} etat={parcours.renonciation} />}
-        <p className="m-0 text-center text-micro font-extrabold leading-[1.45] text-pale">{DANS_LA_FEUILLE.garder}</p>
       </div>
     </>
   );

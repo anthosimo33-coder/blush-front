@@ -174,7 +174,6 @@ export function OffreAvantDePartir({
           surPaye={setPaye}
           surOccupe={setOccupe}
           fleche
-          sansCarteGardee
           jalons={jalons}
         />
         {!paye && !occupe && (

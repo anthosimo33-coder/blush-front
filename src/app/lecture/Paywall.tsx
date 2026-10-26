@@ -403,7 +403,6 @@ function Paiement({
             surPaye={setPaye}
             surOuvert={setOuvert}
             fleche
-            sansCarteGardee
             jalons
           />
         )}

@@ -43,7 +43,7 @@ export type Section = { id: string; titre: string; blocs: readonly Bloc[] };
 export const CONDITIONS = {
   titre: "Conditions",
   sous: "Les règles entre toi et BLUSH, sans jargon\u00a0: ce que fait BLUSH, ce que tu peux acheter, et ce qui se passe si ça coince.",
-  maj: "Dernière mise à jour\u00a0: 23 octobre 2026.",
+  maj: "Dernière mise à jour\u00a0: 26 octobre 2026.",
 } as const;
 
 /** Utiliser BLUSH : les conditions d’utilisation. */
@@ -139,7 +139,7 @@ const VENTE: readonly Section[] = [
     blocs: [
       "Le paiement passe par Whop, qui vend en son nom (le vendeur en titre)\u00a0: il encaisse, collecte la TVA et t’envoie ton reçu. Ce qu’il vend, c’est BLUSH qui te le livre.",
       "Whop reçoit ton email, le montant et un numéro de commande\u00a0: jamais ta conv, ni un prénom. Ta carte, BLUSH ne la voit jamais. Sur ton relevé, le paiement porte le nom de Whop.",
-      "Quand tu paies dans BLUSH, Whop garde ta carte (la ligne sous le bouton le dit)\u00a0: tes achats suivants se paient en un geste, toujours à ta demande.",
+      "Quand tu paies dans BLUSH, Whop garde ta carte\u00a0: tes achats suivants se paient en un geste, toujours à ta demande.",
     ],
   },
   {

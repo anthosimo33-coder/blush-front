@@ -24,9 +24,10 @@ export const CASE_IMPORT = {
    * d’urgence et d’écoute restent sans bulle. Le 22 octobre : « BLUSH est une intelligence artificielle et peut se
    * tromper » (il disait « Une IA peut se tromper »). Le 23 octobre : la grille de la marge à 80 % (le rapport à 3 bulles,
    * Premium à 19,90 € et 25 bulles, les recharges de 10, 25 et 60 bulles, Premium moins cher après le rapport à la place
-   * du bonus de la première recharge, le repli de la roue à +3 bulles)
+   * du bonus de la première recharge, le repli de la roue à +3 bulles). Le 26 octobre : la carte gardée chez Whop ne se
+   * dit plus sous les boutons, les conditions ne renvoient plus à cette ligne
    */
-  version: "2026-10-23.1",
+  version: "2026-10-26.1",
   avant: "En continuant, tu acceptes les ",
   lien: "conditions",
   apres: " et que BLUSH lise toute ta conv.",
