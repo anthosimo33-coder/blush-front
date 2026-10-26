@@ -6,7 +6,7 @@ import { AVIS_DU_HAUT, TEMOIGNAGES, TESTIMONIALS } from "@/contenu/landing";
 import { CATALOGUE, enEuros, FORMULE_CHOISIE } from "@/contenu/offres";
 import { DANS_LA_FEUILLE, FEUILLE_FORMULE, MESSAGES_LUS, NOTE_DES_AVIS, OFFRE_SUITE, PAYWALL } from "@/contenu/paiement";
 import { hautDuPaywall } from "@/contenu/haut-du-paywall";
-import { QUI_COINCE } from "@/contenu/mesures";
+import { QUI_COINCE, type EtatQuiCoince } from "@/contenu/mesures";
 import { bullesDuLot, DUREE_DU_CADEAU_MS, GAINS, lotSAppliqueA, prixAvecLot } from "@/contenu/roue";
 import { cn } from "@/lib/cn";
 import { useMomentVenu } from "@/lib/hooks";
@@ -34,7 +34,7 @@ import { Icon } from "@/components/ui/icons";
 import { Tag } from "@/components/ui/messages";
 import { Toast } from "@/components/ui/surfaces";
 import { ApercusDuRapport } from "./ApercusDuRapport";
-import { FeuilleQuiCoince } from "./FeuilleQuiCoince";
+import { FeuilleQuiCoince, type SuiteTropCher } from "./FeuilleQuiCoince";
 import { CarteDuHaut, PreuveDuHaut, TitreDuHaut } from "./HautDuPaywall";
 import type { ApercuDuPaywall, Formule, Goal, LotDeLaRoue, OffreId, Story, Testimonial } from "@/types";
 import type { RoueDuCompte } from "@/types/api";
@@ -81,8 +81,11 @@ export function Paywall({
   story: Story;
   apercu: ApercuDuPaywall;
   temoignages?: Testimonial[];
-  /** L’aperçu de l’équipe (`/apercu/paywall?question=coince|bug`) : « Qu’est-ce qui coince ? » ouverte d’avance (proposition). */
-  question?: "coince" | "bug";
+  /**
+   * L’aperçu de l’équipe (`/apercu/paywall?question=…`) : « Qu’est-ce qui coince ? » ouverte d’avance sur une de ses
+   * suites, ou l’offre ① montrée (`offre`), sans compte ni serveur (proposition).
+   */
+  question?: EtatQuiCoince | "offre";
   /** Arrivé par le mail J+6 de S1 (`/lecture?paywall=1&offre=1`) : la one time offer, rouverte, se demande tout de suite. */
   offreDirecte?: boolean;
   /**
@@ -159,6 +162,7 @@ export function Paywall({
             surEnRoute={setEnRoute}
             {...(enUnGeste ? { enUnGeste } : {})}
             {...(question ? { question } : {})}
+            roueOuverte={roueOuverte}
           />
         </div>
         <Sommaire autre={autre.name} il={!elle} objectif={apercu.objectif} className="mt-3 flex lg:hidden" />
@@ -292,6 +296,7 @@ function Paiement({
   surEnRoute,
   enUnGeste,
   question,
+  roueOuverte,
 }: {
   ref: Ref<HTMLElement>;
   /** Le bouton qui paie (et ce qu’il devient) : la barre du bas le guette. */
@@ -302,7 +307,9 @@ function Paiement({
   autre: string;
   surEnRoute: (enRoute: boolean) => void;
   enUnGeste?: EnUnGeste;
-  question?: "coince" | "bug";
+  question?: EtatQuiCoince | "offre";
+  /** La roue des cadeaux ouverte par-dessus : la question attend qu’elle se ferme. */
+  roueOuverte: boolean;
 }) {
   useAuPaiement(true);
   const avoirs = useFeuilleDuPaiement().data;
@@ -313,24 +320,71 @@ function Paiement({
   const [paye, setPaye] = useState(false);
   /* Dans le paiement : la carte ouverte, Apple Pay, un paiement en route (PayerDansLaFeuille, surOuvert) */
   const [ouvert, setOuvert] = useState(false);
-  /* « Qu’est-ce qui coince ? » (proposition, FeuilleQuiCoince) : posée une fois par visite, la carte refermée sans payer */
-  const [coince, setCoince] = useState<"ouverte" | "merci" | null>(question ? "ouverte" : null);
-  const coinceDemandee = useRef(!!question);
+  /*
+   * « Qu’est-ce qui coince ? » (proposition, FeuilleQuiCoince) : posée une fois par visite, la carte refermée sans payer,
+   * ou aux moments où l’offre ① venait d’elle-même (OFFRE_APRES_MS sans payer, le retour sur l’onglet). L’offre ①, elle,
+   * ne vient plus qu’après « C’est trop cher » (ou rouverte par le mail J+6).
+   */
+  const enApercu = question !== undefined;
+  const [coince, setCoince] = useState<"ouverte" | "merci" | null>(enApercu && question !== "offre" ? "ouverte" : null);
+  const coinceDemandee = useRef(enApercu);
   const refermee = () => {
     if (coinceDemandee.current) return;
     coinceDemandee.current = true;
     setCoince("ouverte");
   };
+  /* Ce que les moments de la question regardent, sans les relancer à chaque rendu */
+  const libreDePoser = useRef(true);
+  useEffect(() => {
+    libreDePoser.current = !paye && !ouvert && !roueOuverte;
+  });
+  useEffect(() => {
+    if (enApercu || offreDirecte) return;
+    const poser = () => {
+      if (libreDePoser.current) refermee();
+    };
+    const minuteur = setTimeout(poser, OFFRE_APRES_MS);
+    let partie = false;
+    const vu = () => {
+      if (document.visibilityState === "hidden") partie = true;
+      else if (partie) poser();
+    };
+    document.addEventListener("visibilitychange", vu);
+    return () => {
+      clearTimeout(minuteur);
+      document.removeEventListener("visibilitychange", vu);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- armés une fois, à l’arrivée
+  }, []);
   /* Son merci, deux secondes et demie */
   useEffect(() => {
     if (coince !== "merci") return;
     const minuteur = setTimeout(() => setCoince(null), 2500);
     return () => clearTimeout(minuteur);
   }, [coince]);
-  /* La question ouverte retient l’offre ① et la roue, comme la carte qu’on remplit */
-  const enRoute = paye || ouvert || coince === "ouverte";
-  useEffect(() => surEnRoute(enRoute), [enRoute, surEnRoute]);
-  const { suiteMontree, passee, setPassee, fermer } = useOffreSuite({ sans: !!avoirs?.avance || !!garde || sansOffre, enRoute, directe: offreDirecte });
+  /* La question ouverte retient la roue, comme la carte qu’on remplit ; l’offre ①, elle, se demande depuis la question */
+  const enRoute = paye || ouvert;
+  const enRouteOuQuestion = enRoute || coince === "ouverte";
+  useEffect(() => surEnRoute(enRouteOuQuestion), [enRouteOuQuestion, surEnRoute]);
+  const { suiteMontree, passee, setPassee, fermer, demander, montrer } = useOffreSuite({ sans: !!avoirs?.avance || !!garde || sansOffre, enRoute, directe: offreDirecte });
+  /* L’aperçu de l’équipe (`?question=offre`) : l’offre ① montrée d’emblée, sans serveur */
+  useEffect(() => {
+    if (question === "offre") montrer();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- une fois, à l’arrivée
+  }, []);
+  /* Le bouton qui paie, ramené à l’écran (la feuille fermée) */
+  const auBouton = () => {
+    setCoince(null);
+    setTimeout(() => document.getElementById("payer")?.scrollIntoView({ behavior: "smooth", block: "center" }), 350);
+  };
+  /* « C’est trop cher » : l’offre ① si le serveur la donne (l’aperçu la montre sans lui) ; sinon le rapport seul, Premium choisie */
+  const tropCher = async (): Promise<SuiteTropCher> => {
+    if (enApercu ? (montrer(), true) : await demander()) {
+      setCoince(null);
+      return "offre";
+    }
+    return choisie === "premium" ? "rapport" : "merci";
+  };
   /* Le rapport déjà débloqué ailleurs (un autre onglet, 409 « deja ») : relu, la vraie lecture reprend ici */
   const relire = () => window.location.reload();
 
@@ -409,7 +463,7 @@ function Paiement({
           </RadioGroup>
         </>
       )}
-      <div ref={refDuBouton} className="flex flex-col gap-1">
+      <div ref={refDuBouton} id="payer" className="flex scroll-mt-24 flex-col gap-1">
         {choisie === "avance" ? (
           <DebloquerAvecLAvance suite="/lecture" deja={relire} />
         ) : enUnGeste ? (
@@ -432,13 +486,21 @@ function Paiement({
         )}
       </div>
       <FeuilleQuiCoince
-        open={coince === "ouverte" && !suiteMontree}
-        bugDAbord={question === "bug"}
+        open={coince === "ouverte" && !suiteMontree && !roueOuverte}
         onClose={() => setCoince(null)}
         onMerci={() => setCoince("merci")}
+        onTropCher={tropCher}
+        onRapportSeul={() => {
+          setChoix("rapport");
+          auBouton();
+        }}
+        onRetour={auBouton}
         offre={offre}
         centimes={prix.centimes}
+        rapport={{ centimes: rapport.centimes, bulles: CATALOGUE.rapport.bulles + bullesDuLot(lotSurRapport) }}
+        autre={autre}
         relire={relire}
+        {...(question && question !== "offre" ? { etatDAbord: question } : {})}
       />
       {coince === "merci" && <Toast className="fixed inset-x-4 top-3 z-[95] lg:left-1/2 lg:right-auto lg:w-[420px] lg:-translate-x-1/2">{QUI_COINCE.merci}</Toast>}
       {suiteMontree && (
@@ -762,6 +824,8 @@ function useOffreSuite({ sans, enRoute, directe }: { sans: boolean; enRoute: boo
   useEffect(() => {
     if (sans) return;
     let vivant = true;
+    /* Proposition du 26 octobre : plus de moment à elle, sauf rouverte par le mail J+6 (la question pose les siens) */
+    if (!directe) return;
     proposer.current = () => {
       if (demandee.current) return;
       if (occupe.current) return setRetenue(true);
@@ -801,7 +865,25 @@ function useOffreSuite({ sans, enRoute, directe }: { sans: boolean; enRoute: boo
     const t = setTimeout(() => setPassee(false), 2600);
     return () => clearTimeout(t);
   }, [passee]);
-  return { suiteMontree: libre ? suiteMontree : null, passee, setPassee, fermer: () => setSuiteMontree(null) };
+  /*
+   * « C’est trop cher » (FeuilleQuiCoince) : l’offre demandée au serveur tout de suite. Vrai si elle se montre ; faux si
+   * le compte a mieux (`sans`), l’a déjà eue, ou si le serveur la refuse.
+   */
+  const demander = async (): Promise<boolean> => {
+    if (sans || demandee.current) return false;
+    demandee.current = true;
+    try {
+      const o = await proposerOffreUnique("suite");
+      if (o.offre !== "suite" || o.reste === null) return false;
+      setSuiteMontree(Date.now() + o.reste);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+  /* L’aperçu de l’équipe : l’offre montrée cinq minutes, sans serveur */
+  const montrer = () => setSuiteMontree(Date.now() + 5 * 60_000);
+  return { suiteMontree: libre ? suiteMontree : null, passee, setPassee, fermer: () => setSuiteMontree(null), demander, montrer };
 }
 
 /**
