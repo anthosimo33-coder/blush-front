@@ -91,6 +91,7 @@ test("connecté avec l’email de l’équipe, le pilotage s’ouvre : ses carte
       "le revenu par acheteur",
       "la marge après IA",
       "le tunnel",
+      "qui importe",
       "les sources",
       "ce qui se vend",
       "les coups de pouce",

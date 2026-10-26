@@ -46,11 +46,31 @@ describe("le pilotage, rendu", () => {
       expect(t).toMatch(/iMessage \d+ → \d+ — Instagram/);
       expect(t).toContain("«\u00a0—\u00a0»\u00a0: moins de 30\u00a0personnes, trop peu pour un taux.");
     }
+    /* Qui importe : celui qui importe, puis la paire, chaque ligne avec sa part, et l’autre, dont ceux devinés */
+    for (const titre of ["Qui importe", "Des filles", "Des garçons", "Pas encore dit", "Et sur qui", "Une fille sur un garçon", "Deux garçons"]) expect(t, titre).toContain(titre);
+    expect(t).toMatch(/L’autre\u00a0: [\d\u202f]+\u00a0garçons, [\d\u202f]+\u00a0filles, dont [\d\u202f]+\u00a0devinés/);
+    if (jours === 1) expect(t).toContain("«\u00a0—\u00a0»\u00a0: moins de 30\u00a0convs, trop peu pour un taux.");
     for (const titre of ["D’où ils viennent", "Ce qui se vend", "Les coups de pouce", "Ce que coûte l’IA", "Santé", "Outils", "Bêta", "Les derniers gestes"])
       expect(t, titre).toContain(titre);
     expect(t).toContain("Que des nombres\u00a0: aucune conv, aucun message, aucun email ne sort d’ici.");
     /* Un « ? » par carte et par chiffre clé, chacun nommé */
-    for (const cle of ["ca", "live", "visiteurs", "conversion", "panier", "marge", "tunnel", "import", "paywall", "sources", "mix", "coups", "couts", "sante"] as const)
+    for (const cle of [
+      "ca",
+      "live",
+      "visiteurs",
+      "conversion",
+      "panier",
+      "marge",
+      "tunnel",
+      "import",
+      "paywall",
+      "quiImporte",
+      "sources",
+      "mix",
+      "coups",
+      "couts",
+      "sante",
+    ] as const)
       expect(html, cle).toContain(`aria-label="Comment lire ${AIDES_DU_PILOTAGE[cle].de}"`);
     /* La période en liens, celle-ci marquée */
     const marques = html.match(/<a [^>]*aria-current="page"[^>]*>/g) ?? [];
@@ -88,6 +108,12 @@ describe("le pilotage, rendu", () => {
     const s = statsDExemple(1, { calme: true });
     const zero = { valeur: 0, avant: 0 };
     const rien = { n: 0, centimes: 0 };
+    const personne = {
+      convs: 0,
+      moi: { elle: 0, il: 0, inconnu: 0 },
+      autre: { elle: 0, il: 0, devines: 0 },
+      paires: { fille_garcon: 0, garcon_fille: 0, deux_filles: 0, deux_garcons: 0 },
+    };
     s.pilotage = {
       ...s.pilotage,
       cases: s.pilotage.cases.map((c) => ({ ...c, visiteurs: 0, acheteurs: 0, centimes: 0, dollars: 0 })),
@@ -101,6 +127,7 @@ describe("le pilotage, rendu", () => {
       dollars: zero,
       tunnel: { visiteurs: 0, imports: 0, paywall: 0, acheteurs: 0, racheteurs: 0 },
       sources: [],
+      quiImporte: { importees: personne, payees: personne },
       mix: s.pilotage.mix.map((m) => ({ ...m, n: 0, centimes: 0 })),
       iaDuJour: { dollars: 0, budget: 30 },
       suiviDepuis: null,
@@ -111,6 +138,7 @@ describe("le pilotage, rendu", () => {
     const t = texte(renderToStaticMarkup(createElement(Pilotage, { s, direct: vide, base: "/admin", sonder: false })));
     expect(t).not.toMatch(SALE);
     expect(t).toContain("Ni visite ni vente sur la période.");
+    expect(t).toContain("Aucune conv importée sur la période.");
     expect(t).toContain("Aucun appel au modèle sur la période.");
     expect(t).toContain("Pas encore de fuite à comparer");
     expect(t).toContain("Personne sur le site en ce moment.");

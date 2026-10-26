@@ -105,6 +105,17 @@ export const AIDES_DU_PILOTAGE = {
     siCaBouge:
       "Peu de monde descend jusqu’aux avis\u00a0: remonte une preuve. Beaucoup voient le formulaire sans envoyer\u00a0: le prix ou la confiance coince au dernier moment. Beaucoup de refus\u00a0: regarde Whop.",
   },
+  quiImporte: {
+    titre: "Qui importe",
+    de: "qui importe",
+    quoi: "Les filles et les garçons qui importent une conv, de qui ils parlent (un garçon, une fille), et qui achète le mieux.",
+    calcul:
+      "Chaque conv importée sur la période compte une fois, sans les prises du tournage\u00a0: une personne qui importe deux convs compte deux fois. Son genre est le pronom choisi sur «\u00a0Qui es-tu\u00a0?\u00a0»\u00a0; «\u00a0Pas encore dit\u00a0»\u00a0: la conv laissée avant cet écran. L’autre est celui que prend la lecture\u00a0: le pronom choisi sur sa fiche, sinon celui que ses accords laissent lire dans la conv, sinon l’opposé de celui qui importe («\u00a0devinés\u00a0»). «\u00a0Payées\u00a0»\u00a0: celles de ces convs dont le rapport a été payé depuis (le rapport, Premium, une offre unique, un 2e rapport), même remboursé\u00a0; une conv offerte par l’équipe ou la bêta n’y est pas. Le taux\u00a0: payées ÷ importées, ligne par ligne (aucun pour «\u00a0Pas encore dit\u00a0»\u00a0: le paywall vient après «\u00a0Qui es-tu\u00a0?\u00a0»). Le genre reste chiffré avec la conv\u00a0: il se déchiffre le temps du calcul, et seuls des totaux en sortent.",
+    repere:
+      "Un taux se lit à partir de 30\u00a0convs\u00a0: en dessous, «\u00a0—\u00a0». Une conv importée à la fin de la période a encore le temps d’être payée\u00a0: le taux de 24\u00a0h est plus bas que celui de 30\u00a0jours. Beaucoup de «\u00a0devinés\u00a0»\u00a0: deux filles ou deux garçons qui ne l’ont pas corrigé sur la fiche comptent comme une fille et un garçon.",
+    siCaBouge:
+      "Le public qui achète le mieux est celui à viser\u00a0: ses vidéos, ses créatrices, ses accroches. Un genre qui importe beaucoup et achète peu\u00a0: le paywall lui parle mal, relis-le avec ses yeux.",
+  },
   hauts: {
     titre: "Le haut du paywall",
     de: "le haut du paywall",

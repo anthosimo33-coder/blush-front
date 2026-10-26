@@ -5,13 +5,13 @@ import { AIDES_DU_PILOTAGE } from "@/contenu/aide-pilotage";
 import { NOM_DU_GENRE } from "@/contenu/haut-du-paywall";
 import { NOMS_DES_MAILS } from "@/contenu/mails";
 import { CATALOGUE } from "@/contenu/offres";
-import { CIBLE_DE_MARGE, NOMS_DES_ETAPES, NOMS_DES_GROUPES, NOMS_DES_SOURCES, SOURCE_INCONNUE, margeApresIA } from "@/contenu/pilotage";
+import { CIBLE_DE_MARGE, NOMS_DES_ETAPES, NOMS_DES_GENRES, NOMS_DES_GROUPES, NOMS_DES_PAIRES, NOMS_DES_SOURCES, PAIRES, SOURCE_INCONNUE, margeApresIA } from "@/contenu/pilotage";
 import type { SourceVisite } from "@/types";
 import { delivrabilite } from "../delivrabilite";
 import { direct } from "../direct";
 import { actionsRecentes } from "../equipe";
 import { santeDesNavigateurs } from "../navigateur";
-import { statsAdmin, type Chiffre, type Montant, type Periode, type StatsAdmin, type Ventes } from "../stats";
+import { statsAdmin, type Chiffre, type Montant, type Periode, type Pilotage, type StatsAdmin, type Ventes } from "../stats";
 import { ErreurDOutil, resultatTexte, type OutilMcp, type ResultatDOutil, type SchemaDArgument, type ServeurMcp } from "./protocole";
 
 /*
@@ -38,7 +38,7 @@ export const OUTILS: readonly OutilMcp[] = [
     name: "pilotage",
     title: "Pilotage",
     description:
-      "L’écran principal de /admin sur la période : « À regarder » (ce qui coince, les bonnes nouvelles), le chiffre d’affaires net (payé − remboursé − contesté), les visiteurs, les acheteurs, le taux d’achat, le revenu par acheteur, la dépense de l’IA et la marge après l’IA (cible comprise), le tunnel visiteurs → imports → paywall → acheteurs → racheteurs et sa plus grosse fuite, les sources, ce qui se vend, et la santé. Chaque chiffre avec celui de la période d’avant. À appeler en premier.",
+      "L’écran principal de /admin sur la période : « À regarder » (ce qui coince, les bonnes nouvelles), le chiffre d’affaires net (payé − remboursé − contesté), les visiteurs, les acheteurs, le taux d’achat, le revenu par acheteur, la dépense de l’IA et la marge après l’IA (cible comprise), le tunnel visiteurs → imports → paywall → acheteurs → racheteurs et sa plus grosse fuite, qui importe (des filles ou des garçons, sur un garçon ou une fille, et le taux d’achat de chacun), les sources, ce qui se vend, et la santé. Chaque chiffre avec celui de la période d’avant. À appeler en premier.",
     inputSchema: AVEC_JOURS,
   },
   {
@@ -172,9 +172,28 @@ function pilotage(s: StatsAdmin) {
     plusGrosseFuite: fuite
       ? { de: ETAPES_DU_TUNNEL[fuite.etape - 1]![1], vers: ETAPES_DU_TUNNEL[fuite.etape]![1], passentPct: arrondi(fuite.taux * 100), depuis: fuite.depuis, arrivent: fuite.vers }
       : null,
+    quiImporte: quiImporte(p.quiImporte),
     sources: p.sources.map((x) => ({ source: nomDeLaSource(x.source), visiteurs: x.visiteurs, acheteurs: x.acheteurs, payeEuros: euros(x.centimes) })),
     ceQuiSeVend: p.mix.map((m) => ({ groupe: NOMS_DES_GROUPES[m.groupe], achats: m.n, payeEuros: euros(m.centimes) })),
     sante: p.sante,
+  };
+}
+
+/**
+ * Qui importe : les convs importées sur la période et payées depuis, par genre de celui qui importe, puis par paire, avec
+ * leur taux d’achat (null sous les 30 convs, comme dans /admin) ; et le genre de l’autre, dont ceux devinés (l’opposé).
+ */
+function quiImporte({ importees: i, payees: a }: Pilotage["quiImporte"]) {
+  const ligne = (nom: string, importees: number, payees: number) => {
+    const taux = tauxLisible(payees, importees);
+    return { nom, importees, payees, tauxDAchatPct: taux === null ? null : arrondi(taux * 100) };
+  };
+  return {
+    convsImportees: i.convs,
+    convsPayees: a.convs,
+    celuiQuiImporte: (["elle", "il", "inconnu"] as const).map((g) => ligne(NOMS_DES_GENRES[g], i.moi[g], a.moi[g])),
+    lAutre: { garcons: i.autre.il, filles: i.autre.elle, devines: i.autre.devines },
+    paires: PAIRES.map((x) => ligne(NOMS_DES_PAIRES[x], i.paires[x], a.paires[x])),
   };
 }
 

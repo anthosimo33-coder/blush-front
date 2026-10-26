@@ -167,8 +167,17 @@ export function pronomsLus(messages: readonly { role: Role; texte: string }[]): 
  * tien. La conv n’est pas crue sur l’autre quand elle se trompe sur toi (elle te lit « il », tu as dit « elle ») : ses
  * accords viennent alors d’ailleurs (des messages cités, un téléphone prêté).
  */
-export function pronomDeLAutre(meta: Pick<Meta, "pronom" | "pronomAutre">, { moi, autre }: { moi: Participant; autre: Participant }): Pronom {
-  if (meta.pronomAutre) return meta.pronomAutre;
+export function pronomDeLAutre(meta: Pick<Meta, "pronom" | "pronomAutre">, personnes: { moi: Participant; autre: Participant }): Pronom {
+  return pronomDeLAutreLu(meta, personnes).pronom;
+}
+
+/** Le pronom de l’autre (pronomDeLAutre), et d’où il vient : sa fiche, la conv, ou l’opposé du tien (`devine`). */
+export function pronomDeLAutreLu(
+  meta: Pick<Meta, "pronom" | "pronomAutre">,
+  { moi, autre }: { moi: Participant; autre: Participant },
+): { pronom: Pronom; source: "fiche" | "conv" | "devine" } {
+  if (meta.pronomAutre) return { pronom: meta.pronomAutre, source: "fiche" };
   const croire = !moi.pronomLu || !meta.pronom || moi.pronomLu === meta.pronom;
-  return (croire && autre.pronomLu) || pronomOppose(meta.pronom);
+  if (croire && autre.pronomLu) return { pronom: autre.pronomLu, source: "conv" };
+  return { pronom: pronomOppose(meta.pronom), source: "devine" };
 }

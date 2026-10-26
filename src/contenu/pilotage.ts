@@ -84,6 +84,18 @@ export const NOMS_DES_SOURCES: Record<SourceVisite, string> = {
 };
 export const SOURCE_INCONNUE = "Avant le suivi";
 
+/** Celui qui importe et la personne dont il parle, d’après leurs pronoms (« Qui importe », src/server/stats.ts). */
+export const PAIRES = ["fille_garcon", "garcon_fille", "deux_filles", "deux_garcons"] as const;
+export type Paire = (typeof PAIRES)[number];
+export const NOMS_DES_PAIRES: Record<Paire, string> = {
+  fille_garcon: "Une fille sur un garçon",
+  garcon_fille: "Un garçon sur une fille",
+  deux_filles: "Deux filles",
+  deux_garcons: "Deux garçons",
+};
+/** Celui qui importe, d’après son pronom de « Qui es-tu ? » ; `inconnu` : pas encore rempli. */
+export const NOMS_DES_GENRES: Record<"elle" | "il" | "inconnu", string> = { elle: "Des filles", il: "Des garçons", inconnu: "Pas encore dit" };
+
 /** Ce que fait un visiteur sur cet écran, en ce moment (/admin en direct). */
 export const NOMS_DES_ETAPES: Record<EtapeVisite, string> = {
   accueil: "Sur l’accueil",
