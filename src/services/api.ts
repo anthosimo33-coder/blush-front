@@ -390,7 +390,7 @@ export async function uploadScreenshots(
  * Un lot n’est jamais payé deux fois (src/server/lots.ts) : un lot déjà lu dans cet onglet ne repart pas
  * (preparer-video.ts, lotDejaLu), le premier lot à lire part d’abord (`ordre` : les autres attendent, sur le serveur,
  * que sa réponse commence, pour ne pas écrire chacun le texte système en cache), et un envoi abandonné (un lot en échec
- * pour de bon) le dit au serveur, qui arrête les lots encore en cours.
+ * pour de bon, ou la page fermée pendant la lecture) le dit au serveur, qui arrête les lots encore en cours.
  */
 export async function uploadRecording(
   file: File,
@@ -435,7 +435,10 @@ export async function uploadRecording(
   let faits = lots.length - aLire.length;
   onAvance?.({ etape: "lecture", faits, total: lots.length });
   let suivant = 0;
-  /* Un lot qui échoue encore après un nouvel essai : les autres s’arrêtent (pas d’appels payés pour rien), ici et chez le serveur */
+  /*
+   * Un lot qui échoue encore après un nouvel essai (ou la page fermée, plus bas) : les autres s’arrêtent (pas d’appels
+   * payés pour rien), ici et chez le serveur
+   */
   const arret = new AbortController();
   const abandonner = () => {
     if (arret.signal.aborted) return;
@@ -477,7 +480,21 @@ export async function uploadRecording(
       onAvance?.({ etape: "lecture", faits: ++faits, total: lots.length });
     }
   };
-  await Promise.all(Array.from({ length: Math.min(LECTEURS, aLire.length) }, lecteur));
+  /*
+   * La page fermée pour de bon pendant la lecture (l’onglet fermé, une autre adresse) : ses lots en cours ne vont plus au
+   * bout chez le prestataire. Pas une page mise de côté par le navigateur (persisted : elle peut revenir, et ses lots
+   * reprendre), ni Safari passé en arrière-plan (pagehide ne vient pas) : leurs lots continuent, et un nouvel essai les
+   * retrouve sur le serveur
+   */
+  const enPartant = (e: PageTransitionEvent) => {
+    if (!e.persisted) abandonner();
+  };
+  window.addEventListener("pagehide", enPartant);
+  try {
+    await Promise.all(Array.from({ length: Math.min(LECTEURS, aLire.length) }, lecteur));
+  } finally {
+    window.removeEventListener("pagehide", enPartant);
+  }
   const corps = { app, lots: lus, cle, consentement, ...(ajout ? { mode: "ajout" as const } : {}) };
   return avecReprise(
     () => appel("POST /api/captures/video", { corps }),

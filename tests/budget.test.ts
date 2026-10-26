@@ -21,7 +21,7 @@ vi.mock("next/headers", () => ({
 
 import type { Utilisateur } from "@/server/auth";
 import { ouvrirSession } from "@/server/auth";
-import { BUDGET_IA, cleDeDepense, controlerBudget, noterDepense, oublierLeBudget, payeurDuCompte, type Payeur } from "@/server/budget";
+import { BUDGET_IA, cleDeDepense, controlerBudget, noterDepense, oublierLeBudget, payeurDuCompte, reserverSansCompte, type Payeur, type Reservation } from "@/server/budget";
 import { lireCaptures } from "@/server/captures";
 import { empreinte } from "@/server/chiffrement";
 import { db, schema } from "@/server/db";
@@ -30,6 +30,7 @@ import { ErreurTache } from "@/server/erreurs";
 import { appeler } from "@/server/ia/claude";
 import { fournisseurFactice } from "@/server/ia/factice";
 import { noterCout } from "@/server/ia/usage";
+import { compteDe } from "@/server/limites";
 import { cloreLesAbandons, executerChaine } from "@/server/pipeline";
 import { etatDesTaches, planifier } from "@/server/taches";
 import { retenir } from "@/server/memoire-groupee";
@@ -185,6 +186,28 @@ describe("avant l’appel", () => {
     const appel = avecFactice(modele, () => appeler({ tache: "10-chat", blocs: [{ texte: "salut" }] }, z.object({ ok: z.boolean() }), { storyId: a.id }));
     await expect(appel).rejects.toMatchObject({ code: "budget" });
     expect(modele).not.toHaveBeenCalled();
+  });
+
+  it("sans compte, une rafale de réservations lancées ensemble s’arrête à la part sans compte : seules celles qui tiennent passent, les autres sont rendues aussitôt", async () => {
+    /* 3 $ de place, douze appels qui réservent 1 $ chacun au même instant (douze lots d’une rafale, sur autant d’instances) */
+    await depense(null, BUDGET_IA.anonyme - 3);
+    const part = () => compteDe(cleDeDepense(null, aujourdhuiParis().iso), { fenetreS: 2 * 86400 });
+    const avant = await part();
+    const issues = await Promise.all(
+      Array.from({ length: 12 }, () =>
+        reserverSansCompte(1e6).then(
+          (r) => r,
+          (e: unknown) => (e instanceof ErreurTache ? e.code : "autre"),
+        ),
+      ),
+    );
+    const passees = issues.filter((x): x is Reservation => typeof x !== "string");
+    expect(passees).toHaveLength(3);
+    expect(issues.filter((x) => x === "budget")).toHaveLength(9);
+    /* Les refusées n’ont rien laissé ; les passées tiennent leur place jusqu’à ce qu’elles la rendent */
+    expect(await part()).toBe(avant + 3e6);
+    await Promise.all(passees.map((r) => r.rendre()));
+    expect(await part()).toBe(avant);
   });
 });
 

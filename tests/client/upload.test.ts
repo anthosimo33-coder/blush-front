@@ -204,6 +204,31 @@ describe("uploadRecording : un lot n’est jamais payé deux fois", () => {
     expect(abandons).toHaveLength(1);
   });
 
+  it("la page fermée pendant la lecture : l’envoi abandonné le dit au serveur, ses lots en cours s’arrêtent ; pas une page mise de côté, ni une page fermée après", async () => {
+    /** Un pagehide, comme le navigateur l’envoie : `persisted`, la page gardée pour revenir. */
+    const quitter = (persisted: boolean) => window.dispatchEvent(Object.assign(new Event("pagehide"), { persisted }));
+    const { abandons, champs, signaux } = serveur({ lot: () => "pend" });
+    const envoi = uploadRecording(VIDEO, "imessage", CASE_IMPORT.version).catch((e: unknown) => e);
+    await vi.advanceTimersByTimeAsync(50);
+    expect(signaux.size).toBe(2);
+    /* Mise de côté (le cache des pages) : elle peut revenir, ses lots continuent */
+    quitter(true);
+    await vi.advanceTimersByTimeAsync(50);
+    expect(abandons).toEqual([]);
+    expect([...signaux.values()].some((s) => s.aborted)).toBe(false);
+    quitter(false);
+    await vi.advanceTimersByTimeAsync(50);
+    expect(abandons).toEqual([{ corps: { cle: champs[0]!.cle }, keepalive: true }]);
+    expect([...signaux.values()].every((s) => s.aborted)).toBe(true);
+    expect(await envoi).toBeInstanceOf(Error);
+    /* Une lecture finie n’écoute plus la page : la quitter ensuite n’abandonne rien */
+    const fini = serveur({ lot: (n) => json({ lot: `lecture ${n}` }) });
+    sel++;
+    await uploadRecording(VIDEO, "imessage", CASE_IMPORT.version);
+    quitter(false);
+    expect(fini.abandons).toEqual([]);
+  });
+
   it("une autre appli, ou un autre jour : le lot déjà lu ne sert pas (la lecture dépend des deux)", async () => {
     const { appels } = serveur({ lot: (n) => json({ lot: `lecture ${n}` }) });
     await uploadRecording(VIDEO, "imessage", CASE_IMPORT.version);

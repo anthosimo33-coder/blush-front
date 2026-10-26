@@ -18,9 +18,11 @@ import { compteDe, compter } from "./limites";
  *   quelques secondes au plus (ATTENTE_DU_PREMIER_MS). Le texte système du prompt 01 est alors en cache : il ne s’écrit
  *   qu’une fois par enregistrement, au lieu d’une fois par lot du premier tour. Le navigateur envoie tout en même temps,
  *   et marque le premier (`ordre`) ; l’attente se fait ici, par l’instance (en mémoire) ou par la base (rate_limits).
- * - Un envoi abandonné par le navigateur (un autre lot a échoué pour de bon : POST /api/captures/lot/abandon) arrête ses
- *   lectures : celles de l’instance tout de suite (leur appel au modèle s’arrête chez le prestataire), celles des autres
- *   instances à leur prochain coup d’œil (VERIFICATION_MS, pendant leur flux), et aucun de ses lots ne part plus.
+ * - Un envoi abandonné par le navigateur (un autre lot a échoué pour de bon, ou la page est fermée pendant la lecture :
+ *   POST /api/captures/lot/abandon) arrête ses lectures : celles de l’instance tout de suite (leur appel au modèle
+ *   s’arrête chez le prestataire), celles des autres instances à leur prochain coup d’œil (VERIFICATION_MS, pendant leur
+ *   flux), et aucun de ses lots ne part plus. Une requête coupée seule (le réseau, Safari en arrière-plan) n’arrête pas
+ *   sa lecture : le nouvel essai du navigateur la retrouve ici, au lieu de la payer deux fois.
  * Un envoi se désigne par l’empreinte de sa clé (envoiDe, src/server/imports.ts), la même que la mesure des imports.
  */
 

@@ -7,9 +7,9 @@ import { garde, sousLaLimiteDeLIp } from "@/server/requete";
 import { ROUTES } from "@/types/api";
 
 /**
- * Le navigateur abandonne un enregistrement d’écran en cours de lecture (un de ses lots a échoué pour de bon) : les lots
- * de cet envoi (`cle`, celle de ses lots) ne vont plus au bout chez le prestataire, et aucun ne part plus
- * (src/server/lots.ts). Les lots déjà lus restent gardés. Une clé qui n’en a pas la forme n’arrête rien. Toujours
+ * Le navigateur abandonne un enregistrement d’écran en cours de lecture (un de ses lots a échoué pour de bon, ou la page
+ * est fermée pendant la lecture) : les lots de cet envoi (`cle`, celle de ses lots) ne vont plus au bout chez le
+ * prestataire, et aucun ne part plus (src/server/lots.ts). Les lots déjà lus restent gardés. Une clé qui n’en a pas la forme n’arrête rien. Toujours
  * `{ ok: true }` : le navigateur l’envoie en partant, sans lire la réponse.
  */
 export const POST = route("POST /api/captures/lot/abandon", async (req: Request) => {
