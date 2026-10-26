@@ -839,7 +839,7 @@ function NotesDuRapport({ p, jours }: { p: Chiffres; jours: Periode }) {
   return (
     <Bloc
       id="note"
-      titre="Le rapport t’a parlé\u00a0?"
+      titre={"Le rapport t’a parlé\u00a0?"}
       sous={`La note en bas des rapports écrits, une par conv · ${PERIODES[jours].sur}`}
       aide={{ cle: "note", valeur: taux === null ? "—" : pourcent(taux * 100, 0), contexte: "de «\u00a0Oui, grave\u00a0»" }}
     >
