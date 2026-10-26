@@ -60,7 +60,7 @@ vi.mock("@/server/email", async (original) => {
 
 import { CASE_IMPORT } from "@/contenu/consentements";
 import { POST as postAnalyse } from "@/app/api/analyse/route";
-import { POST as postCode } from "@/app/api/auth/code/route";
+import { GET as getCode, POST as postCode } from "@/app/api/auth/code/route";
 import { POST as postDeconnexion } from "@/app/api/auth/deconnexion/route";
 import { POST as postVerifier } from "@/app/api/auth/verifier/route";
 import { DELETE as deleteCompte, GET as getCompte } from "@/app/api/compte/route";
@@ -75,7 +75,7 @@ import { GET as getReveil } from "@/app/api/reveil/route";
 import { editionsBornees, type DonneesMemoire } from "@/server/stockage/types";
 import { inscrire } from "@/server/attente";
 import { empreinteDeLaListe } from "@/server/invitations";
-import { envoyerCode, ouvrirSession, preparerCode } from "@/server/auth";
+import { envoyerCode, noterLeRetourDuCode, ouvrirSession, preparerCode } from "@/server/auth";
 import { lecturePermise } from "@/server/captures";
 import { chiffrer, chiffrerCompresse, dechiffrer, empreinte } from "@/server/chiffrement";
 import { effacerSession, poserChoisie, poserSession } from "@/server/cookies";
@@ -489,6 +489,35 @@ describe("la connexion : des codes liés au navigateur et bornés", () => {
     etat.cookies = navigateurA;
     expect(await verifier(e, codeA)).toEqual({ statut: 200, corps: { ok: true, email: e } });
     expect(etat.cookies.get(SESSION)).toBeTruthy();
+  });
+
+  it("le mail du code revenu (une adresse qui n’existe pas) : GET /api/auth/code le dit au seul navigateur qui l’a demandé, pour son dernier code encore bon", async () => {
+    const revenu = async () => (await (await getCode()).json()) as unknown;
+    const faute = email("faute");
+    /* Sans cookie de code : rien à dire */
+    expect(await revenu()).toEqual({ revenu: false });
+    await demander(faute);
+    expect(await revenu()).toEqual({ revenu: false });
+    /* Le webhook de Resend : le mail est revenu (src/server/delivrabilite.ts) */
+    await noterLeRetourDuCode(faute.toUpperCase());
+    expect(await revenu()).toEqual({ revenu: true });
+    /* Un autre navigateur n’en sait rien */
+    const navigateurA = autreNavigateur();
+    expect(await revenu()).toEqual({ revenu: false });
+    /* L’adresse corrigée, dans le même navigateur : son dernier code n’est pas revenu */
+    etat.cookies = navigateurA;
+    await demander(email("corrigee"));
+    expect(await revenu()).toEqual({ revenu: false });
+    /* Un code expiré ne se lit plus, revenu ou non */
+    autreNavigateur();
+    const vieux = email("vieux");
+    await demander(vieux);
+    await noterLeRetourDuCode(vieux);
+    await db()
+      .update(schema.loginCodes)
+      .set({ expiresAt: new Date(Date.now() - 1000) })
+      .where(eq(schema.loginCodes.email, vieux));
+    expect(await revenu()).toEqual({ revenu: false });
   });
 
   it("S-09 · pas plus d’un mail par minute pour un même navigateur, tant que son code marche", async () => {

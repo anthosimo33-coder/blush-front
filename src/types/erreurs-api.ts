@@ -62,6 +62,8 @@ export const ERREURS_API = {
   /* Ce qu’elle envoie */
   /** Un email qui n’en est pas un (le code de connexion, la liste d’attente). */
   email: 422,
+  /** Un email dont le domaine ne reçoit aucun mail (src/server/domaine-email.ts) : le code n’est pas parti. */
+  domaine: 422,
   /** Un message au chat vide, ou trop long. */
   texte: 422,
   /** Sa fiche corrigée, mal formée. */

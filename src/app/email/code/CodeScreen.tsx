@@ -10,12 +10,16 @@ import { play } from "@/lib/sound";
 import { tracer } from "@/lib/tracer";
 import { marquerJalon, useJalon } from "@/lib/jalons";
 import { messageErreur } from "@/lib/messages-erreur";
+import { nomDeMessagerie } from "@/lib/domaines-email";
+import { useSaisieEmail } from "@/lib/email";
+import { useCodeRevenu } from "@/lib/useCodeRevenu";
 import { sendLoginCode, startAnalysis, verifyLoginCode } from "@/services/api";
 import { cheminDe } from "@/lib/navigation";
 import { CODE_RENVOI_S } from "@/lib/limites";
 import { connexionPuis, suiteSure } from "@/lib/suite";
 import { Button } from "@/components/ui/Button";
 import { Captcha } from "@/components/ui/Captcha";
+import { FormulaireEmail } from "@/components/formulaires/FormulaireEmail";
 import { NotePrivee } from "@/components/ui/NotePrivee";
 import { ParcoursScreen } from "@/components/shell/ParcoursScreen";
 import { Lead, ScreenTitle } from "@/components/shell/Screen";
@@ -26,16 +30,24 @@ import { retenirLecture } from "@/state/lecture";
 
 const LENGTH = 6;
 
+/**
+ * Le mail du code est revenu (useCodeRevenu) : la messagerie de l’adresse la dit inexistante. TODO(produit): texte
+ * nouveau, à valider (maquette du 26 octobre).
+ */
+const texteDuRetour = (email: string) => `${nomDeMessagerie(email) ?? "Ta messagerie"} dit que cette adresse n’existe pas. Une lettre de travers\u00a0?`;
+
 /*
  * Écran 07b — Le code reçu par email. Un seul champ (le collage et le remplissage automatique
  * du téléphone marchent), affiché en 6 cases. Le code complet valide tout seul.
  * `connexion` : on se reconnecte (un autre appareil) ; le bon code ouvre ses convs, sans relancer de lecture.
  * `fermee` : la bêta est fermée. Tout le monde arrive ici, invité ou pas (personne ne peut savoir si un email est invité) :
  * l’invité a reçu son code, les autres le mail de la liste d’attente. L’écran le dit sans savoir lequel.
+ * Le mail revenu (une adresse qui n’existe pas, useCodeRevenu) : les cases s’effacent, l’écran le dit et propose de
+ * corriger l’adresse sur place ; le code part à la nouvelle, qui devient l’email du parcours.
  */
 export function CodeScreen({ connexion = false, suite = "/app", fermee = false }: { connexion?: boolean; suite?: Route; fermee?: boolean }) {
   const router = useRouter();
-  const [j] = useJourney();
+  const [j, setJ] = useJourney();
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [wrong, setWrong] = useState(false);
@@ -44,11 +56,42 @@ export function CodeScreen({ connexion = false, suite = "/app", fermee = false }
   /* Autre chose qu’un mauvais code : trop d’essais, pas de réseau */
   const [souci, setSouci] = useState<string | null>(null);
   const input = useRef<HTMLInputElement>(null);
+  /* Chaque envoi (le premier, avant cet écran ; « Renvoyer » ; l’adresse corrigée) : l’écoute du mail revenu repart */
+  const [envoi, setEnvoi] = useState(0);
+  const revenu = useCodeRevenu(envoi);
   /* Le tunnel d’/admin (src/lib/jalons.ts) : le code demandé (cet écran, après l’email), validé, puis la lecture lancée ; pas à la connexion */
   useJalon(connexion ? null : "email");
   const email = j.email.trim();
   /* Revenir changer d’email garde la page où l’on allait */
   const retour = !connexion ? "/email" : suite === "/app" ? "/connexion" : connexionPuis(suite);
+
+  /* L’adresse corrigée, une fois le mail revenu : la saisie du parcours (sa forme, la suggestion d’un domaine), et son envoi */
+  const [correction, setCorrection] = useState<string | null>(null);
+  const [envoiCorrige, setEnvoiCorrige] = useState(false);
+  const [problemeCorrige, setProblemeCorrige] = useState<string | null>(null);
+  const saisie = useSaisieEmail(correction ?? email, setCorrection, {
+    probleme: problemeCorrige,
+    oublierProbleme: () => setProblemeCorrige(null),
+    occupe: envoiCorrige,
+    envoyer: async (nouvel) => {
+      setEnvoiCorrige(true);
+      try {
+        await sendLoginCode(nouvel);
+        setJ({ email: nouvel });
+        setCorrection(null);
+        setCode("");
+        setWrong(false);
+        setSouci(null);
+        setWait(CODE_RENVOI_S);
+        setResent(true);
+        setEnvoi((n) => n + 1);
+      } catch (e) {
+        setProblemeCorrige(messageErreur("code", e));
+      } finally {
+        setEnvoiCorrige(false);
+      }
+    },
+  });
 
   /* Le bouton « Renvoyer le code » se libère au bout d’une minute : avant, le serveur n’en écrirait pas d’autre */
   useEffect(() => {
@@ -136,6 +179,7 @@ export function CodeScreen({ connexion = false, suite = "/app", fermee = false }
     try {
       await sendLoginCode(email);
       setResent(true);
+      setEnvoi((n) => n + 1);
     } catch (e) {
       setSouci(messageErreur("code", e));
     }
@@ -159,25 +203,32 @@ export function CodeScreen({ connexion = false, suite = "/app", fermee = false }
         <>
           {/* Le CAPTCHA de « Renvoyer le code » (un mail de plus) : invisible tant qu’il ne demande pas de geste */}
           <Captcha action="code" />
-          <Button
-            arrow
-            disabled={code.length !== LENGTH || busy}
-            loading={busy}
-            loadingLabel={!connexion ? "Création de ton rapport" : suite.startsWith("/importer/") ? "Connexion" : "Ouverture de tes convs"}
-            onClick={() => void verify(code)}
-          >
-            {!connexion
-              ? "Créer mon rapport"
-              : suite.startsWith("/importer/")
-                ? /* Venu de l’import : un premier accès, la suite est l’envoi de sa conv */
-                  "Continuer"
-                : "Retrouver mes convs"}
-          </Button>
+          {revenu ? (
+            /* TODO(produit): texte nouveau, à valider (maquette du 26 octobre) */
+            <Button arrow loading={envoiCorrige} loadingLabel="Envoi du code" disabled={!saisie.valide || envoiCorrige} onClick={() => void saisie.envoyer()}>
+              M’envoyer le code ici
+            </Button>
+          ) : (
+            <Button
+              arrow
+              disabled={code.length !== LENGTH || busy}
+              loading={busy}
+              loadingLabel={!connexion ? "Création de ton rapport" : suite.startsWith("/importer/") ? "Connexion" : "Ouverture de tes convs"}
+              onClick={() => void verify(code)}
+            >
+              {!connexion
+                ? "Créer mon rapport"
+                : suite.startsWith("/importer/")
+                  ? /* Venu de l’import : un premier accès, la suite est l’envoi de sa conv */
+                    "Continuer"
+                  : "Retrouver mes convs"}
+            </Button>
+          )}
         </>
       }
     >
       {/* Un seul vrai champ, posé sur les 6 cases : saisie, collage et code proposé par le téléphone */}
-      <div className="relative" onClick={() => input.current?.focus()}>
+      <div className={cn("relative", revenu && "opacity-40")} onClick={() => input.current?.focus()}>
         <label htmlFor="code" className="sr-only">
           Code à 6 chiffres reçu par email
         </label>
@@ -195,7 +246,7 @@ export function CodeScreen({ connexion = false, suite = "/app", fermee = false }
           autoComplete="one-time-code"
           autoFocus
           maxLength={LENGTH}
-          disabled={busy}
+          disabled={busy || revenu}
           aria-invalid={wrong || undefined}
           aria-describedby={wrong ? "code-erreur" : undefined}
           className="absolute inset-0 z-10 h-full w-full cursor-text bg-transparent text-transparent caret-transparent opacity-0 outline-none"
@@ -203,7 +254,7 @@ export function CodeScreen({ connexion = false, suite = "/app", fermee = false }
         <div aria-hidden="true" className={cn("grid grid-cols-6 gap-2 sm:gap-2.5", wrong && "motion-safe:animate-[codeShake_0.4s_ease-in-out]")}>
           {Array.from({ length: LENGTH }, (_, i) => {
             const digit = code[i];
-            const active = i === Math.min(code.length, LENGTH - 1) && !busy;
+            const active = i === Math.min(code.length, LENGTH - 1) && !busy && !revenu;
             return (
               <span
                 key={i}
@@ -219,29 +270,40 @@ export function CodeScreen({ connexion = false, suite = "/app", fermee = false }
         </div>
       </div>
 
-      <div aria-live="polite" className="-mt-1 min-h-5">
-        {wrong && (
-          <p id="code-erreur" className="m-0 text-note font-extrabold text-danger">
-            Ce code ne marche pas. Vérifie-le, ou demande-en un nouveau.
+      {revenu ? (
+        <div className="rounded-[20px] bg-white p-4 shadow-[inset_0_0_0_2px_var(--color-danger)]">
+          <p role="alert" className="m-0 mb-3 text-note font-black text-danger">
+            {texteDuRetour(email)}
           </p>
-        )}
-        {!wrong && souci && <p className="m-0 text-note font-extrabold text-danger">{souci}</p>}
-        {!wrong && !souci && resent && <p className="m-0 text-note font-extrabold text-vrai-ink">Nouveau code envoyé.</p>}
-      </div>
+          <FormulaireEmail envoi={saisie} />
+        </div>
+      ) : (
+        <>
+          <div aria-live="polite" className="-mt-1 min-h-5">
+            {wrong && (
+              <p id="code-erreur" className="m-0 text-note font-extrabold text-danger">
+                Ce code ne marche pas. Vérifie-le, ou demande-en un nouveau.
+              </p>
+            )}
+            {!wrong && souci && <p className="m-0 text-note font-extrabold text-danger">{souci}</p>}
+            {!wrong && !souci && resent && <p className="m-0 text-note font-extrabold text-vrai-ink">Nouveau code envoyé.</p>}
+          </div>
 
-      <div className="flex flex-wrap items-center gap-x-5 gap-y-1">
-        <button
-          type="button"
-          onClick={() => void resend()}
-          disabled={wait > 0}
-          className="-my-2 inline-flex min-h-11 items-center text-note font-black text-toi-ink disabled:text-grey"
-        >
-          {wait > 0 ? `Renvoyer le code (${wait} s)` : "Renvoyer le code"}
-        </button>
-        <Link href={retour} className="-my-2 inline-flex min-h-11 items-center text-note font-black text-ink no-underline">
-          Changer d’email
-        </Link>
-      </div>
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-1">
+            <button
+              type="button"
+              onClick={() => void resend()}
+              disabled={wait > 0}
+              className="-my-2 inline-flex min-h-11 items-center text-note font-black text-toi-ink disabled:text-grey"
+            >
+              {wait > 0 ? `Renvoyer le code (${wait} s)` : "Renvoyer le code"}
+            </button>
+            <Link href={retour} className="-my-2 inline-flex min-h-11 items-center text-note font-black text-ink no-underline">
+              Changer d’email
+            </Link>
+          </div>
+        </>
+      )}
 
       {/* La phrase d’un seul tenant : coupée autour du nombre, Chromium la dessinait à quelques pixels près */}
       <NotePrivee>{NOTE_CODE}</NotePrivee>

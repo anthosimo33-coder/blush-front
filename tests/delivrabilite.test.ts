@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { eq } from "drizzle-orm";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { eq, inArray } from "drizzle-orm";
+import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 /*
  * La délivrabilité des mails (src/server/delivrabilite.ts), avec la base : le webhook de Resend par sa route
@@ -26,6 +26,7 @@ vi.mock("@/server/alertes", async (original) => ({
 }));
 
 import { POST as webhook } from "@/app/api/mails/resend/route";
+import { codeRevenu, preparerCode } from "@/server/auth";
 import { empreinte } from "@/server/chiffrement";
 import { db, schema } from "@/server/db";
 import { delivrabilite, verifierLesSeuils } from "@/server/delivrabilite";
@@ -129,6 +130,43 @@ describe("le webhook de Resend (POST /api/mails/resend)", () => {
     const r = await poster(evenement("email.sent", { tags: { sorte: "code", rembourrage: "x".repeat(70 * 1024) } }));
     expect(r.status).toBe(422);
     expect(await lignes()).toEqual([]);
+  });
+});
+
+describe("le mail d’un code revenu", () => {
+  /* Les emails des codes de ces tests, effacés à la fin avec leurs codes */
+  const emails: string[] = [];
+  const adresse = (nom: string) => {
+    const e = `${nom}-${randomUUID()}@blush.test`;
+    emails.push(e);
+    return e;
+  };
+  afterAll(async () => {
+    if (emails.length) await db().delete(schema.loginCodes).where(inArray(schema.loginCodes.email, emails));
+  });
+
+  it("un rebond, ou l’adresse bloquée, d’un mail de code ou de la liste d’attente : les codes encore bons de l’adresse le notent, dans chaque navigateur ; un autre mail, une plainte, non", async () => {
+    const [faute, bloquee, autre] = [adresse("faute"), adresse("bloquee"), adresse("autre")];
+    const [a, b, c, d] = [randomUUID(), randomUUID(), randomUUID(), randomUUID()];
+    for (const [e, nav] of [
+      [faute, a],
+      [faute, b],
+      [bloquee, c],
+      [autre, d],
+    ] as const)
+      await preparerCode(e, nav, { envoye: true });
+    expect(await Promise.all([a, b, c, d].map((n) => codeRevenu(n)))).toEqual([false, false, false, false]);
+    /* Un rapport qui rebondit, une plainte sur un code : pas un code revenu */
+    await poster(evenement("email.bounced", { to: [autre], tags: { sorte: "rapport" } }));
+    await poster(evenement("email.complained", { to: [autre], tags: { sorte: "code" } }));
+    expect(await codeRevenu(d)).toBe(false);
+    /* Le code rebondit (l’adresse en majuscules, comme on l’a tapée) : les deux navigateurs qui l’ont demandé le lisent */
+    expect((await poster(evenement("email.bounced", { to: [faute.toUpperCase()], tags: { sorte: "code" } }))).status).toBe(200);
+    expect(await Promise.all([a, b].map((n) => codeRevenu(n)))).toEqual([true, true]);
+    /* Le mail de la liste d’attente, bloqué par Resend (une adresse déjà revenue) */
+    await poster(evenement("email.suppressed", { to: [bloquee], tags: { sorte: "attente" } }));
+    expect(await codeRevenu(c)).toBe(true);
+    expect(await codeRevenu(undefined)).toBe(false);
   });
 });
 

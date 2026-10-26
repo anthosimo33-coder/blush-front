@@ -59,6 +59,7 @@ const SANS_COMPTE = new Set<CleRoute>([
   "POST /api/attente",
   "POST /api/attente/retrait",
   "POST /api/desinscription",
+  "GET /api/auth/code",
   "POST /api/auth/code",
   "POST /api/auth/deconnexion",
   "POST /api/auth/verifier",

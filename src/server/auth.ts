@@ -1,6 +1,6 @@
 import "server-only";
 import { randomInt } from "node:crypto";
-import { and, eq, gt, inArray, lt, or, sql } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, lt, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { alerter } from "./alertes";
 import { empreinte, jeton, memeEmpreinte } from "./chiffrement";
@@ -39,7 +39,14 @@ const empreinteNavigateur = (navigateur: string) => empreinte(`code:${navigateur
 export async function preparerCode(email: string, navigateur: string, { envoye }: { envoye: boolean }): Promise<string | null> {
   const code = String(randomInt(0, 1_000_000)).padStart(6, "0");
   const c = schema.loginCodes;
-  const ligne = { codeHash: empreinte(envoye ? `${email}:${code}` : jeton()), expiresAt: new Date(Date.now() + CODE_MINUTES * 60e3), attempts: 0, createdAt: new Date() };
+  /* Un nouveau code n’est pas encore revenu (revenuLe : son mail a rebondi, noterLeRetourDuCode) */
+  const ligne = {
+    codeHash: empreinte(envoye ? `${email}:${code}` : jeton()),
+    expiresAt: new Date(Date.now() + CODE_MINUTES * 60e3),
+    attempts: 0,
+    createdAt: new Date(),
+    revenuLe: null,
+  };
   const [prise] = await db()
     .insert(c)
     .values({ email, navigateur: empreinteNavigateur(navigateur), ...ligne })
@@ -51,6 +58,36 @@ export async function preparerCode(email: string, navigateur: string, { envoye }
     })
     .returning({ email: c.email });
   return prise ? code : null;
+}
+
+/**
+ * Le mail du code (ou celui de la liste d’attente, en bêta fermée) envoyé à cette adresse est revenu : le webhook de
+ * Resend le dit (un rebond, ou l’adresse bloquée par sa liste de suppression, src/server/delivrabilite.ts). Les codes
+ * encore bons de l’adresse le notent, dans chaque navigateur qui l’a demandé : son écran du code le lira (codeRevenu).
+ */
+export async function noterLeRetourDuCode(adresse: string, maintenant = new Date()): Promise<void> {
+  const c = schema.loginCodes;
+  await db()
+    .update(c)
+    .set({ revenuLe: maintenant })
+    .where(and(eq(c.email, adresse.trim().toLowerCase()), gt(c.expiresAt, maintenant)));
+}
+
+/**
+ * Le dernier code demandé dans ce navigateur (son jeton : le cookie du code), encore bon, est-il revenu ? L’écran du code
+ * le demande quelques secondes après l’envoi, puis à chaque retour sur l’onglet : revenu, il dit que l’adresse n’existe
+ * pas et propose de la corriger. Rien d’autre ne se lit : ni l’email, ni le code, et seulement pour ce navigateur.
+ */
+export async function codeRevenu(navigateur: string | undefined): Promise<boolean> {
+  if (!navigateur) return false;
+  const c = schema.loginCodes;
+  const [dernier] = await db()
+    .select({ revenuLe: c.revenuLe })
+    .from(c)
+    .where(and(eq(c.navigateur, empreinteNavigateur(navigateur)), gt(c.expiresAt, new Date())))
+    .orderBy(desc(c.createdAt))
+    .limit(1);
+  return !!dernier?.revenuLe;
 }
 
 /* Le plafond des mails de code ne compte que ceux qui partent : pas ceux de la boîte des tests de bout en bout */

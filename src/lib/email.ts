@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { suggestionEmail } from "./domaines-email";
 
 /*
  * La forme d’un email, vérifiée dans le navigateur avant d’envoyer quoi que ce soit (le parcours, la connexion, la liste
@@ -25,9 +26,21 @@ export type SaisieEmail = {
   invalide: boolean;
   /** Pourquoi l’envoi a raté, ou null : le champ le dit à la place de l’erreur de forme. */
   probleme: string | null;
+  /**
+   * L’adresse que l’email tapé voulait sans doute dire, son domaine corrigé (suggestionEmail, src/lib/domaines-email.ts),
+   * une fois montrée : après une pause dans la frappe, le champ quitté, ou un premier envoi. null : rien à proposer.
+   */
+  suggestion: string | null;
+  /** « Oui » : l’email devient la suggestion. */
+  accepterSuggestion: () => void;
+  /** « Non » : l’email reste tel quel, la suggestion ne revient plus pour lui. */
+  ignorerSuggestion: () => void;
   /** Entrée dans le champ, ou le bouton du pied d’écran. */
   envoyer: () => Promise<void>;
 };
+
+/** La pause dans la frappe après laquelle la suggestion se montre : assez longue pour ne pas clignoter à chaque lettre. */
+export const PAUSE_SUGGESTION_MS = 900;
 
 /** Le champ en erreur : un envoi raté, ou un email mal formé, une fois le champ quitté et quelque chose d’écrit. */
 export const champInvalide = ({ email, valide, probleme, touche }: { email: string; valide: boolean; probleme: string | null; touche: boolean }) =>
@@ -37,7 +50,8 @@ export const champInvalide = ({ email, valide, probleme, touche }: { email: stri
  * La saisie d’un email, commune à l’envoi du code (useEnvoiCode) et à la liste d’attente : l’email vient de l’écran
  * (`email`, `setEmail`), avec ce que l’envoi en dit (`probleme`, `oublierProbleme`, `occupe`). Envoyer un email mal
  * formé, ou pendant un envoi, ne part pas : le champ est seulement marqué quitté, pour montrer l’erreur de forme.
- * `envoyer` reçoit l’email sans les espaces du bord.
+ * Un domaine mal tapé (suggestionEmail) : le premier envoi montre la suggestion au lieu de partir, si elle n’était pas
+ * déjà là ; un second envoi part tel quel (on l’a vue, c’est bien cet email). `envoyer` reçoit l’email sans les espaces du bord.
  */
 export function useSaisieEmail(
   email: string,
@@ -45,23 +59,49 @@ export function useSaisieEmail(
   { probleme, oublierProbleme, occupe, envoyer }: { probleme: string | null; oublierProbleme: () => void; occupe: boolean; envoyer: (email: string) => Promise<void> },
 ): SaisieEmail {
   const [touche, setTouche] = useState(false);
+  /* La suggestion montrée (pour l’email d’alors), et l’email dont on a dit « Non » */
+  const [vue, setVue] = useState<string | null>(null);
+  const [ignore, setIgnore] = useState<string | null>(null);
   const valide = emailValide(email);
+  const propre = email.trim();
+  const possible = valide && ignore !== propre ? suggestionEmail(propre) : null;
+  /* Une pause dans la frappe la montre */
+  useEffect(() => {
+    if (!possible) return;
+    const t = setTimeout(() => setVue(possible), PAUSE_SUGGESTION_MS);
+    return () => clearTimeout(t);
+  }, [possible]);
+  const suggestion = possible && vue === possible ? possible : null;
   return {
     email,
     changer: (v) => {
       setEmail(v);
       oublierProbleme();
     },
-    quitter: () => setTouche(true),
+    quitter: () => {
+      setTouche(true);
+      if (possible) setVue(possible);
+    },
     valide,
     invalide: champInvalide({ email, valide, probleme, touche }),
     probleme,
+    suggestion,
+    accepterSuggestion: () => {
+      if (!suggestion) return;
+      setEmail(suggestion);
+      oublierProbleme();
+    },
+    ignorerSuggestion: () => setIgnore(propre),
     envoyer: async () => {
       if (!valide || occupe) {
         setTouche(true);
         return;
       }
-      await envoyer(email.trim());
+      if (possible && !suggestion) {
+        setVue(possible);
+        return;
+      }
+      await envoyer(propre);
     },
   };
 }
