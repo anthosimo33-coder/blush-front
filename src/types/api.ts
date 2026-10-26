@@ -374,7 +374,8 @@ type Reponses = {
   /** Ce que la purge de la nuit a effacé. */
   "GET /api/cron/chaine": Ok;
   "GET /api/cron/purge": { brouillons: number; convs: number; sessions: number };
-  "GET /api/cron/relances": PassageDesRelances & { chaines: number; prises: number; sequences: number };
+  /* `lotsEnvoyes`, `lotsLus`, `lotsAnnules` : les mises à jour de la mémoire envoyées en lot, les lots relevés, ceux annulés (src/server/memoire-en-lot.ts) */
+  "GET /api/cron/relances": PassageDesRelances & { chaines: number; prises: number; sequences: number; lotsEnvoyes: number; lotsLus: number; lotsAnnules: number };
   "POST /api/desinscription": Ok;
   "POST /api/desinscription/un-clic": Ok;
   /** Le webhook de Resend (ce qui arrive aux mails), hors de la garde commune : sa signature (401 « interdit » sinon). */

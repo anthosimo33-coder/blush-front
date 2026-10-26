@@ -2,9 +2,9 @@ import "server-only";
 import { eq, sql } from "drizzle-orm";
 import { chiffrer as chiffresDe, lire, rendre } from "@prompts/lib/conv";
 import { DEMANDE_PLAN, demandeMoitie, requeteMemoireCreation, requeteMemoireMaj, requeteRapport, requeteVerdict, requeteVocal } from "@prompts/lib/contextes";
-import { alerteRetenue, appliquerMaj, aTrancher, estFaite, rapportCourt, rendreNouveaux, reunirLesAlertes } from "@prompts/lib/memoire";
-import { preuvesChapitres, preuvesMaj, preuvesMemoire, preuvesPlan, preuvesRapport, preuvesVerdict, preuvesVocal } from "@prompts/lib/preuves";
-import { Etape05, Maj07, Sortie04, Sortie05, Sortie06, Sortie07, verdictNormalise, type Chapitre, type Plan, type Rapport, type Verdict } from "@prompts/lib/schemas";
+import { alerteRetenue, appliquerMaj, aTrancher, estFaite, rapportCourt, rendreNouveaux, reunirLesAlertes, type Echange } from "@prompts/lib/memoire";
+import { introuvables, preuvesChapitres, preuvesMaj, preuvesMemoire, preuvesPlan, preuvesRapport, preuvesVerdict, preuvesVocal } from "@prompts/lib/preuves";
+import { Etape05, Maj07, Sortie04, Sortie05, Sortie06, Sortie07, verdictNormalise, type Chapitre, type Maj, type Plan, type Rapport, type Verdict } from "@prompts/lib/schemas";
 import { profil } from "@prompts/lib/style";
 import { alerteSobre, enAlerteSobre, imposerTitres, titresDuVerdict } from "@prompts/lib/titres";
 import { genreDuHaut } from "@/contenu/haut-du-paywall";
@@ -33,6 +33,7 @@ import { mailRapport } from "./mail-rapport";
 import { aPrisPremium, noterLEnvoi, personnesDe } from "./sequences";
 import type { Etape } from "./pipeline";
 import { lectureReunie } from "./morceaux";
+import { alertesNoteesDepuis, surLaRelue } from "./memoire-relue";
 import { memoireDeSecours, remplacerLeSecours } from "./secours";
 import { editionsBornees, lignesGardees, type Contexte, type DonneesMemoire, type DonneesRapport } from "./stockage/types";
 import { entreeDe, etatDesTaches, type Tache } from "./taches";
@@ -557,6 +558,52 @@ function banqueDuSecours(story: LigneComplete): { lignes: Map<string, string>; s
   return { lignes: new Map(), suivant: story.nextMessage ?? 1 };
 }
 
+/* ———— La mise à jour de la mémoire ———— */
+
+/** Au plus ce nombre d’appels au modèle pour une mise à jour (un premier, et un second si la mémoire a changé entre-temps). */
+const APPELS_PAR_MAJ = 2;
+
+/** Les preuves qu’une mise à jour cite : aucune quand elle dit « rien de neuf ». */
+const preuvesDeLaMaj = (m: Maj) => (m.rien_de_neuf ? [] : preuvesMaj(m));
+
+/**
+ * Ce qu’une mise à jour lit, faite sur cette mémoire (`lue`) et ces échanges : sa requête (requeteMemoireMaj), les messages
+ * qu’elle peut citer (ceux de la mémoire, et ceux des échanges, numérotés à la suite : rendreNouveaux), et le prochain
+ * numéro libre. La même en direct et en lot (src/server/memoire-en-lot.ts) : le lot envoie cette requête-là.
+ */
+export function preparerLaMaj(story: Ligne, lue: DonneesMemoire, echanges: Echange[]) {
+  const h = histoireDe(metaDe(story));
+  const nouveau = rendreNouveaux(echanges, h, lue.suivant);
+  const lignes = new Map([...lue.lignes, ...nouveau.lignes]);
+  /* La ligne de l’alerte et la décision suivent les mêmes échanges que la mémoire lue */
+  const trancher = aTrancher(lue.etat, echanges);
+  const req = requeteMemoireMaj(h, aujourdhuiParis().t, lue.etat, lignes, nouveau.blocs, editionsBornees(lue.editions), { trancher });
+  return { req, lignes, suivant: nouveau.suivant };
+}
+
+/**
+ * La mémoire après la mise à jour `maj`, faite sur `lue` : le code applique ce qui change (appliquerMaj). Null : elle n’y
+ * change rien (« rien de neuf » ne s’écrit pas, sauf s’il tranche une alerte venue du chat : appliquerMaj rend alors un
+ * autre état).
+ */
+function majAppliquee(
+  lue: DonneesMemoire,
+  maj: Maj,
+  echanges: Echange[],
+  { lignes, suivant }: Pick<ReturnType<typeof preparerLaMaj>, "lignes" | "suivant">,
+): DonneesMemoire | null {
+  const etat = appliquerMaj(lue.etat, maj, echanges);
+  if (etat === lue.etat) return null;
+  return {
+    etat,
+    lignes: lignesGardees(etat, lignes),
+    suivant,
+    ...(lue.editions ? { editions: editionsBornees(lue.editions) } : {}),
+    /* Mise à jour, une mémoire de secours le reste : la vraie la remplacera */
+    ...(lue.secours ? { secours: true as const } : {}),
+  };
+}
+
 /**
  * Après des échanges qui apportent du neuf (retenus ensemble jusqu’à ce que le chat se calme : src/server/memoire-groupee.ts),
  * ou un ajout à sa fiche : la mémoire se met à jour, en un seul appel pour tous (ou dit « rien de neuf », le cas le plus
@@ -564,47 +611,65 @@ function banqueDuSecours(story: LigneComplete): { lignes: Map<string, string>; s
  * prompts/lib/memoire.ts, appliquerMaj), seulement si un de ses échanges relit cette réponse (aTrancher) : notée après
  * qu’elle est partie, l’alerte attend la mise à jour qui a son échange. Jamais celle de la lecture. Elle n’écrit que sur
  * la mémoire qu’elle a lue : si la fiche a été corrigée entre-temps (la mise à jour prend 20 à 60 s), elle recommence
- * sur la nouvelle, pour ne rien effacer de ce que l’utilisateur vient d’écrire.
+ * sur la nouvelle, pour ne rien effacer de ce que l’utilisateur vient d’écrire. Si le chat n’y a noté que des alertes, sa
+ * sortie s’applique encore, ces alertes rejouées par-dessus, sans rappeler le modèle (src/server/memoire-relue.ts).
  */
 async function memoireMaj(story: Ligne, t: Tache) {
   const echanges = entreeDe(t);
   if (!echanges?.length) throw new ErreurTache("memoire_absente");
-  const h = histoireDe(metaDe(story));
   /* Pas encore de mémoire (la vraie a échoué, et celle de secours n’a pas pu s’écrire à ce moment-là) : celle de secours d’abord */
   if (!(await donneesMemoire(story.id))) await garderUneMemoireDeSecours(story.id);
-  /* Deux essais : chacun rappelle le modèle */
+  /* La dernière mise à jour faite : la mémoire qu’elle a lue, et ce qu’elle en a fait */
+  let faite: { lue: DonneesMemoire; apres: DonneesMemoire | null } | null = null;
+  let appels = 0;
   const ecrite = await modifierMemoire(
     story.id,
-    async (avant) => {
-      const nouveau = rendreNouveaux(echanges, h, avant.suivant);
-      const lignes = new Map([...avant.lignes, ...nouveau.lignes]);
-      /* Sur la mémoire relue à chaque essai : la ligne de l’alerte et la décision suivent les mêmes échanges */
-      const trancher = aTrancher(avant.etat, echanges);
-      const req = requeteMemoireMaj(h, aujourdhuiParis().t, avant.etat, lignes, nouveau.blocs, editionsBornees(avant.editions), { trancher });
+    async (lue) => {
+      /* La mémoire n’a changé que par des alertes du chat : la sortie déjà là s’applique encore */
+      const notees = faite && alertesNoteesDepuis(faite.lue, lue);
+      if (faite && notees) return surLaRelue(faite.apres, notees);
+      if (appels++ >= APPELS_PAR_MAJ) throw new ErreurTache("memoire_changee");
+      const prepa = preparerLaMaj(story, lue, echanges);
       /* La mise à jour ne renvoie que ce qui change ; le code l’applique à la mémoire */
-      const maj = await appelVerifie(req, Maj07, {
-        preuves: (m) => (m.rien_de_neuf ? [] : preuvesMaj(m)),
-        lignes,
+      const maj = await appelVerifie(prepa.req, Maj07, {
+        preuves: preuvesDeLaMaj,
+        lignes: prepa.lignes,
         storyId: story.id,
         etiquette: "memoire_maj",
         partie: "mise à jour",
       });
-      /* « Rien de neuf » ne s’écrit pas, sauf s’il tranche une alerte venue du chat : appliquerMaj rend alors un autre état */
-      const etat = appliquerMaj(avant.etat, maj, echanges);
-      if (etat === avant.etat) return null;
-      return {
-        etat,
-        lignes: lignesGardees(etat, lignes),
-        suivant: nouveau.suivant,
-        ...(avant.editions ? { editions: editionsBornees(avant.editions) } : {}),
-        /* Mise à jour, une mémoire de secours le reste : la vraie la remplacera */
-        ...(avant.secours ? { secours: true as const } : {}),
-      };
+      faite = { lue, apres: majAppliquee(lue, maj, echanges, prepa) };
+      return faite.apres;
     },
-    { essais: 2 },
+    /* Un essai de plus que d’appels : celui qui ne fait que rejouer des alertes */
+    { essais: APPELS_PAR_MAJ + 1 },
   );
   if (ecrite === "absente") throw new ErreurTache("memoire_absente");
   if (ecrite === "occupee") throw new ErreurTache("memoire_changee");
+}
+
+/**
+ * La réponse d’une mise à jour partie en lot (src/server/memoire-en-lot.ts), appliquée à la mémoire : elle a été faite sur
+ * `lue` (la mémoire gardée à l’envoi), et ne s’écrit que sur elle, ou sur elle et les alertes que le chat a notées depuis
+ * (comme en direct). « faite » : écrite, ou rien à écrire ; « preuves » : elle cite des messages introuvables (en direct,
+ * le modèle serait rappelé) ; « a_refaire » : la mémoire a changé autrement (une fiche corrigée, une autre mise à jour),
+ * ou elle n’est plus là. Dans ces deux cas, la mise à jour repart en direct, sur la mémoire d’aujourd’hui.
+ */
+export async function majDuLot(story: Ligne, echanges: Echange[], lue: DonneesMemoire, maj: Maj): Promise<"faite" | "preuves" | "a_refaire"> {
+  const prepa = preparerLaMaj(story, lue, echanges);
+  if (introuvables(preuvesDeLaMaj(maj), prepa.lignes).length) return "preuves";
+  const apres = majAppliquee(lue, maj, echanges, prepa);
+  let aRefaire = false;
+  const ecrite = await modifierMemoire(
+    story.id,
+    (relue) => {
+      const notees = alertesNoteesDepuis(lue, relue);
+      aRefaire = !notees;
+      return notees ? surLaRelue(apres, notees) : null;
+    },
+    { essais: 3 },
+  );
+  return aRefaire || ecrite === "absente" || ecrite === "occupee" ? "a_refaire" : "faite";
 }
 
 /**

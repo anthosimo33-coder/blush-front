@@ -333,6 +333,12 @@ export const tasks = pgTable(
      * (src/server/memoire-groupee.ts). Null : elle part tout de suite, comme toute autre tâche.
      */
     pasAvant: quand("pas_avant"),
+    /**
+     * Une mise à jour de la mémoire envoyée en lot (statut `lot`, src/server/memoire-en-lot.ts) : la mémoire sur laquelle
+     * sa requête a été faite, chiffrée. Sa réponse ne s’applique que sur elle, ou sur elle et les alertes que le chat a
+     * notées depuis. Effacée dès que la tâche quitte le lot, comme son entrée une fois finie (S-34).
+     */
+    lotAvant: chiffre("lot_avant"),
     createdAt: quand("created_at").notNull().defaultNow(),
     updatedAt: quand("updated_at").notNull().defaultNow(),
   },
@@ -347,6 +353,35 @@ export const tasks = pgTable(
       .where(sql`${t.status} in ('attente', 'en_cours') and ${t.kind} in (${sql.raw(GENRES_CHAINE.map((g) => `'${g}'`).join(", "))})`),
   ],
 );
+
+/**
+ * Un lot envoyé au prestataire du modèle (son API Message Batches : src/server/memoire-en-lot.ts), une requête, celle
+ * d’une mise à jour de la mémoire, tant qu’il existe chez lui : jusqu’à ce que sa réponse soit lue et le lot effacé là-bas
+ * (le texte y resterait 29 jours). Son identifiant est celui du prestataire. La tâche ou la conv effacée ne l’efface pas
+ * (`set null`) : le passage suivant annule le lot, puis l’efface chez le prestataire. Rien de la conv : des identifiants
+ * et des heures. Un lot du prestataire qui n’a pas sa ligne (l’instance coupée juste après l’envoi) y est remis par le
+ * ménage, sans tâche, pour être relevé et effacé comme les autres.
+ */
+export const lots = pgTable("lots", {
+  id: text("id").primaryKey(),
+  tacheId: uuid("tache_id").references(() => tasks.id, { onDelete: "set null" }),
+  storyId: uuid("story_id").references(() => stories.id, { onDelete: "set null" }),
+  /**
+   * Le compte de la conv à l’envoi : qui paie sa réponse (le budget du jour), même si la conv est effacée pendant le lot.
+   * Le compte effacé, sa réponse passe dans la part sans compte.
+   */
+  userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
+  envoyeLe: quand("envoye_le").notNull().defaultNow(),
+  /** L’annulation demandée (sa tâche repartie en direct, ou plus là) : il finira sans elle, puis s’effacera. */
+  annuleLe: quand("annule_le"),
+  /** Ses résultats en cours de lecture : un seul passage à la fois, repris 10 minutes après s’il a été coupé. */
+  luLe: quand("lu_le"),
+  /**
+   * Ses réponses prises en main (leur coût noté, chacune appliquée ou partie en direct) : un passage qui le relève de
+   * nouveau (son effacement raté, une lecture coupée) ne fait plus que l’effacer, sans noter leur coût une seconde fois.
+   */
+  traiteLe: quand("traite_le"),
+});
 
 /**
  * Un verdict partagé : le lien public (/v/<id>) qui montre le verdict seul, le prénom de l’autre masqué, jamais la conv.

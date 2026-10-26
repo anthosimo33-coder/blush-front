@@ -3,6 +3,7 @@ import { and, eq, gte, inArray, isNull, lt, lte, or, sql } from "drizzle-orm";
 import * as coffre from "./coffre";
 import { db, schema } from "./db";
 import type { Genre } from "./db/enums";
+import { memoireEnLot } from "./env";
 
 /*
  * Les tâches longues, rangées en base et exécutées après la réponse HTTP (after()).
@@ -65,17 +66,28 @@ export async function paiementRecu(storyId: string): Promise<number> {
 
 /**
  * Une tâche en attente qu’on peut prendre : pas une mise à jour de la mémoire qui attend que le chat se calme (son heure,
- * `pas_avant`, pas encore venue : src/server/memoire-groupee.ts).
+ * `pas_avant`, pas encore venue : src/server/memoire-groupee.ts). Avec la mémoire en lot (BLUSH_MEMOIRE_EN_LOT), celle
+ * dont le chat s’est calmé non plus : elle est au passage des 5 minutes, qui l’envoie en lot (src/server/memoire-en-lot.ts).
+ * Seules les mises à jour de la mémoire ont une heure : toute autre tâche est à prendre.
  */
-export const aPrendre = or(isNull(schema.tasks.pasAvant), lte(schema.tasks.pasAvant, sql`now()`));
+export const aPrendre = () => (memoireEnLot() ? isNull(schema.tasks.pasAvant) : or(isNull(schema.tasks.pasAvant), lte(schema.tasks.pasAvant, sql`now()`)));
 
-/* Une autre tâche de la même histoire tourne (son battement est frais) : la chaîne qui la tient enchaînera la suite */
-const autreEnCours = sql`not exists (select 1 from ${schema.tasks} as "autre" where "autre"."story_id" = ${schema.tasks.storyId} and "autre"."id" <> ${schema.tasks.id} and "autre"."status" = 'en_cours' and "autre"."heartbeat_at" >= now() - make_interval(secs => ${PERIME_S}))`;
+/** Aucune autre tâche de la même histoire ne tourne (son battement est frais) : sinon, la chaîne qui la tient enchaînera la suite. */
+export const autreEnCours = sql`not exists (select 1 from ${schema.tasks} as "autre" where "autre"."story_id" = ${schema.tasks.storyId} and "autre"."id" <> ${schema.tasks.id} and "autre"."status" = 'en_cours' and "autre"."heartbeat_at" >= now() - make_interval(secs => ${PERIME_S}))`;
+
+/**
+ * Pas de lot en vol pour la mémoire de l’histoire, ou une tâche qui n’y touche pas : une mise à jour (ou la mémoire) ne
+ * part pas pendant que la réponse d’une autre est attendue en lot (src/server/memoire-en-lot.ts). Elle trouverait la
+ * mémoire changée et se referait, ou ferait refaire l’autre : la même mise à jour payée deux fois. Ce qui doit partir
+ * tout de suite rapatrie le lot d’abord (rapatrier).
+ */
+export const sansLotEnVol = sql`(${schema.tasks.kind} not in ('memoire', 'memoire_maj') or not exists (select 1 from ${schema.tasks} as "lot" where "lot"."story_id" = ${schema.tasks.storyId} and "lot"."id" <> ${schema.tasks.id} and "lot"."status" = 'lot'))`;
 
 /**
  * Prend la tâche si personne ne la tient (atomique). Renvoie null si elle est déjà prise, finie, à bout d’essais, ou
  * si une autre tâche de la même histoire tourne déjà : jamais deux étapes d’une histoire en même temps (deux mises à
- * jour de la mémoire perdraient l’une des deux, un vocal partirait sans son rapport).
+ * jour de la mémoire perdraient l’une des deux, un vocal partirait sans son rapport). Ni une mise à jour de la mémoire
+ * pendant qu’une autre est en lot (sansLotEnVol).
  */
 export async function prendre(id: string): Promise<Tache | null> {
   const [t] = await db()
@@ -86,10 +98,11 @@ export async function prendre(id: string): Promise<Tache | null> {
         eq(schema.tasks.id, id),
         lt(schema.tasks.attempts, ESSAIS_MAX),
         or(
-          and(eq(schema.tasks.status, "attente"), aPrendre),
+          and(eq(schema.tasks.status, "attente"), aPrendre()),
           and(eq(schema.tasks.status, "en_cours"), lt(schema.tasks.heartbeatAt, sql`now() - make_interval(secs => ${PERIME_S})`)),
         ),
         autreEnCours,
+        sansLotEnVol,
       ),
     )
     .returning();
@@ -100,31 +113,34 @@ export const battre = (id: string) => db().update(schema.tasks).set({ heartbeatA
 
 /**
  * Une tâche finie. Son entrée (les échanges d’une mise à jour de la mémoire : ce qu’il a dit, ce qu’il a ajouté) est
- * effacée avec : la mémoire l’a retenue, rien ne la relira (S-34). Une tâche en échec garde la sienne, pour repartir.
+ * effacée avec, et la mémoire gardée pour son lot s’il y en a eu un : la mémoire l’a retenue, rien ne la relira (S-34).
+ * Une tâche en échec garde son entrée, pour repartir.
  */
 export async function finir(id: string): Promise<void> {
-  await db().update(schema.tasks).set({ status: "fini", error: null, input: null, updatedAt: new Date() }).where(eq(schema.tasks.id, id));
+  await db().update(schema.tasks).set({ status: "fini", error: null, input: null, lotAvant: null, updatedAt: new Date() }).where(eq(schema.tasks.id, id));
 }
 
 /**
  * Un échec : la tâche repart en attente, sauf au dernier essai, ou si réessayer ne changerait rien (`definitif` :
- * le modèle a refusé). `code` ne contient jamais de contenu.
+ * le modèle a refusé). `code` ne contient jamais de contenu. La mémoire gardée pour un lot (une réponse de lot que la
+ * base a empêché d’appliquer, reprise en direct) s’efface : rien ne la relira, le direct part de la mémoire du moment.
  */
 export async function echouer(t: Tache, code: string, definitif = false): Promise<void> {
   await db()
     .update(schema.tasks)
-    .set({ status: definitif || t.attempts >= ESSAIS_MAX ? "echec" : "attente", error: code.slice(0, 120), updatedAt: new Date() })
+    .set({ status: definitif || t.attempts >= ESSAIS_MAX ? "echec" : "attente", error: code.slice(0, 120), lotAvant: null, updatedAt: new Date() })
     .where(eq(schema.tasks.id, t.id));
 }
 
 /**
  * Les tâches coupées à leur dernier essai (l’instance arrêtée en pleine étape : `echouer` n’a jamais tourné) passent
- * en échec. Sans ça, elles resteraient « en cours » pour toujours : plus rien ne les reprend, et rien ne le dit.
+ * en échec. Sans ça, elles resteraient « en cours » pour toujours : plus rien ne les reprend, et rien ne le dit. La
+ * mémoire gardée pour un lot s’efface avec (echouer).
  */
 export async function clore(storyId: string): Promise<Tache[]> {
   return db()
     .update(schema.tasks)
-    .set({ status: "echec", error: "coupee", updatedAt: new Date() })
+    .set({ status: "echec", error: "coupee", lotAvant: null, updatedAt: new Date() })
     .where(
       and(
         eq(schema.tasks.storyId, storyId),
@@ -153,7 +169,10 @@ export async function reprendre(storyId: string, genres: Genre[]): Promise<numbe
   return remises.length;
 }
 
-/** Les tâches d’une histoire à (re)lancer : en attente (sauf une mise à jour qui attend que le chat se calme), ou abandonnées. */
+/**
+ * Les tâches d’une histoire à (re)lancer : en attente (sauf une mise à jour qui attend que le chat se calme, ou que la
+ * réponse d’une autre revienne de son lot), ou abandonnées.
+ */
 export async function aRelancer(storyId: string): Promise<Tache[]> {
   return db()
     .select()
@@ -163,9 +182,10 @@ export async function aRelancer(storyId: string): Promise<Tache[]> {
         eq(schema.tasks.storyId, storyId),
         lt(schema.tasks.attempts, ESSAIS_MAX),
         or(
-          and(eq(schema.tasks.status, "attente"), aPrendre),
+          and(eq(schema.tasks.status, "attente"), aPrendre()),
           and(eq(schema.tasks.status, "en_cours"), lt(schema.tasks.heartbeatAt, sql`now() - make_interval(secs => ${PERIME_S})`)),
         ),
+        sansLotEnVol,
       ),
     )
     .orderBy(schema.tasks.createdAt);

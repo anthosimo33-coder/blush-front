@@ -24,9 +24,11 @@ export type DetailEcriture = { a: AvanceMoitie; b: AvanceMoitie };
 /**
  * tasks.status : attente → en_cours → fini, ou echec (BACKEND.md, « Les tâches »). `paiement` : le verdict d’une conv
  * pas encore payée, qui attend son paiement sans jamais partir (le paywall passe avant toute lecture, décidé le
- * 16 octobre) ; le paiement le passe en attente (lancerApresPaiement, src/server/pipeline.ts).
+ * 16 octobre) ; le paiement le passe en attente (lancerApresPaiement, src/server/pipeline.ts). `lot` : une mise à jour
+ * de la mémoire envoyée en lot au prestataire (src/server/memoire-en-lot.ts), qui attend sa réponse sans que rien ne la
+ * reprenne en direct ; elle finit, ou repart en attente pour le direct.
  */
-export const STATUTS_TACHE = ["attente", "en_cours", "fini", "echec", "paiement"] as const;
+export const STATUTS_TACHE = ["attente", "en_cours", "fini", "echec", "paiement", "lot"] as const;
 export type StatutTache = (typeof STATUTS_TACHE)[number];
 
 /** chat_messages.role : son message, ou la réponse de BLUSH. */

@@ -123,6 +123,11 @@ const EXEMPLES: { [C in coffre.Colonne]: coffre.Formes[C] } = {
     { date: "2026-03-11", dit: "elle m’a répondu ok", reponse: ["Un « ok » le matin, c’est bon signe."] },
     { date: "2026-03-11", dit: "et là elle like ma story" },
   ],
+  "tasks.lot_avant": {
+    etat: MEMOIRE,
+    lignes: [["m0002", "m0002 2026-03-02 lun. 21:04 Léa : on se voit jeudi ?"]],
+    suivant: 221,
+  },
   "shares.data": { emoji: "🔥", title: "Elle attend que tu proposes", subtitle: "L. relance, Tom hésite." },
   "vocals.data": { sobre: false, lignes: [{ texte: "Elle relance.", punch: true, debut: 0, fin: 1.2, mots: [{ t: "Elle", debut: 0 }] }], version: 2 },
   "waitlist.email": "tom@exemple.fr",
