@@ -7,9 +7,21 @@ import { AUTRE, REPORT as report, STORY as story } from "./exemple";
 export const metadata: Metadata = { title: "Aperçu de l’écriture du rapport" };
 export const dynamic = "force-dynamic";
 
-/** Hors de Vercel seulement (src/proxy.ts) : le rapport pendant son écriture, à trois moments (?etat=plan | chapitres | presque | lecture). */
+/**
+ * Hors de Vercel seulement (src/proxy.ts) : le rapport pendant son écriture, à trois moments (?etat=plan | chapitres |
+ * presque | lecture), ou écrit (`?etat=complet`, avec sa note au bas, la proposition du 26 octobre : `#note-du-rapport`).
+ */
 export default async function Page({ searchParams }: PageProps<"/apercu/ecriture">) {
   const { etat = "chapitres" } = await searchParams;
+  if (etat === "complet")
+    return (
+      <ReportScreen
+        initial={{ report: { ...report, chapters: report.chapters.map((c) => ({ ...c, locked: false })) }, sober: null, debloque: true, generating: false }}
+        story={story}
+        openPaywall={false}
+        fixed
+      />
+    );
   /* Le chapitre offert se lit déjà ; les payants s’écrivent, sous leurs titres d’attente tant que le plan n’est pas fait */
   const suite = report.chapters.filter((c) => CHAPITRES_PAYANTS.includes(c.number));
   const etats = {

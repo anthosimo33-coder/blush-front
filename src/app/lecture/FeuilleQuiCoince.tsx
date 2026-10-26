@@ -25,6 +25,7 @@ export function FeuilleQuiCoince({
   offre,
   centimes,
   relire,
+  bugDAbord = false,
 }: {
   open: boolean;
   onClose: () => void;
@@ -32,8 +33,10 @@ export function FeuilleQuiCoince({
   offre: OffreId;
   centimes: number;
   relire: () => void;
+  /** L’aperçu de l’équipe : la feuille ouverte d’avance sur « Ça a bugué ». */
+  bugDAbord?: boolean;
 }) {
-  const [bug, setBug] = useState(false);
+  const [bug, setBug] = useState(bugDAbord);
   const paiement = usePaiement({ suite: "/lecture", quand: { deja: relire } });
   const choisir = (id: (typeof QUI_COINCE.raisons)[number]["id"]) => {
     if (id === "bug") return setBug(true);

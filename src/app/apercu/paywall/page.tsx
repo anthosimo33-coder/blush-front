@@ -9,10 +9,12 @@ export const dynamic = "force-dynamic";
 /**
  * Hors de Vercel seulement (src/proxy.ts) : le paywall d’une conv inventée, avec le titre choisi (`?titre=contraste`,
  * `toi`, `elle`, `egalite`, `tendance`, `aucun` ; contraste par défaut). Les cinq titres du haut, côte à côte dans la
- * galerie de l’équipe, sans passer par un import ni payer.
+ * galerie de l’équipe, sans passer par un import ni payer. `?question=coince` (ou `bug`) : « Qu’est-ce qui coince ? »
+ * ouverte d’avance (la proposition du 26 octobre, FeuilleQuiCoince).
  */
 export default async function Page({ searchParams }: PageProps<"/apercu/paywall">) {
-  const { titre } = await searchParams;
+  const { titre, question } = await searchParams;
   const genre: GenreDuHaut = GENRES_DU_HAUT.find((g) => g === titre) ?? "contraste";
-  return <Paywall key={genre} story={STORY_D_EXEMPLE} apercu={EXEMPLES[genre]} />;
+  const ouverte = question === "coince" || question === "bug" ? question : undefined;
+  return <Paywall key={genre} story={STORY_D_EXEMPLE} apercu={EXEMPLES[genre]} {...(ouverte ? { question: ouverte } : {})} />;
 }

@@ -32,7 +32,7 @@ export function NoteDuRapport({ autre }: { autre: Pronom }) {
   return (
     <>
       <ChapterRule />
-      <section aria-labelledby={id} className="flex flex-col gap-3">
+      <section id="note-du-rapport" aria-labelledby={id} className="flex scroll-mt-24 flex-col gap-3">
         <h2 id={id} className="m-0 text-[22px] font-black leading-[1.15] tracking-[-0.01em]">
           {N.titre}
         </h2>

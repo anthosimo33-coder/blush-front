@@ -76,10 +76,13 @@ export function Paywall({
   temoignages = TESTIMONIALS,
   offreDirecte = false,
   enUnGeste,
+  question,
 }: {
   story: Story;
   apercu: ApercuDuPaywall;
   temoignages?: Testimonial[];
+  /** L’aperçu de l’équipe (`/apercu/paywall?question=coince|bug`) : « Qu’est-ce qui coince ? » ouverte d’avance (proposition). */
+  question?: "coince" | "bug";
   /** Arrivé par le mail J+6 de S1 (`/lecture?paywall=1&offre=1`) : la one time offer, rouverte, se demande tout de suite. */
   offreDirecte?: boolean;
   /**
@@ -155,6 +158,7 @@ export function Paywall({
             autre={autre.name}
             surEnRoute={setEnRoute}
             {...(enUnGeste ? { enUnGeste } : {})}
+            {...(question ? { question } : {})}
           />
         </div>
         <Sommaire autre={autre.name} il={!elle} objectif={apercu.objectif} className="mt-3 flex lg:hidden" />
@@ -287,6 +291,7 @@ function Paiement({
   autre,
   surEnRoute,
   enUnGeste,
+  question,
 }: {
   ref: Ref<HTMLElement>;
   /** Le bouton qui paie (et ce qu’il devient) : la barre du bas le guette. */
@@ -297,6 +302,7 @@ function Paiement({
   autre: string;
   surEnRoute: (enRoute: boolean) => void;
   enUnGeste?: EnUnGeste;
+  question?: "coince" | "bug";
 }) {
   useAuPaiement(true);
   const avoirs = useFeuilleDuPaiement().data;
@@ -308,8 +314,8 @@ function Paiement({
   /* Dans le paiement : la carte ouverte, Apple Pay, un paiement en route (PayerDansLaFeuille, surOuvert) */
   const [ouvert, setOuvert] = useState(false);
   /* « Qu’est-ce qui coince ? » (proposition, FeuilleQuiCoince) : posée une fois par visite, la carte refermée sans payer */
-  const [coince, setCoince] = useState<"ouverte" | "merci" | null>(null);
-  const coinceDemandee = useRef(false);
+  const [coince, setCoince] = useState<"ouverte" | "merci" | null>(question ? "ouverte" : null);
+  const coinceDemandee = useRef(!!question);
   const refermee = () => {
     if (coinceDemandee.current) return;
     coinceDemandee.current = true;
@@ -427,6 +433,7 @@ function Paiement({
       </div>
       <FeuilleQuiCoince
         open={coince === "ouverte" && !suiteMontree}
+        bugDAbord={question === "bug"}
         onClose={() => setCoince(null)}
         onMerci={() => setCoince("merci")}
         offre={offre}
