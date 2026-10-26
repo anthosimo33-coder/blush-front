@@ -92,7 +92,7 @@ describe("le pilotage, rendu", () => {
       acheteurs: zero,
       centimesPayes: zero,
       dollars: zero,
-      tunnel: { visiteurs: 0, imports: 0, verdicts: 0, acheteurs: 0, racheteurs: 0 },
+      tunnel: { visiteurs: 0, imports: 0, paywall: 0, acheteurs: 0, racheteurs: 0 },
       sources: [],
       mix: s.pilotage.mix.map((m) => ({ ...m, n: 0, centimes: 0 })),
       iaDuJour: { dollars: 0, budget: 30 },

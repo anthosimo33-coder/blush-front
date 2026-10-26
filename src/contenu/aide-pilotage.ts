@@ -79,7 +79,7 @@ export const AIDES_DU_PILOTAGE = {
     de: "le tunnel",
     quoi: "Où les gens s’arrêtent, de l’arrivée sur le site au deuxième achat.",
     calcul:
-      "Les visiteurs de la période, les convs importées sur la période, celles d’entre elles qui ont leur verdict, les comptes qui ont payé sur la période, et ceux d’entre eux qui ont payé au moins deux achats (depuis toujours). Le pourcentage du haut se fait sur l’étape d’avant.",
+      "Les visiteurs de la période, les convs importées sur la période, celles d’entre elles qui ont vu le paywall (leur lecture lancée\u00a0; le verdict, lui, vient après le paiement), les comptes qui ont payé sur la période, et ceux d’entre eux qui ont payé au moins deux achats (depuis toujours). Le pourcentage du haut se fait sur l’étape d’avant.",
     repere: "La colonne orange est la plus grosse fuite, entre l’arrivée et l’achat\u00a0: c’est là qu’un changement rapporte le plus.",
     siCaBouge: "Change une seule chose à la fois, et compare avec la période d’après.",
   },

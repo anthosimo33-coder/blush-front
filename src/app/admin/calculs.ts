@@ -137,7 +137,7 @@ export function pointsDeLaCourbe(valeurs: (number | null)[]): string {
 export const ETAPES_DU_TUNNEL = [
   ["visiteurs", "Visiteurs"],
   ["imports", "Ont importé une conv"],
-  ["verdicts", "Ont eu leur verdict"],
+  ["paywall", "Ont vu le paywall"],
   ["acheteurs", "Ont acheté"],
   ["racheteurs", "Ont racheté"],
 ] as const satisfies readonly (readonly [keyof Pilotage["tunnel"], string])[];
@@ -146,12 +146,12 @@ export const ETAPES_DU_TUNNEL = [
 export type Fuite = { etape: 1 | 2 | 3; taux: number; depuis: number; vers: number };
 
 /**
- * La plus grosse fuite du tunnel, entre l’arrivée et l’achat (visiteurs → imports, imports → verdicts, verdicts →
+ * La plus grosse fuite du tunnel, entre l’arrivée et l’achat (visiteurs → imports, imports → paywall, paywall →
  * acheteurs) : le passage au plus petit taux, parmi ceux dont l’étape d’avant n’est pas vide. Le rachat n’en est pas une.
  * null : rien à comparer, ou rien ne fuit.
  */
 export function fuiteDuTunnel(t: Pilotage["tunnel"]): Fuite | null {
-  const n = [t.visiteurs, t.imports, t.verdicts, t.acheteurs];
+  const n = [t.visiteurs, t.imports, t.paywall, t.acheteurs];
   let pire: Fuite | null = null;
   for (const etape of [1, 2, 3] as const) {
     const depuis = n[etape - 1] ?? 0;
@@ -172,12 +172,12 @@ export function texteDeLaFuite(f: Fuite): { titre: string; texte: string } {
     };
   if (f.etape === 2)
     return {
-      titre: `${perte} des convs importées n’arrivent pas au verdict`,
-      texte: `C’est la plus grosse fuite du tunnel (${pluriel(f.vers, "verdict")} pour ${pluriel(f.depuis, "conv")} importée${f.depuis > 1 ? "s" : ""}). Regarde «\u00a0Qui es-tu\u00a0?\u00a0», l’attente du verdict et la santé de l’IA.`,
+      titre: `${perte} des convs importées n’arrivent pas au paywall`,
+      texte: `C’est la plus grosse fuite du tunnel (${pluriel(f.vers, "conv")} au paywall pour ${pluriel(f.depuis, "conv")} importée${f.depuis > 1 ? "s" : ""}). Regarde l’import écran par écran\u00a0: «\u00a0Qui es-tu\u00a0?\u00a0», l’email et son code.`,
     };
   return {
-    titre: `${perte} des verdicts ne finissent pas en achat`,
-    texte: `C’est la plus grosse fuite du tunnel (${pluriel(f.vers, "acheteur")} pour ${pluriel(f.depuis, "verdict")}). Le verdict doit donner envie de la suite\u00a0: regarde la feuille du paiement et les coups de pouce.`,
+    titre: `${perte} de ceux qui voient le paywall n’achètent pas`,
+    texte: `C’est la plus grosse fuite du tunnel (${pluriel(f.vers, "acheteur")} pour ${pluriel(f.depuis, "conv")} au paywall). Le verdict vient après le paiement\u00a0: regarde le paywall jusqu’au paiement, le formulaire de Whop et les paiements refusés.`,
   };
 }
 
