@@ -50,7 +50,9 @@ export type CodeTache =
   | "rapport_absent"
   | "memoire_vide"
   | "memoire_absente"
-  | "memoire_changee";
+  | "memoire_changee"
+  /* La suite d’une longue vidéo (src/server/suite-video.ts) ne s’est pas lue avant le verdict (une panne passagère) : il repart sur les lots qui manquent */
+  | "suite_video";
 
 /**
  * Les codes d’un arrêt par un budget, celui de l’IA ou celui de la voix (tasks.error) : l’étape repart après minuit, ce

@@ -40,6 +40,12 @@ export const avanceVerdict = (a: Avance) =>
     ),
   );
 
+/**
+ * L’avancée du verdict (0 à VERDICT_DEPART) pendant la lecture de la suite d’une longue vidéo, avant lui
+ * (src/server/suite-video.ts) : ses lots lus, sur combien. Le verdict repart ensuite de VERDICT_DEPART.
+ */
+export const avanceDeLaSuite = (faits: number, total: number) => Math.round(VERDICT_DEPART * Math.min(1, faits / Math.max(1, total)));
+
 /* ———— Le plan du rapport ———— */
 
 /** Le plan (0 à 100) : sa réflexion jusqu’à ce seuil, puis ses chapitres. */

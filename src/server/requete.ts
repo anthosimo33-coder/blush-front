@@ -77,11 +77,48 @@ export const rendreAuCompte = (compte: { email: string }, nom: LimiteDuCompte) =
  */
 export const sousLaLimiteDeLIp = (req: Request, nom: string, limite: Limite, n = 1) => sousLaLimite(`${nom}:ip:${ipDe(req)}`, limite, n);
 
-/* Le compteur des Ko importés par tous, rangé sur le jour de Paris : il repart à minuit, ses alertes avec lui */
-const koDesBrouillons = (jour: string) => `brouillons:ko:${jour}`;
-
 /** Un import dans le budget d’octets du jour (octetsDansLeBudget) : `rendre` lui retire sa place dans le plafond de tous. */
 export type PlaceDansLeBudget = { rendre: () => Promise<void> };
+
+/**
+ * Un budget d’octets du jour : ses clés (par adresse IP, pour tous, sur le jour de Paris : il repart à minuit, ses
+ * alertes avec lui), ses plafonds, et ce que dit l’alerte à l’équipe.
+ */
+type BudgetDOctets = {
+  cleIp: string;
+  cleTous: (jour: string) => string;
+  parIp: Limite;
+  tous: Limite & { alerteA: number };
+  nom: string;
+  sujet: string;
+  /** Ce que sont ces Ko, dans l’alerte (« 1 200 000 Ko importés le… ») */
+  quoi: string;
+  consequence: string;
+};
+
+const BUDGETS = {
+  /* Le compteur des Ko importés par tous s’appelait déjà ainsi : le changer remettrait le jour à zéro pendant une mise en ligne */
+  imports: {
+    cleIp: "import:ko",
+    cleTous: (jour) => `brouillons:ko:${jour}`,
+    parIp: LIMITES.koImportParIp,
+    tous: LIMITES.koBrouillonsParJour,
+    nom: "LIMITES.koBrouillonsParJour",
+    sujet: "imports",
+    quoi: "importés",
+    consequence: "Au plafond, plus personne ne peut importer\u00a0: chacun voit «\u00a0trop_jour\u00a0» jusqu’à minuit.",
+  },
+  ecrans: {
+    cleIp: "ecrans:ko",
+    cleTous: (jour) => `ecrans:ko:${jour}`,
+    parIp: LIMITES.koEcransParIp,
+    tous: LIMITES.koEcransParJour,
+    nom: "LIMITES.koEcransParJour",
+    sujet: "écrans gardés",
+    quoi: "d’écrans gardés",
+    consequence: "Au plafond, les longues vidéos se lisent en entier avant l’achat (plus cher), jusqu’à minuit.",
+  },
+} as const satisfies Record<string, BudgetDOctets>;
 
 /**
  * Les octets d’un import tiennent-ils dans le budget du jour (S-02) ? Comptés en Ko, arrondis au-dessus, avant de le
@@ -92,18 +129,27 @@ export type PlaceDansLeBudget = { rendre: () => Promise<void> };
  * courte n’entrent pas en base). L’équipe est prévenue quand le jour passe 80 % du plafond de tous, puis au premier
  * refus : une fois chacun par jour.
  */
-export async function octetsDansLeBudget(req: Request, octets: number): Promise<PlaceDansLeBudget | null> {
+export const octetsDansLeBudget = (req: Request, octets: number) => dansLeBudget(BUDGETS.imports, req, octets);
+
+/**
+ * Les octets d’un lot d’écrans gardés (POST /api/captures/ecrans) tiennent-ils dans leur budget du jour ? Comme
+ * octetsDansLeBudget, sur ses plafonds à lui (LIMITES.koEcransParIp, LIMITES.koEcransParJour) : ces écrans restent
+ * chiffrés en base jusqu’à 24 h, sans qu’aucune lecture ne les paie.
+ */
+export const ecransDansLeBudget = (req: Request, octets: number) => dansLeBudget(BUDGETS.ecrans, req, octets);
+
+async function dansLeBudget(b: BudgetDOctets, req: Request, octets: number): Promise<PlaceDansLeBudget | null> {
   const ko = Math.max(1, Math.ceil(octets / 1024));
-  const deLIp = `import:ko:ip:${ipDe(req)}`;
-  if (!(await sousLaLimite(deLIp, LIMITES.koImportParIp, ko))) return null;
-  const { alerteA, ...plafond } = LIMITES.koBrouillonsParJour;
+  const deLIp = `${b.cleIp}:ip:${ipDe(req)}`;
+  if (!(await sousLaLimite(deLIp, b.parIp, ko))) return null;
+  const { alerteA, ...plafond } = b.tous;
   const jour = aujourdhuiParis().iso;
-  const deTous = koDesBrouillons(jour);
+  const deTous = b.cleTous(jour);
   const total = await compter(deTous, plafond, ko);
   const avant = total - ko;
   /* Au-delà du plafond, chaque refus le dit : la clé de l’alerte n’en laisse partir qu’une par jour */
-  if (total > plafond.max) await prevenirDesBrouillons(jour, 1, avant);
-  else if (avant < alerteA * plafond.max && total >= alerteA * plafond.max) await prevenirDesBrouillons(jour, alerteA, total);
+  if (total > plafond.max) await prevenir(b, jour, 1, avant);
+  else if (avant < alerteA * plafond.max && total >= alerteA * plafond.max) await prevenir(b, jour, alerteA, total);
   const rendreATous = () => auMieux(() => rendre(deTous, ko), "Ko d’un import non rendus", { ko });
   if (total <= plafond.max) return { rendre: rendreATous };
   await rendreATous();
@@ -111,21 +157,17 @@ export async function octetsDansLeBudget(req: Request, octets: number): Promise<
   return null;
 }
 
-/** Prévient l’équipe que les Ko importés de ce jour ont passé ce seuil du plafond (1 : atteint), une fois par seuil et par jour. */
-async function prevenirDesBrouillons(jour: string, seuil: number, ko: number): Promise<void> {
+/** Prévient l’équipe que les Ko de ce jour ont passé ce seuil du plafond de tous (1 : atteint), une fois par seuil et par jour. */
+async function prevenir(b: BudgetDOctets, jour: string, seuil: number, ko: number): Promise<void> {
   await auMieux(async () => {
-    if (!(await sousLaLimite(`${koDesBrouillons(jour)}:alerte:${seuil}`, { max: 1, fenetreS: 2 * 86400 }))) return;
-    const { max } = LIMITES.koBrouillonsParJour;
+    if (!(await sousLaLimite(`${b.cleTous(jour)}:alerte:${seuil}`, { max: 1, fenetreS: 2 * 86400 }))) return;
     await alerter(
-      seuil >= 1 ? "imports : plafond du jour atteint" : `imports : ${Math.round(seuil * 100)} % du plafond du jour`,
-      [
-        `${ko} Ko importés le ${jour}, pour un plafond de ${max} Ko par jour (LIMITES.koBrouillonsParJour).`,
-        "Au plafond, plus personne ne peut importer : chacun voit « trop_jour » jusqu’à minuit.",
-      ],
+      seuil >= 1 ? `${b.sujet} : plafond du jour atteint` : `${b.sujet} : ${Math.round(seuil * 100)} % du plafond du jour`,
+      [`${ko} Ko ${b.quoi} le ${jour}, pour un plafond de ${b.tous.max} Ko par jour (${b.nom}).`, b.consequence],
       /* Touche tout le monde : passe dans la réserve des alertes importantes (S-19) */
       { importante: true },
     );
-  }, "alerte des imports du jour");
+  }, "alerte des octets du jour");
 }
 
 /**

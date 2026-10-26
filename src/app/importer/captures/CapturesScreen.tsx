@@ -33,15 +33,21 @@ import { BarreLecture, CarteEnregistrement, CaseAjout, CommentFilmer, Dropzone, 
 /* Les applis lues par captures côté serveur (les autres passent par « autre ») */
 const APPLIS_CAPTURES: AppKind[] = ["instagram", "hinge", "imessage"];
 
-/** Où en est un enregistrement, dit simplement : la vidéo regardée dans le téléphone, puis lue par BLUSH. */
+/**
+ * Où en est un enregistrement, dit simplement : la vidéo regardée dans le téléphone, puis lue par BLUSH ; une longue
+ * vidéo lue en partie, puis le reste de ses écrans envoyé pour après le paiement.
+ * TODO(produit): « J’envoie la suite de ta conv » (26 octobre, la lecture partielle des longues vidéos), à valider.
+ */
 const texteAvance = (a: AvanceVideo) =>
   a.etape === "reprise"
     ? "La connexion a coupé, je reprends…"
     : a.etape === "video"
       ? `Je regarde ton enregistrement · ${Math.round(a.p * 100)}\u00a0%`
-      : a.total > 1
-        ? `BLUSH lit ta conv · ${a.faits} sur ${a.total}`
-        : "BLUSH lit ta conv";
+      : a.etape === "envoi"
+        ? `J’envoie la suite de ta conv · ${a.faits} sur ${a.total}`
+        : a.total > 1
+          ? `BLUSH lit ta conv · ${a.faits} sur ${a.total}`
+          : "BLUSH lit ta conv";
 
 /*
  * Ce que l’écran des captures dit d’abord, d’après l’appli. Instagram (et WhatsApp) s’exportent : on y arrive souvent

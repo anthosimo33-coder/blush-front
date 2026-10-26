@@ -39,8 +39,14 @@ export const NOTE_CODE = `Pas de mot de passe\u00a0: ce code suffit. Il expire a
 /** Sous le champ de la liste d’attente. */
 export const NOTE_ATTENTE = `Un mail pour confirmer, puis un autre le jour où ta place est prête. ${PROMESSE_EMAIL}`;
 
-/** L’enregistrement de l’écran (iMessage) : la vidéo ne part pas, seuls ses écrans. */
-export const NOTE_ENREGISTREMENT = "La vidéo reste sur ton téléphone\u00a0: seuls les écrans de la conv partent, lus une fois puis oubliés.";
+/**
+ * L’enregistrement de l’écran (iMessage) : la vidéo ne part pas, seuls ses écrans. D’une longue vidéo lue en partie
+ * avant l’achat (src/server/lecture-partielle.ts), les écrans les plus anciens attendent le paiement, chiffrés, 24 h au
+ * plus (src/server/ecrans-gardes.ts) : la page de confidentialité le dit en entier.
+ * TODO(produit): la phrase sur les longues vidéos (26 octobre), à valider avec le juriste, comme la page.
+ */
+export const NOTE_ENREGISTREMENT =
+  "La vidéo reste sur ton téléphone\u00a0: seuls les écrans de la conv partent, lus une fois puis oubliés. D’une longue vidéo, les plus anciens peuvent attendre ton paiement, chiffrés, 24\u00a0h au plus.";
 
 /**
  * Sous l’en-tête du rapport, avant « En savoir plus » : la conv est à toi, rien n’en sort sans toi (le détail est dans

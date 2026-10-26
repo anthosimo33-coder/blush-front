@@ -5,6 +5,7 @@ import { alerter } from "./alertes";
 import { purgerLaListe } from "./attente";
 import { db, schema } from "./db";
 import { EVENEMENTS_MAILS_GARDES_JOURS } from "./delivrabilite";
+import { purgerLesEcrans } from "./ecrans-gardes";
 import { PREDICATS } from "./depot";
 import { IMPORTS_GARDES_JOURS } from "./imports";
 import { journalErreur } from "./journal";
@@ -36,6 +37,8 @@ import { PRESENCES_GARDEES_JOURS, VISITES_GARDEES_JOURS } from "./visites";
  * - la mesure des imports (src/server/imports.ts) de plus de 90 jours (IMPORTS_GARDES_JOURS) : /admin n’en lit que les 30 derniers ;
  * - les lectures des lots d’un enregistrement dont les dix minutes sont passées (src/server/lots.ts), que la purge des
  *   5 minutes (GET /api/cron/relances) aurait laissées (une panne) : un filet.
+ * - les écrans gardés des longues vidéos (src/server/ecrans-gardes.ts) dont l’heure est passée : la purge des 5 minutes
+ *   (GET /api/cron/relances) les efface déjà ; celle de la nuit les reprend si elle n’a pas tourné.
  */
 
 /** Combien de jours on garde le registre des effacements : plus que la fenêtre de restauration de Neon (BACKEND.md, « Les sauvegardes »). */
@@ -133,6 +136,9 @@ export async function purger(maintenant = new Date()) {
   });
   await etape("lectures des lots", async () => {
     await purgerLesLecturesDesLots(maintenant);
+  });
+  await etape("écrans gardés des longues vidéos", async () => {
+    await purgerLesEcrans(maintenant);
   });
   await etape("registre des effacements", async () => {
     await db()

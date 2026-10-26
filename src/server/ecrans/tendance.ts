@@ -51,7 +51,21 @@ const arrondi = (x: number) => (x < 10 ? Math.round(x * 10) / 10 : Math.round(x)
  * d’histoire de chaque côté, qui tombe à 60 % d’avant au plus et n’en remonte pas. null : pas de chute nette (ou une
  * conv trop courte, ou des captures sans les jours).
  */
-export function tendance(messages: Message[]): TendanceDuPaywall | null {
+export const tendance = (messages: Message[]): TendanceDuPaywall | null => chuteDe(messages)?.tendance ?? null;
+
+/**
+ * Combien de semaines la conv a avant sa chute (celle de tendance), ou null sans chute. Moins que les semaines de
+ * référence (SEUILS_TENDANCE.semainesDeReference) : son « avant » ne se compare pas à tout ce qui la précède. La lecture
+ * partielle d’une longue vidéo (src/server/lecture-partielle.ts) lit alors plus loin, sinon la chute serait mal datée.
+ */
+export function semainesAvantLaChute(messages: Message[]): number | null {
+  return chuteDe(messages)?.k ?? null;
+}
+
+/** Les semaines de référence de « avant » : la lecture partielle les veut toutes avant de s’arrêter sur une chute. */
+export const SEMAINES_DE_REFERENCE = SEUILS_TENDANCE.semainesDeReference;
+
+function chuteDe(messages: Message[]): { tendance: TendanceDuPaywall; k: number } | null {
   const S = SEUILS_TENDANCE;
   /* Les jours approximatifs (des captures sans date) ne se rangent dans aucune semaine */
   const dates = messages.filter((m) => m.approx !== "jour");
@@ -99,11 +113,14 @@ export function tendance(messages: Message[]): TendanceDuPaywall | null {
 
   const debutCourbe = Math.max(0, nbSemaines - S.courbe);
   return {
-    depuis: jour(coupureJour * J + COUPURE_JOURNEE_H * H),
-    avant: arrondi(meilleure.avant),
-    apres: arrondi(meilleure.apres),
-    semaines: parJour.slice(debutCourbe).map(arrondi),
-    coupure: meilleure.k - debutCourbe,
-    delai: delai && delai.apres >= S.delaiMin && delai.apres >= S.delaiPlusLong * delai.avant ? delai : null,
+    k: meilleure.k,
+    tendance: {
+      depuis: jour(coupureJour * J + COUPURE_JOURNEE_H * H),
+      avant: arrondi(meilleure.avant),
+      apres: arrondi(meilleure.apres),
+      semaines: parJour.slice(debutCourbe).map(arrondi),
+      coupure: meilleure.k - debutCourbe,
+      delai: delai && delai.apres >= S.delaiMin && delai.apres >= S.delaiPlusLong * delai.avant ? delai : null,
+    },
   };
 }

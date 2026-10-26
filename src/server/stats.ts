@@ -11,9 +11,11 @@ import {
   JALONS_PAR_APPLI,
   OFFRES,
   OFFRES_UNIQUES,
+  BRAS_DE_LA_LECTURE,
   RAISONS_DE_LA_NOTE,
   TYPES_D_IMPORT,
   type AppKind,
+  type BrasDeLaLecture,
   type GenreVendu,
   type Jalon,
   type JalonParAppli,
@@ -238,6 +240,37 @@ export type Pilotage = {
     pourRien: number;
   }[];
   /**
+   * La lecture partielle des longues vidéos (src/server/lecture-partielle.ts), sur la période. `bras` : chaque moitié de
+   * l’A/B (BRAS_DE_LA_LECTURE, dans l’ordre, même vide) : ses longues vidéos importées, celles arrivées au paywall et
+   * payées (comme importsParType), ce qu’ont coûté leurs lectures d’avant l’achat et la suite lue après (en dollars), leurs
+   * écrans et leurs lots lus avant, leurs lots gardés et combien en ont gardé (`coupees` : la règle s’est arrêtée avant
+   * la fin, les autres ont tout lu), combien ont vu le titre « Tendance » parmi celles dont le titre est noté, le temps
+   * médian de la première lecture au paywall (en secondes, null sans aucune), leurs suites lues, incomplètes ou perdues,
+   * et, parmi les suites lues, combien de titres la conv entière aurait changés (`titres.entiers`, `titres.changes`).
+   * `contrefactuel` : les longues vidéos lues en entier (le mode « mesure », la moitié entière), ce qu’aurait montré le
+   * haut de leur paywall sur leur seule partie récente, et les lots que la règle aurait épargnés.
+   */
+  lecturePartielle: {
+    bras: {
+      bras: BrasDeLaLecture;
+      videos: number;
+      paywall: number;
+      payes: number;
+      dollarsAvant: number;
+      dollarsSuite: number;
+      ecrans: number;
+      lots: number;
+      lotsGardes: number;
+      coupees: number;
+      tendance: number;
+      titres: number;
+      secondesAuPaywall: number | null;
+      suites: { lues: number; incompletes: number; perdues: number };
+      titresEntiers: { entiers: number; changes: number };
+    }[];
+    contrefactuel: { videos: number; pareil: number; tendancePerdue: number; dateDecalee: number; autreTitre: number; lots: number; lotsEpargnables: number };
+  };
+  /**
    * La dépense de l’IA aujourd’hui (jour de Paris) et le budget du jour (BUDGET_IA.jour), en dollars ; `sansCompte` : la
    * part sans compte (les lectures d’avant l’email, celles en cours comprises par leur réservation) et son budget
    * (BUDGET_IA.anonyme), qui arrête tous les visiteurs sans compte une fois atteint.
@@ -310,7 +343,8 @@ function horsEquipe(colonne: SQL): SQL {
 /**
  * Les postes de coût, d’après l’étiquette de chaque appel au modèle. La mémoire en trois : sa création après le rapport
  * (une par rapport), ses mises à jour en direct, et celles parties en lot (src/server/memoire-en-lot.ts, à moitié prix) :
- * leurs appels se comparent aux messages du chat sans en retirer les créations à l’estime.
+ * leurs appels se comparent aux messages du chat sans en retirer les créations à l’estime. Les captures en deux : la
+ * suite d’une longue vidéo, lue après le paiement (src/server/suite-video.ts), à part de ce qui se lit avant l’achat.
  */
 const POSTES: [string, (tache: string) => boolean][] = [
   ["Verdict", (t) => t === "verdict"],
@@ -319,7 +353,8 @@ const POSTES: [string, (tache: string) => boolean][] = [
   ["Mémoire (mise à jour)", (t) => t === "memoire_maj"],
   ["Mémoire (en lot)", (t) => t === "memoire_maj_lot"],
   ["Chat", (t) => t === "chat"],
-  ["Captures", (t) => t.startsWith("captures") || t === "01"],
+  ["Captures", (t) => (t.startsWith("captures") && t !== "captures_suite") || t === "01"],
+  ["Captures (la suite)", (t) => t === "captures_suite"],
 ];
 
 /*
@@ -540,6 +575,8 @@ async function pilotageDe(jours: Periode): Promise<Pilotage> {
     parType,
     pourRien,
     sansCompte,
+    parBras,
+    contrefactuels,
   ] = await Promise.all([
     lignes<{ debut: string; visiteurs: string; acheteurs: string; centimes: string; micros: string }>(
       sql`with c as (${cases}),
@@ -655,6 +692,52 @@ async function pilotageDe(jours: Periode): Promise<Pilotage> {
           where ${W("u.created_at")} and u.envoi is not null and not exists (select 1 from imports i where i.envoi = u.envoi) group by task`,
     ),
     partSansCompteDuJour(),
+    /*
+     * Les deux moitiés de la lecture partielle : leurs longues vidéos de la période, ce qu’ont coûté leurs lectures d’avant
+     * l’achat (sous l’empreinte de l’envoi) et leur suite (« captures_suite », sous la conv), et le temps de leur première
+     * lecture (le début de son appel : sa fin moins sa durée) jusqu’au paywall (la tâche du verdict posée)
+     */
+    lignes<{
+      bras: BrasDeLaLecture;
+      videos: string;
+      paywall: string;
+      payes: string;
+      avant: string;
+      suite: string;
+      ecrans: string;
+      lots: string;
+      gardes: string;
+      coupees: string;
+      tendance: string;
+      titres: string;
+      secondes: string | null;
+      lues: string;
+      incompletes: string;
+      perdues: string;
+      entiers: string;
+      changes: string;
+    }>(
+      sql`with i as (select bras, envoi, story_id, ecrans, lots, lots_gardes, suite, titre, titre_entier from imports where ${W("cree_le")} and type = 'video' and bras is not null and ${horsEquipe(sql.raw("imports.story_id"))}),
+            c as (select envoi, sum(cost_micros) as micros, min(created_at - ms * interval '1 millisecond') as debut from ai_usage where envoi in (select envoi from i) group by envoi),
+            s as (select story_id, sum(cost_micros) as micros from ai_usage where task = 'captures_suite' and story_id in (select story_id from i) group by story_id),
+            p as (select story_id, min(created_at) as le from tasks where kind = 'verdict' and story_id in (select story_id from i) group by story_id)
+          select i.bras, count(*) as videos, count(p.story_id) as paywall,
+            count(*) filter (where exists (select 1 from achats a where a.story_id = i.story_id and a.paye_le is not null)) as payes,
+            coalesce(sum(c.micros), 0) as avant, coalesce(sum(s.micros), 0) as suite,
+            sum(i.ecrans) as ecrans, sum(i.lots) as lots, sum(i.lots_gardes) as gardes, count(*) filter (where i.lots_gardes > 0) as coupees,
+            count(*) filter (where i.titre = 'tendance') as tendance, count(i.titre) as titres,
+            count(i.titre_entier) as entiers, count(*) filter (where i.titre_entier is not null and i.titre is distinct from i.titre_entier) as changes,
+            percentile_cont(0.5) within group (order by extract(epoch from p.le - c.debut)) filter (where p.le is not null and c.debut is not null) as secondes,
+            count(*) filter (where i.suite = 'lue') as lues, count(*) filter (where i.suite = 'incomplete') as incompletes, count(*) filter (where i.suite = 'perdue') as perdues
+          from i left join c on c.envoi = i.envoi left join s on s.story_id = i.story_id left join p on p.story_id = i.story_id group by i.bras`,
+    ),
+    /* Le contrefactuel des longues vidéos lues en entier de la période (« mesure », la moitié entière) */
+    ligne<{ videos: string; pareil: string; perdue: string; decalee: string; autre: string; lots: string; epargnables: string }>(
+      sql`select count(*) as videos, count(*) filter (where contrefactuel = 'pareil') as pareil, count(*) filter (where contrefactuel = 'tendance_perdue') as perdue,
+            count(*) filter (where contrefactuel = 'date_decalee') as decalee, count(*) filter (where contrefactuel = 'autre_titre') as autre,
+            coalesce(sum(lots), 0) as lots, coalesce(sum(lots_epargnables), 0) as epargnables
+          from imports where ${W("cree_le")} and type = 'video' and contrefactuel is not null and ${horsEquipe(sql.raw("imports.story_id"))}`,
+    ),
   ]);
 
   const m = (c: unknown) => n(c);
@@ -737,6 +820,37 @@ async function pilotageDe(jours: Periode): Promise<Pilotage> {
         pourRien: tache ? n(pourRien.find((x) => x.task === tache)?.micros) / 1e6 : 0,
       };
     }),
+    lecturePartielle: {
+      bras: BRAS_DE_LA_LECTURE.map((bras) => {
+        const l = parBras.find((x) => x.bras === bras);
+        return {
+          bras,
+          videos: n(l?.videos),
+          paywall: n(l?.paywall),
+          payes: n(l?.payes),
+          dollarsAvant: n(l?.avant) / 1e6,
+          dollarsSuite: n(l?.suite) / 1e6,
+          ecrans: n(l?.ecrans),
+          lots: n(l?.lots),
+          lotsGardes: n(l?.gardes),
+          coupees: n(l?.coupees),
+          tendance: n(l?.tendance),
+          titres: n(l?.titres),
+          secondesAuPaywall: l?.secondes == null ? null : Math.round(n(l.secondes)),
+          suites: { lues: n(l?.lues), incompletes: n(l?.incompletes), perdues: n(l?.perdues) },
+          titresEntiers: { entiers: n(l?.entiers), changes: n(l?.changes) },
+        };
+      }),
+      contrefactuel: {
+        videos: n(contrefactuels.videos),
+        pareil: n(contrefactuels.pareil),
+        tendancePerdue: n(contrefactuels.perdue),
+        dateDecalee: n(contrefactuels.decalee),
+        autreTitre: n(contrefactuels.autre),
+        lots: n(contrefactuels.lots),
+        lotsEpargnables: n(contrefactuels.epargnables),
+      },
+    },
     iaDuJour: { dollars: n(iaDuJour.micros) / 1e6, budget: BUDGET_IA.jour, sansCompte: { dollars: sansCompte / 1e6, budget: BUDGET_IA.anonyme } },
     sante: {
       echecs: n(sante.echecs),

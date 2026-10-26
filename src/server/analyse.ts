@@ -9,12 +9,13 @@ import { profil } from "@prompts/lib/style";
 import { alerteSobre, enAlerteSobre, imposerTitres, titresDuVerdict } from "@prompts/lib/titres";
 import { genreDuHaut } from "@/contenu/haut-du-paywall";
 import type { ApercuDuPaywall, Message, ScoreRow } from "@/types";
-import { avanceChapitres, avanceMoitie, avancePlan, avanceVerdict, CHAPITRES_PAR_MOITIE, chapitresFinis } from "./avancement";
+import { avanceChapitres, avanceMoitie, avancePlan, avanceVerdict, CHAPITRES_PAR_MOITIE, chapitresFinis, avanceDeLaSuite } from "./avancement";
 import * as coffre from "./coffre";
 import { db, schema } from "./db";
 import type { DetailEcriture, Genre } from "./db/enums";
 import { donneesMemoire, donneesVerdict, ligneRapport, modifierMemoire } from "./depot";
 import { compterLeHaut } from "./compteurs";
+import { noterLeTitre, noterLeTitreEntier } from "./imports";
 import { contexteDe, convDe, histoireDe, metaDe, provenancesDe, type Ligne, type LigneComplete } from "./histoires";
 import { messagesAffiches } from "./ecrans/messages";
 import { apercuDuPaywall } from "./ecrans/haut-du-paywall";
@@ -119,7 +120,10 @@ export async function ecrireLeContexte(storyId: string): Promise<void> {
   const { contexte } = contexteDuCode(story);
   const context = coffre.ecrire("stories.context", contexte);
   await db().update(schema.stories).set({ context, updatedAt: new Date() }).where(eq(schema.stories.id, storyId));
-  if (contexte.accroche) await compterLeHaut(contexte.accroche, "vu");
+  if (!contexte.accroche) return;
+  await compterLeHaut(contexte.accroche, "vu");
+  /* La mesure des imports le garde aussi, conv par conv (l’A/B de la lecture partielle compare les titres de ses deux moitiés) */
+  await noterLeTitre(storyId, contexte.accroche);
 }
 
 /**
@@ -134,8 +138,32 @@ export async function apercuAvantPaiement(storyId: string): Promise<ApercuDuPayw
   return apercuDuPaywall(chiffres, messages, h);
 }
 
-async function verdict(story: LigneComplete, t: Tache) {
-  const { rendu, chiffres, contexte } = contexteDuCode(story);
+/**
+ * La suite d’une longue vidéo lue en partie avant l’achat (src/server/suite-video.ts), lue avant tout le reste : la conv
+ * devient la vidéo entière, et le verdict, le rapport, la mémoire et le chat la lisent comme si elle avait été lue d’un
+ * coup. La jauge du verdict avance pendant ce temps, jusqu’à son départ (avanceDeLaSuite). Rend la ligne de la conv,
+ * relue si elle a changé (`completee`).
+ */
+async function avecSaSuite(story: LigneComplete, t: Tache): Promise<{ story: LigneComplete; completee: boolean }> {
+  const ecrire = ecrireAvance(t.id);
+  const { lireLaSuite } = await import("./suite-video");
+  const issue = await lireLaSuite(story.id, (faits, total) => ecrire(avanceDeLaSuite(faits, total)));
+  if (issue !== "lue" && issue !== "incomplete") return { story, completee: false };
+  const [relue] = await db().select().from(schema.stories).where(eq(schema.stories.id, story.id));
+  return { story: relue ?? story, completee: true };
+}
+
+async function verdict(lue: LigneComplete, t: Tache) {
+  const { story, completee } = await avecSaSuite(lue, t);
+  const { rendu, chiffres, contexte: calcule } = contexteDuCode(story);
+  /*
+   * Le titre que le paywall a montré reste celui de la conv, même si la conv entière en donnerait un autre (la suite d’une
+   * longue vidéo, lue depuis) : /admin compte les achats de chaque titre vu. Celui de la conv entière se note à part (la
+   * mesure de la lecture partielle : ses titres perdus)
+   */
+  const vu = story.context ? contexteDe(story)?.accroche : undefined;
+  const contexte: Contexte = vu ? { ...calcule, accroche: vu } : calcule;
+  if (completee && calcule.accroche) await noterLeTitreEntier(story.id, calcule.accroche);
   /* Ce que le code sait déjà, gardé avant l’appel : les trouvailles s’affichent pendant que le modèle lit. Chiffré une fois, écrit deux fois : avant l’appel, puis avec le verdict */
   const context = coffre.ecrire("stories.context", contexte);
   await db().update(schema.stories).set({ context, updatedAt: new Date() }).where(eq(schema.stories.id, story.id));

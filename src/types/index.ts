@@ -178,6 +178,29 @@ export type RaisonDeLaNote = (typeof RAISONS_DE_LA_NOTE)[number];
 export const TYPES_D_IMPORT = ["export", "captures", "video"] as const;
 export type TypeDImport = (typeof TYPES_D_IMPORT)[number];
 
+/**
+ * La moitié d’une longue vidéo dans l’A/B de la lecture partielle (src/server/lecture-partielle.ts) : lue en entier avant
+ * l’achat, comme avant, ou seulement sa partie la plus récente, le reste de ses écrans lu après le paiement.
+ */
+export const BRAS_DE_LA_LECTURE = ["entiere", "partielle"] as const;
+export type BrasDeLaLecture = (typeof BRAS_DE_LA_LECTURE)[number];
+
+/**
+ * Ce que devient la suite d’une longue vidéo lue en partie (src/server/suite-video.ts) : elle attend le paiement, elle a
+ * été lue (avant le verdict), lue avec un lot sauté (un refus, une sortie illisible) ou perdue (ses écrans effacés avant
+ * le paiement, ou jamais arrivés).
+ */
+export const ISSUES_DE_LA_SUITE = ["attente", "lue", "incomplete", "perdue"] as const;
+export type IssueDeLaSuite = (typeof ISSUES_DE_LA_SUITE)[number];
+
+/**
+ * Le contrefactuel d’une longue vidéo lue en entier (src/server/lecture-partielle.ts) : le haut du paywall qu’aurait
+ * montré sa seule partie récente, comparé au vrai. Le même titre (« pareil ») ; la tendance perdue ; la tendance datée à
+ * plus de 7 jours de la vraie ; un autre titre.
+ */
+export const CONTREFACTUELS = ["pareil", "tendance_perdue", "date_decalee", "autre_titre"] as const;
+export type Contrefactuel = (typeof CONTREFACTUELS)[number];
+
 /** Les mesures de vitesse que les navigateurs envoient (les Web Vitals : src/lib/sentinelle.tsx), en millisecondes sauf CLS. */
 export const METRIQUES_WEB = ["LCP", "INP", "CLS", "FCP", "TTFB"] as const;
 export type MetriqueWeb = (typeof METRIQUES_WEB)[number];
@@ -247,6 +270,8 @@ export type Source = {
   voiceCount?: number;
   /** Un export trop long pour partir en entier : BLUSH n’en lit que les derniers mois (combien). */
   moisLus?: number;
+  /** Une longue vidéo lue en partie avant l’achat : BLUSH en a lu la partie la plus récente, le début se lira avec le rapport. */
+  suiteVideo?: boolean;
 };
 
 /** Une conv du compte, telle que la liste « Tes convs » la montre : qui, où vous en êtes, quand BLUSH en a parlé pour la dernière fois. */

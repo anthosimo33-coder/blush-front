@@ -158,9 +158,22 @@ export const LIMITES = {
    * (trente-deux le 20 octobre, seize avant). Ramené de 1 200 à 600 par heure le 26 octobre (l’audit des coûts, 1.25) :
    * quarante longs enregistrements par heure et par adresse, leurs nouveaux essais compris, bien assez pour un Wi-Fi
    * partagé ou le NAT d’un opérateur ; une rafale de 1 200 lots coûtait jusqu’à 470 $. Jamais sous 150 : les Wi-Fi
-   * partagés et les clients seraient touchés. Un lot déjà lu (src/server/lots.ts) passe aussi par elle.
+   * partagés et les clients seraient touchés. Un lot déjà lu (src/server/lots.ts) passe aussi par elle, comme la
+   * question du plan d’une longue vidéo (POST /api/captures/video/plan, une par enregistrement).
    */
   lotParIp: { max: 600, fenetreS: 3600 },
+  /*
+   * Les écrans gardés d’une longue vidéo lue en partie avant l’achat (POST /api/captures/ecrans, src/server/suite-video.ts) :
+   * des lots d’images que le modèle ne lit pas tout de suite, chiffrés en base 24 h au plus. Rien n’y coûte une lecture,
+   * mais tout y prend de la place chez Neon. Par heure et par adresse, autant que de lots (une longue vidéo en garde dix au
+   * plus). Leurs octets, en Ko, comme ceux des imports (S-02) : par adresse IP et par 24 h, de quoi passer le NAT d’un
+   * opérateur mobile (une longue vidéo en garde 15 à 30 Mo, 60 au pire) ; pour tous, par jour de Paris, une centaine de
+   * longues vidéos (prévenu à `alerteA`, puis au premier refus). Au-delà, l’envoi est refusé : le navigateur lit alors le
+   * reste avant l’achat, comme avant (rien n’est perdu, c’est seulement plus cher).
+   */
+  ecransParIp: { max: 600, fenetreS: 3600 },
+  koEcransParIp: { max: 300_000, fenetreS: 86400 },
+  koEcransParJour: { max: 3_000_000, fenetreS: 2 * 86400, alerteA: 0.8 },
   /** Des captures ou un export envoyés après l’import (dans le chat ou pour sa fiche) : les lire coûte plus qu’un message. */
   ajoutParCompte: { max: 40, fenetreS: 86400 },
   /**

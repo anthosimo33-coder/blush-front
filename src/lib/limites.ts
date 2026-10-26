@@ -25,6 +25,16 @@ export const ECRANS_PAR_LOT = { min: 6, max: 12 } as const;
 export const ENVOIS_REPRIS_MAX = 10;
 
 /**
+ * Les lots d’un enregistrement lus en même temps par le navigateur (chacun est un appel au modèle : lotParIp et
+ * lotsParCompte les bornent). Une vidéo de plus de lots que ça ne se lit pas en un seul tour : c’est une longue vidéo,
+ * que la lecture partielle peut ne lire qu’en partie avant l’achat (src/server/lecture-partielle.ts).
+ */
+export const LECTEURS_DE_LOTS = 5;
+
+/** Les lots d’un enregistrement, au plus, pour le serveur (/api/captures/video, /api/captures/ecrans) : un très long en fait quinze. */
+export const LOTS_MAX = 40;
+
+/**
  * Au plus 50 invitations de la liste d’attente dans un lot (/admin, POST /api/admin) : le formulaire s’arrête là, le
  * serveur refuse au-delà (src/server/attente.ts, inviterLaListe). Le plafond des mails du jour arrête souvent avant.
  */

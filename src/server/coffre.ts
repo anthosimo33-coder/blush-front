@@ -71,6 +71,10 @@ export type Formes = {
   "tournages.cle": string;
   /** La lecture d’un lot d’enregistrement d’écran (prompt 01), gardée dix minutes : un nouvel essai ne la repaie pas (src/server/lots.ts). */
   "lectures_des_lots.lu": Captures;
+  /** La lecture d’un lot d’écrans gardés, faite après le paiement (src/server/suite-video.ts) : un nouvel essai ne la repaie pas. */
+  "ecrans_gardes.lu": Captures;
+  /** Les lectures des lots d’une longue vidéo lus avant l’achat, dans l’ordre de la vidéo : la suite les rejoint après le paiement. */
+  "suites_video.recents": Captures[];
 };
 export type Colonne = keyof Formes;
 
@@ -95,6 +99,8 @@ const MetaGardee = z
     participants: z.tuple([participantGarde, participantGarde]),
     captures: z.number().optional(),
     coupe: z.boolean().optional(),
+    /* Une longue vidéo lue en partie avant l’achat (depuis le 26 octobre) : sa suite attend le paiement */
+    suiteVideo: z.boolean().optional(),
     moi: z.literal([0, 1]).optional(),
     pronom: z.string().optional(),
     devinette: z.string().optional(),
@@ -189,13 +195,18 @@ const REGISTRE: { [C in Colonne]: Regle<Formes[C]> } = {
   "tournages.cle": {},
   /* Quelques dizaines de Ko de texte (les messages d’une douzaine d’écrans), qui se compressent bien */
   "lectures_des_lots.lu": { compressee: true },
+  "ecrans_gardes.lu": {},
+  /* Cinq lots lus, de quelques dizaines de Ko chacun : du texte, qui se compresse bien */
+  "suites_video.recents": { compressee: true },
 };
 
 /** Les colonnes d’audio (des MP3) : chiffrées telles quelles, sans JSON (ecrireAudio, lireAudio). */
 const AUDIOS = ["vocals.audio", "chat_vocals.audio"];
+/** Les colonnes d’images (les écrans gardés d’une longue vidéo, des JPEG à la suite) : chiffrées telles quelles, sans JSON (ecrireImages, lireImages). */
+const IMAGES = ["ecrans_gardes.data"];
 
 /** Toutes les colonnes que le coffre connaît (tests/unit/coffre.test.ts les compare aux colonnes chiffrées du schéma). */
-export const COLONNES = [...Object.keys(REGISTRE), ...AUDIOS];
+export const COLONNES = [...Object.keys(REGISTRE), ...AUDIOS, ...IMAGES];
 
 /* ———— Lire, écrire ———— */
 
@@ -223,3 +234,17 @@ export const ecrireAudio = (audio: Buffer): Buffer => chiffrerOctets(audio);
 
 /** Un audio (vocals.audio, chat_vocals.audio), déchiffré. */
 export const lireAudio = (chiffre: Buffer | Uint8Array): Buffer => dechiffrerOctets(chiffre);
+
+/**
+ * Les images d’un lot d’écrans gardés (ecrans_gardes.data), à la suite, chiffrées : sans compression (un JPEG ne se
+ * compresse plus), ni JSON (le base64 les grossirait d’un tiers). Leur taille, à part, les redécoupe (lireImages).
+ */
+export const ecrireImages = (images: Buffer[]): Buffer => chiffrerOctets(Buffer.concat(images));
+
+/** Les images d’un lot d’écrans gardés, déchiffrées puis redécoupées d’après leurs tailles (dans l’ordre de l’écriture). */
+export function lireImages(chiffre: Buffer | Uint8Array, tailles: readonly number[]): Buffer[] {
+  const tout = dechiffrerOctets(chiffre);
+  if (tailles.reduce((n, t) => n + t, 0) !== tout.length) throw new ErreurInvariant("ecrans_gardes.data:tailles", "ecrans_gardes.data : les tailles ne couvrent pas les images");
+  let debut = 0;
+  return tailles.map((t) => tout.subarray(debut, (debut += t)));
+}

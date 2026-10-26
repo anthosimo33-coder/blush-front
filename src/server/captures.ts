@@ -84,23 +84,35 @@ export async function lireCaptures(images: Image[], appli: string, envoi: string
  * Ce qui accompagne la lecture d’un lot : l’empreinte de son envoi (la mesure des imports, src/server/imports.ts), et
  * pour un lot d’enregistrement (src/server/lots.ts) la sienne (`lot` : un nouvel essai qui le reprend en prend le coût),
  * de quoi l’arrêter (`signal` : son envoi abandonné), suivre son flux (`surAvance`) et dire quand sa réponse commence
- * (`auDebut` : le premier lot de l’envoi).
+ * (`auDebut` : le premier lot de l’envoi). Un lot gardé d’une longue vidéo, lu après le paiement
+ * (src/server/suite-video.ts) : sa conv (`storyId`) et le jour de son import (`jour`, AAAA-MM-JJ : « hier » s’y date
+ * comme à l’import).
  */
-type SuiviDuLot = Pick<OptionsAppel, "envoi" | "lot" | "signal" | "surAvance" | "auDebut">;
+type SuiviDuLot = Pick<OptionsAppel, "envoi" | "lot" | "signal" | "surAvance" | "auDebut" | "storyId"> & { jour?: string };
 
 /**
  * La lecture brute d’un lot d’images (des captures, ou les images d’un enregistrement d’écran). Les lots d’un
- * enregistrement sont notés à part dans ai_usage (« captures_video ») : la durée d’un import de captures (un seul appel,
- * de 1 à 20 images) se mesure alors sans eux, pour décider s’il faut le lire en lots. Une sortie illisible : « fichier » ;
- * un refus du modèle : « refus » (exigerSortie). Ce que lit le modèle ne dépend que des images, de l’appli et du jour :
- * la même lecture peut resservir (src/server/lots.ts).
+ * enregistrement sont notés à part dans ai_usage (« captures_video »), ceux de la suite d’une longue vidéo, lus après le
+ * paiement, aussi (« captures_suite ») : la durée d’un import de captures (un seul appel, de 1 à 20 images) se mesure
+ * alors sans eux, pour décider s’il faut le lire en lots. Une sortie illisible : « fichier » ; un refus du modèle :
+ * « refus » (exigerSortie). Ce que lit le modèle ne dépend que des images, de l’appli et du jour : la même lecture peut
+ * resservir (src/server/lots.ts).
  */
-export async function lireLot(images: Image[], appli: string, etiquette: "captures" | "captures_video" = "captures", suivi: SuiviDuLot = {}): Promise<Captures> {
-  /* Le budget de l’IA du jour (src/server/budget.ts) : la lecture est payée par le compte connecté, sinon par la part sans compte */
-  const compte = await utilisateurDeSession(await lireSession());
-  const a = await appeler(requeteCaptures({ prenom: "l’utilisateur", autre: null, appli, aujourdhui: aujourdhuiParis().t, images }), Sortie01, {
+export async function lireLot(
+  images: Image[],
+  appli: string,
+  etiquette: "captures" | "captures_video" | "captures_suite" = "captures",
+  { jour, ...suivi }: SuiviDuLot = {},
+): Promise<Captures> {
+  /*
+   * Le budget de l’IA du jour (src/server/budget.ts) : la suite d’une vidéo est payée par le compte de sa conv (lue hors
+   * de toute requête du navigateur : la chaîne), une autre lecture par le compte connecté, sinon par la part sans compte
+   */
+  const compte = suivi.storyId ? undefined : await utilisateurDeSession(await lireSession());
+  const aujourdhui = jour ? Date.parse(`${jour}T00:00:00Z`) : aujourdhuiParis().t;
+  const a = await appeler(requeteCaptures({ prenom: "l’utilisateur", autre: null, appli, aujourdhui, images }), Sortie01, {
     etiquette,
-    compte,
+    ...(compte === undefined ? {} : { compte }),
     ...suivi,
   });
   return exigerSortie(a, () => new ErreurImport("fichier"));

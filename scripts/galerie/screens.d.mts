@@ -11,6 +11,7 @@ import type { Page } from "@playwright/test";
 export type Compte =
   | "brouillon"
   | "brouillon-court"
+  | "video-partielle"
   | "morceaux"
   | "code"
   | "gratuit"

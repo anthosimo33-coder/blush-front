@@ -348,6 +348,7 @@ describe("la relance par mail (②)", () => {
       "dues",
       "ecartees",
       "echecs",
+      "ecrans",
       "envoyees",
       "lecturesEffacees",
       "lotsAnnules",

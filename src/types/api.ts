@@ -6,7 +6,7 @@
  * ici : tests/unit/contrat.test.ts compare la table aux routes de src/app/api, et vérifie ces imports.
  */
 import { z } from "zod";
-import { ENVOIS_REPRIS_MAX, INVITATIONS_PAR_LOT, NOM_TOURNAGE_MAX, PRENOM_MAX } from "@/lib/limites";
+import { ENVOIS_REPRIS_MAX, INVITATIONS_PAR_LOT, LOTS_MAX, NOM_TOURNAGE_MAX, PRENOM_MAX } from "@/lib/limites";
 import {
   CLES_DES_APPLIS,
   DESINSCRIPTIONS,
@@ -29,6 +29,7 @@ import {
 import type {
   AnalysisProgress,
   BlushAnswer,
+  BrasDeLaLecture,
   Echec,
   EtapeVisite,
   Fiche,
@@ -105,9 +106,11 @@ export type HistoriqueChat = { echanges: EchangeChat[]; plus: boolean; modeVocal
 
 /**
  * Où en est la lecture d’un enregistrement d’écran : la vidéo regardée dans le navigateur, puis ses lots lus par BLUSH.
+ * « envoi » : une longue vidéo lue en partie avant l’achat, ses lots plus anciens envoyés pour après le paiement.
  * « reprise » : le réseau a coupé pendant un envoi de captures ou d’enregistrement, il repart (voir avecReprise).
  */
-export type AvanceVideo = { etape: "video"; p: number } | { etape: "lecture"; faits: number; total: number } | { etape: "reprise" };
+export type AvanceVideo =
+  { etape: "video"; p: number } | { etape: "lecture"; faits: number; total: number } | { etape: "envoi"; faits: number; total: number } | { etape: "reprise" };
 
 /** Le verdict tel que le montre un lien partagé : le prénom de l’autre en initiale, le tien en clair (« C. t’attend, Hugo »). */
 export type VerdictMontre = { emoji: string; title: string };
@@ -275,6 +278,30 @@ type ConvImportee = { source: Source; story: Story };
 /** Ce que répondent les routes qui ne disent rien de plus que « c’est fait ». */
 type Ok = { ok: true };
 
+/**
+ * Une longue vidéo lue en partie avant l’achat (src/server/lecture-partielle.ts), pas encore importée : `lire`, ses
+ * `lots` plus anciens juste avant ceux déjà lus sont à lire (puis la renvoyer) ; `garder`, ses `lots` plus anciens sont
+ * à envoyer tels quels (POST /api/captures/ecrans, lus après le paiement), puis la renvoyer avec `gardes`.
+ */
+export type SuiteDeLaVideo = { suite: "lire" | "garder"; lots: number };
+
+/*
+ * Ce que le navigateur dit d’une longue vidéo (POST /api/captures/video) : ses lots plus anciens pas encore lus
+ * (`restants`), tous ses écrans, l’empreinte de son lot le plus récent (`video`, la moitié de l’A/B), si son sens de
+ * défilement est sûr, et si ses lots plus anciens sont déjà envoyés (`gardes`)
+ */
+const LongueVideo = z.object({
+  restants: z.number().int().min(0).max(LOTS_MAX),
+  ecrans: z
+    .number()
+    .int()
+    .min(1)
+    .max(LOTS_MAX * 12),
+  video: z.string().min(16).max(128),
+  sensSur: z.boolean(),
+  gardes: z.literal(true).optional(),
+});
+
 /* ———— Ce que les routes reçoivent ———— */
 
 /** « Qui es-tu ? » : qui tu es dans la conv (l’un de ses deux participants, p0 ou p1), ton pronom, ta devinette, ce que tu veux. */
@@ -364,7 +391,12 @@ type Reponses = {
   "POST /api/captures/lot": { lot: unknown };
   /** Toujours `{ ok: true }` : le navigateur l’envoie en partant (src/server/lots.ts). */
   "POST /api/captures/lot/abandon": Ok;
-  "POST /api/captures/video": ConvImportee & { messagesRead: number };
+  /** La conv importée, ou ce qui reste à faire d’une longue vidéo lue en partie (SuiteDeLaVideo). */
+  "POST /api/captures/video": (ConvImportee & { messagesRead: number }) | SuiteDeLaVideo;
+  /** Comment lire une longue vidéo avant l’achat : en entier, ou d’abord sa partie la plus récente (src/server/lecture-partielle.ts). */
+  "POST /api/captures/video/plan": { lecture: BrasDeLaLecture };
+  /** Les écrans d’un lot gardés, le temps de l’import et du paiement (src/server/ecrans-gardes.ts). */
+  "POST /api/captures/ecrans": Ok;
   "GET /api/achats": { achats: AchatDuCompte[] };
   "GET /api/chat": HistoriqueChat;
   /** D’un bloc ; en flux, quand le navigateur le demande (Accept), une ligne JSON par événement (EvenementChat, src/types). */
@@ -388,6 +420,8 @@ type Reponses = {
     lotsAnnules: number;
     /** Les lectures des lots d’un enregistrement dont les dix minutes sont passées, effacées (src/server/lots.ts). */
     lecturesEffacees: number;
+    /** Les écrans gardés des longues vidéos effacés à leur heure (src/server/ecrans-gardes.ts). */
+    ecrans: number;
   };
   "POST /api/desinscription": Ok;
   "POST /api/desinscription/un-clic": Ok;
@@ -537,8 +571,25 @@ export const ROUTES = {
       consentement: z.string().max(40).optional(),
       mode: z.literal("ajout").optional(),
       repris: z.array(z.string().max(64)).max(ENVOIS_REPRIS_MAX).optional(),
+      /* Une longue vidéo : ce qui permet de n’en lire avant l’achat que la partie la plus récente (src/server/lecture-partielle.ts) */
+      partiel: LongueVideo.optional(),
     }),
   },
+  /*
+   * Avant de lire une longue vidéo : ses lots, l’empreinte de son lot le plus récent (`video`), si son sens est sûr, et
+   * l’accord de l’import ; `mode: "ajout"`, un morceau de plus (lu en entier)
+   */
+  "POST /api/captures/video/plan": {
+    corps: z.object({
+      lots: z.number().int().min(1).max(LOTS_MAX),
+      video: z.string().min(16).max(128),
+      sensSur: z.boolean(),
+      consentement: z.string().max(40).optional(),
+      mode: z.literal("ajout").optional(),
+    }),
+  },
+  /* Les images d’un lot à garder, son rang dans la vidéo (0 : le plus ancien), son appli, la clé de l’envoi et l’accord de l’import */
+  "POST /api/captures/ecrans": { formulaire: true },
   "GET /api/achats": {},
   "GET /api/chat": {},
   /*
