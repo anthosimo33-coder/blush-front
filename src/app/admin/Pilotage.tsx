@@ -12,6 +12,7 @@ import {
   NOMS_DES_GROUPES,
   NOMS_DES_PAIRES,
   NOMS_DES_SOURCES,
+  NOMS_DES_TYPES_D_IMPORT,
   NOMS_DES_VENTES,
   PAIRES,
   SOURCE_INCONNUE,
@@ -65,7 +66,7 @@ import { SondeDuDirect } from "./SondeDuDirect";
 /*
  * Le pilotage (/admin) : ce qui se passe sur la période, d’un coup d’œil. En haut, « À regarder » (ce qui coince, puis
  * les bonnes nouvelles) ; puis l’argent (le chiffre d’affaires net, case par case) à côté du direct ; les quatre chiffres
- * clés ; le tunnel, puis le détail de l’import et du paywall (leurs jalons), et qui importe ; les mails des séquences et leur délivrabilité ; d’où viennent les visiteurs et ce qui se vend ; ce que coûte l’IA et la santé ; enfin les outils de
+ * clés ; le tunnel, puis le détail de l’import et du paywall (leurs jalons), et qui importe ; les mails des séquences et leur délivrabilité ; d’où viennent les visiteurs et ce qui se vend ; l’IA avant l’achat (par type d’import), ce que coûte l’IA et la santé ; enfin les outils de
  * l’équipe. Que des nombres : aucune conv, aucun message, aucun email. Chaque carte a son « ? » (src/contenu/aide-pilotage.ts).
  * Maquette validée le 13 octobre ; l’écran d’avant reste à /admin?version=actuelle.
  * TODO(produit): textes du pilotage à valider.
@@ -163,6 +164,7 @@ export function Pilotage({
             <CeQuiSeVend s={s} />
           </div>
 
+          <IAAvantLAchat p={p} />
           <div className="flex flex-wrap gap-4 md:gap-6">
             <Couts s={s} />
             <Sante s={s} />
@@ -1239,6 +1241,106 @@ function CeQuiSeVend({ s }: { s: StatsAdmin }) {
   );
 }
 
+/* ———— L’IA avant l’achat, par type d’import ———— */
+
+/* Une moyenne par import : à l’unité, à la décimale sous 10 (des exports dont quelques-uns ont reçu un morceau de captures : « 0,4 écran ») */
+const moyenne = (v: number) => (v < 10 ? Math.round(v * 10) / 10 : Math.round(v));
+
+/* Une durée en secondes : « 45 s », « 2 min 5 s » */
+const duree = (secondes: number) => (secondes >= 60 ? `${Math.floor(secondes / 60)}\u00a0min ${secondes % 60}\u00a0s` : `${secondes}\u00a0s`);
+
+/**
+ * Ce que coûtent les convs avant que la personne paie, par type d’import (src/server/imports.ts) : combien sont arrivées,
+ * ce que leurs lectures ont coûté par import, le temps médian jusqu’au paywall, la part qui y arrive et celle qui paie (à
+ * partir de PERSONNES_D_UN_TAUX convs), et ce que coûte un acheteur, lu pour rien compris.
+ */
+function IAAvantLAchat({ p }: { p: Chiffres }) {
+  const types = p.importsParType;
+  const total = types.reduce((t, x) => t + x.dollars + x.pourRien, 0);
+  const pourRien = types.filter((x) => x.pourRien > 0);
+  const lignes = types.filter((x) => x.imports || x.pourRien);
+  return (
+    <Bloc
+      id="ia-avant-achat"
+      titre="L’IA avant l’achat"
+      sous="Par type d’import, ce que coûte une conv avant le paiement"
+      aide={{ cle: "avantLAchat", valeur: dollars(total), contexte: "lus avant l’achat sur la période" }}
+    >
+      {lignes.length ? (
+        <div role="region" aria-label="L’IA avant l’achat, par type d’import, à faire défiler" tabIndex={0} className="-mx-2 mt-[18px] overflow-x-auto px-2">
+          <table className="w-full min-w-[720px] border-collapse text-left">
+            <caption className="sr-only">
+              Par type d’import, les convs importées, l’IA par import, le temps médian jusqu’au paywall, la part au paywall et la part qui paie, l’IA par acheteur
+            </caption>
+            <thead>
+              <tr className="text-micro font-black uppercase tracking-[0.06em] text-grey">
+                <th scope="col" className="pb-2.5 pr-3 font-black">
+                  Type
+                </th>
+                <th scope="col" className="pb-2.5 pr-3 text-right font-black">
+                  Imports
+                </th>
+                <th scope="col" className="pb-2.5 pr-3 text-right font-black">
+                  IA par import
+                </th>
+                <th scope="col" className="pb-2.5 pr-3 text-right font-black">
+                  Jusqu’au paywall
+                </th>
+                <th scope="col" className="pb-2.5 pr-3 text-right font-black">
+                  Paywall
+                </th>
+                <th scope="col" className="pb-2.5 pr-3 text-right font-black">
+                  Paient
+                </th>
+                <th scope="col" className="pb-2.5 text-right font-black">
+                  IA par acheteur
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {lignes.map((x) => {
+                const parImport = rapport(x.dollars, x.imports);
+                const parAcheteur = rapport(x.dollars + x.pourRien, x.payes);
+                const auPaywall = tauxLisible(x.paywall, x.imports);
+                const paient = tauxLisible(x.payes, x.imports);
+                const ecrans = rapport(x.ecrans, x.imports);
+                const lots = rapport(x.lots, x.imports);
+                return (
+                  <tr key={x.type} className="border-t border-sep text-detail font-extrabold">
+                    <th scope="row" className="py-3 pr-3 text-left font-extrabold">
+                      <span className="block">{NOMS_DES_TYPES_D_IMPORT[x.type]}</span>
+                      {ecrans !== null && lots !== null && x.lots > 0 && (
+                        <span className="block text-micro font-bold text-grey">{`${pluriel(moyenne(ecrans), "écran")}, ${pluriel(moyenne(lots), "lot")} par import`}</span>
+                      )}
+                    </th>
+                    <td className="py-3 pr-3 text-right tabular-nums">{nombre(x.imports)}</td>
+                    <td className="py-3 pr-3 text-right tabular-nums">{parImport === null ? "—" : dollars(parImport)}</td>
+                    <td className="py-3 pr-3 text-right tabular-nums">{x.secondesAuPaywall === null ? "—" : duree(x.secondesAuPaywall)}</td>
+                    <td className="py-3 pr-3 text-right tabular-nums">{auPaywall === null ? "—" : pourcent(auPaywall * 100, 0)}</td>
+                    <td className="py-3 pr-3 text-right tabular-nums">
+                      {nombre(x.payes)}
+                      <span className="ml-1.5 text-micro text-grey">{paient === null ? "—" : pourcent(paient * 100)}</span>
+                    </td>
+                    <td className="py-3 text-right tabular-nums">{parAcheteur === null ? "—" : dollars(parAcheteur)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <p className="m-0 mt-[18px] text-note font-bold text-grey">Aucun import mesuré sur la période.</p>
+      )}
+      <p className="m-0 mt-3 text-legende font-bold text-grey">
+        {pourRien.length
+          ? `Lu pour rien (aucune conv importée ensuite)\u00a0: ${pourRien.map((x) => `${NOMS_DES_TYPES_D_IMPORT[x.type].toLowerCase()} ${dollars(x.pourRien)}`).join(", ")}, compté dans l’IA par acheteur.`
+          : "Rien de lu pour rien sur la période."}{" "}
+        {`«\u00a0—\u00a0»\u00a0: moins de ${PERSONNES_D_UN_TAUX}\u00a0convs, trop peu pour un taux.`}
+      </p>
+    </Bloc>
+  );
+}
+
 /* ———— Ce que coûte l’IA ———— */
 
 function Couts({ s }: { s: StatsAdmin }) {
@@ -1247,6 +1349,7 @@ function Couts({ s }: { s: StatsAdmin }) {
   const parAcheteur = rapport(c.total, p.acheteurs.valeur);
   const max = Math.max(0.0001, ...c.postes.map((x) => x.dollars));
   const jour = rapport(p.iaDuJour.dollars, p.iaDuJour.budget);
+  const sansCompte = rapport(p.iaDuJour.sansCompte.dollars, p.iaDuJour.sansCompte.budget);
   const ecart = ecartRelatif(c.total, c.avant, dollars, null);
   return (
     <Bloc
@@ -1297,6 +1400,23 @@ function Couts({ s }: { s: StatsAdmin }) {
         >
           <div className="h-full rounded-full" style={{ width: `${Math.min(1, jour ?? 0) * 100}%`, background: (jour ?? 0) >= 0.8 ? ORANGE : "var(--ink)" }} />
         </div>
+        {/* La part sans compte (src/server/budget.ts) : atteinte, tous les visiteurs d’avant l’email voient « souffle » jusqu’à minuit */}
+        <p className="m-0 mt-3.5 flex justify-between gap-3 text-detail font-extrabold">
+          <span>Sans compte</span>
+          <span className="tabular-nums">
+            {dollars(p.iaDuJour.sansCompte.dollars)} sur {dollars(p.iaDuJour.sansCompte.budget)}
+          </span>
+        </p>
+        <div
+          role="img"
+          aria-label={`${dollars(p.iaDuJour.sansCompte.dollars)} de la part sans compte sur ${dollars(p.iaDuJour.sansCompte.budget)} aujourd’hui`}
+          className="mt-2.5 h-3 overflow-hidden rounded-full bg-paper"
+        >
+          <div className="h-full rounded-full" style={{ width: `${Math.min(1, sansCompte ?? 0) * 100}%`, background: (sansCompte ?? 0) >= 0.8 ? ORANGE : "var(--ink)" }} />
+        </div>
+        <p className="m-0 mt-2 text-legende font-bold text-grey">
+          Les captures et les vidéos d’avant l’email, celles en cours comprises. Atteinte, elles s’arrêtent jusqu’à minuit.
+        </p>
       </div>
     </Bloc>
   );

@@ -13,7 +13,7 @@ import { ErreurPublique } from "./erreurs";
 import { brouillonDe, metaDe, type Meta } from "./histoires";
 import { ErreurImport } from "./import";
 import { exigerSortie } from "./ia/appel-verifie";
-import { appeler } from "./ia/claude";
+import { appeler, type OptionsAppel } from "./ia/claude";
 import { LIMITES, sousLaLimite } from "./limites";
 import { sousLaLimiteDuCompte } from "./requete";
 import { aujourdhuiParis } from "./temps";
@@ -72,23 +72,37 @@ export async function imagesDe(fichiers: File[]): Promise<Image[]> {
 }
 
 /**
- * Lit les captures (prompt 01) et les remet au format « captures » que la lecture connaît.
+ * Lit les captures (prompt 01) et les remet au format « captures » que la lecture connaît. `envoi` : l’empreinte de
+ * l’envoi (src/server/imports.ts), notée avec le coût de la lecture.
  * Rien de lisible (que des captures hors sujet) : l’erreur « capture », que le front sait afficher.
  */
-export async function lireCaptures(images: Image[], appli: string): Promise<TexteCaptures> {
-  return enTexte(await lireLot(images, appli));
+export async function lireCaptures(images: Image[], appli: string, envoi: string | null = null): Promise<TexteCaptures> {
+  return enTexte(await lireLot(images, appli, "captures", { envoi }));
 }
+
+/**
+ * Ce qui accompagne la lecture d’un lot : l’empreinte de son envoi (la mesure des imports, src/server/imports.ts), et
+ * pour un lot d’enregistrement (src/server/lots.ts) la sienne (`lot` : un nouvel essai qui le reprend en prend le coût),
+ * de quoi l’arrêter (`signal` : son envoi abandonné), suivre son flux (`surAvance`) et dire quand sa réponse commence
+ * (`auDebut` : le premier lot de l’envoi).
+ */
+type SuiviDuLot = Pick<OptionsAppel, "envoi" | "lot" | "signal" | "surAvance" | "auDebut">;
 
 /**
  * La lecture brute d’un lot d’images (des captures, ou les images d’un enregistrement d’écran). Les lots d’un
  * enregistrement sont notés à part dans ai_usage (« captures_video ») : la durée d’un import de captures (un seul appel,
  * de 1 à 20 images) se mesure alors sans eux, pour décider s’il faut le lire en lots. Une sortie illisible : « fichier » ;
- * un refus du modèle : « refus » (exigerSortie).
+ * un refus du modèle : « refus » (exigerSortie). Ce que lit le modèle ne dépend que des images, de l’appli et du jour :
+ * la même lecture peut resservir (src/server/lots.ts).
  */
-export async function lireLot(images: Image[], appli: string, etiquette: "captures" | "captures_video" = "captures"): Promise<Captures> {
+export async function lireLot(images: Image[], appli: string, etiquette: "captures" | "captures_video" = "captures", suivi: SuiviDuLot = {}): Promise<Captures> {
   /* Le budget de l’IA du jour (src/server/budget.ts) : la lecture est payée par le compte connecté, sinon par la part sans compte */
   const compte = await utilisateurDeSession(await lireSession());
-  const a = await appeler(requeteCaptures({ prenom: "l’utilisateur", autre: null, appli, aujourdhui: aujourdhuiParis().t, images }), Sortie01, { etiquette, compte });
+  const a = await appeler(requeteCaptures({ prenom: "l’utilisateur", autre: null, appli, aujourdhui: aujourdhuiParis().t, images }), Sortie01, {
+    etiquette,
+    compte,
+    ...suivi,
+  });
   return exigerSortie(a, () => new ErreurImport("fichier"));
 }
 

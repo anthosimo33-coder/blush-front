@@ -123,10 +123,11 @@ describe("/api/captures", () => {
 });
 
 describe("un enregistrement d’écran : /api/captures/lot puis /api/captures/video", () => {
+  /* Un écran qu’aucun autre lancement ne recopie : un lot déjà lu reste dix minutes en base (src/server/lots.ts), et ne rappellerait pas le modèle */
   const lot = (ip: string, consentement?: string) => {
     etat.cookies.set("blush-session", session);
     const fd = new FormData();
-    fd.append("captures", new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47])], "e.png", { type: "image/png" }));
+    fd.append("captures", new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47]), crypto.randomUUID()], "e.png", { type: "image/png" }));
     fd.append("app", "imessage");
     if (consentement !== undefined) fd.append("consentement", consentement);
     return postLot(requete("/api/captures/lot", ip, { method: "POST", body: fd }));

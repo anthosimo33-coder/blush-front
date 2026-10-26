@@ -6,7 +6,7 @@
  * ici : tests/unit/contrat.test.ts compare la table aux routes de src/app/api, et vérifie ces imports.
  */
 import { z } from "zod";
-import { INVITATIONS_PAR_LOT, NOM_TOURNAGE_MAX, PRENOM_MAX } from "@/lib/limites";
+import { ENVOIS_REPRIS_MAX, INVITATIONS_PAR_LOT, NOM_TOURNAGE_MAX, PRENOM_MAX } from "@/lib/limites";
 import {
   CLES_DES_APPLIS,
   DESINSCRIPTIONS,
@@ -362,6 +362,8 @@ type Reponses = {
   "POST /api/captures": ConvImportee & { messagesRead: number };
   /** La lecture brute d’un lot : le navigateur ne la lit pas, il la rend à /api/captures/video. */
   "POST /api/captures/lot": { lot: unknown };
+  /** Toujours `{ ok: true }` : le navigateur l’envoie en partant (src/server/lots.ts). */
+  "POST /api/captures/lot/abandon": Ok;
   "POST /api/captures/video": ConvImportee & { messagesRead: number };
   "GET /api/achats": { achats: AchatDuCompte[] };
   "GET /api/chat": HistoriqueChat;
@@ -377,7 +379,16 @@ type Reponses = {
   "GET /api/cron/chaine": Ok;
   "GET /api/cron/purge": { brouillons: number; convs: number; sessions: number };
   /* `lotsEnvoyes`, `lotsLus`, `lotsAnnules` : les mises à jour de la mémoire envoyées en lot, les lots relevés, ceux annulés (src/server/memoire-en-lot.ts) */
-  "GET /api/cron/relances": PassageDesRelances & { chaines: number; prises: number; sequences: number; lotsEnvoyes: number; lotsLus: number; lotsAnnules: number };
+  "GET /api/cron/relances": PassageDesRelances & {
+    chaines: number;
+    prises: number;
+    sequences: number;
+    lotsEnvoyes: number;
+    lotsLus: number;
+    lotsAnnules: number;
+    /** Les lectures des lots d’un enregistrement dont les dix minutes sont passées, effacées (src/server/lots.ts). */
+    lecturesEffacees: number;
+  };
   "POST /api/desinscription": Ok;
   "POST /api/desinscription/un-clic": Ok;
   /** Le webhook de Resend (ce qui arrive aux mails), hors de la garde commune : sa signature (401 « interdit » sinon). */
@@ -444,6 +455,14 @@ type Reponses = {
 type Entree = { corps?: z.ZodType; formulaire?: true };
 
 /**
+ * Pourquoi le navigateur abandonne un enregistrement en cours de lecture (POST /api/captures/lot/abandon, src/server/lots.ts) :
+ * un de ses lots a échoué pour de bon (`echec` : tous ses lots s’arrêtent), ou la page est fermée (`page` : un rechargement,
+ * l’onglet fermé ; seuls ses lots qui n’ont pas encore commencé chez le prestataire s’arrêtent).
+ */
+const RAISONS_D_ABANDON = ["echec", "page"] as const;
+export type RaisonDAbandon = (typeof RAISONS_D_ABANDON)[number];
+
+/**
  * La table des routes, à l’exécution : ce que chacune reçoit. Une route sans corps reçoit tout au plus une requête
  * (`?avant=`, `?conv=`) ou des en-têtes. Ce qu’elle répond n’est qu’un type (Reponses) : rien de plus à embarquer.
  * La route lit son corps par ce schéma (lireCorps), qu’elle peut resserrer de ce que seul le serveur sait vérifier.
@@ -498,12 +517,17 @@ export const ROUTES = {
   /* Le jeton du widget voyage dans l’en-tête x-blush-captcha (ENTETE_CAPTCHA, src/lib/captcha.ts), comme à la demande de code */
   "POST /api/captcha": {},
   "POST /api/captures": { formulaire: true },
+  /* Les images d’un lot, son appli, l’accord de l’import, la clé de l’envoi (`cle`) et son ordre (« premier », « suite ») */
   "POST /api/captures/lot": { formulaire: true },
+  /* La clé de l’envoi abandonné, celle de ses lots, et pourquoi (RAISONS_D_ABANDON) */
+  "POST /api/captures/lot/abandon": { corps: z.object({ cle: z.string().max(64), raison: z.enum(RAISONS_D_ABANDON) }) },
   /*
    * Les lots lus (/api/captures/lot), rendus tels quels : le serveur les revérifie, appli comprise. `cle` : celle de
-   * l’envoi, pour qu’un nouvel essai après une coupure retrouve l’histoire déjà créée. `consentement` : la version de la
-   * case de l’import cochée (src/server/juridique.ts) ; sans elle, 422 `consentement`. `mode: "ajout"` : un morceau de
-   * plus pour la conv qu’on importe (src/server/morceaux.ts)
+   * l’envoi (la même que ses lots : la mesure des imports y retrouve leur coût), pour qu’un nouvel essai après une
+   * coupure retrouve l’histoire déjà créée. `consentement` : la version de la case de l’import cochée
+   * (src/server/juridique.ts) ; sans elle, 422 `consentement`. `mode: "ajout"` : un morceau de plus pour la conv qu’on
+   * importe (src/server/morceaux.ts). `repris` : les clés des envois d’avant dont l’onglet a repris des lots déjà lus
+   * (un nouvel essai de la même vidéo) : leur coût passe sous cet import (src/server/imports.ts)
    */
   "POST /api/captures/video": {
     corps: z.object({
@@ -512,6 +536,7 @@ export const ROUTES = {
       cle: z.string().max(64).optional(),
       consentement: z.string().max(40).optional(),
       mode: z.literal("ajout").optional(),
+      repris: z.array(z.string().max(64)).max(ENVOIS_REPRIS_MAX).optional(),
     }),
   },
   "GET /api/achats": {},

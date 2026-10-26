@@ -47,6 +47,7 @@ import type {
   OffreUniqueMontree,
   RoueDuCompte,
   PaiementCommence,
+  RaisonDAbandon,
   ReponseErreur,
   ReportPayload,
   Routes,
@@ -55,7 +56,8 @@ import type {
 import { ErreurApi } from "@/types/erreurs-api";
 import { CASE_RENONCIATION } from "@/contenu/consentements";
 import { codeDe, messageErreur, problemeAjout } from "@/lib/messages-erreur";
-import { ENVOI_IMAGES_MAX, extensionAudio } from "@/lib/limites";
+import { jourDeParis } from "@/lib/jours";
+import { ENVOI_IMAGES_MAX, ENVOIS_REPRIS_MAX, extensionAudio } from "@/lib/limites";
 import { ENTETE_CAPTCHA } from "@/lib/captcha";
 import { cleDuSiteCaptcha } from "@/lib/publique";
 import { retenirSecrets } from "@/lib/secrets";
@@ -386,6 +388,11 @@ export async function uploadScreenshots(
  * Un enregistrement d’écran de la conv (sa première importation) : le navigateur en tire les écrans de la conv (la vidéo
  * ne part pas), BLUSH les lit par lots (cinq à la fois), puis les lectures sont rassemblées en une histoire brouillon,
  * comme des captures. `consentement` : la version de la case de l’import cochée, envoyée avec chaque lot et avec leur fin.
+ * Un lot n’est jamais payé deux fois (src/server/lots.ts) : un lot déjà lu dans cet onglet ne repart pas
+ * (preparer-video.ts, lotDejaLu ; la fin donne au serveur les clés des envois repris, pour la mesure des imports), le
+ * premier lot à lire part d’abord (`ordre` : les autres attendent, sur le serveur, que sa réponse commence, pour ne pas
+ * écrire chacun le texte système en cache), et un envoi abandonné le dit au serveur : un lot en échec pour de bon arrête
+ * les lots encore en cours ; la page fermée n’arrête que ceux qui n’ont pas commencé chez le prestataire.
  */
 export async function uploadRecording(
   file: File,
@@ -395,7 +402,7 @@ export async function uploadRecording(
   { ajout = false }: { ajout?: boolean } = {},
 ): Promise<{ source: Source; messagesRead: number; story: Story }> {
   const passe = laissezPasser();
-  const { imagesDeLaVideo, lotsDe, tailleDesLots, VideoIllisible } = await pVideo();
+  const { imagesDeLaVideo, lotsDe, tailleDesLots, VideoIllisible, empreinteDuLot, lotDejaLu, garderLeLot } = await pVideo();
   let images: Blob[];
   try {
     images = await imagesDeLaVideo(file, (p) => onAvance?.({ etape: "video", p }));
@@ -408,24 +415,56 @@ export async function uploadRecording(
    * plus lourd). Avec Sonnet, un lot de douze se lit en 25 à 30 s, un lot de six en 15 s environ (21 octobre).
    */
   const lots = lotsDe(images, tailleDesLots(images.length, LECTEURS), (b) => b.size, ENVOI_IMAGES_MAX);
+  /*
+   * La clé de l’envoi, la même pour ses lots et pour leur fin : le serveur y range leur coût (la mesure des imports), y
+   * reconnaît le premier lot et l’abandon, et un nouvel essai de la fin après une coupure retrouve l’histoire déjà créée
+   */
+  const cle = cleEnvoi();
+  const jour = jourDeParis();
+  /* Un lot après l’autre : une longue vidéo pèse des dizaines de Mo d’images, un téléphone ne les relit pas toutes d’un coup */
+  const empreintes: (string | null)[] = [];
+  for (const l of lots) empreintes.push(await empreinteDuLot(l, app, jour));
+  const lus: unknown[] = new Array(lots.length);
+  /* Les lots déjà lus dans cet onglet (un nouvel essai de la même vidéo) ne repartent pas ; leurs envois d’avant, pour la mesure */
+  const repris = new Set<string>();
+  const aLire = lots.flatMap((_, k) => {
+    const deja = lotDejaLu(empreintes[k] ?? null);
+    if (deja === undefined) return [k];
+    lus[k] = deja.lot;
+    if (deja.cle !== cle) repris.add(deja.cle);
+    return [];
+  });
   /* Le même laissez-passer pour tous les lots, puis pour les rassembler */
   await passe;
-  const lus: unknown[] = new Array(lots.length);
-  let faits = 0;
+  let faits = lots.length - aLire.length;
   onAvance?.({ etape: "lecture", faits, total: lots.length });
   let suivant = 0;
-  /* Un lot qui échoue encore après un nouvel essai : les autres s’arrêtent (pas d’appels payés pour rien) */
+  /*
+   * Un lot qui échoue encore après un nouvel essai (ou la page fermée, plus bas) : les autres s’arrêtent (pas d’appels
+   * payés pour rien), ici et chez le serveur
+   */
   const arret = new AbortController();
+  const abandonner = (raison: RaisonDAbandon) => {
+    if (arret.signal.aborted) return;
+    arret.abort();
+    void appel("POST /api/captures/lot/abandon", { corps: { cle, raison }, keepalive: true }).catch(() => {});
+  };
+  /* Le premier lot à lire part d’abord ; seul à lire, il n’a personne à prévenir */
+  const ordre = (k: number) => (aLire.length < 2 ? null : k === aLire[0] ? "premier" : "suite");
   const lireLot = async (k: number) => {
     const fd = new FormData();
     (lots[k] ?? []).forEach((b, i) => fd.append("captures", b, `ecran-${k + 1}-${i + 1}.jpg`));
     fd.append("app", app);
     fd.append("consentement", consentement);
+    fd.append("cle", cle);
+    const o = ordre(k);
+    if (o) fd.append("ordre", o);
     return (await appel("POST /api/captures/lot", { corps: fd, signal: arret.signal })).lot;
   };
   const lecteur = async () => {
-    while (suivant < lots.length && !arret.signal.aborted) {
-      const k = suivant++;
+    while (suivant < aLire.length && !arret.signal.aborted) {
+      /* suivant < aLire.length : le lot existe */
+      const k = aLire[suivant++]!;
       try {
         lus[k] = await lireLot(k).catch(async (e: unknown) => {
           /*
@@ -438,15 +477,30 @@ export async function uploadRecording(
           return lireLot(k);
         });
       } catch (e) {
-        arret.abort();
+        abandonner("echec");
         throw e;
       }
+      garderLeLot(empreintes[k] ?? null, { lot: lus[k], cle });
       onAvance?.({ etape: "lecture", faits: ++faits, total: lots.length });
     }
   };
-  await Promise.all(Array.from({ length: Math.min(LECTEURS, lots.length) }, lecteur));
-  /* La clé : un nouvel essai après une coupure retrouve l’histoire déjà créée au lieu d’en faire une seconde */
-  const corps = { app, lots: lus, cle: cleEnvoi(), consentement, ...(ajout ? { mode: "ajout" as const } : {}) };
+  /*
+   * La page fermée pour de bon pendant la lecture (l’onglet fermé, une autre adresse, un rechargement) : ses lots qui
+   * n’ont pas encore commencé chez le prestataire ne partent plus ; ceux en cours vont au bout (leur entrée est payée),
+   * et la page rechargée qui renvoie la même vidéo les retrouve sur le serveur. Pas une page mise de côté par le
+   * navigateur (persisted : elle peut revenir, et ses lots reprendre), ni Safari passé en arrière-plan (pagehide ne vient
+   * pas) : tous leurs lots continuent
+   */
+  const enPartant = (e: PageTransitionEvent) => {
+    if (!e.persisted) abandonner("page");
+  };
+  window.addEventListener("pagehide", enPartant);
+  try {
+    await Promise.all(Array.from({ length: Math.min(LECTEURS, aLire.length) }, lecteur));
+  } finally {
+    window.removeEventListener("pagehide", enPartant);
+  }
+  const corps = { app, lots: lus, cle, consentement, ...(repris.size ? { repris: [...repris].slice(0, ENVOIS_REPRIS_MAX) } : {}), ...(ajout ? { mode: "ajout" as const } : {}) };
   return avecReprise(
     () => appel("POST /api/captures/video", { corps }),
     () => onAvance?.({ etape: "reprise" }),

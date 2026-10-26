@@ -1,12 +1,13 @@
 import { eq } from "drizzle-orm";
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it, vi } from "vitest";
 import type { Captures } from "@prompts/lib/schemas";
 import { enTexte } from "@/server/captures";
 import { db, schema } from "@/server/db";
 import { storyAffichee } from "@/server/conv-affichee";
 import { importerCaptures } from "@/server/histoires";
 import { fusionnerLots, recouvrement } from "@/server/video";
-import { decalage, garderLesPlusRecents, IMAGES_MAX, lotsDe, tailleDesLots } from "@/services/preparer-video";
+import { decalage, empreinteDuLot, garderLesPlusRecents, garderLeLot, IMAGES_MAX, lotDejaLu, lotsDe, tailleDesLots } from "@/services/preparer-video";
+import { empreinteDuLot as empreinteDuServeur } from "@/server/lots";
 import { captures, msg } from "./aide/fabriques";
 import { accordDeTest } from "./aide/fixtures";
 
@@ -141,6 +142,51 @@ describe("l’enregistrement, découpé et mesuré dans le navigateur", () => {
     const court = [1, 2, 3];
     expect(garderLesPlusRecents(court, true)).toBe(false);
     expect(court).toEqual([1, 2, 3]);
+  });
+
+  it("l’empreinte d’un lot, dans le navigateur comme sur le serveur : la même pour les mêmes images, la même appli et le même jour ; une autre sinon", async () => {
+    const image = (octets: number[]) => new Blob([new Uint8Array(octets)], { type: "image/jpeg" });
+    const [a, b] = [image([1, 2, 3]), image([4, 5])];
+    const navigateur = (images: Blob[], appli = "imessage", jour = "2026-10-26") => empreinteDuLot(images, appli, jour);
+    const meme = await navigateur([a, b]);
+    expect(meme).toMatch(/^[0-9a-f]{64}$/);
+    expect(await navigateur([image([1, 2, 3]), image([4, 5])])).toBe(meme);
+    const autres = await Promise.all([
+      navigateur([b, a]),
+      navigateur([a]),
+      navigateur([a, b], "instagram"),
+      navigateur([a, b], "imessage", "2026-10-27"),
+      navigateur([image([1, 2]), image([3, 4, 5])]),
+    ]);
+    expect(new Set([meme, ...autres]).size).toBe(6);
+    /* Le serveur, sur les images reçues (base64) : le même principe */
+    const recue = (octets: number[]) => ({ media: "image/jpeg" as const, base64: Buffer.from(octets).toString("base64") });
+    const serveur = empreinteDuServeur([recue([1, 2, 3]), recue([4, 5])], "imessage", "2026-10-26");
+    expect(empreinteDuServeur([recue([1, 2, 3]), recue([4, 5])], "imessage", "2026-10-26")).toBe(serveur);
+    expect(
+      new Set([
+        serveur,
+        empreinteDuServeur([recue([4, 5]), recue([1, 2, 3])], "imessage", "2026-10-26"),
+        empreinteDuServeur([recue([1, 2, 3]), recue([4, 5])], "imessage", "2026-10-27"),
+      ]).size,
+    ).toBe(3);
+  });
+
+  it("un lot lu reste dans l’onglet, frais une heure, avec la clé de l’envoi qui l’a lu ; sans empreinte, rien n’est gardé", () => {
+    const lot = { blocs: [] };
+    garderLeLot("lot-a", { lot, cle: "cle-de-l-envoi" });
+    expect(lotDejaLu("lot-a")).toEqual({ lot, cle: "cle-de-l-envoi" });
+    expect(lotDejaLu("lot-a")?.lot).toBe(lot);
+    expect(lotDejaLu("lot-b")).toBeUndefined();
+    garderLeLot(null, { lot, cle: "cle-de-l-envoi" });
+    expect(lotDejaLu(null)).toBeUndefined();
+    const maintenant = Date.now();
+    const horloge = vi.spyOn(Date, "now").mockReturnValue(maintenant + 61 * 60e3);
+    try {
+      expect(lotDejaLu("lot-a")).toBeUndefined();
+    } finally {
+      horloge.mockRestore();
+    }
   });
 
   it("mesure de combien la conv a défilé, et voit quand elle a sauté", () => {

@@ -12,6 +12,7 @@ import {
   OFFRES,
   OFFRES_UNIQUES,
   RAISONS_DE_LA_NOTE,
+  TYPES_D_IMPORT,
   type AppKind,
   type GenreVendu,
   type Jalon,
@@ -20,10 +21,11 @@ import {
   type OffreUnique,
   type RaisonDeLaNote,
   type SourceVisite,
+  type TypeDImport,
 } from "@/types";
 import { pronomDeLAutreLu } from "./accords";
 import { etatDeLaListe } from "./attente";
-import { BUDGET_IA } from "./budget";
+import { BUDGET_IA, partSansCompteDuJour } from "./budget";
 import { COMPTE_DU_TOURNAGE } from "./compte-du-tournage";
 import { CLES, CLES_DE_LA_NOTE, HAUT, MAIL, NOTE, PANNE } from "./compteurs";
 import { CLES_DES_MAILS, type CleDeMail } from "./sequences";
@@ -214,8 +216,33 @@ export type Pilotage = {
    * offer rouverte (le mail parti) ou sans (le témoin), et ceux qui ont payé un rapport dans les 3 jours.
    */
   abDerniere: { avec: { n: number; payes: number }; sans: { n: number; payes: number } };
-  /** La dépense de l’IA aujourd’hui (jour de Paris) et le budget du jour (BUDGET_IA.jour), en dollars. */
-  iaDuJour: { dollars: number; budget: number };
+  /**
+   * L’IA avant l’achat, par type d’import (src/server/imports.ts) : pour chaque type de TYPES_D_IMPORT, dans l’ordre, même
+   * vide, les convs importées sur la période (sans les prises du mode tournage, ni celles des comptes de l’équipe :
+   * horsEquipe), leurs écrans et leurs lots lus par le modèle, ce qu’ont coûté ces lectures (en dollars, une lecture
+   * notée après l’import comprise), celles arrivées au paywall (leur lecture lancée, comme le tunnel) et celles payées
+   * (un achat payé pour la conv, même remboursé depuis : une conv effacée depuis n’y compte plus). `secondesAuPaywall` :
+   * le temps médian de leur première lecture (le début de son appel ; l’import, pour un export) au paywall, en
+   * secondes (null sans aucune). `pourRien` : ce que le modèle a lu sur la période avant un import qui n’est jamais venu
+   * (un enregistrement abandonné, des captures refusées), en dollars.
+   */
+  importsParType: {
+    type: TypeDImport;
+    imports: number;
+    ecrans: number;
+    lots: number;
+    dollars: number;
+    paywall: number;
+    payes: number;
+    secondesAuPaywall: number | null;
+    pourRien: number;
+  }[];
+  /**
+   * La dépense de l’IA aujourd’hui (jour de Paris) et le budget du jour (BUDGET_IA.jour), en dollars ; `sansCompte` : la
+   * part sans compte (les lectures d’avant l’email, celles en cours comprises par leur réservation) et son budget
+   * (BUDGET_IA.anonyme), qui arrête tous les visiteurs sans compte une fois atteint.
+   */
+  iaDuJour: { dollars: number; budget: number; sansCompte: { dollars: number; budget: number } };
   /**
    * Ce qui coince sur la période : les tâches en échec, celles bloquées en ce moment, les paiements refusés (un achat
    * resté en attente, lui, est surtout un paiement abandonné), les réponses de BLUSH sorties en alerte danger (leurs
@@ -256,6 +283,29 @@ const lignes = async <T>(q: SQL) => (await db().execute(q)).rows as T[];
 /** La ligne d’un agrégat (count, sum sans group by) : il en rend toujours une. */
 const ligne = async <T>(q: SQL) => uneLigne(await lignes<T>(q), "stats");
 const n = (v: unknown) => Number(v ?? 0);
+
+/** L’étiquette des lectures d’avant l’import de chaque type (src/server/captures.ts) : un export n’en a pas. */
+const TACHE_DU_TYPE: Record<TypeDImport, string | null> = { export: null, captures: "captures", video: "captures_video" };
+
+/**
+ * Les emails de l’équipe (BLUSH_ADMINS, sinon BLUSH_ALERTES) et de ses invités (BLUSH_ACCES_LIBRE, sauf « * » : tout le
+ * monde), en minuscules : leurs imports ne comptent pas parmi ceux de la mesure (tests ≠ clients). Ils ne paient jamais
+ * (tout leur est ouvert), et quelques essais d’une vidéo pèseraient lourd sur une dizaine de longues vidéos par semaine.
+ */
+function emailsDeLEquipe(): string[] {
+  const e = env();
+  return [...new Set([...(e.BLUSH_ADMINS ?? e.BLUSH_ALERTES), ...(e.BLUSH_ACCES_LIBRE === "*" ? [] : e.BLUSH_ACCES_LIBRE)].map((m) => m.toLowerCase()))];
+}
+
+/**
+ * La conv de cet import (`colonne` : son story_id) n’est pas celle d’un compte de l’équipe (emailsDeLEquipe). Un
+ * brouillon jamais rattaché, ou une conv effacée, compte : rien ne dit d’où il venait.
+ */
+function horsEquipe(colonne: SQL): SQL {
+  const equipe = emailsDeLEquipe();
+  if (!equipe.length) return sql`true`;
+  return sql`not exists (select 1 from stories s join users u on u.id = s.user_id where s.id = ${colonne} and lower(u.email) in ${equipe})`;
+}
 
 /**
  * Les postes de coût, d’après l’étiquette de chaque appel au modèle. La mémoire en trois : sa création après le rapport
@@ -487,6 +537,9 @@ async function pilotageDe(jours: Periode): Promise<Pilotage> {
     abChat,
     convsDeLaPeriode,
     notes,
+    parType,
+    pourRien,
+    sansCompte,
   ] = await Promise.all([
     lignes<{ debut: string; visiteurs: string; acheteurs: string; centimes: string; micros: string }>(
       sql`with c as (${cases}),
@@ -581,6 +634,27 @@ async function pilotageDe(jours: Periode): Promise<Pilotage> {
     lignes<{ key: string; n: string }>(
       sql`select key, sum(count) as n from counters where key like ${`${NOTE}%`} and day > (now() at time zone 'Europe/Paris')::date - ${jours}::int group by key`,
     ),
+    /*
+     * Les imports de la période (hors de l’équipe), ce qu’ont coûté leurs lectures (ai_usage, sous l’empreinte de leur
+     * envoi), et le temps de leur première lecture (le début de son appel : sa fin moins sa durée ; l’import, pour un
+     * export) jusqu’au paywall (la tâche du verdict posée)
+     */
+    lignes<{ type: TypeDImport; imports: string; ecrans: string; lots: string; micros: string; paywall: string; payes: string; secondes: string | null }>(
+      sql`with i as (select type, envoi, story_id, ecrans, lots, cree_le from imports where ${W("cree_le")} and ${horsEquipe(sql.raw("imports.story_id"))}),
+            c as (select envoi, sum(cost_micros) as micros, min(created_at - ms * interval '1 millisecond') as debut from ai_usage where envoi in (select envoi from i) group by envoi),
+            p as (select story_id, min(created_at) as le from tasks where kind = 'verdict' and story_id in (select story_id from i) group by story_id)
+          select i.type, count(*) as imports, sum(i.ecrans) as ecrans, sum(i.lots) as lots, coalesce(sum(c.micros), 0) as micros,
+            count(p.story_id) as paywall,
+            count(*) filter (where exists (select 1 from achats a where a.story_id = i.story_id and a.paye_le is not null)) as payes,
+            percentile_cont(0.5) within group (order by extract(epoch from p.le - coalesce(c.debut, i.cree_le))) filter (where p.le is not null) as secondes
+          from i left join c on c.envoi = i.envoi left join p on p.story_id = i.story_id group by i.type`,
+    ),
+    /* Les lectures d’avant l’import de la période dont aucun import n’est né : des captures (« captures »), des lots (« captures_video ») */
+    lignes<{ task: string; micros: string }>(
+      sql`select task, sum(cost_micros) as micros from ai_usage u
+          where ${W("u.created_at")} and u.envoi is not null and not exists (select 1 from imports i where i.envoi = u.envoi) group by task`,
+    ),
+    partSansCompteDuJour(),
   ]);
 
   const m = (c: unknown) => n(c);
@@ -648,7 +722,22 @@ async function pilotageDe(jours: Periode): Promise<Pilotage> {
       avec: { n: n(ab.find((l) => !l.temoin)?.n), payes: n(ab.find((l) => !l.temoin)?.payes) },
       sans: { n: n(ab.find((l) => l.temoin)?.n), payes: n(ab.find((l) => l.temoin)?.payes) },
     },
-    iaDuJour: { dollars: n(iaDuJour.micros) / 1e6, budget: BUDGET_IA.jour },
+    importsParType: TYPES_D_IMPORT.map((type) => {
+      const l = parType.find((x) => x.type === type);
+      const tache = TACHE_DU_TYPE[type];
+      return {
+        type,
+        imports: n(l?.imports),
+        ecrans: n(l?.ecrans),
+        lots: n(l?.lots),
+        dollars: n(l?.micros) / 1e6,
+        paywall: n(l?.paywall),
+        payes: n(l?.payes),
+        secondesAuPaywall: l?.secondes == null ? null : Math.round(n(l.secondes)),
+        pourRien: tache ? n(pourRien.find((x) => x.task === tache)?.micros) / 1e6 : 0,
+      };
+    }),
+    iaDuJour: { dollars: n(iaDuJour.micros) / 1e6, budget: BUDGET_IA.jour, sansCompte: { dollars: sansCompte / 1e6, budget: BUDGET_IA.anonyme } },
     sante: {
       echecs: n(sante.echecs),
       bloquees: n(sante.bloquees),

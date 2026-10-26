@@ -164,6 +164,31 @@ function pilotageDe(jours: Periode, { calme = false, suivi = true }: Variante): 
     ["instagram", 0.27, 0.38],
     ["autre", 0.16, 0.71],
   ];
+  /*
+   * L’IA avant l’achat, par type d’import (la semaine du 26 octobre : 110 convs, 9 payées, ≈ 20 $ de captures et de
+   * vidéos) : la part de chaque type parmi les imports, ses écrans et ses lots par import, ce qu’il coûte par import, et
+   * le temps médian jusqu’au paywall, la part qui y arrive et qui paie ; un peu de lu pour rien sur les captures et les
+   * vidéos
+   */
+  const types: [Pilotage["importsParType"][number]["type"], number, number, number, number, number, number, number][] = [
+    ["export", 0.46, 0, 0, 0, 0.9, 0.1, 95],
+    ["captures", 0.31, 6, 1, 0.07, 0.85, 0.07, 110],
+    ["video", 0.23, 120, 11, 0.95, 0.83, 0.06, 185],
+  ];
+  const importsParType = types.map(([type, part, ecrans, lots, dollars, paywall, payes, secondes]) => {
+    const n = Math.round(imports * part);
+    return {
+      type,
+      imports: n,
+      ecrans: n * ecrans,
+      lots: n * lots,
+      dollars: n * dollars,
+      paywall: Math.round(n * paywall),
+      payes: Math.round(n * payes),
+      secondesAuPaywall: n ? secondes : null,
+      pourRien: n * dollars * 0.08,
+    };
+  });
   const jalonsParAppli = applis
     .map(([appli, part, passe]) => {
       const choisie = Math.round(jalons.appli * part);
@@ -250,7 +275,8 @@ function pilotageDe(jours: Periode, { calme = false, suivi = true }: Variante): 
       { cle: "s2_question", envoyes: 31, clics: 5, payes: 0 },
     ],
     abDerniere: { avec: { n: 38, payes: 6 }, sans: { n: 41, payes: 3 } },
-    iaDuJour: { dollars: 12.4, budget: 30 },
+    importsParType,
+    iaDuJour: { dollars: 12.4, budget: 30, sansCompte: { dollars: 3.1, budget: 50 } },
     sante: calme
       ? { echecs: 0, bloquees: 0, paiementsEchoues: 0, alertes: 0, pannes: 0, pannesDuJour: 0 }
       : { echecs: 3, bloquees: 1, paiementsEchoues: 2, alertes: 1, pannes: 2, pannesDuJour: 1 },

@@ -31,6 +31,7 @@ describe("le serveur", () => {
       sobre: 409,
       tournage: 409,
       deja: 409,
+      abandon: 409,
       acces: 402,
       bientot: 402,
       carte: 402,

@@ -25,13 +25,17 @@ type Cout = {
   ms: number;
   /** Qui paie, quand l’appel compte dans le budget du jour d’un compte (src/server/budget.ts) : la dépense s’y ajoute aussi. */
   payeur?: Payeur;
+  /** Une lecture d’avant l’import : l’empreinte de son envoi, que l’import retrouve (src/server/imports.ts). */
+  envoi?: string | null;
+  /** Un lot d’enregistrement : son empreinte, qu’un nouvel essai qui le reprend retrouve (src/server/lots.ts). */
+  lot?: string | null;
 };
 
 /**
  * Note un appel dans le suivi des coûts (et, avec `payeur`, dans la dépense du jour de qui paie). Ne lève jamais : le
  * suivi des coûts ne doit pas faire échouer une réponse, une ligne perdue part dans les logs (son étiquette seulement).
  */
-export async function noterCout({ storyId, tache, modele, entree = 0, sortie = 0, cacheLu = 0, cacheEcrit = 0, micros: brut, ms, payeur }: Cout): Promise<void> {
+export async function noterCout({ storyId, tache, modele, entree = 0, sortie = 0, cacheLu = 0, cacheEcrit = 0, micros: brut, ms, payeur, envoi, lot }: Cout): Promise<void> {
   /*
    * Arrondi une fois pour les deux : la dépense du jour s’ajoute à un compteur entier (rate_limits.count). La voix est
    * comptée au caractère (22 $ pour 121 000), des millionièmes à virgule : sans l’arrondi, Postgres refusait chaque
@@ -52,6 +56,8 @@ export async function noterCout({ storyId, tache, modele, entree = 0, sortie = 0
         cacheWriteTokens: cacheEcrit,
         costMicros: micros,
         ms: Math.round(ms),
+        envoi: envoi ?? null,
+        lot: lot ?? null,
       });
   } catch (e) {
     journalErreur("usage non noté", e, { tache });

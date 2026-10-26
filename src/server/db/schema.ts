@@ -35,6 +35,7 @@ import {
   OFFRES_UNIQUES,
   SOURCES_VISITE,
   STATUTS_ACHAT,
+  TYPES_D_IMPORT,
   VOIX,
 } from "../../types";
 import {
@@ -512,13 +513,72 @@ export const aiUsage = pgTable(
     /** En millionièmes de dollar. */
     costMicros: integer("cost_micros").notNull().default(0),
     ms: integer("ms").notNull().default(0),
+    /**
+     * Une lecture d’avant l’import (des captures, un lot d’enregistrement d’écran) : l’empreinte de son envoi
+     * (src/server/imports.ts, envoiDe), jamais sa clé. L’import qui en naît la retrouve (imports.envoi) ; sans import,
+     * elle a été lue pour rien. Vide pour tout autre appel.
+     */
+    envoi: text("envoi"),
+    /**
+     * Un lot d’enregistrement d’écran : son empreinte (empreinteDuLot, src/server/lots.ts, passée par la clé du serveur :
+     * rien n’y reconnaît des images). Un nouvel essai de l’enregistrement qui reprend ce lot déjà lu (un autre envoi)
+     * range alors son coût sous le sien (reprendreLeLot, src/server/imports.ts). Vide pour tout autre appel.
+     */
+    lot: text("lot"),
     createdAt: quand("created_at").notNull().defaultNow(),
   },
   /*
    * Supprimer une histoire met ses lignes à vide (set null) : sans index, toute la table serait parcourue. La dépense du
-   * jour (src/server/budget.ts) et le tableau de bord (src/server/stats.ts) la lisent par date.
+   * jour (src/server/budget.ts) et le tableau de bord (src/server/stats.ts) la lisent par date ; la mesure des imports,
+   * par envoi et par lot.
    */
-  (t) => [index("ai_usage_story_idx").on(t.storyId), index("ai_usage_created_idx").on(t.createdAt)],
+  (t) => [index("ai_usage_story_idx").on(t.storyId), index("ai_usage_created_idx").on(t.createdAt), index("ai_usage_envoi_idx").on(t.envoi), index("ai_usage_lot_idx").on(t.lot)],
+);
+
+/**
+ * Les lectures des lots d’un enregistrement d’écran (src/server/lots.ts), gardées dix minutes (`expire_le`) : un nouvel
+ * essai du même lot qui arrive sur une autre instance (le réseau coupé, la page rechargée) la retrouve au lieu de la
+ * payer une seconde fois. Le texte lu seulement, chiffré (`lu`), jamais les images. `lot` : l’empreinte du lot
+ * (empreinteDuLot, passée par la clé du serveur) ; `envoi` : celle de l’envoi qui l’a payé (envoiDe, src/server/imports.ts),
+ * jamais sa clé. Jamais vers le journal ; vers le navigateur, seulement à qui renvoie les mêmes images. Effacées par la
+ * purge des 5 minutes, une fois leur heure passée (purgerLesLecturesDesLots).
+ */
+export const lecturesDesLots = pgTable(
+  "lectures_des_lots",
+  {
+    lot: text("lot").primaryKey(),
+    envoi: text("envoi"),
+    lu: chiffre("lu").notNull(),
+    expireLe: quand("expire_le").notNull(),
+  },
+  (t) => [index("lectures_des_lots_expire_idx").on(t.expireLe)],
+);
+
+/**
+ * La mesure des imports (src/server/imports.ts, /admin « L’IA avant l’achat ») : une ligne par conv importée (pas une
+ * prise du mode tournage), sans rien de son contenu. Son type (TYPES_D_IMPORT) et son appli, ses écrans et ses lots lus
+ * (ceux de ses morceaux ajoutés avant « Qui es-tu ? » compris), et l’empreinte de son envoi (`envoi`), sous laquelle
+ * ai_usage range ce qu’ont coûté ses lectures. Ce qu’elle devient (le paywall, le paiement) se lit par sa conv. Une conv
+ * effacée (la purge des brouillons, « Supprimer ») y laisse sa ligne, sans conv : elle compte encore parmi les imports,
+ * avec ce qu’elle a coûté. Gardées IMPORTS_GARDES_JOURS (la purge de la nuit).
+ */
+export const imports = pgTable(
+  "imports",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    storyId: uuid("story_id")
+      .unique()
+      .references(() => stories.id, { onDelete: "set null" }),
+    envoi: text("envoi").notNull().unique(),
+    type: text("type", { enum: TYPES_D_IMPORT }).notNull(),
+    appli: text("appli", { enum: CLES_DES_APPLIS }).notNull(),
+    /** Les écrans lus par le modèle avant l’import : des captures, ou les images d’un enregistrement (sans les doublons des jointures). */
+    ecrans: integer("ecrans").notNull().default(0),
+    /** Les appels au modèle de ces lectures : un pour des captures, un par lot pour un enregistrement. */
+    lots: integer("lots").notNull().default(0),
+    creeLe: quand("cree_le").notNull().defaultNow(),
+  },
+  (t) => [index("imports_cree_idx").on(t.creeLe)],
 );
 
 /**

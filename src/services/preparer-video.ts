@@ -203,6 +203,63 @@ export async function imagesDeLaVideo(fichier: File, onAvance?: (p: number) => v
  */
 export const tailleDesLots = (ecrans: number, lecteurs: number) => Math.min(ECRANS_PAR_LOT.max, Math.max(ECRANS_PAR_LOT.min, Math.ceil((ecrans - 1) / lecteurs) + 1));
 
+/* ———— Un lot déjà lu ne repart pas ———— */
+
+/*
+ * Les lots déjà lus dans cet onglet, par empreinte (empreinteDuLot) : un nouvel essai de l’enregistrement (après un lot
+ * en échec, la même vidéo choisie de nouveau) ne renvoie que ceux qui manquent. La même vidéo donne les mêmes images,
+ * octet pour octet : la lire pas à pas est déterministe. En mémoire de la page seulement (ce sont des messages de leur
+ * conv) : jamais dans le stockage du navigateur, oubliés au bout d’une heure ou en fermant l’onglet. Un échec n’est
+ * jamais gardé. Chacun garde la clé de l’envoi qui l’a lu : la fin de l’enregistrement qui le reprend la donne au serveur,
+ * qui range son coût sous le nouvel import (src/server/imports.ts). Le serveur garde aussi les siens (src/server/lots.ts).
+ */
+const LUS = new Map<string, LotLu & { jusqua: number }>();
+const GARDE_LU_MS = 60 * 60e3;
+/* Une quarantaine de lots : deux ou trois longs enregistrements */
+const LUS_MAX = 40;
+
+/**
+ * L’empreinte d’un lot : ses images (octets), son appli et le jour de Paris (la lecture date « hier » d’après lui), jamais
+ * son seul numéro. null si le navigateur ne sait pas la calculer (crypto.subtle vient avec https) : le lot repart.
+ */
+export async function empreinteDuLot(images: Blob[], appli: string, jour: string): Promise<string | null> {
+  if (!globalThis.crypto?.subtle) return null;
+  try {
+    /* L’empreinte de chaque image (32 octets), puis celle de l’appli, du jour et de leur suite : deux lots ne se confondent pas */
+    const parImage = await Promise.all(images.map(async (b) => new Uint8Array(await crypto.subtle.digest("SHA-256", await b.arrayBuffer()))));
+    const tete = new TextEncoder().encode(`lot:${appli}:${jour}:${images.length}`);
+    const tout = new Uint8Array(tete.length + 32 * parImage.length);
+    tout.set(tete);
+    parImage.forEach((e, k) => tout.set(e, tete.length + 32 * k));
+    return Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", tout)), (o) => o.toString(16).padStart(2, "0")).join("");
+  } catch {
+    return null;
+  }
+}
+
+/** Un lot lu : sa lecture brute, et la clé de l’envoi qui l’a lu. */
+export type LotLu = { lot: unknown; cle: string };
+
+/** Le lot déjà lu dans cet onglet (encore frais), ou undefined. */
+export function lotDejaLu(empreinte: string | null): LotLu | undefined {
+  if (!empreinte) return undefined;
+  const l = LUS.get(empreinte);
+  if (l && l.jusqua > Date.now()) return { lot: l.lot, cle: l.cle };
+  LUS.delete(empreinte);
+  return undefined;
+}
+
+/** Garde la lecture d’un lot lu avec succès, et la clé de son envoi (les plus anciennes partent au-delà de LUS_MAX). */
+export function garderLeLot(empreinte: string | null, { lot, cle }: LotLu): void {
+  if (!empreinte) return;
+  LUS.delete(empreinte);
+  LUS.set(empreinte, { lot, cle, jusqua: Date.now() + GARDE_LU_MS });
+  for (const k of LUS.keys()) {
+    if (LUS.size <= LUS_MAX) break;
+    LUS.delete(k);
+  }
+}
+
 /**
  * Les lots à lire : une douzaine d’images, chaque lot reprenant la dernière image du précédent (pour recoller les
  * messages). `poids` et `max` : un lot ne dépasse pas non plus ce poids (Vercel refuse un envoi de plus de 4,5 Mo).

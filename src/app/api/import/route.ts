@@ -7,6 +7,7 @@ import { erreur, repondre, route } from "@/server/http";
 import { storyEtSource } from "@/server/conv-affichee";
 import { ajouterUnExport, importer } from "@/server/histoires";
 import { depuisFichier, depuisPaquet } from "@/server/import";
+import { noterImport } from "@/server/imports";
 import { consentementImport, type Consentement } from "@/server/juridique";
 import { LIMITES } from "@/server/limites";
 import { garde, octetsDansLeBudget, sousLaLimiteDeLIp } from "@/server/requete";
@@ -78,8 +79,12 @@ export const POST = route("POST /api/import", async (req: Request) => {
     throw e;
   });
   await poserBrouillon(secret);
-  /* Une créatrice qui filme (le mode tournage, src/server/tournage.ts) n’est ni un import du direct, ni un import venu d’un partage */
+  /*
+   * Une créatrice qui filme (le mode tournage, src/server/tournage.ts) n’est ni un import du direct, ni un import venu d’un
+   * partage, ni mesurée (src/server/imports.ts : un export ne coûte rien avant l’achat)
+   */
   if (!(await lireTournage())) {
+    await noterImport({ storyId: id, type: "export", appli: meta.appli, ecrans: 0, lots: 0, envoi: null });
     await compterImportVenuDuPartage();
     await noterAuFil(req, { genre: "import" });
   }
