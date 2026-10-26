@@ -19,6 +19,7 @@ import type { Consentement } from "./juridique";
 import { offreValable } from "./offres-uniques";
 import { recompenserLeParrainage, reprendreLeParrainage } from "./parrainage";
 import { reparerLaChaine } from "./pipeline";
+import { rangerLAchat } from "./population";
 import { lotValable } from "./roue";
 import { noterAchatAuFil } from "./visites";
 
@@ -238,6 +239,11 @@ export async function livrer(achatId: string, paiement: Paiement = {}): Promise<
     if (debloquee) await recompenserLeParrainage(tx, userId);
     return { effet: "livre", achat: paye!, debloquee };
   });
+  /*
+   * Qui l’a payé (achats.population, la règle « qui est qui », src/server/population.ts), après la transaction : la règle
+   * ne peut pas faire échouer un paiement. En échec, le passage des 5 minutes le range
+   */
+  if (r.effet === "livre" && r.achat) await auMieux(rangerLAchat(r.achat.id), "achat non rangé", { offre: r.achat.offre });
   /* Au fil du direct d’/admin : la ville de son paiement ouvert, l’offre (jamais le compte) */
   if (r.effet === "livre" && r.achat) await noterAchatAuFil(r.achat);
   if (r.debloquee && r.achat) await relancerLaChaine(r.achat, "rapport non relancé après la livraison");

@@ -5,9 +5,12 @@ import { dollars, euros, fuiteDuTunnel, pluriel, pourcent, rapport, texteDeLaFui
 
 /*
  * « À regarder », en haut du pilotage : trois cartes au plus, calculées des chiffres de la période. D’abord ce qui coince
- * (la santé, la plus grosse fuite du tunnel, la marge sous la cible, les remboursements), puis les bonnes nouvelles (la
- * source qui achète le mieux, la marge au-dessus de la cible). Tant qu’aucune visite n’est comptée, une carte neutre le
- * dit, à la place de ce qui dépend des visiteurs. Pure : tests/unit/admin-a-regarder.test.ts.
+ * (la santé, la plus grosse fuite du tunnel, la marge produit sous la cible, les remboursements), puis les bonnes
+ * nouvelles (la source qui achète le mieux, la marge produit au-dessus de la cible). La marge est celle du produit : les
+ * ventes des vrais clients face à l’IA du produit, les tests à part (src/server/population.ts) ; au-dessus de la cible
+ * seulement si l’IA non classée ne peut pas la faire passer dessous (margeProduit, son plancher), sinon une carte neutre
+ * le dit. Tant qu’aucune visite n’est comptée, une carte neutre le dit, à la place de ce qui dépend des visiteurs. Pure :
+ * tests/unit/admin-a-regarder.test.ts.
  */
 
 /** Au-delà de cette part du payé, les remboursements se regardent. */
@@ -34,6 +37,33 @@ export function meilleureSource(sources: StatsAdmin["pilotage"]["sources"]): { s
     if (!meilleure || taux > meilleure.taux) meilleure = { source: s.source, taux, visiteurs: s.visiteurs, acheteurs: s.acheteurs };
   }
   return meilleure;
+}
+
+/**
+ * La marge produit de la période (`valeur`) et de celle d’avant (`avant`), en % : les ventes des vrais clients face à
+ * l’IA du produit (margeApresIA ; null sans vente). Les tests (l’équipe et le tournage, `tests`, en dollars) se disent à
+ * côté, à part. Le non classé (`nonClasse` : une conv effacée avant sa note, une ligne d’avant la règle que rien ne
+ * rattache, une ligne pas encore rangée) n’est ni du produit ni des tests : `plancher`, la marge s’il était tout du
+ * produit, borne ce qu’il peut lui coûter. /admin, « À regarder » et le serveur MCP la lisent d’ici.
+ */
+export function margeProduit(s: StatsAdmin): { valeur: number | null; avant: number | null; plancher: number | null; tests: number; nonClasse: number } {
+  const p = s.pilotage;
+  const c = s.couts;
+  const nonClasse = c.populations.find((x) => x.population === "inconnu")?.dollars ?? 0;
+  return {
+    valeur: margeApresIA(p.net.valeur, c.produit.valeur),
+    avant: margeApresIA(p.net.avant, c.produit.avant),
+    plancher: margeApresIA(p.net.valeur, c.produit.valeur + nonClasse),
+    tests: c.tests.valeur,
+    nonClasse,
+  };
+}
+
+/** Ce qui s’écrit à côté de la marge produit : les tests à part, et le non classé (avec la marge au pire) s’il y en a. */
+export function aCoteDeLaMarge(m: ReturnType<typeof margeProduit>): string {
+  const tests = `tests\u00a0: ${dollars(m.tests)} à part`;
+  if (m.nonClasse < 0.005) return tests;
+  return `${tests} · non classé\u00a0: ${dollars(m.nonClasse)}${m.plancher === null ? "" : ` (au pire ${pourcent(m.plancher, 0)})`}`;
 }
 
 /** Les trois cartes au plus d’« À regarder », dans l’ordre où les lire. Jamais vide : sans rien à dire, une carte calme. */
@@ -63,18 +93,25 @@ export function aRegarder(s: StatsAdmin): CarteARegarder[] {
   const fuite = fuiteDuTunnel(suivi ? p.tunnel : { ...p.tunnel, visiteurs: 0 });
   if (fuite && fuite.depuis >= PERSONNES_D_UNE_FUITE) mal.push({ ton: "mal", ...texteDeLaFuite(fuite), lien: { texte: "Voir le tunnel", ancre: "tunnel" } });
 
-  /* La marge après l’IA, contre la cible */
-  const marge = margeApresIA(p.net.valeur, p.dollars.valeur);
+  /* La marge produit, contre la cible : son poste le plus cher, puis les tests et le non classé, à part */
+  const produit = s.couts.produit.valeur;
+  const m = margeProduit(s);
+  const marge = m.valeur;
+  const tests = m.tests > 0 ? ` Les tests (${dollars(m.tests)}) n’y comptent pas.` : "";
+  const nonClasse =
+    m.nonClasse >= 0.005
+      ? ` L’IA non classée (${dollars(m.nonClasse)}) n’y compte pas${m.plancher === null ? "" : `\u00a0: comptée dans le produit, la marge serait de ${pourcent(m.plancher, 0)}`}.`
+      : "";
   if (marge !== null && marge < CIBLE_DE_MARGE) {
-    const [poste] = s.couts.postes;
-    const part = poste ? rapport(poste.dollars, s.couts.total) : null;
+    const [poste] = [...s.couts.postes].sort((a, b) => b.produit.dollars - a.produit.dollars);
+    const part = poste ? rapport(poste.produit.dollars, produit) : null;
     mal.push({
       ton: "mal",
-      titre: `Marge après IA\u00a0: ${pourcent(marge, 0)}, sous ta cible de ${pourcent(CIBLE_DE_MARGE, 0)}`,
+      titre: `Marge produit\u00a0: ${pourcent(marge, 0)}, sous ta cible de ${pourcent(CIBLE_DE_MARGE, 0)}`,
       texte:
         poste && part !== null
-          ? `Le poste «\u00a0${poste.nom}\u00a0» fait ${pourcent(part * 100, 0)} de ce que coûte l’IA (${dollars(poste.dollars)} sur ${dollars(s.couts.total)}).`
-          : `L’IA a coûté ${dollars(p.dollars.valeur)} pour ${euros(p.net.valeur)} de chiffre d’affaires net.`,
+          ? `Le poste «\u00a0${poste.nom}\u00a0» fait ${pourcent(part * 100, 0)} de l’IA du produit (${dollars(poste.produit.dollars)} sur ${dollars(produit)}).${tests}${nonClasse}`
+          : `L’IA du produit a coûté ${dollars(produit)} pour ${euros(p.net.valeur)} de chiffre d’affaires net des vrais clients.${tests}${nonClasse}`,
       lien: { texte: "Voir les coûts", ancre: "couts" },
     });
   }
@@ -110,12 +147,22 @@ export function aRegarder(s: StatsAdmin): CarteARegarder[] {
     });
   }
 
-  /* La marge au-dessus de la cible */
-  if (marge !== null && marge >= CIBLE_DE_MARGE)
+  /*
+   * La marge produit au-dessus de la cible : une bonne nouvelle si le non classé ne peut pas la faire passer dessous
+   * (son plancher aussi au-dessus), sinon à confirmer
+   */
+  if (marge !== null && marge >= CIBLE_DE_MARGE && m.plancher !== null && m.plancher >= CIBLE_DE_MARGE)
     bon.push({
       ton: "bon",
-      titre: `Marge après IA\u00a0: ${pourcent(marge, 0)}`,
-      texte: `Au-dessus de ta cible de ${pourcent(CIBLE_DE_MARGE, 0)}, une fois l’IA payée (hors frais Whop).`,
+      titre: `Marge produit\u00a0: ${pourcent(marge, 0)}`,
+      texte: `Au-dessus de ta cible de ${pourcent(CIBLE_DE_MARGE, 0)}, une fois l’IA du produit payée (hors frais Whop).${tests}${nonClasse}`,
+      lien: { texte: "Voir les coûts", ancre: "couts" },
+    });
+  else if (marge !== null && marge >= CIBLE_DE_MARGE)
+    neutre.push({
+      ton: "neutre",
+      titre: `Marge produit\u00a0: ${pourcent(marge, 0)}, à confirmer`,
+      texte: `Au-dessus de ta cible de ${pourcent(CIBLE_DE_MARGE, 0)}, mais ${dollars(m.nonClasse)} d’IA non classée (une conv effacée avant sa note, une ligne d’avant le rangement) la ramèneraient à ${pourcent(m.plancher ?? 0, 0)} si elle était du produit.${tests}`,
       lien: { texte: "Voir les coûts", ancre: "couts" },
     });
 

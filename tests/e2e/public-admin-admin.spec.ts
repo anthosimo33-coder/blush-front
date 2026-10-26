@@ -58,7 +58,7 @@ test("connecté avec l’email de l’équipe, le pilotage s’ouvre : ses carte
     ]) {
       await expect(page.getByRole("heading", { level: 2, name: titre, exact: true })).toBeVisible();
     }
-    for (const titre of ["Visiteurs", "Taux d’achat", "Revenu par acheteur", "Marge après IA", "Les coups de pouce", "Bêta", "Les derniers gestes"]) {
+    for (const titre of ["Visiteurs", "Taux d’achat", "Revenu par acheteur", "Marge produit", "Les coups de pouce", "Bêta", "Les derniers gestes"]) {
       await expect(page.getByRole("heading", { level: 3, name: titre, exact: true })).toBeVisible();
     }
     /* « À regarder » : une carte au moins, trois au plus */
@@ -102,7 +102,7 @@ test("connecté avec l’email de l’équipe, le pilotage s’ouvre : ses carte
       "les visiteurs",
       "le taux d’achat",
       "le revenu par acheteur",
-      "la marge après IA",
+      "la marge produit",
       "le tunnel",
       "qui importe",
       "les sources",
@@ -196,6 +196,31 @@ test("connecté avec l’email de l’équipe, le pilotage s’ouvre : ses carte
     await expect(cellules.first()).toHaveText(/^[1-9]\d*$/);
     await expect(cellules.nth(1)).toHaveText("0,00\u00a0$");
     await expect(bloc).not.toContainText(/NaN|Infinity|undefined/);
+  });
+
+  await test.step("ce que coûte l’IA : le produit et les tests à part, chaque population, et la marge produit qui dit les tests et le non classé", async () => {
+    /* Le modèle factice ne note rien : des appels déjà rangés par la règle « qui est qui », sous une étiquette à ce test (l’autre navigateur a la sienne) */
+    const tache = `e2e-population-${testInfo.project.name}-${Date.now()}`;
+    await sql()`insert into ai_usage (task, model, cost_micros, population) values (${tache}, 'test', 5000000, 'equipe'), (${tache}, 'test', 3000000, 'client'), (${tache}, 'test', 1000000, 'inconnu')`;
+    try {
+      await page.goto("/admin?p=1");
+      const bloc = page.getByRole("region", { name: "Ce que coûte l’IA", exact: true });
+      for (const nom of ["IA du produit", "IA des tests", "Les clients et les prospects", "L’équipe et le tournage"])
+        await expect(bloc.getByText(nom, { exact: true })).toBeVisible();
+      const populations = bloc.getByRole("list", { name: "L’IA par population" }).getByRole("listitem");
+      await expect(populations).toHaveCount(6);
+      for (const [k, nom] of ["Clients", "Prospects", "Invités (offert)", "L’équipe", "Le tournage", "Non classé"].entries()) await expect(populations.nth(k)).toContainText(nom);
+      /* Nos 5 $ de l’équipe et 3 $ d’un client au moins (l’autre navigateur peut avoir ajouté les siens) */
+      await expect(populations.filter({ hasText: /^L’équipe/ })).toHaveText(/^L’équipe\s*([5-9]|\d{2,}),\d{2}\s\$\s*\d+\s%$/);
+      await expect(populations.filter({ hasText: /^Clients/ })).toHaveText(/^Clients\s*([3-9]|\d{2,}),\d{2}\s\$\s*\d+\s%$/);
+      await expect(bloc.getByRole("heading", { level: 3, name: "Les postes du produit" })).toBeVisible();
+      await expect(bloc.getByRole("list", { name: "Les ratios du produit" }).getByRole("listitem")).toHaveCount(3);
+      /* Les tests à part, puis le non classé (notre 1 $ au moins) et la marge au pire s’il y a des ventes */
+      await expect(page.getByText(/^cible 80\s% · tests\s: ([5-9]|\d{2,}),\d{2}\s\$ à part · non classé\s: ([1-9]|\d{2,}),\d{2}\s\$( \(au pire -?\d+\s%\))?$/)).toBeVisible();
+      await expect(bloc).not.toContainText(/NaN|Infinity|undefined/);
+    } finally {
+      await sql()`delete from ai_usage where task = ${tache}`;
+    }
   });
 
   await test.step("l’écran d’avant reste à ?version=actuelle, tel quel", async () => {

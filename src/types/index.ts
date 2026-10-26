@@ -179,6 +179,19 @@ export const TYPES_D_IMPORT = ["export", "captures", "video"] as const;
 export type TypeDImport = (typeof TYPES_D_IMPORT)[number];
 
 /**
+ * Qui a fait un appel payant au modèle, à la voix ou à la transcription (ai_usage.population, la règle « qui est qui » :
+ * src/server/population.ts), dans l’ordre où /admin les montre : un client (un achat payé), un prospect (un compte sans
+ * achat, ou personne : des captures d’avant l’email), un invité de BLUSH_ACCES_LIBRE (l’offert), l’équipe, le tournage
+ * (ses convs, ses créatrices, son compte), ou rien qui le dise (une conv effacée, une ligne d’avant la règle).
+ */
+export const POPULATIONS = ["client", "prospect", "offert", "equipe", "tournage", "inconnu"] as const;
+export type Population = (typeof POPULATIONS)[number];
+/** Le produit : ceux à qui BLUSH se vend. Leur IA est celle de la marge produit (/admin). */
+export const POPULATIONS_DU_PRODUIT = ["client", "prospect"] as const satisfies readonly Population[];
+/** Les tests : l’équipe et le tournage. Leur IA se paie, mais ne se vend pas. */
+export const POPULATIONS_DES_TESTS = ["equipe", "tournage"] as const satisfies readonly Population[];
+
+/**
  * La moitié d’une longue vidéo dans l’A/B de la lecture partielle (src/server/lecture-partielle.ts) : lue en entier avant
  * l’achat, comme avant, ou seulement sa partie la plus récente, le reste de ses écrans lu après le paiement.
  */

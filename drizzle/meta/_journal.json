@@ -253,6 +253,20 @@
       "when": 1793033719632,
       "tag": "0035_lecture_partielle",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1793050519151,
+      "tag": "0036_population_des_couts",
+      "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1793054403412,
+      "tag": "0037_email_canonique",
+      "breakpoints": true
     }
   ]
 }

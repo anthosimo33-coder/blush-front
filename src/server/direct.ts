@@ -4,6 +4,7 @@ import { ETAPES_VISITE, type EtapeVisite, type GenreFil, type OffreId, type Sour
 import type { Direct, GesteDuFil } from "@/types/api";
 import { db, uneLigne } from "./db";
 import { DEBUT_DU_JOUR, aujourdhuiParis } from "./temps";
+import { achatDuProduit } from "./population";
 import { EN_LIGNE_S } from "./visites";
 
 /*
@@ -40,8 +41,8 @@ export async function direct(): Promise<Direct> {
     ),
     lignes<{ visiteurs: string; achats: string; centimes: string }>(
       sql`select (select count(*) from visites where jour = ${aujourdhuiParis().iso}) as visiteurs,
-            (select count(*) from achats where paye_le >= ${DEBUT_DU_JOUR}) as achats,
-            (select coalesce(sum(centimes), 0) from achats where paye_le >= ${DEBUT_DU_JOUR}) as centimes`,
+            (select count(*) from achats a where a.paye_le >= ${DEBUT_DU_JOUR} and ${achatDuProduit("a")}) as achats,
+            (select coalesce(sum(a.centimes), 0) from achats a where a.paye_le >= ${DEBUT_DU_JOUR} and ${achatDuProduit("a")}) as centimes`,
     ).then((l) => uneLigne(l, "direct:jour")),
   ]);
 

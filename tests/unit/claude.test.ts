@@ -328,7 +328,9 @@ describe("appeler : l’envoi", () => {
     expect(vi.mocked(reserver)).toHaveBeenCalledWith(null, coutMaximal(envois[0]![0].params) * 1e6);
     expect(reservation.rendue).toBe(1);
     /* Le compte connecté qui envoie ses captures : sa réservation à lui */
-    await expect(appeler(lecture, Format, { compte: { email: "lea@exemple.test" } })).rejects.toBeInstanceOf(Anthropic.InternalServerError);
+    await expect(appeler(lecture, Format, { compte: { id: "00000000-0000-4000-8000-000000000001", email: "lea@exemple.test" } })).rejects.toBeInstanceOf(
+      Anthropic.InternalServerError,
+    );
     expect(vi.mocked(reserver)).toHaveBeenLastCalledWith("payeur", expect.any(Number));
     expect(reservation.rendue).toBe(2);
     /* Le compte de la conv paie : rien à réserver ; une conv sans compte, la part sans compte */

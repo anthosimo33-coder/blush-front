@@ -344,7 +344,9 @@ describe("la relance par mail (②)", () => {
     expect(r.status).toBe(200);
     const corps = (await r.json()) as Record<string, unknown>;
     expect(Object.keys(corps).sort()).toEqual([
+      "achats",
       "chaines",
+      "couts",
       "dues",
       "ecartees",
       "echecs",

@@ -32,8 +32,14 @@ describe("le pilotage, rendu", () => {
     const html = renderToStaticMarkup(createElement(Pilotage, { s: statsDExemple(jours), direct: directDExemple(), base: "/apercu/admin", sonder: false }));
     const t = texte(html);
     expect(t).not.toMatch(SALE);
-    for (const titre of ["Pilotage", "À regarder", "Chiffre d’affaires", "En direct", "Visiteurs", "Taux d’achat", "Revenu par acheteur", "Marge après IA", "Le tunnel"])
+    for (const titre of ["Pilotage", "À regarder", "Chiffre d’affaires", "En direct", "Visiteurs", "Taux d’achat", "Revenu par acheteur", "Marge produit", "Le tunnel"])
       expect(t, titre).toContain(titre);
+    /* La marge produit dit ce que coûtent les tests, à part ; la carte de l’IA les sépare, population par population */
+    expect(t).toMatch(/cible 80\u00a0% · tests\u00a0: [\d,]+\u00a0\$ à part · non classé\u00a0: [\d,]+\u00a0\$ \(au pire \d+\u00a0%\)/);
+    for (const titre of ["IA du produit", "IA des tests", "Les clients et les prospects", "L’équipe et le tournage", "Les postes du produit"]) expect(t, titre).toContain(titre);
+    for (const population of ["Clients", "Prospects", "Invités (offert)", "L’équipe", "Le tournage", "Non classé"]) expect(t, population).toContain(population);
+    expect(html).toContain('aria-label="L’IA par population"');
+    expect(html).toContain('aria-label="Les ratios du produit"');
     /* Le détail du tunnel : l’import et le paywall, jalon par jalon, leur plus grosse perte, et ce qu’il y a autour */
     for (const titre of ["L’import, écran par écran", "Le paywall, jusqu’au paiement", "Choisissent leur fichier", "Voient le formulaire de Whop", "Premium au bouton"])
       expect(t, titre).toContain(titre);
@@ -116,11 +122,12 @@ describe("le pilotage, rendu", () => {
     };
     s.pilotage = {
       ...s.pilotage,
-      cases: s.pilotage.cases.map((c) => ({ ...c, visiteurs: 0, acheteurs: 0, centimes: 0, dollars: 0 })),
+      cases: s.pilotage.cases.map((c) => ({ ...c, visiteurs: 0, acheteurs: 0, centimes: 0, dollars: 0, dollarsProduit: 0 })),
       net: zero,
       payes: rien,
       rembourses: rien,
       contestes: rien,
+      achatsRetires: rien,
       visiteurs: zero,
       acheteurs: zero,
       centimesPayes: zero,
@@ -132,7 +139,16 @@ describe("le pilotage, rendu", () => {
       iaDuJour: { dollars: 0, budget: 30, sansCompte: { dollars: 0, budget: 50 } },
       suiviDepuis: null,
     };
-    s.couts = { total: 0, avant: 0, parRapport: null, parVerdict: null, postes: [] };
+    s.couts = {
+      total: 0,
+      avant: 0,
+      produit: zero,
+      tests: zero,
+      populations: s.couts.populations.map((p) => ({ ...p, dollars: 0, appels: 0 })),
+      parRapport: null,
+      parVerdict: null,
+      postes: [],
+    };
     s.offresUniques = s.offresUniques.map((o) => ({ ...o, montrees: 0, prises: 0 }));
     const vide = { ...directDExemple(), enLigne: 0, etapes: [], sources: [], villes: [], fil: [], record: null };
     const t = texte(renderToStaticMarkup(createElement(Pilotage, { s, direct: vide, base: "/admin", sonder: false })));

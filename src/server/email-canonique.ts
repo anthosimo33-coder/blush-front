@@ -26,6 +26,23 @@ export function emailCanonique(email: string): string {
 }
 
 /**
+ * L’email canonique en SQL, la même règle, en une expression à plat sur `colonne` (du SQL brut : un nom de colonne) :
+ * sans sous-requête, rien que des fonctions immuables, pour la colonne générée users.email_canonique
+ * (src/server/db/schema.ts) et emailCanoniqueEnSQL (src/server/population.ts). Les blancs autour retirés (`\s` de
+ * Postgres), en minuscules ; le nom jusqu’au dernier « @ », sans son `+suffixe` à partir du deuxième caractère ; un texte
+ * sans nom ou sans domaine revient en minuscules. tests/population.test.ts compare les deux à emailCanonique cas par cas.
+ */
+export function emailCanoniqueEnSQLBrut(colonne: string): string {
+  const propre = `lower(regexp_replace(${colonne}, '^\\s+|\\s+$', '', 'g'))`;
+  const nom = `substring(${propre} from '^(.*)@[^@]*$')`;
+  const domaine = `substring(${propre} from '@([^@]*)$')`;
+  const court = `regexp_replace(${nom}, '^(.[^+]*)\\+.*$', '\\1')`;
+  return `(case when position('@' in ${propre}) = 0 or ${nom} = '' or ${domaine} = '' then ${propre}
+    when ${domaine} in ('gmail.com', 'googlemail.com') then coalesce(nullif(replace(${court}, '.', ''), ''), ${court}) || '@gmail.com'
+    else ${court} || '@' || ${domaine} end)`;
+}
+
+/**
  * Ce qui range les limites d’un compte (src/server/limites.ts) : son email canonique, pas son identifiant. Supprimer son
  * compte puis le recréer, ou en ouvrir un sous un alias, ne remet pas ses compteurs du jour à zéro (rate_limits survit au
  * compte). La clé d’une limite : cleDeLimiteDuCompte.

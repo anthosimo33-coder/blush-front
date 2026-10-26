@@ -11,6 +11,7 @@ import {
   NOMS_DES_GENRES,
   NOMS_DES_GROUPES,
   NOMS_DES_PAIRES,
+  NOMS_DES_POPULATIONS,
   NOMS_DES_SOURCES,
   NOMS_DES_TYPES_D_IMPORT,
   NOMS_DES_VENTES,
@@ -24,9 +25,9 @@ import { jourDeParisAvant } from "@/lib/jours";
 import type { Delivrabilite as ChiffresDeDelivrabilite } from "@/server/delivrabilite";
 import type { SanteDesNavigateurs } from "@/server/navigateur";
 import type { Periode, Pilotage as Chiffres, StatsAdmin } from "@/server/stats";
-import type { OffreUnique } from "@/types";
+import type { OffreUnique, Population } from "@/types";
 import type { Direct } from "@/types/api";
-import { aRegarder, meilleureSource, type CarteARegarder } from "./a-regarder";
+import { aCoteDeLaMarge, aRegarder, margeProduit, meilleureSource, type CarteARegarder } from "./a-regarder";
 import { BoutonAide } from "./Aide";
 import { Beta, Journal, NOMS_OFFRES_UNIQUES } from "./AdminScreen";
 import {
@@ -267,7 +268,7 @@ function ChiffreDAffaires({ p, jours }: { p: Chiffres; jours: Periode }) {
     <Bloc
       id="chiffre-d-affaires"
       titre="Chiffre d’affaires"
-      sous="Net, TTC, remboursements retirés"
+      sous="Net, TTC, des vrais clients"
       aide={{ cle: "ca", valeur: euros(p.net.valeur), contexte: `${PERIODES[jours].sur}, ${texteDeLEcart(ecart)} ${PERIODES[jours].contre}` }}
       className="grow-[999] basis-[560px]"
     >
@@ -281,6 +282,12 @@ function ChiffreDAffaires({ p, jours }: { p: Chiffres; jours: Periode }) {
         <span>Payé {euros(p.payes.centimes)}</span>
         <span>Remboursé {p.rembourses.centimes ? `−${euros(p.rembourses.centimes)} (${nombre(p.rembourses.n)})` : euros(0)}</span>
         <span>Contesté {p.contestes.centimes ? `−${euros(p.contestes.centimes)} (${nombre(p.contestes.n)})` : euros(0)}</span>
+        {/* Les achats de l’équipe, du tournage et des invités : hors de toutes les ventes, dits ici */}
+        {p.achatsRetires.n > 0 && (
+          <span className="text-grey">
+            Achats d’essai retirés {euros(p.achatsRetires.centimes)} ({nombre(p.achatsRetires.n)})
+          </span>
+        )}
         <span className="inline-flex items-center gap-1.5 text-grey md:ml-auto">
           <span aria-hidden="true" className="size-2.5 rounded-[3px]" style={{ background: ROSE }} />
           {p.pas === "heure" ? "cette heure, en cours" : "aujourd’hui, en cours"}
@@ -377,13 +384,15 @@ function ChiffresCles({ s }: { s: StatsAdmin }) {
   const tauxAvant = rapport(p.acheteurs.avant, p.visiteurs.avant);
   const parAcheteur = rapport(p.centimesPayes.valeur, p.acheteurs.valeur);
   const parAcheteurAvant = rapport(p.centimesPayes.avant, p.acheteurs.avant);
-  const marge = margeApresIA(p.net.valeur, p.dollars.valeur);
-  const margeAvant = margeApresIA(p.net.avant, p.dollars.avant);
+  /* La marge produit : les ventes des vrais clients face à l’IA du produit ; les tests et le non classé à part (margeProduit) */
+  const m = margeProduit(s);
+  const marge = m.valeur;
   const sousLaCible = marge !== null && marge < CIBLE_DE_MARGE;
+  const aCote = aCoteDeLaMarge(m);
   const ecartVisiteurs = suivi ? ecartRelatif(p.visiteurs.valeur, p.visiteurs.avant, nombre) : null;
   const ecartTaux = ecartEnPoints(taux === null ? null : taux * 100, tauxAvant === null ? null : tauxAvant * 100, "hausse", 2);
   const ecartPanier = ecartEnValeur(parAcheteur, parAcheteurAvant, (v) => euros(v));
-  const ecartMarge = ecartEnPoints(marge, margeAvant);
+  const ecartMarge = ecartEnPoints(marge, m.avant);
   /* Le suivi des visites a commencé pendant la période : elle n’en a qu’une partie */
   const debut = jourDeParisAvant(s.jours, new Date(s.le));
   const depuis =
@@ -432,13 +441,13 @@ function ChiffresCles({ s }: { s: StatsAdmin }) {
           couleur="var(--ink)"
         />
         <ChiffreCle
-          titre="Marge après IA"
-          aide={{ cle: "marge", valeur: marge === null ? "—" : pourcent(marge, 0), contexte: `cible ${pourcent(CIBLE_DE_MARGE, 0)}` }}
+          titre="Marge produit"
+          aide={{ cle: "marge", valeur: marge === null ? "—" : pourcent(marge, 0), contexte: `cible ${pourcent(CIBLE_DE_MARGE, 0)}, ${aCote}` }}
           valeur={marge === null ? "—" : pourcent(marge, 0)}
           valeurClasse={sousLaCible ? "text-attente-ink" : undefined}
           ecart={ecartMarge}
-          sous={`cible ${pourcent(CIBLE_DE_MARGE, 0)}`}
-          courbe={pointsDeLaCourbe(cases.map((c) => margeApresIA(c.centimes, c.dollars)))}
+          sous={`cible ${pourcent(CIBLE_DE_MARGE, 0)} · ${aCote}`}
+          courbe={pointsDeLaCourbe(cases.map((c) => margeApresIA(c.centimes, c.dollarsProduit)))}
           couleur={sousLaCible ? ORANGE : VERT}
         />
       </div>
@@ -1438,45 +1447,101 @@ function LecturePartielle({ p }: { p: Chiffres }) {
 
 /* ———— Ce que coûte l’IA ———— */
 
+/** La couleur de la barre d’une population : le produit en encre, les tests en orange, le reste en gris. */
+const COULEURS_DES_POPULATIONS: Record<Population, string> = {
+  client: "var(--ink)",
+  prospect: "var(--ink)",
+  offert: "var(--grey)",
+  equipe: ORANGE,
+  tournage: ORANGE,
+  inconnu: "var(--grey)",
+};
+
+/**
+ * L’IA de la période en deux (la règle « qui est qui », src/server/population.ts) : celle du produit (les clients et les
+ * prospects), en grand, et celle des tests (l’équipe et le tournage) à côté ; puis chaque population, les postes du
+ * produit, ses ratios (la même population en haut et en bas), et le budget du jour, qui compte tout.
+ */
 function Couts({ s }: { s: StatsAdmin }) {
   const c = s.couts;
   const p = s.pilotage;
-  const parAcheteur = rapport(c.total, p.acheteurs.valeur);
-  const max = Math.max(0.0001, ...c.postes.map((x) => x.dollars));
+  const parAcheteur = rapport(c.produit.valeur, p.acheteurs.valeur);
+  const postes = c.postes.filter((x) => x.produit.appels > 0).sort((a, b) => b.produit.dollars - a.produit.dollars);
+  const max = Math.max(0.0001, ...postes.map((x) => x.produit.dollars));
+  const maxDesPopulations = Math.max(0.0001, ...c.populations.map((x) => x.dollars));
   const jour = rapport(p.iaDuJour.dollars, p.iaDuJour.budget);
   const sansCompte = rapport(p.iaDuJour.sansCompte.dollars, p.iaDuJour.sansCompte.budget);
-  const ecart = ecartRelatif(c.total, c.avant, dollars, null);
+  const ecart = ecartRelatif(c.produit.valeur, c.produit.avant, dollars, null);
+  const ecartDesTests = ecartRelatif(c.tests.valeur, c.tests.avant, dollars, null);
   return (
     <Bloc
       id="couts"
       titre="Ce que coûte l’IA"
-      sous="En dollars, comme on la paie"
-      aide={{ cle: "couts", valeur: dollars(c.total), contexte: parAcheteur === null ? "aucun acheteur sur la période" : `${dollars(parAcheteur)} par acheteur` }}
+      sous="En dollars, comme on la paie, le produit et les tests à part"
+      aide={{
+        cle: "couts",
+        valeur: `${dollars(c.produit.valeur)} pour le produit`,
+        contexte: `${dollars(c.tests.valeur)} de tests, ${dollars(c.total)} en tout${parAcheteur === null ? "" : `, ${dollars(parAcheteur)} par acheteur`}`,
+      }}
       className="grow-[999] basis-[560px]"
     >
-      <p className="m-0 mt-[18px] flex flex-wrap items-baseline gap-x-3 gap-y-2">
-        <span className="text-[44px] font-black leading-none tracking-[-0.03em] tabular-nums">{dollars(c.total)}</span>
-        <span className="text-detail font-bold text-grey">≈ {euros(c.total * EUROS_PAR_DOLLAR * 100, 0)}</span>
-        <PastilleEcart e={ecart} />
+      <div className="mt-[18px] grid gap-x-6 gap-y-4 sm:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
+        <div className="min-w-0">
+          <p className="m-0 text-detail font-extrabold">IA du produit</p>
+          <p className="m-0 mt-1.5 flex flex-wrap items-baseline gap-x-3 gap-y-2">
+            <span className="text-[44px] font-black leading-none tracking-[-0.03em] tabular-nums">{dollars(c.produit.valeur)}</span>
+            <span className="text-detail font-bold text-grey">≈ {euros(c.produit.valeur * EUROS_PAR_DOLLAR * 100, 0)}</span>
+            <PastilleEcart e={ecart} />
+          </p>
+          <p className="m-0 mt-1.5 text-legende font-bold text-grey">Les clients et les prospects</p>
+        </div>
+        <div className="min-w-0">
+          <p className="m-0 text-detail font-extrabold">IA des tests</p>
+          <p className="m-0 mt-1.5 flex flex-wrap items-baseline gap-x-3 gap-y-2">
+            <span className="text-[30px] font-black leading-none tracking-[-0.03em] tabular-nums">{dollars(c.tests.valeur)}</span>
+            <PastilleEcart e={ecartDesTests} />
+          </p>
+          <p className="m-0 mt-1.5 text-legende font-bold text-grey">L’équipe et le tournage</p>
+        </div>
+      </div>
+      <ul aria-label="L’IA par population" className="m-0 mt-[22px] flex list-none flex-col gap-3 p-0">
+        {c.populations.map((x) => {
+          const part = rapport(x.dollars, c.total);
+          return (
+            <li key={x.population} className="grid grid-cols-[minmax(0,110px)_minmax(0,1fr)_auto_44px] items-center gap-3 text-detail font-extrabold">
+              <span className="truncate">{NOMS_DES_POPULATIONS[x.population]}</span>
+              <Barre part={x.dollars / maxDesPopulations} couleur={COULEURS_DES_POPULATIONS[x.population]} />
+              <span className="text-right tabular-nums">{dollars(x.dollars)}</span>
+              <span className="text-right text-legende text-grey tabular-nums">{part === null ? "—" : pourcent(part * 100, 0)}</span>
+            </li>
+          );
+        })}
+      </ul>
+      <p className="m-0 mt-2 text-legende font-bold text-grey">
+        En tout, {dollars(c.total)} (≈ {euros(c.total * EUROS_PAR_DOLLAR * 100, 0)}). Les invités ne sont ni un test, ni une vente. Non classé{NBSP}: une conv effacée avant la
+        note, une ligne d’avant la règle que rien ne rattache, ou pas encore rangée{NBSP}; hors de la marge produit, qui dit à côté ce qu’il lui coûterait au pire.
       </p>
-      {c.postes.length ? (
-        <ul className="m-0 mt-[22px] flex list-none flex-col gap-3 p-0">
-          {c.postes.map((x) => {
-            const part = rapport(x.dollars, c.total);
+      <h3 className="m-0 mt-[22px] text-detail font-black">Les postes du produit</h3>
+      {postes.length ? (
+        <ul aria-label="Les postes du produit" className="m-0 mt-3 flex list-none flex-col gap-3 p-0">
+          {postes.map((x) => {
+            const part = rapport(x.produit.dollars, c.produit.valeur);
             return (
               <li key={x.nom} className="grid grid-cols-[minmax(0,90px)_minmax(0,1fr)_auto_44px] items-center gap-3 text-detail font-extrabold">
                 <span className="truncate">{x.nom}</span>
-                <Barre part={x.dollars / max} couleur="var(--ink)" />
-                <span className="text-right tabular-nums">{dollars(x.dollars)}</span>
+                <Barre part={x.produit.dollars / max} couleur="var(--ink)" />
+                <span className="text-right tabular-nums">{dollars(x.produit.dollars)}</span>
                 <span className="text-right text-legende text-grey tabular-nums">{part === null ? "—" : pourcent(part * 100, 0)}</span>
               </li>
             );
           })}
         </ul>
       ) : (
-        <p className="m-0 mt-[22px] text-note font-bold text-grey">Aucun appel au modèle sur la période.</p>
+        <p className="m-0 mt-3 text-note font-bold text-grey">
+          {c.postes.length ? "Aucun appel du produit sur la période\u00a0: seulement des tests." : "Aucun appel au modèle sur la période."}
+        </p>
       )}
-      <ul className="m-0 mt-[18px] flex list-none flex-wrap gap-2 p-0">
+      <ul aria-label="Les ratios du produit" className="m-0 mt-[18px] flex list-none flex-wrap gap-2 p-0">
         <Pastille valeur={parAcheteur === null ? "—" : dollars(parAcheteur)} nom="par acheteur" />
         <Pastille valeur={c.parVerdict === null ? "—" : dollars(c.parVerdict)} nom="par verdict" />
         <Pastille valeur={c.parRapport === null ? "—" : dollars(c.parRapport)} nom="par rapport" />
@@ -1495,6 +1560,7 @@ function Couts({ s }: { s: StatsAdmin }) {
         >
           <div className="h-full rounded-full" style={{ width: `${Math.min(1, jour ?? 0) * 100}%`, background: (jour ?? 0) >= 0.8 ? ORANGE : "var(--ink)" }} />
         </div>
+        <p className="m-0 mt-2 text-legende font-bold text-grey">Tout ce qui part, tests compris{NBSP}: c’est lui qui protège la facture.</p>
         {/* La part sans compte (src/server/budget.ts) : atteinte, tous les visiteurs d’avant l’email voient « souffle » jusqu’à minuit */}
         <p className="m-0 mt-3.5 flex justify-between gap-3 text-detail font-extrabold">
           <span>Sans compte</span>

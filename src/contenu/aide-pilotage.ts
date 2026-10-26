@@ -24,9 +24,9 @@ export const AIDES_DU_PILOTAGE = {
   ca: {
     titre: "Chiffre d’affaires",
     de: "le chiffre d’affaires",
-    quoi: "Ce que les gens ont vraiment payé sur la période, une fois les remboursements et les contestations retirés.",
+    quoi: "Ce que les vrais clients ont payé sur la période, une fois les remboursements et les contestations retirés.",
     calcul:
-      "Les achats payés sur la période (même remboursés depuis), moins ceux remboursés et ceux contestés sur la période. En TTC\u00a0: le prix payé, figé à la commande. Whop reverse ensuite la TVA et garde ses frais. Les colonnes montrent le payé de chaque heure (sur 24\u00a0h) ou de chaque jour de Paris, remboursements non retirés.",
+      "Les achats payés sur la période (même remboursés depuis), moins ceux remboursés et ceux contestés sur la période. En TTC\u00a0: le prix payé, figé à la commande. Whop reverse ensuite la TVA et garde ses frais. Les vrais clients seulement\u00a0: les achats de l’équipe, du tournage et des invités, rangés une fois pour toutes à l’heure de leur paiement, sont retirés de toutes les ventes de /admin (le taux d’achat, le revenu par acheteur, les courbes, les sources, ce qui se vend)\u00a0; «\u00a0Achats d’essai retirés\u00a0» dit combien. Whop, lui, les compte\u00a0: son total peut être plus haut. Les colonnes montrent le payé de chaque heure (sur 24\u00a0h) ou de chaque jour de Paris, remboursements non retirés.",
     repere: "La flèche compare à la période d’avant, de même durée. La colonne rose est celle en cours\u00a0: elle n’est pas finie.",
     siCaBouge: "S’il baisse alors que les visiteurs montent, le problème est après l’arrivée\u00a0: regarde le tunnel. S’il baisse avec les visiteurs, c’est la distribution.",
   },
@@ -35,7 +35,7 @@ export const AIDES_DU_PILOTAGE = {
     de: "le direct",
     quoi: "Les personnes sur le site en ce moment, l’écran où elles sont, d’où elles arrivent et la ville d’où elles se connectent.",
     calcul:
-      "Chaque onglet ouvert et visible fait signe toutes les 40\u00a0secondes\u00a0; il compte en ligne s’il a fait signe dans la dernière minute et demie. La ville vient de la connexion, à la ville près\u00a0: l’adresse IP n’est jamais gardée, et ni compte, ni conv, ni nom n’apparaît. Les outils de l’équipe (/admin, /apercu) ne comptent pas.",
+      "Chaque onglet ouvert et visible fait signe toutes les 40\u00a0secondes\u00a0; il compte en ligne s’il a fait signe dans la dernière minute et demie. La ville vient de la connexion, à la ville près\u00a0: l’adresse IP n’est jamais gardée, et ni compte, ni conv, ni nom n’apparaît. Les outils de l’équipe (/admin, /apercu) ne comptent pas. Le fil montre chaque achat, ceux de l’équipe compris\u00a0; le total du jour, lui, ne compte que les vrais clients.",
     repere: "Un pic soudain veut presque toujours dire qu’une vidéo vient de partir\u00a0: regarde «\u00a0D’où ils arrivent\u00a0» sur la page En direct.",
     siCaBouge: "Beaucoup de monde au paiement et aucun achat dans le fil\u00a0: vérifie que Whop répond.",
   },
@@ -53,7 +53,7 @@ export const AIDES_DU_PILOTAGE = {
     de: "le taux d’achat",
     quoi: "La part des visiteurs qui achètent au moins une fois sur la période.",
     calcul:
-      "Les comptes qui ont payé au moins un achat sur la période, divisés par les visiteurs de la même période. Un compte qui achète deux fois compte une fois\u00a0; un visiteur revenu deux jours compte deux fois\u00a0: le taux est plutôt prudent.",
+      "Les vrais clients qui ont payé au moins un achat sur la période (sans l’équipe, le tournage ni les invités), divisés par les visiteurs de la même période. Un compte qui achète deux fois compte une fois\u00a0; un visiteur revenu deux jours compte deux fois\u00a0: le taux est plutôt prudent.",
     repere: "Entre 2 et 4\u00a0% est bon pour un achat sous 20\u00a0€ venu des réseaux.",
     siCaBouge: "S’il baisse, regarde quelle étape du tunnel a lâché, puis quelle source a changé.",
   },
@@ -61,25 +61,27 @@ export const AIDES_DU_PILOTAGE = {
     titre: "Revenu par acheteur",
     de: "le revenu par acheteur",
     quoi: "Ce qu’un acheteur dépense en moyenne sur la période, recharges de bulles comprises.",
-    calcul: "Le payé TTC de la période (remboursements non retirés), divisé par les comptes qui ont payé au moins un achat.",
+    calcul:
+      "Le payé TTC des vrais clients sur la période (remboursements non retirés, achats de l’équipe, du tournage et des invités retirés), divisé par les vrais clients qui ont payé au moins un achat.",
     repere: "Au-dessus de 9,90\u00a0€, Premium et les recharges font leur travail. Le plafond naturel est autour de 20\u00a0€.",
     siCaBouge: "S’il baisse\u00a0: Premium est moins choisi sur la feuille du paiement, ou les coups de pouce ne se montrent plus.",
   },
   marge: {
-    titre: "Marge après IA",
-    de: "la marge après IA",
-    quoi: "Ce qu’il reste du chiffre d’affaires hors taxes une fois l’IA payée.",
+    titre: "Marge produit",
+    de: "la marge produit",
+    quoi: "Ce qu’il reste de ce que paient les vrais clients, hors taxes, une fois payée l’IA du produit. Les tests (l’équipe et le tournage) n’y comptent ni dans les ventes ni dans l’IA\u00a0: ils se lisent à côté.",
     calcul:
-      "(Chiffre d’affaires net hors taxes − ce qu’a coûté l’IA, en euros) ÷ chiffre d’affaires net hors taxes. La TVA retirée est celle de la France (20\u00a0%), le dollar compté à son cours du 11 octobre. Hors frais Whop et hors créatrices\u00a0: c’est une estimation.",
-    repere: `La cible\u00a0: ${CIBLE_DE_MARGE}\u00a0% ou plus. En dessous, la carte passe en orange.`,
-    siCaBouge: "Si elle baisse\u00a0: le chat coûte trop par réponse, ou des bulles offertes partent en réponses. Regarde ce que coûte l’IA, poste par poste.",
+      "(Chiffre d’affaires net des vrais clients hors taxes − l’IA du produit, en euros) ÷ ce chiffre d’affaires. Les vrais clients\u00a0: les acheteurs qui ne sont ni de l’équipe, ni du tournage, ni des invités, rangés une fois pour toutes à l’heure de leur paiement (les achats d’essai de l’équipe sont retirés, même si son compte d’essai est effacé ensuite). L’IA du produit\u00a0: celle des clients et des prospects (ceux qui importent sans acheter\u00a0: ce qu’il en coûte pour faire des clients), chaque appel rangé par la même règle («\u00a0Ce que coûte l’IA\u00a0» la détaille). La TVA retirée est celle de la France (20\u00a0%), le dollar compté à son cours du 11 octobre. Hors frais Whop et hors créatrices\u00a0: c’est une estimation. La courbe\u00a0: le payé et l’IA du produit de chaque case.",
+    repere: `La cible\u00a0: ${CIBLE_DE_MARGE}\u00a0% ou plus. En dessous, la carte passe en orange. Ce que coûtent les tests s’écrit dessous, à part, et le non classé avec la marge au pire (s’il était tout du produit).`,
+    siCaBouge:
+      "Si elle baisse\u00a0: le chat coûte trop par réponse, ou des bulles offertes partent en réponses. Regarde l’IA du produit, poste par poste. Des tests qui grimpent ne la touchent pas. Un appel «\u00a0non classé\u00a0» (une conv effacée avant sa note, une ligne d’avant la règle que rien ne rattache, une ligne pas encore rangée) n’y est pas non plus\u00a0: beaucoup de non classé, et la marge se lit trop belle, d’où la marge au pire écrite dessous. Juste après une mise en ligne, l’historique se range en quelques passages de 5\u00a0minutes\u00a0: lis la marge une fois le non classé retombé. Les lectures de captures d’avant le 26 octobre (sans conv ni envoi notés) sont rangées en prospect\u00a0: un essai de l’équipe sans compte peut s’y glisser.",
   },
   tunnel: {
     titre: "Le tunnel",
     de: "le tunnel",
     quoi: "Où les gens s’arrêtent, de l’arrivée sur le site au deuxième achat.",
     calcul:
-      "Les visiteurs de la période, les convs importées sur la période, celles d’entre elles qui ont vu le paywall (leur lecture lancée\u00a0; le verdict, lui, vient après le paiement), les comptes qui ont payé sur la période, et ceux d’entre eux qui ont payé au moins deux achats (depuis toujours). Le pourcentage du haut se fait sur l’étape d’avant.",
+      "Les visiteurs de la période, les convs importées sur la période, celles d’entre elles qui ont vu le paywall (leur lecture lancée\u00a0; le verdict, lui, vient après le paiement), les vrais clients qui ont payé sur la période, et ceux d’entre eux qui ont payé au moins deux achats (depuis toujours). Les convs et les achats de l’équipe, du tournage et des invités n’y sont pas\u00a0: une conv dont une lecture leur est rangée ne compte pas, ni une conv jamais lue de l’un de leurs comptes. Le pourcentage du haut se fait sur l’étape d’avant.",
     repere: "La colonne orange est la plus grosse fuite, entre l’arrivée et l’achat\u00a0: c’est là qu’un changement rapporte le plus.",
     siCaBouge: "Change une seule chose à la fois, et compare avec la période d’après.",
   },
@@ -99,7 +101,7 @@ export const AIDES_DU_PILOTAGE = {
     de: "le paywall, jusqu’au paiement",
     quoi: "Ce qui se passe entre l’arrivée au paywall et le paiement\u00a0: jusqu’où l’on descend, la formule touchée, le bouton qui paie, le formulaire de Whop et ce qu’il devient.",
     calcul:
-      "Les personnes qui ont passé chaque étape sur la période, une fois par jour (la même empreinte que les visiteurs). «\u00a0Voient le formulaire de Whop\u00a0»\u00a0: la carte de Whop affichée, ou Apple Pay ouvert. «\u00a0Refermé sans payer\u00a0»\u00a0: la feuille de la carte refermée, ou Apple Pay annulé. Seul le paywall d’avant la lecture compte ici (son offre ① comprise, depuis le 21 octobre), ni la feuille du rapport, ni les recharges. «\u00a0Qu’est-ce qui coince\u00a0?\u00a0» (depuis le 26 octobre)\u00a0: la question posée une fois par visite (la carte refermée sans payer, 40\u00a0s sans payer, ou le retour sur l’onglet), puis la réponse touchée\u00a0; l’offre ① ne vient plus qu’après «\u00a0C’est trop cher\u00a0».",
+      "Les personnes qui ont passé chaque étape sur la période, une fois par jour (la même empreinte que les visiteurs), l’équipe comprise\u00a0: ces étapes se notent sans compte, et ses essais au paywall y comptent, jusqu’au paiement. «\u00a0Voient le formulaire de Whop\u00a0»\u00a0: la carte de Whop affichée, ou Apple Pay ouvert. «\u00a0Refermé sans payer\u00a0»\u00a0: la feuille de la carte refermée, ou Apple Pay annulé. Seul le paywall d’avant la lecture compte ici (son offre ① comprise, depuis le 21 octobre), ni la feuille du rapport, ni les recharges. «\u00a0Qu’est-ce qui coince\u00a0?\u00a0» (depuis le 26 octobre)\u00a0: la question posée une fois par visite (la carte refermée sans payer, 40\u00a0s sans payer, ou le retour sur l’onglet), puis la réponse touchée\u00a0; l’offre ① ne vient plus qu’après «\u00a0C’est trop cher\u00a0».",
     repere:
       "Plus de feuilles de carte ouvertes que de formulaires affichés\u00a0: la carte de Whop charge mal. «\u00a0Premium au bouton\u00a0» se compare à «\u00a0Ce qui se vend\u00a0». Un taux se lit à partir de 30\u00a0personnes.",
     siCaBouge:
@@ -120,7 +122,7 @@ export const AIDES_DU_PILOTAGE = {
     de: "qui importe",
     quoi: "Les filles et les garçons qui importent une conv, de qui ils parlent (un garçon, une fille), et qui achète le mieux.",
     calcul:
-      "Chaque conv importée sur la période compte une fois, sans les prises du tournage\u00a0: une personne qui importe deux convs compte deux fois. Son genre est le pronom choisi sur «\u00a0Qui es-tu\u00a0?\u00a0»\u00a0; «\u00a0Pas encore dit\u00a0»\u00a0: la conv laissée avant cet écran. L’autre est celui que prend la lecture\u00a0: le pronom choisi sur sa fiche, sinon celui que ses accords laissent lire dans la conv, sinon l’opposé de celui qui importe («\u00a0devinés\u00a0»). «\u00a0Payées\u00a0»\u00a0: celles de ces convs dont le rapport a été payé depuis (le rapport, Premium, une offre unique, un 2e rapport), même remboursé\u00a0; une conv offerte par l’équipe ou la bêta n’y est pas. Le taux\u00a0: payées ÷ importées, ligne par ligne (aucun pour «\u00a0Pas encore dit\u00a0»\u00a0: le paywall vient après «\u00a0Qui es-tu\u00a0?\u00a0»). Le genre reste chiffré avec la conv\u00a0: il se déchiffre le temps du calcul, et seuls des totaux en sortent.",
+      "Chaque conv importée sur la période compte une fois, sans les prises du tournage ni les convs de l’équipe et des invités (une de leurs lectures leur est rangée, ou leur compte pour une conv jamais lue)\u00a0: une personne qui importe deux convs compte deux fois. Son genre est le pronom choisi sur «\u00a0Qui es-tu\u00a0?\u00a0»\u00a0; «\u00a0Pas encore dit\u00a0»\u00a0: la conv laissée avant cet écran. L’autre est celui que prend la lecture\u00a0: le pronom choisi sur sa fiche, sinon celui que ses accords laissent lire dans la conv, sinon l’opposé de celui qui importe («\u00a0devinés\u00a0»). «\u00a0Payées\u00a0»\u00a0: celles de ces convs dont le rapport a été payé depuis (le rapport, Premium, une offre unique, un 2e rapport), même remboursé, par un vrai client\u00a0; une conv offerte par l’équipe ou la bêta n’y est pas. Le taux\u00a0: payées ÷ importées, ligne par ligne (aucun pour «\u00a0Pas encore dit\u00a0»\u00a0: le paywall vient après «\u00a0Qui es-tu\u00a0?\u00a0»). Le genre reste chiffré avec la conv\u00a0: il se déchiffre le temps du calcul, et seuls des totaux en sortent.",
     repere:
       "Un taux se lit à partir de 30\u00a0convs\u00a0: en dessous, «\u00a0—\u00a0». Une conv importée à la fin de la période a encore le temps d’être payée\u00a0: le taux de 24\u00a0h est plus bas que celui de 30\u00a0jours. Beaucoup de «\u00a0devinés\u00a0»\u00a0: deux filles ou deux garçons qui ne l’ont pas corrigé sur la fiche comptent comme une fille et un garçon.",
     siCaBouge:
@@ -131,7 +133,7 @@ export const AIDES_DU_PILOTAGE = {
     de: "le haut du paywall",
     quoi: "Le titre que chaque conv voit en haut de son paywall, parmi cinq (la tendance, tout vient de toi, tout vient de l’autre, le contraste, l’égalité), et combien de rapports se débloquent après chacun.",
     calcul:
-      "Le code choisit le titre d’après les chiffres de la conv, sans le modèle (src/contenu/haut-du-paywall.ts). «\u00a0Vus\u00a0»\u00a0: les convs arrivées au paywall avec ce titre, comptées le jour de leur arrivée. «\u00a0Payés\u00a0»\u00a0: les rapports de ces convs débloqués (payés, ou par un rapport d’avance), comptés le jour du paiement. Le titre d’une conv reste chiffré avec elle\u00a0: ici, seulement des comptes par jour.",
+      "Le code choisit le titre d’après les chiffres de la conv, sans le modèle (src/contenu/haut-du-paywall.ts). «\u00a0Vus\u00a0»\u00a0: les convs arrivées au paywall avec ce titre, comptées le jour de leur arrivée. «\u00a0Payés\u00a0»\u00a0: les rapports de ces convs débloqués (payés, ou par un rapport d’avance), comptés le jour du paiement, ceux de l’équipe compris (des compteurs, pas les achats). Le titre d’une conv reste chiffré avec elle\u00a0: ici, seulement des comptes par jour.",
     repere:
       "Compare les taux d’un titre à l’autre, pas les nombres de vus\u00a0: chaque titre va à des convs différentes. Un taux se lit à partir de 30\u00a0vus. Un payé peut venir d’un vu de la période d’avant.",
     siCaBouge:
@@ -160,7 +162,7 @@ export const AIDES_DU_PILOTAGE = {
   sources: {
     titre: "D’où ils viennent",
     de: "les sources",
-    quoi: "Le canal par lequel les visiteurs arrivent, et ce que ses acheteurs ont payé.",
+    quoi: "Le canal par lequel les visiteurs arrivent, et ce que ses vrais clients ont payé.",
     calcul:
       "Le lien d’une créatrice (utm_source), sinon un verdict partagé, sinon le site d’avant, sinon l’appli qui a ouvert le lien, sinon «\u00a0Direct\u00a0». Les acheteurs se rangent d’après le canal de leur compte\u00a0; «\u00a0Avant le suivi\u00a0»\u00a0: des comptes venus avant qu’on compte les visites.",
     repere: "Juge un canal sur son taux d’achat et ce qu’il rapporte, jamais sur ses visiteurs seuls. Le «\u00a0meilleur taux\u00a0» ne se donne qu’à partir de 30\u00a0visiteurs.",
@@ -169,8 +171,9 @@ export const AIDES_DU_PILOTAGE = {
   mix: {
     titre: "Ce qui se vend",
     de: "ce qui se vend",
-    quoi: "Le payé de la période, par offre.",
-    calcul: "Les achats payés sur la période, TTC, remboursements non retirés. «\u00a0Bulles\u00a0» réunit les packs et le passage en Premium après le rapport.",
+    quoi: "Le payé des vrais clients sur la période, par offre.",
+    calcul:
+      "Les achats payés sur la période, TTC, remboursements non retirés, achats de l’équipe, du tournage et des invités retirés. «\u00a0Bulles\u00a0» réunit les packs et le passage en Premium après le rapport.",
     repere: "Premium au-dessus de la moitié\u00a0: la feuille du paiement fait son travail.",
     siCaBouge: "Si le rapport seul passe devant Premium, regarde ce que montre la feuille du paiement.",
   },
@@ -185,18 +188,19 @@ export const AIDES_DU_PILOTAGE = {
   couts: {
     titre: "Ce que coûte l’IA",
     de: "les coûts de l’IA",
-    quoi: "Ce que coûtent les appels au modèle (écrire, lire, répondre) sur la période.",
+    quoi: "Ce que coûtent les appels au modèle, à la voix et à la transcription sur la période, en deux\u00a0: l’IA du produit (les vrais clients et les prospects) et l’IA des tests (l’équipe et le tournage).",
     calcul:
-      "La somme de chaque appel, en dollars comme sur la facture, rangée par poste. Par acheteur\u00a0: le total divisé par les comptes qui ont payé. Le budget du jour (fixé côté serveur) coupe les appels une fois atteint\u00a0; l’équipe est prévenue à 50 et 80\u00a0%. Sans compte\u00a0: la part du budget des captures et des vidéos lues avant l’email, celles en cours comptées à ce qu’elles peuvent coûter au plus\u00a0; atteinte, elles s’arrêtent pour tous les visiteurs jusqu’à minuit (l’équipe est prévenue à 80\u00a0%, puis au premier refus).",
-    repere: `Par acheteur, sous 3\u00a0$ pour tenir ${CIBLE_DE_MARGE}\u00a0% de marge.`,
-    siCaBouge: "Si le chat grimpe\u00a0: vérifie la mémoire et la longueur des réponses de BLUSH.",
+      "La somme de chaque appel, en dollars comme sur la facture. Chaque appel est rangé une fois, à sa fin, par une seule règle, la première qui convient\u00a0: le tournage (une conv de tournage, son compte, le compte d’une créatrice), l’équipe (un compte qui ouvre /admin, ses alias compris, et toutes ses convs), les invités de BLUSH_ACCES_LIBRE (l’offert, à part\u00a0: ni un test, ni une vente), les clients (un achat payé avant l’appel), les prospects (un compte sans achat, ou des captures lues avant l’email), sinon «\u00a0non classé\u00a0» (une conv effacée avant la note, une ligne d’avant la règle que rien ne rattache, une ligne pas encore rangée). Les achats se rangent de même, une fois, à l’heure du paiement. IA des tests = l’équipe + le tournage\u00a0; IA du produit = les clients + les prospects. Un prospect qui achète garde ses appels d’avant en prospect\u00a0; des captures lues sans compte prennent la population du compte que leur conv trouve dans les deux jours. Les postes, par acheteur, par verdict et par rapport\u00a0: le produit seul, la même population en haut et en bas. Par acheteur\u00a0: l’IA du produit sur les acheteurs du produit. Par verdict (par rapport)\u00a0: tous les appels du verdict (du rapport, de sa mémoire) du produit, essais rejoués, verdicts refaits et convs effacées depuis compris, sur les verdicts (les rapports) gardés de la période dont un appel est du produit\u00a0: ce que coûte un verdict gardé, pas un appel. Le budget du jour, lui, compte tout ce qui part (fixé côté serveur)\u00a0: il coupe les appels une fois atteint\u00a0; l’équipe est prévenue à 50 et 80\u00a0%. Sans compte\u00a0: la part du budget des captures et des vidéos lues avant l’email, celles en cours comptées à ce qu’elles peuvent coûter au plus\u00a0; atteinte, elles s’arrêtent pour tous les visiteurs jusqu’à minuit (l’équipe est prévenue à 80\u00a0%, puis au premier refus). Les bancs des prompts, sur une autre clé, n’y sont pas.",
+    repere: `IA du produit par acheteur, sous 3\u00a0$ pour tenir ${CIBLE_DE_MARGE}\u00a0% de marge. Les tests se paient mais ne se vendent pas\u00a0: ils peuvent coûter plus que le produit sans toucher la marge.`,
+    siCaBouge:
+      "Si le chat du produit grimpe\u00a0: vérifie la mémoire et la longueur des réponses de BLUSH. Si les tests grimpent\u00a0: un tournage ou des essais tournent sur la production.",
   },
   avantLAchat: {
     titre: "L’IA avant l’achat",
     de: "l’IA avant l’achat",
     quoi: "Ce que coûte la lecture d’une conv avant que la personne paie, selon comment elle est arrivée\u00a0: un export (rien n’est lu avant l’achat), des captures (une lecture) ou un enregistrement d’écran (lu par lots).",
     calcul:
-      "Chaque conv importée sur la période (sans les prises du mode tournage, ni celles des comptes de l’équipe et de ses invités) garde son type, son appli, ses écrans et ses lots lus, sans rien de son contenu. Ses lectures (des captures, les lots d’une vidéo, ceux d’un morceau ajouté avant «\u00a0Qui es-tu\u00a0?\u00a0» compris, et ceux qu’un nouvel essai de la même vidéo a repris sans les relire) sont notées sous l’empreinte de son envoi, en dollars comme sur la facture, une lecture arrêtée en route comprise. Jusqu’au paywall\u00a0: le temps médian de sa première lecture (son import, pour un export) au paywall. Paywall\u00a0: sa lecture lancée, comme le tunnel. Paient\u00a0: un achat payé pour cette conv, même remboursé depuis (une conv effacée depuis n’y compte plus). IA par acheteur\u00a0: tout ce que le type a coûté avant l’achat, lu pour rien compris, divisé par les convs payées. Lu pour rien\u00a0: des lectures d’avant l’import qui n’ont mené à aucune conv (un enregistrement abandonné, des captures refusées, une lecture ratée).",
+      "Chaque conv importée sur la période (sans les prises du mode tournage, ni les tests et les invités\u00a0: une conv dont une lecture est rangée équipe, tournage ou invité, par la règle de «\u00a0Ce que coûte l’IA\u00a0») garde son type, son appli, ses écrans et ses lots lus, sans rien de son contenu. Ses lectures (des captures, les lots d’une vidéo, ceux d’un morceau ajouté avant «\u00a0Qui es-tu\u00a0?\u00a0» compris, et ceux qu’un nouvel essai de la même vidéo a repris sans les relire) sont notées sous l’empreinte de son envoi, en dollars comme sur la facture, une lecture arrêtée en route comprise. Jusqu’au paywall\u00a0: le temps médian de sa première lecture (son import, pour un export) au paywall. Paywall\u00a0: sa lecture lancée, comme le tunnel. Paient\u00a0: un achat payé pour cette conv, même remboursé depuis (une conv effacée depuis n’y compte plus). IA par acheteur\u00a0: tout ce que le type a coûté avant l’achat, lu pour rien compris, divisé par les convs payées. Lu pour rien\u00a0: des lectures d’avant l’import qui n’ont mené à aucune conv (un enregistrement abandonné, des captures refusées, une lecture ratée).",
     repere:
       "Un taux se lit à partir de 30\u00a0convs. Une vidéo de 160\u00a0écrans coûte environ 1,25\u00a0$ à lire. Le poste «\u00a0Captures\u00a0» de «\u00a0Ce que coûte l’IA\u00a0» réunit les captures et les vidéos, celles envoyées au chat comprises\u00a0: ici, seulement ce qui est lu avant l’achat.",
     siCaBouge:
@@ -207,7 +211,7 @@ export const AIDES_DU_PILOTAGE = {
     de: "la lecture partielle des longues vidéos",
     quoi: "L’A/B des longues vidéos (plus de 5\u00a0lots)\u00a0: une moitié est lue en entier avant l’achat, comme avant\u00a0; l’autre n’est lue que dans sa partie la plus récente, assez pour le haut du paywall. Le reste de ses écrans est gardé chiffré le temps que la conv puisse être achetée (11\u00a0jours après le paywall, le temps des relances), lu après le paiement juste avant le verdict, ou effacé sans avoir été lu.",
     calcul:
-      "La moitié se tire de l’empreinte des images du lot le plus récent\u00a0: la même vidéo tombe toujours du même côté. Chaque vidéo compte dès son plan, avant sa lecture, qu’elle aille ou non jusqu’à l’import (ses essais réunis, celles de l’équipe à part)\u00a0: la moitié entière, plus longue à lire, perd plus de monde en route. Importées, Paywall et Paient\u00a0: sur ces vidéos. Paient plus de 24\u00a0h après\u00a0: les achats faits plus d’un jour après l’import (les relances). IA avant l’achat\u00a0: les lots lus avant le paiement, ceux des vidéos jamais importées compris. Suite lue après\u00a0: les lots gardés, lus après le paiement (le poste «\u00a0captures_suite\u00a0»), divisés par les convs payées. Jusqu’au paywall\u00a0: de la première lecture d’un lot au paywall, «\u00a0Qui es-tu\u00a0?\u00a0» compris (la médiane). Tendance\u00a0: la part des paywalls de la moitié qui ont montré ce titre. Une suite est incomplète quand un lot gardé a été refusé ou illisible, perdue quand ses écrans ont été effacés avant le paiement (payé plus de 11\u00a0jours après le paywall). Coupées\u00a0: les vidéos dont la règle a gardé des lots pour après le paiement (les autres ont tout lu avant l’achat). Titre changé par la suite\u00a0: parmi les suites lues, les convs entières qui auraient montré un autre titre que celui vu au paywall. Le contrefactuel rejoue la règle sur les vidéos lues en entier (en «\u00a0mesure\u00a0», et la moitié entière)\u00a0: le titre qu’aurait montré la partie récente, comparé au vrai.",
+      "La moitié se tire de l’empreinte des images du lot le plus récent\u00a0: la même vidéo tombe toujours du même côté. Chaque vidéo compte dès son plan, avant sa lecture, qu’elle aille ou non jusqu’à l’import (ses essais réunis, celles des tests et des invités à part)\u00a0: la moitié entière, plus longue à lire, perd plus de monde en route. Importées, Paywall et Paient\u00a0: sur ces vidéos. Paient plus de 24\u00a0h après\u00a0: les achats faits plus d’un jour après l’import (les relances). IA avant l’achat\u00a0: les lots lus avant le paiement, ceux des vidéos jamais importées compris. Suite lue après\u00a0: les lots gardés, lus après le paiement (le poste «\u00a0captures_suite\u00a0»), divisés par les convs payées. Jusqu’au paywall\u00a0: de la première lecture d’un lot au paywall, «\u00a0Qui es-tu\u00a0?\u00a0» compris (la médiane). Tendance\u00a0: la part des paywalls de la moitié qui ont montré ce titre. Une suite est incomplète quand un lot gardé a été refusé ou illisible, perdue quand ses écrans ont été effacés avant le paiement (payé plus de 11\u00a0jours après le paywall). Coupées\u00a0: les vidéos dont la règle a gardé des lots pour après le paiement (les autres ont tout lu avant l’achat). Titre changé par la suite\u00a0: parmi les suites lues, les convs entières qui auraient montré un autre titre que celui vu au paywall. Le contrefactuel rejoue la règle sur les vidéos lues en entier (en «\u00a0mesure\u00a0», et la moitié entière)\u00a0: le titre qu’aurait montré la partie récente, comparé au vrai.",
     repere:
       "Le coût se lit en une semaine\u00a0: la moitié partielle doit coûter bien moins avant l’achat, pour un coût par acheteur proche. La part qui paie demande des milliers de vidéos pour un écart net\u00a0: garde-fou, si la partielle paie moins de la moitié de l’entière après 100\u00a0vidéos chacune, coupe. Le contrefactuel, comme «\u00a0Titre changé par la suite\u00a0», doit garder le même titre presque toujours.",
     siCaBouge:
