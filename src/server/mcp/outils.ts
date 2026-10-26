@@ -64,14 +64,14 @@ export const OUTILS: readonly OutilMcp[] = [
     name: "tunnel",
     title: "Tunnel détaillé",
     description:
-      "Le tunnel écran par écran sur la période : les jalons de l’import (du choix de l’appli au lancement de la lecture), l’import appli par appli (WhatsApp, Instagram, iMessage, Captures ou vidéo : ceux qui ouvrent son écran, qui y choisissent un fichier, et le taux de passage à partir de 30 personnes, puis les convs bien reçues et les envois ratés), les jalons du paywall (de l’arrivée au paiement), « Qu’est-ce qui coince ? » (la question posée, et chaque réponse : trop cher, pas confiance, pas maintenant, ça a bugué), les titres du haut du paywall (vus, payés), les offres uniques (montrées, prises), les commandes (payées, échouées, en attente) et jusqu’où vont les convs importées.",
+      "Le tunnel écran par écran sur la période : les jalons de l’import (du choix de l’appli au lancement de la lecture), l’import appli par appli (WhatsApp, Instagram, iMessage, Captures ou vidéo : ceux qui ouvrent son écran, qui y choisissent un fichier, et le taux de passage à partir de 30 personnes, puis les convs bien reçues et les envois ratés), les jalons du paywall (de l’arrivée au paiement), « Qu’est-ce qui coince ? » (la question posée, et chaque réponse : trop cher, pas confiance, pas maintenant, ça a bugué), les titres du haut du paywall (vus, payés), les offres uniques (montrées, prises), les commandes des vrais clients (payées, échouées, en attente) et jusqu’où vont les convs importées.",
     inputSchema: AVEC_JOURS,
   },
   {
     name: "ventes",
     title: "Ventes et bulles",
     description:
-      "Les ventes d’aujourd’hui et des 7 derniers jours (jours de Paris, quelle que soit la période) : payé, remboursé, contesté, et le payé par offre ; et les bulles vendues, dépensées, offertes, rendues.",
+      "Les ventes des vrais clients d’aujourd’hui et des 7 derniers jours (jours de Paris, quelle que soit la période ; sans les achats de l’équipe, du tournage ni des invités) : payé, remboursé, contesté, et le payé par offre ; et les bulles vendues (aux vrais clients), dépensées, offertes, rendues.",
     inputSchema: SANS_ARGUMENT,
   },
   {
@@ -106,7 +106,7 @@ export const OUTILS: readonly OutilMcp[] = [
     name: "direct",
     title: "En direct",
     description:
-      "Qui est sur le site en ce moment : le nombre de personnes en ligne, leur écran, leur source, leur ville, la courbe des 30 dernières minutes, le record du jour, les derniers gestes (arrivées, imports, paiements, achats, partages des dernières 24 h) et le total du jour.",
+      "Qui est sur le site en ce moment : le nombre de personnes en ligne, leur écran, leur source, leur ville, la courbe des 30 dernières minutes, le record du jour, les derniers gestes (arrivées, imports, paiements, achats, partages des dernières 24 h, ceux de l’équipe compris) et le total du jour (les achats des vrais clients).",
     inputSchema: SANS_ARGUMENT,
   },
   {

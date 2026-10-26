@@ -35,7 +35,7 @@ export const AIDES_DU_PILOTAGE = {
     de: "le direct",
     quoi: "Les personnes sur le site en ce moment, l’écran où elles sont, d’où elles arrivent et la ville d’où elles se connectent.",
     calcul:
-      "Chaque onglet ouvert et visible fait signe toutes les 40\u00a0secondes\u00a0; il compte en ligne s’il a fait signe dans la dernière minute et demie. La ville vient de la connexion, à la ville près\u00a0: l’adresse IP n’est jamais gardée, et ni compte, ni conv, ni nom n’apparaît. Les outils de l’équipe (/admin, /apercu) ne comptent pas.",
+      "Chaque onglet ouvert et visible fait signe toutes les 40\u00a0secondes\u00a0; il compte en ligne s’il a fait signe dans la dernière minute et demie. La ville vient de la connexion, à la ville près\u00a0: l’adresse IP n’est jamais gardée, et ni compte, ni conv, ni nom n’apparaît. Les outils de l’équipe (/admin, /apercu) ne comptent pas. Le fil montre chaque achat, ceux de l’équipe compris\u00a0; le total du jour, lui, ne compte que les vrais clients.",
     repere: "Un pic soudain veut presque toujours dire qu’une vidéo vient de partir\u00a0: regarde «\u00a0D’où ils arrivent\u00a0» sur la page En direct.",
     siCaBouge: "Beaucoup de monde au paiement et aucun achat dans le fil\u00a0: vérifie que Whop répond.",
   },
@@ -62,7 +62,7 @@ export const AIDES_DU_PILOTAGE = {
     de: "le revenu par acheteur",
     quoi: "Ce qu’un acheteur dépense en moyenne sur la période, recharges de bulles comprises.",
     calcul:
-      "Le payé TTC des vrais clients sur la période (remboursements non retirés, achats d’essai de l’équipe retirés), divisé par les vrais clients qui ont payé au moins un achat.",
+      "Le payé TTC des vrais clients sur la période (remboursements non retirés, achats de l’équipe, du tournage et des invités retirés), divisé par les vrais clients qui ont payé au moins un achat.",
     repere: "Au-dessus de 9,90\u00a0€, Premium et les recharges font leur travail. Le plafond naturel est autour de 20\u00a0€.",
     siCaBouge: "S’il baisse\u00a0: Premium est moins choisi sur la feuille du paiement, ou les coups de pouce ne se montrent plus.",
   },
@@ -81,7 +81,7 @@ export const AIDES_DU_PILOTAGE = {
     de: "le tunnel",
     quoi: "Où les gens s’arrêtent, de l’arrivée sur le site au deuxième achat.",
     calcul:
-      "Les visiteurs de la période, les convs importées sur la période, celles d’entre elles qui ont vu le paywall (leur lecture lancée\u00a0; le verdict, lui, vient après le paiement), les comptes qui ont payé sur la période, et ceux d’entre eux qui ont payé au moins deux achats (depuis toujours). Le pourcentage du haut se fait sur l’étape d’avant.",
+      "Les visiteurs de la période, les convs importées sur la période, celles d’entre elles qui ont vu le paywall (leur lecture lancée\u00a0; le verdict, lui, vient après le paiement), les vrais clients qui ont payé sur la période, et ceux d’entre eux qui ont payé au moins deux achats (depuis toujours). Les convs et les achats de l’équipe, du tournage et des invités n’y sont pas\u00a0: une conv dont une lecture leur est rangée ne compte pas, ni une conv jamais lue de l’un de leurs comptes. Le pourcentage du haut se fait sur l’étape d’avant.",
     repere: "La colonne orange est la plus grosse fuite, entre l’arrivée et l’achat\u00a0: c’est là qu’un changement rapporte le plus.",
     siCaBouge: "Change une seule chose à la fois, et compare avec la période d’après.",
   },
@@ -101,7 +101,7 @@ export const AIDES_DU_PILOTAGE = {
     de: "le paywall, jusqu’au paiement",
     quoi: "Ce qui se passe entre l’arrivée au paywall et le paiement\u00a0: jusqu’où l’on descend, la formule touchée, le bouton qui paie, le formulaire de Whop et ce qu’il devient.",
     calcul:
-      "Les personnes qui ont passé chaque étape sur la période, une fois par jour (la même empreinte que les visiteurs). «\u00a0Voient le formulaire de Whop\u00a0»\u00a0: la carte de Whop affichée, ou Apple Pay ouvert. «\u00a0Refermé sans payer\u00a0»\u00a0: la feuille de la carte refermée, ou Apple Pay annulé. Seul le paywall d’avant la lecture compte ici (son offre ① comprise, depuis le 21 octobre), ni la feuille du rapport, ni les recharges. «\u00a0Qu’est-ce qui coince\u00a0?\u00a0» (depuis le 26 octobre)\u00a0: la question posée une fois par visite (la carte refermée sans payer, 40\u00a0s sans payer, ou le retour sur l’onglet), puis la réponse touchée\u00a0; l’offre ① ne vient plus qu’après «\u00a0C’est trop cher\u00a0».",
+      "Les personnes qui ont passé chaque étape sur la période, une fois par jour (la même empreinte que les visiteurs), l’équipe comprise\u00a0: ces étapes se notent sans compte, et ses essais au paywall y comptent, jusqu’au paiement. «\u00a0Voient le formulaire de Whop\u00a0»\u00a0: la carte de Whop affichée, ou Apple Pay ouvert. «\u00a0Refermé sans payer\u00a0»\u00a0: la feuille de la carte refermée, ou Apple Pay annulé. Seul le paywall d’avant la lecture compte ici (son offre ① comprise, depuis le 21 octobre), ni la feuille du rapport, ni les recharges. «\u00a0Qu’est-ce qui coince\u00a0?\u00a0» (depuis le 26 octobre)\u00a0: la question posée une fois par visite (la carte refermée sans payer, 40\u00a0s sans payer, ou le retour sur l’onglet), puis la réponse touchée\u00a0; l’offre ① ne vient plus qu’après «\u00a0C’est trop cher\u00a0».",
     repere:
       "Plus de feuilles de carte ouvertes que de formulaires affichés\u00a0: la carte de Whop charge mal. «\u00a0Premium au bouton\u00a0» se compare à «\u00a0Ce qui se vend\u00a0». Un taux se lit à partir de 30\u00a0personnes.",
     siCaBouge:
@@ -122,7 +122,7 @@ export const AIDES_DU_PILOTAGE = {
     de: "qui importe",
     quoi: "Les filles et les garçons qui importent une conv, de qui ils parlent (un garçon, une fille), et qui achète le mieux.",
     calcul:
-      "Chaque conv importée sur la période compte une fois, sans les prises du tournage\u00a0: une personne qui importe deux convs compte deux fois. Son genre est le pronom choisi sur «\u00a0Qui es-tu\u00a0?\u00a0»\u00a0; «\u00a0Pas encore dit\u00a0»\u00a0: la conv laissée avant cet écran. L’autre est celui que prend la lecture\u00a0: le pronom choisi sur sa fiche, sinon celui que ses accords laissent lire dans la conv, sinon l’opposé de celui qui importe («\u00a0devinés\u00a0»). «\u00a0Payées\u00a0»\u00a0: celles de ces convs dont le rapport a été payé depuis (le rapport, Premium, une offre unique, un 2e rapport), même remboursé\u00a0; une conv offerte par l’équipe ou la bêta n’y est pas. Le taux\u00a0: payées ÷ importées, ligne par ligne (aucun pour «\u00a0Pas encore dit\u00a0»\u00a0: le paywall vient après «\u00a0Qui es-tu\u00a0?\u00a0»). Le genre reste chiffré avec la conv\u00a0: il se déchiffre le temps du calcul, et seuls des totaux en sortent.",
+      "Chaque conv importée sur la période compte une fois, sans les prises du tournage ni les convs de l’équipe et des invités (une de leurs lectures leur est rangée, ou leur compte pour une conv jamais lue)\u00a0: une personne qui importe deux convs compte deux fois. Son genre est le pronom choisi sur «\u00a0Qui es-tu\u00a0?\u00a0»\u00a0; «\u00a0Pas encore dit\u00a0»\u00a0: la conv laissée avant cet écran. L’autre est celui que prend la lecture\u00a0: le pronom choisi sur sa fiche, sinon celui que ses accords laissent lire dans la conv, sinon l’opposé de celui qui importe («\u00a0devinés\u00a0»). «\u00a0Payées\u00a0»\u00a0: celles de ces convs dont le rapport a été payé depuis (le rapport, Premium, une offre unique, un 2e rapport), même remboursé, par un vrai client\u00a0; une conv offerte par l’équipe ou la bêta n’y est pas. Le taux\u00a0: payées ÷ importées, ligne par ligne (aucun pour «\u00a0Pas encore dit\u00a0»\u00a0: le paywall vient après «\u00a0Qui es-tu\u00a0?\u00a0»). Le genre reste chiffré avec la conv\u00a0: il se déchiffre le temps du calcul, et seuls des totaux en sortent.",
     repere:
       "Un taux se lit à partir de 30\u00a0convs\u00a0: en dessous, «\u00a0—\u00a0». Une conv importée à la fin de la période a encore le temps d’être payée\u00a0: le taux de 24\u00a0h est plus bas que celui de 30\u00a0jours. Beaucoup de «\u00a0devinés\u00a0»\u00a0: deux filles ou deux garçons qui ne l’ont pas corrigé sur la fiche comptent comme une fille et un garçon.",
     siCaBouge:
@@ -133,7 +133,7 @@ export const AIDES_DU_PILOTAGE = {
     de: "le haut du paywall",
     quoi: "Le titre que chaque conv voit en haut de son paywall, parmi cinq (la tendance, tout vient de toi, tout vient de l’autre, le contraste, l’égalité), et combien de rapports se débloquent après chacun.",
     calcul:
-      "Le code choisit le titre d’après les chiffres de la conv, sans le modèle (src/contenu/haut-du-paywall.ts). «\u00a0Vus\u00a0»\u00a0: les convs arrivées au paywall avec ce titre, comptées le jour de leur arrivée. «\u00a0Payés\u00a0»\u00a0: les rapports de ces convs débloqués (payés, ou par un rapport d’avance), comptés le jour du paiement. Le titre d’une conv reste chiffré avec elle\u00a0: ici, seulement des comptes par jour.",
+      "Le code choisit le titre d’après les chiffres de la conv, sans le modèle (src/contenu/haut-du-paywall.ts). «\u00a0Vus\u00a0»\u00a0: les convs arrivées au paywall avec ce titre, comptées le jour de leur arrivée. «\u00a0Payés\u00a0»\u00a0: les rapports de ces convs débloqués (payés, ou par un rapport d’avance), comptés le jour du paiement, ceux de l’équipe compris (des compteurs, pas les achats). Le titre d’une conv reste chiffré avec elle\u00a0: ici, seulement des comptes par jour.",
     repere:
       "Compare les taux d’un titre à l’autre, pas les nombres de vus\u00a0: chaque titre va à des convs différentes. Un taux se lit à partir de 30\u00a0vus. Un payé peut venir d’un vu de la période d’avant.",
     siCaBouge:
@@ -173,7 +173,7 @@ export const AIDES_DU_PILOTAGE = {
     de: "ce qui se vend",
     quoi: "Le payé des vrais clients sur la période, par offre.",
     calcul:
-      "Les achats payés sur la période, TTC, remboursements non retirés, achats d’essai de l’équipe retirés. «\u00a0Bulles\u00a0» réunit les packs et le passage en Premium après le rapport.",
+      "Les achats payés sur la période, TTC, remboursements non retirés, achats de l’équipe, du tournage et des invités retirés. «\u00a0Bulles\u00a0» réunit les packs et le passage en Premium après le rapport.",
     repere: "Premium au-dessus de la moitié\u00a0: la feuille du paiement fait son travail.",
     siCaBouge: "Si le rapport seul passe devant Premium, regarde ce que montre la feuille du paiement.",
   },

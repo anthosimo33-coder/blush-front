@@ -55,6 +55,7 @@ import {
   TYPES_EVENEMENTS_MAILS,
   type DetailEcriture,
 } from "./enums";
+import { emailCanoniqueEnSQLBrut } from "../email-canonique";
 
 /*
  * Le schéma de BLUSH. Règle : tout ce qui contient la conv, ou ce qu’on en a tiré, est dans une colonne
@@ -67,6 +68,12 @@ const quand = (nom: string) => timestamp(nom, { withTimezone: true });
 export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
   email: text("email").notNull().unique(),
+  /**
+   * L’email canonique du compte (emailCanonique : ses alias, ses points chez Gmail), calculé par la base à chaque écriture
+   * de l’email (une colonne générée) : la règle « qui est qui » (src/server/population.ts) y reconnaît l’équipe et le
+   * compte du tournage sans recalculer l’email de chaque compte à chaque lecture de /admin.
+   */
+  emailCanonique: text("email_canonique").generatedAlwaysAs(sql.raw(emailCanoniqueEnSQLBrut("email"))),
   /**
    * L’accès d’avant le paiement (la bêta), par compte : plus rien ne le lit ni ne l’écrit. Seule l’étape des testeurs de
    * la bêta (RATTRAPAGE_BETA, scripts/base.mjs, après les migrations) s’en sert, une fois, pour leur donner leurs rapports et leurs

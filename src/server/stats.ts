@@ -40,7 +40,7 @@ import { env } from "./env";
 import { actionsRecentes, type ActionRecente } from "./equipe";
 import { metaDe, personnesDe, type Meta } from "./histoires";
 import { LOT_BLOQUE_S } from "./memoire-en-lot";
-import { duProduit } from "./population";
+import { achatDuProduit, comptesDesTests, duProduit } from "./population";
 import { PERIME_S } from "./taches";
 import { dansLaMoitieAvec, VENTE, type GroupeDeVente } from "./vente";
 
@@ -66,7 +66,10 @@ export type Montant = { n: number; centimes: number };
  * (même remboursés depuis), ceux remboursés et ceux contestés dans la fenêtre, et les payés par offre.
  */
 export type Ventes = { payes: Montant; rembourses: Montant; contestes: Montant; parOffre: ({ offre: OffreId } & Montant)[] };
-/** Les bulles d’une fenêtre : vendues (livrées avec un achat), dépensées (les réponses de BLUSH), offertes (la bêta, l’équipe), rendues. */
+/**
+ * Les bulles d’une fenêtre : vendues (livrées avec l’achat d’un vrai client), dépensées (les réponses de BLUSH), offertes
+ * (la bêta, l’équipe), rendues.
+ */
 export type Bulles = { vendues: number; depensees: number; offertes: number; rendues: number };
 
 export type StatsAdmin = {
@@ -117,8 +120,9 @@ export type StatsAdmin = {
   bulles: { jour: Bulles; semaine: Bulles };
   /**
    * Les commandes d’un rapport (le rapport, Premium, la suite : les offres d’une conv) créées sur la période
-   * (achats.cree_le), et ce qu’elles sont devenues. Les bulles seules (les recharges, ③) n’entrent pas dans l’entonnoir
-   * des verdicts lus.
+   * (achats.cree_le) par les vrais clients, et ce qu’elles sont devenues : une commande payée se juge par sa population
+   * (ACHAT_DU_PRODUIT), une jamais payée par son compte (comptesDesTests). Les bulles seules (les recharges, ③) n’entrent
+   * pas dans l’entonnoir des verdicts lus.
    */
   achats: { commandes: number; comptes: number; payees: number; echouees: number; enAttente: number };
   /** Les offres uniques montrées sur la période, et combien de celles-là ont été prises. */
@@ -333,10 +337,11 @@ export type Pilotage = {
 /* Les offres qui débloquent le rapport d’une conv : l’entonnoir des achats part des verdicts lus */
 const OFFRES_DU_RAPPORT = OFFRES.filter((o) => CATALOGUE[o].conv);
 /**
- * Une conv payée (en SQL brut, `stories` sous l’alias `s`) : une offre de son rapport payée, ou un rapport d’avance
- * utilisé sur elle (il n’a sa conv qu’alors), même remboursés depuis. Une conv offerte (l’équipe, la bêta) ne l’est pas.
+ * Une conv payée (en SQL brut, `stories` sous l’alias `s`) : une offre de son rapport payée par un vrai client
+ * (achatDuProduit), ou un rapport d’avance utilisé sur elle (il n’a sa conv qu’alors), même remboursés depuis. Une conv
+ * offerte (l’équipe, la bêta), ou payée par un achat d’essai, ne l’est pas.
  */
-const PAYEE_S = sql`exists (select 1 from achats a where a.story_id = s.id and a.paye_le is not null and a.offre in (${sql.join(
+const PAYEE_S = sql`exists (select 1 from achats a where a.story_id = s.id and a.paye_le is not null and ${achatDuProduit("a")} and a.offre in (${sql.join(
   [...OFFRES_DU_RAPPORT, RAPPORT_D_AVANCE.offre].map((o) => sql`${o}`),
   sql`, `,
 )}))`;
@@ -383,17 +388,29 @@ function horsDesTests(alias: string): SQL {
 }
 
 /**
+ * Cette conv (en SQL brut, `stories` sous l’alias `s`) n’est pas un test : aucune de ses lectures n’est rangée équipe,
+ * tournage ou invité, comme horsDesTests pour un import ; jamais lue (un export arrivé au paywall sans payer), son compte
+ * n’en est pas un aujourd’hui (comptesDesTests). Une conv lue se juge par ses lectures, figées ; seule celle qui n’en a
+ * aucune se juge par son compte. Le tunnel et « Qui importe » la comptent face aux vrais clients (ACHAT_DU_PRODUIT,
+ * PAYEE_S) : sinon les convs de l’équipe gonfleraient le dénominateur sans ses achats d’essai en haut. Un brouillon sans
+ * compte et jamais lu compte : rien ne dit d’où il vient. Des anti-jointures, par l’index d’ai_usage.story_id, et un
+ * ensemble de comptes calculé une fois. Une fonction, pas une constante : les listes de l’équipe et des invités se lisent
+ * à chaque calcul.
+ */
+const convHorsDesTests = () =>
+  sql`not exists (select 1 from ai_usage t where t.story_id = s.id and t.population in (${sql.join(
+    HORS_DE_LA_MESURE.map((p) => sql`${p}`),
+    sql`, `,
+  )})) and (exists (select 1 from ai_usage t where t.story_id = s.id) or s.user_id is null or s.user_id not in (${comptesDesTests()}))`;
+
+/**
  * Cette conv (sa colonne `story_id`, en SQL brut) a un appel du produit sous cette étiquette (ai_usage.population : un
  * client ou un prospect) : le dénominateur des ratios du produit, rangé par les mêmes lignes que leur numérateur.
  */
 const appelDuProduit = (conv: string, tache: SQL) => sql`exists (select 1 from ai_usage u where u.story_id = ${sql.raw(conv)} and ${tache} and ${duProduit(sql`u.population`)})`;
 
-/**
- * Un achat du produit (en SQL brut, `achats` sous l’alias `a0`) : payé par un client (achats.population, figée au
- * paiement). Un achat payé pas encore rangé (le passage des 5 minutes le range) compte comme un client : il l’est presque
- * toujours.
- */
-const ACHAT_DU_PRODUIT = sql`(a0.population is null or ${duProduit(sql`a0.population`)})`;
+/** Un achat d’un vrai client, `achats` sous l’alias `a0` (achatDuProduit) : toutes les ventes du pilotage. */
+const ACHAT_DU_PRODUIT = achatDuProduit("a0");
 
 /**
  * Les postes de coût, d’après l’étiquette de chaque appel au modèle. La mémoire en trois : sa création après le rapport
@@ -538,10 +555,11 @@ export async function statsAdmin(jours: Periode): Promise<StatsAdmin> {
     ligne<{ commandes: string; comptes: string; payees: string; echouees: string; en_attente: string }>(
       sql`select count(*) as commandes, count(distinct user_id) as comptes, count(*) filter (where paye_le is not null) as payees,
             count(*) filter (where statut = 'echoue') as echouees, count(*) filter (where statut = 'en_attente') as en_attente
-          from achats where ${dans("cree_le")} and offre in (${sql.join(
-            OFFRES_DU_RAPPORT.map((o) => sql`${o}`),
-            sql`, `,
-          )})`,
+          from achats a0 where ${dans("cree_le")} and ${ACHAT_DU_PRODUIT}
+            and (a0.paye_le is not null or a0.user_id is null or a0.user_id not in (${comptesDesTests()})) and offre in (${sql.join(
+              OFFRES_DU_RAPPORT.map((o) => sql`${o}`),
+              sql`, `,
+            )})`,
     ),
     lignes<{ offre: OffreUnique; montrees: string; prises: string }>(
       sql`select offre, count(*) as montrees, count(*) filter (where prise_le is not null) as prises from offres_uniques where ${dans("montree_le")} group by offre`,
@@ -725,8 +743,8 @@ async function pilotageDe(jours: Periode): Promise<Pilotage> {
      * convs payées. Avant, le verdict offert venait avant le paywall : la tâche le compte aussi
      */
     ligne<{ imports: string; paywall: string; racheteurs: string }>(
-      sql`select (select count(*) from stories s where ${W("s.created_at")} and ${sql.raw(VRAIE_CONV_S)}) as imports,
-            (select count(*) from stories s where ${W("s.created_at")} and ${sql.raw(VRAIE_CONV_S)}
+      sql`select (select count(*) from stories s where ${W("s.created_at")} and ${sql.raw(VRAIE_CONV_S)} and ${convHorsDesTests()}) as imports,
+            (select count(*) from stories s where ${W("s.created_at")} and ${sql.raw(VRAIE_CONV_S)} and ${convHorsDesTests()}
               and exists (select 1 from tasks t where t.story_id = s.id and t.kind = 'verdict')) as paywall,
             (select count(*) from (select a0.user_id from achats a0 where a0.paye_le is not null and ${ACHAT_DU_PRODUIT}
               and a0.user_id in (select a0.user_id from achats a0 where ${W("a0.paye_le")} and ${ACHAT_DU_PRODUIT})
@@ -761,7 +779,7 @@ async function pilotageDe(jours: Periode): Promise<Pilotage> {
     ),
     lignes<{ cle: string; envoyes: string; payes: string }>(
       sql`select e.cle, count(*) as envoyes,
-            count(*) filter (where exists (select 1 from achats a where a.user_id = e.user_id and a.statut = 'paye'
+            count(*) filter (where exists (select 1 from achats a where a.user_id = e.user_id and a.statut = 'paye' and ${achatDuProduit("a")}
               and a.paye_le > e.envoye_le and a.paye_le <= e.envoye_le + interval '3 days')) as payes
           from envois_mails e where e.parti and ${W("e.envoye_le")} group by e.cle`,
     ),
@@ -771,24 +789,27 @@ async function pilotageDe(jours: Periode): Promise<Pilotage> {
     lignes<{ temoin: boolean; n: string; payes: string }>(
       sql`select e.occasion like '%:temoin' as temoin, count(*) as n,
             count(*) filter (where exists (select 1 from achats a where a.user_id = e.user_id and a.statut = 'paye' and a.story_id is not null
-              and a.paye_le > e.envoye_le and a.paye_le <= e.envoye_le + interval '3 days')) as payes
+              and ${achatDuProduit("a")} and a.paye_le > e.envoye_le and a.paye_le <= e.envoye_le + interval '3 days')) as payes
           from envois_mails e where e.cle = 's1_derniere' and (e.parti or e.occasion like '%:temoin') and ${W("e.envoye_le")} group by 1`,
     ),
     lignes<{ key: string; n: string }>(
       sql`select key, sum(count) as n from counters where key like ${`${VENTE}%`} and day > (now() at time zone 'Europe/Paris')::date - ${jours}::int group by key`,
     ),
     lignes<{ vente: GenreVendu; n: string; centimes: string }>(
-      sql`select vente, count(*) as n, sum(centimes) as centimes from achats where vente is not null and paye_le is not null and ${W("paye_le")} group by vente`,
+      sql`select a0.vente, count(*) as n, sum(a0.centimes) as centimes from achats a0
+          where a0.vente is not null and a0.paye_le is not null and ${W("a0.paye_le")} and ${ACHAT_DU_PRODUIT} group by a0.vente`,
     ),
     lignes<{ avec: boolean; comptes: string; acheteurs: string; centimes: string }>(
       sql`with c as (select distinct s.user_id from chat_messages m join stories s on s.id = m.story_id
                      where m.role = 'toi' and s.user_id is not null and ${W("m.created_at")}),
             p as (select a.user_id, sum(a.centimes) as centimes from achats a
-                  where a.paye_le is not null and ${W("a.paye_le")} and a.user_id in (select user_id from c) group by a.user_id)
+                  where a.paye_le is not null and ${W("a.paye_le")} and ${achatDuProduit("a")} and a.user_id in (select user_id from c) group by a.user_id)
           select ${dansLaMoitieAvec(sql`c.user_id`)} as avec, count(*) as comptes, count(p.user_id) as acheteurs, coalesce(sum(p.centimes), 0) as centimes
           from c left join p on p.user_id = c.user_id group by 1`,
     ),
-    lignes<{ meta: Buffer; payee: boolean }>(sql`select s.meta, ${PAYEE_S} as payee from stories s where ${W("s.created_at")} and ${sql.raw(VRAIE_CONV_S)}`),
+    lignes<{ meta: Buffer; payee: boolean }>(
+      sql`select s.meta, ${PAYEE_S} as payee from stories s where ${W("s.created_at")} and ${sql.raw(VRAIE_CONV_S)} and ${convHorsDesTests()}`,
+    ),
     lignes<{ key: string; n: string }>(
       sql`select key, sum(count) as n from counters where key like ${`${NOTE}%`} and day > (now() at time zone 'Europe/Paris')::date - ${jours}::int group by key`,
     ),
@@ -1066,11 +1087,11 @@ async function ventesDepuis(debut: SQL): Promise<Ventes> {
 /** Les bulles depuis `debut`, d’après leur journal (mouvements_bulles) : chaque raison a son sens. */
 async function bullesDepuis(debut: SQL): Promise<Bulles> {
   const r = await ligne<Record<keyof Bulles, string | null>>(
-    sql`select coalesce(sum(delta) filter (where raison = 'achat'), 0) as vendues,
-          coalesce(-sum(delta) filter (where raison = 'reponse'), 0) as depensees,
-          coalesce(sum(delta) filter (where raison in ('beta', 'equipe') and delta > 0), 0) as offertes,
-          coalesce(sum(delta) filter (where raison = 'rendu'), 0) as rendues
-        from mouvements_bulles where cree_le >= ${debut}`,
+    sql`select coalesce(sum(m.delta) filter (where m.raison = 'achat' and (a0.id is null or ${ACHAT_DU_PRODUIT})), 0) as vendues,
+          coalesce(-sum(m.delta) filter (where m.raison = 'reponse'), 0) as depensees,
+          coalesce(sum(m.delta) filter (where m.raison in ('beta', 'equipe') and m.delta > 0), 0) as offertes,
+          coalesce(sum(m.delta) filter (where m.raison = 'rendu'), 0) as rendues
+        from mouvements_bulles m left join achats a0 on m.raison = 'achat' and a0.id::text = m.ref where m.cree_le >= ${debut}`,
   );
   return { vendues: n(r.vendues), depensees: n(r.depensees), offertes: n(r.offertes), rendues: n(r.rendues) };
 }

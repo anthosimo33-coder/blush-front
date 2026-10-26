@@ -3,7 +3,7 @@ import { sql, type SQL } from "drizzle-orm";
 import { POPULATIONS_DU_PRODUIT, type Population } from "@/types";
 import { COMPTE_DU_TOURNAGE } from "./compte-du-tournage";
 import { db } from "./db";
-import { emailCanonique } from "./email-canonique";
+import { emailCanonique, emailCanoniqueEnSQLBrut } from "./email-canonique";
 import { env } from "./env";
 
 /*
@@ -66,17 +66,37 @@ const parmi = (expr: SQL, liste: readonly string[]): SQL =>
 export const duProduit = (population: SQL): SQL => parmi(population, POPULATIONS_DU_PRODUIT);
 
 /**
- * L’email canonique, en SQL : la règle d’emailCanonique (src/server/email-canonique.ts), que tests/population.test.ts
- * compare cas par cas. En minuscules, sans les blancs autour, sans le `+suffixe` du nom (à partir du deuxième caractère),
- * et pour Gmail sans les points du nom, sur gmail.com ; un texte sans nom ou sans domaine revient en minuscules.
+ * Cet achat (en SQL brut, `achats` sous l’alias `alias`) est celui d’un vrai client : achats.population, figée au paiement,
+ * est du produit. Un achat pas encore rangé (le passage des 5 minutes le range ; une commande jamais payée ne l’est jamais)
+ * compte comme un client : il l’est presque toujours. Toutes les ventes de /admin passent par lui.
+ */
+export const achatDuProduit = (alias: string): SQL => {
+  const population = sql.raw(`${alias}.population`);
+  return sql`(${population} is null or ${duProduit(population)})`;
+};
+
+/**
+ * Les comptes des tests et des invités à l’instant du calcul (une sous-requête de users.id, à poser dans un `not in`) :
+ * le compte du tournage, l’équipe (alias compris), une créatrice (une prise, quelle que soit sa date) et un invité, comme
+ * la règle. Seulement pour ce qui n’a aucune population figée : une commande jamais payée, une conv arrivée au paywall
+ * sans aucune lecture (un export pas encore payé). Un ensemble calculé une fois par requête, jamais une sous-requête liée
+ * ligne par ligne (la raison de l’en-tête) : un seul passage sur users, sur l’email canonique que la base garde
+ * (users.email_canonique), face à une seule liste ; les créatrices par un `in`, calculé une fois (un `exists` lié se
+ * chiffrait cent fois plus cher). Il suit les listes d’aujourd’hui : un email retiré de BLUSH_ADMINS
+ * rend ses commandes jamais payées et ses convs jamais lues, rien d’autre.
+ */
+export function comptesDesTests(): SQL {
+  const tests = [...new Set([emailCanonique(COMPTE_DU_TOURNAGE), ...equipe()])];
+  return sql`select pop_c.id from users pop_c where ${parmi(sql`pop_c.email_canonique`, tests)} or ${parmi(sql`lower(pop_c.email)`, invites())}
+    or pop_c.id in (select pop_p.user_id from stories pop_p where pop_p.tournage_id is not null or pop_p.tournage_le is not null)`;
+}
+
+/**
+ * L’email canonique d’une expression SQL, en une valeur : la règle d’emailCanonique (src/server/email-canonique.ts), la même
+ * que la colonne users.email_canonique (emailCanoniqueEnSQLBrut), que tests/population.test.ts compare cas par cas.
  */
 export function emailCanoniqueEnSQL(email: SQL): SQL {
-  return sql`(select case when position('@' in pop_e.propre) = 0 or pop_e.nom = '' or pop_e.domaine = '' then pop_e.propre
-        when pop_e.domaine in ('gmail.com', 'googlemail.com') then coalesce(nullif(replace(pop_e.court, '.', ''), ''), pop_e.court) || '@gmail.com'
-        else pop_e.court || '@' || pop_e.domaine end
-      from (select pop_n.propre, pop_n.nom, pop_n.domaine, regexp_replace(pop_n.nom, '^(.[^+]*)\\+.*$', '\\1') as court
-        from (select pop_m.propre, substring(pop_m.propre from '^(.*)@[^@]*$') as nom, substring(pop_m.propre from '@([^@]*)$') as domaine
-          from (select lower(regexp_replace(${email}, '^\\s+|\\s+$', '', 'g')) as propre) pop_m) pop_n) pop_e)`;
+  return sql`(select ${sql.raw(emailCanoniqueEnSQLBrut("pop_x.e"))} from (select ${email}::text as e) pop_x)`;
 }
 
 /** Ce que la règle sait d’un appel (ou d’un achat), en SQL : des paramètres, ou des colonnes de la requête qui la porte. */
@@ -96,7 +116,8 @@ type QuiEnSQL = {
 
 /** La règle « qui est qui » (en tête du fichier), en SQL : la population de cet appel (POPULATIONS), jamais vide. */
 function populationEnSQL({ conv, compte, instant, sansRien }: QuiEnSQL): SQL {
-  const email = emailCanoniqueEnSQL(sql`pop_u.email`);
+  /* L’email canonique du compte, calculé par la base à l’écriture du compte (users.email_canonique) */
+  const email = sql`pop_u.email_canonique`;
   const rien = typeof sansRien === "string" ? sql`${sansRien}` : sansRien;
   return sql`(select case
         when pop_q.conv is not null and pop_s.id is null then 'inconnu'

@@ -402,10 +402,14 @@ describe("qui importe (/admin)", () => {
     /* Deux garçons, dit sur sa fiche */
     const garcons = await convPrete(u, await importe(SANS_ACCORD), { moi: "Nina", pronom: "il" });
     await definirPronomAutre(garcons.id, "il");
-    /* Une prise du tournage, « Qui es-tu ? » rempli et payée : elle ne compte pas */
+    /*
+     * Une prise du tournage, « Qui es-tu ? » rempli et payée : elle ne compte pas. Dans le compte d’une créatrice : une
+     * prise dans le compte `u` en ferait une, et ses convs jamais lues sortiraient aussi (comptesDesTests)
+     */
+    const creatrice = await compteDeTest("qui-importe-creatrice");
     const [prise] = await db()
       .insert(schema.stories)
-      .values({ userId: u.id, messageCount: 60, meta: (await ligneEnBase(fille.id)).meta, tournageLe: new Date() })
+      .values({ userId: creatrice.id, messageCount: 60, meta: (await ligneEnBase(fille.id)).meta, tournageLe: new Date() })
       .returning({ id: schema.stories.id });
 
     const achat = (storyId: string, offre: OffreId, plus: Partial<typeof schema.achats.$inferInsert> = {}) =>

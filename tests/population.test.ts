@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { desc, eq, inArray, sql, type SQL } from "drizzle-orm";
+import { desc, eq, inArray, sql, TransactionRollbackError, type SQL } from "drizzle-orm";
 import { PgDialect } from "drizzle-orm/pg-core";
 import { afterAll, describe, expect, it, vi } from "vitest";
 
@@ -132,6 +132,20 @@ describe("l’email canonique en SQL", () => {
       const [l] = (await db().execute<{ c: string }>(sql`select ${emailCanoniqueEnSQL(sql`${email}::text`)} as c`)).rows;
       expect({ email, c: l?.c }).toEqual({ email, c: emailCanonique(email) });
     }
+    /* La colonne générée users.email_canonique, la même règle : des comptes écrits dans une transaction annulée */
+    const colonne = new Map<string, string>();
+    await db()
+      .transaction(async (tx) => {
+        for (const email of emails) {
+          const [l] = (await tx.execute<{ c: string }>(sql`insert into users (email) values (${email}) returning email_canonique as c`)).rows;
+          colonne.set(email, l!.c);
+        }
+        tx.rollback();
+      })
+      .catch((e: unknown) => {
+        if (!(e instanceof TransactionRollbackError)) throw e;
+      });
+    expect(Object.fromEntries(colonne)).toEqual(Object.fromEntries(emails.map((e) => [e, emailCanonique(e)])));
   });
 });
 
@@ -350,9 +364,27 @@ describe("le tableau de bord : l’IA du produit et celle des tests à part, la 
     const convClient = await convRattachee(client, "01-a-deux-doigts.txt");
     const equipe = await compteA(`equipe+stats-${unique()}@blush.test`);
     const convEquipe = await convRattachee(equipe, "02-reciproque.txt");
-    /* Les achats : 9,90 € d’un client, 14,90 € d’essai payés par l’équipe */
-    await achatPaye(client.id, { storyId: convClient.id, centimes: 990 });
-    await achatPaye(equipe.id, { storyId: convEquipe.id, centimes: 1490 });
+    /*
+     * Les achats : 9,90 € puis 6,90 € d’un client (qui devient racheteur), 14,90 € puis 6,90 € d’essai payés par l’équipe
+     * (jamais racheteuse : ses achats sont retirés) ; les bulles livrées avec le premier de chacun
+     */
+    const duClient = await achatPaye(client.id, { storyId: convClient.id, centimes: 990 });
+    const deLEquipe = await achatPaye(equipe.id, { storyId: convEquipe.id, centimes: 1490 });
+    await achatPaye(client.id, { centimes: 690 });
+    await achatPaye(equipe.id, { centimes: 690 });
+    await db()
+      .insert(schema.mouvementsBulles)
+      .values([
+        { userId: client.id, delta: 3, raison: "achat", ref: duClient },
+        { userId: equipe.id, delta: 3, raison: "achat", ref: deLEquipe },
+      ]);
+    /*
+     * Ce qui n’a aucune population figée se juge par son compte (comptesDesTests) : une conv jamais lue et une commande
+     * jamais payée de l’équipe sortent ; une conv jamais lue du client compte
+     */
+    await convRattachee(equipe, "01-a-deux-doigts.txt");
+    await convRattachee(client, "02-reciproque.txt");
+    await db().insert(schema.achats).values({ userId: equipe.id, offre: "rapport", centimes: 990, bulles: 3, fournisseur: "factice", statut: "en_attente", creeLe: new Date() });
     /* Un verdict des tests (l’équipe), avec son coût : ni en haut ni en bas du coût par verdict */
     const meta = await metaDe(convEquipe.id);
     await db().insert(schema.verdicts).values({ storyId: convEquipe.id, data: meta });
@@ -376,16 +408,27 @@ describe("le tableau de bord : l’IA du produit et celle des tests à part, la 
     const poste = (s: typeof avant, nom: string) => s.couts.postes.find((p) => p.nom === nom) ?? { dollars: 0, produit: { dollars: 0 } };
     expect([d((s) => poste(s, "Verdict").dollars), d((s) => poste(s, "Verdict").produit.dollars), d((s) => poste(s, "Chat").produit.dollars)]).toEqual([3.5, 1.5, 0.5]);
     /*
-     * Les ventes, toutes celles des vrais clients (sans l’essai de l’équipe, dit à côté) : le net, le payé, les acheteurs,
-     * ce qui se vend, les ventes de la semaine
+     * Les ventes, toutes celles des vrais clients (sans les essais de l’équipe, dits à côté) : le net, le payé, les
+     * acheteurs, ce qui se vend, les sources, les ventes et les bulles vendues de la semaine, l’entonnoir des commandes
      */
     const mix = (s: typeof avant) => s.pilotage.mix.reduce((t, g) => t + g.centimes, 0);
-    expect([d((s) => s.pilotage.net.valeur), d((s) => s.pilotage.centimesPayes.valeur), d((s) => s.pilotage.acheteurs.valeur), d(mix)]).toEqual([990, 990, 1, 990]);
-    expect([d((s) => s.pilotage.achatsRetires.n), d((s) => s.pilotage.achatsRetires.centimes), d((s) => s.ventes.semaine.payes.centimes)]).toEqual([1, 1490, 990]);
+    const sources = (s: typeof avant) => s.pilotage.sources.reduce((t, x) => t + x.centimes, 0);
+    expect([d((s) => s.pilotage.net.valeur), d((s) => s.pilotage.centimesPayes.valeur), d((s) => s.pilotage.acheteurs.valeur), d(mix), d(sources)]).toEqual([
+      1680, 1680, 1, 1680, 1680,
+    ]);
+    expect([d((s) => s.pilotage.achatsRetires.n), d((s) => s.pilotage.achatsRetires.centimes), d((s) => s.ventes.semaine.payes.centimes)]).toEqual([2, 2180, 1680]);
+    expect([d((s) => s.bulles.semaine.vendues), d((s) => s.achats.payees), d((s) => s.achats.commandes), d((s) => s.achats.enAttente)]).toEqual([3, 2, 2, 0]);
+    /*
+     * Le tunnel et « Qui importe » : les deux convs du client (lue, et jamais lue), aucune de l’équipe (lue, et jamais
+     * lue) ; le client racheteur, pas l’équipe
+     */
+    const t = (s: typeof avant) => s.pilotage.tunnel;
+    expect([d((s) => t(s).imports), d((s) => t(s).acheteurs), d((s) => t(s).racheteurs)]).toEqual([2, 1, 1]);
+    expect([d((s) => s.pilotage.quiImporte.importees.convs), d((s) => s.pilotage.quiImporte.payees.convs)]).toEqual([2, 1]);
     /* Case par case aussi (la dernière, aujourd’hui) : le payé des vrais clients et l’IA du produit, la marge produit en sort */
     const derniereCase = (s: typeof avant) => s.pilotage.cases.at(-1)!;
     expect([d((s) => derniereCase(s).centimes), d((s) => derniereCase(s).acheteurs), d((s) => derniereCase(s).dollarsProduit), d((s) => derniereCase(s).dollars)]).toEqual([
-      990, 1, 2, 7,
+      1680, 1, 2, 7,
     ]);
     /* Un verdict du client et son coût : le coût par verdict du produit le compte, en haut et en bas */
     expect(apres.couts.parVerdict).not.toBeNull();
@@ -411,6 +454,9 @@ describe("le tableau de bord : l’IA du produit et celle des tests à part, la 
     const avant = await statsAdmin(7);
     const equipe = await compteA(`equipe+efface-${unique()}@blush.test`);
     const achat = await achatPaye(equipe.id, { centimes: 1490 });
+    /* Avant l’effacement (le compte a encore son achat) : ni dans les ventes, ni dans les acheteurs */
+    const pendant = await statsAdmin(7);
+    expect([pendant.pilotage.net.valeur - avant.pilotage.net.valeur, pendant.pilotage.acheteurs.valeur - avant.pilotage.acheteurs.valeur]).toEqual([0, 0]);
     await supprimerCompte(equipe);
     achatsOrphelins.push(achat);
     const apres = await statsAdmin(7);
@@ -444,7 +490,8 @@ describe("le tableau de bord : l’IA du produit et celle des tests à part, la 
     /*
      * Des tables pleines, loin de toute période (il y a 100 jours) : 3 000 convs d’un compte, leurs verdicts, la moitié en
      * rapports, deux appels chacune, autant d’achats ; et 1 200 lignes à ranger. La règle rejugée ligne par ligne passait
-     * le seuil sur 2 400 lignes ; le coût estimé de chaque requête doit rester loin dessous, quelle que soit la période
+     * le seuil sur 2 400 lignes ; le coût estimé de chaque requête doit rester loin dessous, quelle que soit la période, et
+     * aussi quand les tables sont pleines dans la période (plus bas)
      */
     const SEUIL_DU_JIT = 100_000;
     const u = await compteDeTest("population-jit");
@@ -479,13 +526,44 @@ describe("le tableau de bord : l’IA du produit et celle des tests à part, la 
     } finally {
       espion.mockRestore();
     }
-    const couts: { cout: number; debut: string }[] = [];
-    for (const q of prises) {
-      const [plan] = (await execute(sql`explain (format json) ${q}`)).rows as { "QUERY PLAN": [{ Plan: { "Total Cost": number } }] }[];
-      couts.push({ cout: Math.round(plan!["QUERY PLAN"][0].Plan["Total Cost"]), debut: new PgDialect().sqlToQuery(q).sql.replace(/\s+/g, " ").slice(0, 100) });
-    }
+    const couts: { cout: number; debut: string; periode: boolean }[] = [];
+    const estimer = async (q: SQL, ex: (q: SQL) => Promise<{ rows: unknown[] }>, periode: boolean) => {
+      const [plan] = (await ex(sql`explain (format json) ${q}`)).rows as { "QUERY PLAN": [{ Plan: { "Total Cost": number } }] }[];
+      couts.push({ cout: Math.round(plan!["QUERY PLAN"][0].Plan["Total Cost"]), debut: new PgDialect().sqlToQuery(q).sql.replace(/\s+/g, " ").slice(0, 100), periode });
+    };
+    for (const q of prises) await estimer(q, execute, false);
+    /*
+     * Puis les mêmes requêtes avec des tables pleines dans la période (il y a un jour : des convs jamais lues, des
+     * lectures, des achats et leurs bulles), dans une transaction annulée : les autres fichiers, qui comptent leurs écarts
+     * en même temps, n’en voient rien. Les statistiques des colonnes (pg_statistic) reviennent avec elle ; les tailles des
+     * tables (pg_class), réécrites sur place, restent, sans rien changer aux résultats. Des comptes aussi (10 000), pour
+     * l’ensemble des comptes des tests : un passage sur users, l’email canonique une fois par compte
+     */
+    await db()
+      .transaction(async (tx) => {
+        const pres = sql`now() - interval '1 day'`;
+        await tx.execute(sql`insert into users (email) select 'jit-' || g || '-' || ${u.id}::text || '@blush.test' from generate_series(1, 10000) g`);
+        await tx.execute(sql`insert into stories (user_id, message_count, meta, created_at) select ${u.id}, 1, '\\x00'::bytea, ${pres} from generate_series(1, 3000)`);
+        const recentes = sql`(select id from stories where user_id = ${u.id} and created_at > now() - interval '2 days')`;
+        await tx.execute(
+          sql`insert into ai_usage (story_id, task, model, cost_micros, population, created_at) select id, 'verdict', 'test', 1000, 'client', ${pres} from stories where id in ${recentes} and random() < 0.5`,
+        );
+        await tx.execute(
+          sql`insert into achats (user_id, offre, centimes, bulles, fournisseur, statut, paye_le, cree_le, population) select ${u.id}, 'rapport', 990, 3, 'factice', 'paye', ${pres}, ${pres}, 'client' from generate_series(1, 3000)`,
+        );
+        await tx.execute(
+          sql`insert into mouvements_bulles (user_id, delta, raison, ref, cree_le) select ${u.id}, 3, 'achat', id::text, ${pres} from achats where user_id = ${u.id} and paye_le > now() - interval '2 days'`,
+        );
+        await tx.execute(sql`analyze users, stories, ai_usage, achats, mouvements_bulles`);
+        for (const q of prises) await estimer(q, (x) => tx.execute(x), true);
+        tx.rollback();
+      })
+      .catch((e: unknown) => {
+        if (!(e instanceof TransactionRollbackError)) throw e;
+      });
     try {
       expect(prises.length).toBeGreaterThan(40);
+      expect(couts.filter((c) => c.periode)).toHaveLength(prises.length);
       expect(couts.filter((c) => c.cout >= SEUIL_DU_JIT)).toEqual([]);
     } finally {
       await db().delete(schema.achats).where(eq(schema.achats.userId, u.id));
