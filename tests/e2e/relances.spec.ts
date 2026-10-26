@@ -21,6 +21,7 @@ test("la relance : le mail « Ton rapport t’attend », son lien vers la feuill
     const corps = (await r.json()) as Record<string, unknown>;
     expect(Object.keys(corps).sort()).toEqual([
       "chaines",
+      "couts",
       "dues",
       "ecartees",
       "echecs",

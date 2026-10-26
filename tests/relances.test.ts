@@ -345,6 +345,7 @@ describe("la relance par mail (②)", () => {
     const corps = (await r.json()) as Record<string, unknown>;
     expect(Object.keys(corps).sort()).toEqual([
       "chaines",
+      "couts",
       "dues",
       "ecartees",
       "echecs",

@@ -6,6 +6,7 @@ import { auMieux } from "@/server/journal";
 import { purgerLesLecturesDesLots } from "@/server/lots";
 import { traiterLesLots } from "@/server/memoire-en-lot";
 import { reprendreLesChainesEnPlan } from "@/server/pipeline";
+import { rangerLesCouts } from "@/server/population";
 import { envoyerLesRelances } from "@/server/relances";
 import { envoyerLesSequences } from "@/server/sequences";
 import { renommerLesPrises } from "@/server/tournage";
@@ -24,8 +25,10 @@ import { renommerLesPrises } from "@/server/tournage";
  * d’un enregistrement dont les dix minutes sont passées (`lecturesEffacees`, purgerLesLecturesDesLots, src/server/lots.ts :
  * leur texte ne reste pas plus en base, à 5 minutes près), et les écrans gardés des longues vidéos dont l’heure est passée
  * (`ecrans`, purgerLesEcrans, src/server/ecrans-gardes.ts : une conv qui n’a rien payé les perd à son échéance, à 5
- * minutes près) ; une panne de la base n’arrête pas le reste, la purge de la nuit repasse. Elle ne répond que des
- * nombres : les logs de la veille, qui les écrivent, sont publics. Rien à faire : 200, avec des zéros.
+ * minutes près) ; une panne de la base n’arrête pas le reste, la purge de la nuit repasse. Et le rattrapage de la règle
+ * « qui est qui » (`couts`, rangerLesCouts, src/server/population.ts : les lignes d’ai_usage pas encore rangées, puis les
+ * lectures sans compte dont la conv a trouvé un compte), qui se rejoue sans risque. Elle ne répond que des nombres : les
+ * logs de la veille, qui les écrivent, sont publics. Rien à faire : 200, avec des zéros.
  */
 export const GET = route("GET /api/cron/relances", async (req: Request) => {
   const secret = env().CRON_SECRET;
@@ -40,7 +43,19 @@ export const GET = route("GET /api/cron/relances", async (req: Request) => {
   const gardes = auMieux(async () => {
     ecrans = await purgerLesEcrans();
   }, "purge des écrans gardés en échec");
-  const [{ relances, sequences }, lots, chaines, prises] = await Promise.all([mails, traiterLesLots(), reprendreLesChainesEnPlan(), renommerLesPrises(), lectures, gardes]);
+  let couts = 0;
+  const rangees = auMieux(async () => {
+    couts = await rangerLesCouts();
+  }, "rattrapage des populations en échec");
+  const [{ relances, sequences }, lots, chaines, prises] = await Promise.all([
+    mails,
+    traiterLesLots(),
+    reprendreLesChainesEnPlan(),
+    renommerLesPrises(),
+    lectures,
+    gardes,
+    rangees,
+  ]);
   return repondre("GET /api/cron/relances", {
     ...relances,
     chaines,
@@ -51,5 +66,6 @@ export const GET = route("GET /api/cron/relances", async (req: Request) => {
     lotsAnnules: lots.annules,
     lecturesEffacees,
     ecrans,
+    couts,
   });
 });

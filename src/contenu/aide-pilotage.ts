@@ -66,13 +66,14 @@ export const AIDES_DU_PILOTAGE = {
     siCaBouge: "S’il baisse\u00a0: Premium est moins choisi sur la feuille du paiement, ou les coups de pouce ne se montrent plus.",
   },
   marge: {
-    titre: "Marge après IA",
-    de: "la marge après IA",
-    quoi: "Ce qu’il reste du chiffre d’affaires hors taxes une fois l’IA payée.",
+    titre: "Marge produit",
+    de: "la marge produit",
+    quoi: "Ce qu’il reste de ce que paient les vrais clients, hors taxes, une fois payée l’IA du produit. Les tests (l’équipe et le tournage) n’y comptent ni dans les ventes ni dans l’IA\u00a0: ils se lisent à côté.",
     calcul:
-      "(Chiffre d’affaires net hors taxes − ce qu’a coûté l’IA, en euros) ÷ chiffre d’affaires net hors taxes. La TVA retirée est celle de la France (20\u00a0%), le dollar compté à son cours du 11 octobre. Hors frais Whop et hors créatrices\u00a0: c’est une estimation.",
-    repere: `La cible\u00a0: ${CIBLE_DE_MARGE}\u00a0% ou plus. En dessous, la carte passe en orange.`,
-    siCaBouge: "Si elle baisse\u00a0: le chat coûte trop par réponse, ou des bulles offertes partent en réponses. Regarde ce que coûte l’IA, poste par poste.",
+      "(Chiffre d’affaires net des vrais clients hors taxes − l’IA du produit, en euros) ÷ ce chiffre d’affaires. Les vrais clients\u00a0: les acheteurs qui ne sont ni de l’équipe ni du tournage, rangés à l’heure de leur paiement (les achats d’essai de l’équipe sont retirés). L’IA du produit\u00a0: celle des clients et des prospects (ceux qui importent sans acheter\u00a0: ce qu’il en coûte pour faire des clients), chaque appel rangé par la même règle («\u00a0Ce que coûte l’IA\u00a0» la détaille). La TVA retirée est celle de la France (20\u00a0%), le dollar compté à son cours du 11 octobre. Hors frais Whop et hors créatrices\u00a0: c’est une estimation. La courbe\u00a0: le payé et l’IA du produit de chaque case.",
+    repere: `La cible\u00a0: ${CIBLE_DE_MARGE}\u00a0% ou plus. En dessous, la carte passe en orange. Ce que coûtent les tests s’écrit dessous, à part.`,
+    siCaBouge:
+      "Si elle baisse\u00a0: le chat coûte trop par réponse, ou des bulles offertes partent en réponses. Regarde l’IA du produit, poste par poste. Des tests qui grimpent ne la touchent pas. Un appel «\u00a0non classé\u00a0» (une conv effacée avant sa note, une ligne d’avant la règle que rien ne rattache) n’y est pas non plus\u00a0: beaucoup de non classé, et la marge se lit trop belle.",
   },
   tunnel: {
     titre: "Le tunnel",
@@ -185,11 +186,12 @@ export const AIDES_DU_PILOTAGE = {
   couts: {
     titre: "Ce que coûte l’IA",
     de: "les coûts de l’IA",
-    quoi: "Ce que coûtent les appels au modèle (écrire, lire, répondre) sur la période.",
+    quoi: "Ce que coûtent les appels au modèle, à la voix et à la transcription sur la période, en deux\u00a0: l’IA du produit (les vrais clients et les prospects) et l’IA des tests (l’équipe et le tournage).",
     calcul:
-      "La somme de chaque appel, en dollars comme sur la facture, rangée par poste. Par acheteur\u00a0: le total divisé par les comptes qui ont payé. Le budget du jour (fixé côté serveur) coupe les appels une fois atteint\u00a0; l’équipe est prévenue à 50 et 80\u00a0%. Sans compte\u00a0: la part du budget des captures et des vidéos lues avant l’email, celles en cours comptées à ce qu’elles peuvent coûter au plus\u00a0; atteinte, elles s’arrêtent pour tous les visiteurs jusqu’à minuit (l’équipe est prévenue à 80\u00a0%, puis au premier refus).",
-    repere: `Par acheteur, sous 3\u00a0$ pour tenir ${CIBLE_DE_MARGE}\u00a0% de marge.`,
-    siCaBouge: "Si le chat grimpe\u00a0: vérifie la mémoire et la longueur des réponses de BLUSH.",
+      "La somme de chaque appel, en dollars comme sur la facture. Chaque appel est rangé une fois, à sa fin, par une seule règle, la première qui convient\u00a0: le tournage (une conv de tournage, son compte, le compte d’une créatrice), l’équipe (un compte qui ouvre /admin, ses alias compris, et toutes ses convs), les invités de BLUSH_ACCES_LIBRE (l’offert, à part\u00a0: ni un test, ni une vente), les clients (un achat payé avant l’appel), les prospects (un compte sans achat, ou des captures lues avant l’email), sinon «\u00a0non classé\u00a0» (une conv effacée avant la note, une ligne d’avant la règle que rien ne rattache). IA des tests = l’équipe + le tournage\u00a0; IA du produit = les clients + les prospects. Un prospect qui achète garde ses appels d’avant en prospect\u00a0; des captures lues sans compte prennent la population du compte que leur conv trouve dans les deux jours. Les postes, par acheteur, par verdict et par rapport\u00a0: le produit seul, la même population en haut et en bas (les acheteurs, les verdicts et les rapports des clients et des prospects). Le budget du jour, lui, compte tout ce qui part (fixé côté serveur)\u00a0: il coupe les appels une fois atteint\u00a0; l’équipe est prévenue à 50 et 80\u00a0%. Sans compte\u00a0: la part du budget des captures et des vidéos lues avant l’email, celles en cours comptées à ce qu’elles peuvent coûter au plus\u00a0; atteinte, elles s’arrêtent pour tous les visiteurs jusqu’à minuit (l’équipe est prévenue à 80\u00a0%, puis au premier refus). Les bancs des prompts, sur une autre clé, n’y sont pas.",
+    repere: `IA du produit par acheteur, sous 3\u00a0$ pour tenir ${CIBLE_DE_MARGE}\u00a0% de marge. Les tests se paient mais ne se vendent pas\u00a0: ils peuvent coûter plus que le produit sans toucher la marge.`,
+    siCaBouge:
+      "Si le chat du produit grimpe\u00a0: vérifie la mémoire et la longueur des réponses de BLUSH. Si les tests grimpent\u00a0: un tournage ou des essais tournent sur la production.",
   },
   avantLAchat: {
     titre: "L’IA avant l’achat",

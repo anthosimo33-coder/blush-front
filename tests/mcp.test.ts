@@ -291,8 +291,20 @@ describe("les outils", () => {
   it("le pilotage sur 30 jours (le nombre peut venir en texte), une période inconnue refusée au modèle", async () => {
     const { acces } = await connecter();
     const p = contenu((await mcp("tools/call", { name: "pilotage", arguments: { jours: "30" } }, acces)).json!);
-    expect(p).toMatchObject({ jours: 30, margeApresIAPct: { cible: 80 } });
+    expect(p).toMatchObject({ jours: 30, margeProduitPct: { cible: 80 } });
     expect(p).toHaveProperty("chiffreDAffaires.netEuros.valeur");
+    /* La marge produit : les ventes des vrais clients face à l’IA du produit, les tests à part, chaque population nommée */
+    expect(p).toHaveProperty("chiffreDAffaires.netProduitEuros.valeur");
+    expect(p).toHaveProperty("ia.produitDollars.valeur");
+    expect(p).toHaveProperty("ia.testsDollars.valeur");
+    expect((p.ia as { parPopulation: { population: string }[] }).parPopulation.map((x) => x.population)).toEqual([
+      "Clients",
+      "Prospects",
+      "Invités (offert)",
+      "L’équipe",
+      "Le tournage",
+      "Non classé",
+    ]);
     expect(p).toHaveProperty("tunnel");
     /* Qui importe : des totaux et des taux, pas une conv */
     expect(p).toHaveProperty("quiImporte.paires");
@@ -302,6 +314,9 @@ describe("les outils", () => {
     /* Les coûts : l’IA avant l’achat, un type d’import par ligne, même vide */
     const couts = contenu((await mcp("tools/call", { name: "couts_ia", arguments: { jours: 7 } }, acces)).json!) as { avantLAchat: { type: string }[] };
     expect(couts.avantLAchat.map((t) => t.type)).toEqual(["Export", "Captures", "Vidéo"]);
+    expect(couts).toHaveProperty("produitDollars.valeur");
+    expect(couts).toHaveProperty("testsDollars.valeur");
+    expect(couts).toHaveProperty("parAcheteurDollars");
     const faux = (await mcp("tools/call", { name: "pilotage", arguments: { jours: 5 } }, acces)).json?.result as { isError: boolean; content: { text: string }[] };
     expect(faux.isError).toBe(true);
     expect(faux.content[0]!.text).toContain("1, 7, 30");

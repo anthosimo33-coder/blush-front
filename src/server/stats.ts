@@ -11,6 +11,9 @@ import {
   JALONS_PAR_APPLI,
   OFFRES,
   OFFRES_UNIQUES,
+  POPULATIONS,
+  POPULATIONS_DES_TESTS,
+  POPULATIONS_DU_PRODUIT,
   BRAS_DE_LA_LECTURE,
   RAISONS_DE_LA_NOTE,
   TYPES_D_IMPORT,
@@ -21,6 +24,7 @@ import {
   type JalonParAppli,
   type OffreId,
   type OffreUnique,
+  type Population,
   type RaisonDeLaNote,
   type SourceVisite,
   type TypeDImport,
@@ -36,12 +40,17 @@ import { env } from "./env";
 import { actionsRecentes, type ActionRecente } from "./equipe";
 import { metaDe, personnesDe, type Meta } from "./histoires";
 import { LOT_BLOQUE_S } from "./memoire-en-lot";
+import { duProduit, populationEnSQL } from "./population";
 import { PERIME_S } from "./taches";
 import { dansLaMoitieAvec, VENTE, type GroupeDeVente } from "./vente";
 
 /*
  * Le tableau de bord (/admin) : que des nombres. Aucune conv, aucun message, aucun email n’en sort.
  * Les convs effacées (par l’utilisateur, ou par la purge) sortent des comptes.
+ * L’IA se lit par population (ai_usage.population, la règle « qui est qui » : src/server/population.ts) : celle du
+ * produit (les clients et les prospects) et celle des tests (l’équipe et le tournage) à part. La marge produit met l’IA du
+ * produit face aux ventes des mêmes (l’acheteur rangé par la même règle, à l’heure de son paiement), et chaque ratio
+ * (par verdict, par rapport, par acheteur) prend la même population en haut et en bas.
  */
 
 export type Periode = 1 | 7 | 30;
@@ -68,7 +77,23 @@ export type StatsAdmin = {
   /** Jour par jour (14 jours, ou 30). */
   activite: { jour: string; imports: number; verdicts: number; rapports: number }[];
   partage: { ouvertures: number; liens: number; apercus: number; visites: number; essais: number; imports: number; actifs: number };
-  couts: { total: number; avant: number; parRapport: number | null; parVerdict: number | null; postes: { nom: string; dollars: number; appels: number }[] };
+  /**
+   * Ce qu’a coûté l’IA sur la période. `total` et `avant` : tout, comme sur la facture (la période et celle d’avant).
+   * `produit` : les clients et les prospects ; `tests` : l’équipe et le tournage (la période et celle d’avant).
+   * `populations` : chacune (POPULATIONS, dans l’ordre, même vide), une ligne pas encore rangée comptée « inconnu ».
+   * `parRapport`, `parVerdict` : ceux du produit, l’IA de leurs appels sur leur nombre (le même produit). `postes` : chacun
+   * en tout, et pour le produit seul.
+   */
+  couts: {
+    total: number;
+    avant: number;
+    produit: Chiffre;
+    tests: Chiffre;
+    populations: { population: Population; dollars: number; appels: number }[];
+    parRapport: number | null;
+    parVerdict: number | null;
+    postes: { nom: string; dollars: number; appels: number; produit: { dollars: number; appels: number } }[];
+  };
   /**
    * `pannes` : les lieux des pannes du serveur sur la période (une route /api par sa clé, une page par son fichier), par
    * jours de Paris entiers (la période de 24 h : aujourd’hui), les plus nombreuses d’abord (src/server/pannes.ts).
@@ -116,6 +141,9 @@ export type CaseDuPilotage = {
   centimes: number;
   /** Ce qu’a coûté l’IA dans la case, en dollars. */
   dollars: number;
+  /** Le payé des vrais clients dans la case (sans les achats de l’équipe ni du tournage), et l’IA du produit : la marge produit, case par case. */
+  centimesProduit: number;
+  dollarsProduit: number;
 };
 
 /**
@@ -140,6 +168,14 @@ export type Pilotage = {
   cases: CaseDuPilotage[];
   /** Le chiffre d’affaires net : payé − remboursé − contesté, sur la période (comme ventesDepuis). */
   net: Chiffre;
+  /**
+   * Le chiffre d’affaires net du produit : celui des vrais clients, sans les achats payés par l’équipe ni par le tournage
+   * (l’acheteur rangé par la règle « qui est qui », à l’heure de son paiement ; un compte effacé depuis reste un client).
+   * Face à l’IA du produit (couts.produit), il fait la marge produit.
+   */
+  netProduit: Chiffre;
+  /** Les comptes du produit qui ont payé au moins un achat : le dénominateur de l’IA par acheteur. */
+  acheteursProduit: Chiffre;
   payes: Montant;
   rembourses: Montant;
   contestes: Montant;
@@ -396,7 +432,27 @@ export async function statsAdmin(jours: Periode): Promise<StatsAdmin> {
   };
   const nbJours = jours === 30 ? 30 : 14;
 
-  const [comptes, convs, verdicts, rapports, messages, actifs, parcours, activite, compteurs, liensActifs, couts, coutsAvant, echecs, taches, attente, totaux] = await Promise.all([
+  /* La conv d’un verdict ou d’un rapport, rangée à son heure par la règle « qui est qui » : le dénominateur des ratios du produit */
+  const convDuProduit = (conv: string, heure: string) => duProduit(populationEnSQL({ conv: sql.raw(conv), compte: sql`null`, instant: sql.raw(heure), sansRien: "inconnu" }));
+  const [
+    comptes,
+    convs,
+    verdicts,
+    rapports,
+    messages,
+    actifs,
+    parcours,
+    activite,
+    compteurs,
+    liensActifs,
+    couts,
+    coutsAvant,
+    echecs,
+    taches,
+    attente,
+    totaux,
+    duProduitSurLaPeriode,
+  ] = await Promise.all([
     chiffre("users", "created_at", VRAI_COMPTE),
     chiffre("stories", "created_at", VRAIE_CONV),
     chiffre("verdicts", "created_at", DUNE_VRAIE_CONV("story_id")),
@@ -435,10 +491,14 @@ export async function statsAdmin(jours: Periode): Promise<StatsAdmin> {
     ),
     lignes<{ key: string; total: string }>(sql`select key, sum(count) as total from counters where day > (now() at time zone 'Europe/Paris')::date - ${jours}::int group by key`),
     ligne<{ n: string }>(sql`select count(*) as n from shares`),
-    lignes<{ task: string; appels: string; micros: string }>(
-      sql`select task, count(*) as appels, sum(cost_micros) as micros from ai_usage where ${dans("created_at")} group by task`,
+    /* Une ligne pas encore rangée (le passage des 5 minutes la range) compte « inconnu » */
+    lignes<{ task: string; population: Population; appels: string; micros: string }>(
+      sql`select task, coalesce(population, 'inconnu') as population, count(*) as appels, sum(cost_micros) as micros from ai_usage
+          where ${dans("created_at")} group by 1, 2`,
     ),
-    ligne<{ micros: string }>(sql`select coalesce(sum(cost_micros), 0) as micros from ai_usage where ${dans("created_at", 1)}`),
+    lignes<{ population: Population; micros: string }>(
+      sql`select coalesce(population, 'inconnu') as population, sum(cost_micros) as micros from ai_usage where ${dans("created_at", 1)} group by 1`,
+    ),
     lignes<{ code: string; n: string }>(
       sql`select coalesce(error, 'inconnu') as code, count(*) as n from tasks where status = 'echec' and ${sql.raw(VRAI_ECHEC)} and ${dans("updated_at")} group by 1 order by 2 desc limit 8`,
     ),
@@ -450,6 +510,11 @@ export async function statsAdmin(jours: Periode): Promise<StatsAdmin> {
     ),
     chiffre("waitlist", "created_at"),
     ligne<{ attente: string; comptes: string }>(sql`select (select count(*) from waitlist) as attente, (select count(*) from users where ${sql.raw(VRAI_COMPTE)}) as comptes`),
+    /* Les verdicts et les rapports écrits du produit sur la période : ceux d’une conv d’un client ou d’un prospect, à leur heure */
+    ligne<{ verdicts: string; rapports: string }>(
+      sql`select (select count(*) from verdicts v where ${dans("v.created_at")} and ${convDuProduit("v.story_id", "v.created_at")}) as verdicts,
+            (select count(*) from reports r where r.data is not null and ${dans("r.updated_at")} and ${convDuProduit("r.story_id", "r.updated_at")}) as rapports`,
+    ),
   ]);
 
   const [ventes, bulles, achats, offresUniques, liste, actions] = await Promise.all([
@@ -473,11 +538,27 @@ export async function statsAdmin(jours: Periode): Promise<StatsAdmin> {
 
   const c = new Map(compteurs.map((r) => [r.key, n(r.total)]));
   const dollars = (micros: number) => micros / 1e6;
-  const total = couts.reduce((s, r) => s + n(r.micros), 0);
-  const coutDe = (f: (t: string) => boolean) => couts.filter((r) => f(r.task)).reduce((s, r) => s + n(r.micros), 0);
-  const postes = POSTES.map(([nom, f]) => ({ nom, dollars: dollars(coutDe(f)), appels: couts.filter((r) => f(r.task)).reduce((s, r) => s + n(r.appels), 0) }));
-  const autres = couts.filter((r) => !POSTES.some(([, f]) => f(r.task)));
-  if (autres.length) postes.push({ nom: "Autres", dollars: dollars(autres.reduce((s, r) => s + n(r.micros), 0)), appels: autres.reduce((s, r) => s + n(r.appels), 0) });
+  /* L’IA par poste et par population : en tout, ou pour une population seulement (le produit, les tests) */
+  const pour = (liste: readonly Population[]) => (r: { population: Population }) => liste.includes(r.population);
+  const DU_PRODUIT = pour(POPULATIONS_DU_PRODUIT);
+  const DES_TESTS = pour(POPULATIONS_DES_TESTS);
+  const tout = () => true;
+  const microsDe = (f: (t: string) => boolean, qui: (r: { population: Population }) => boolean = tout) =>
+    couts.filter((r) => f(r.task) && qui(r)).reduce((s, r) => s + n(r.micros), 0);
+  const appelsDe = (f: (t: string) => boolean, qui: (r: { population: Population }) => boolean = tout) =>
+    couts.filter((r) => f(r.task) && qui(r)).reduce((s, r) => s + n(r.appels), 0);
+  const avantDe = (qui: (r: { population: Population }) => boolean) => dollars(coutsAvant.filter(qui).reduce((s, r) => s + n(r.micros), 0));
+  const unPoste = (nom: string, f: (t: string) => boolean) => ({
+    nom,
+    dollars: dollars(microsDe(f)),
+    appels: appelsDe(f),
+    produit: { dollars: dollars(microsDe(f, DU_PRODUIT)), appels: appelsDe(f, DU_PRODUIT) },
+  });
+  const postes = POSTES.map(([nom, f]) => unPoste(nom, f));
+  const autre = (t: string) => !POSTES.some(([, f]) => f(t));
+  if (couts.some((r) => autre(r.task))) postes.push(unPoste("Autres", autre));
+  const rapportsDuProduit = n(duProduitSurLaPeriode.rapports);
+  const verdictsDuProduit = n(duProduitSurLaPeriode.verdicts);
   const invites = env().BLUSH_ACCES_LIBRE;
 
   return {
@@ -496,11 +577,17 @@ export async function statsAdmin(jours: Periode): Promise<StatsAdmin> {
       actifs: n(liensActifs.n),
     },
     couts: {
-      total: dollars(total),
-      avant: dollars(n(coutsAvant.micros)),
-      /* Un rapport complet : son plan, ses chapitres et la mémoire faite juste après */
-      parRapport: rapports.valeur ? dollars(coutDe((t) => t.startsWith("rapport") || t === "memoire")) / rapports.valeur : null,
-      parVerdict: verdicts.valeur ? dollars(coutDe((t) => t === "verdict")) / verdicts.valeur : null,
+      total: dollars(microsDe(tout)),
+      avant: avantDe(tout),
+      produit: { valeur: dollars(microsDe(tout, DU_PRODUIT)), avant: avantDe(DU_PRODUIT) },
+      tests: { valeur: dollars(microsDe(tout, DES_TESTS)), avant: avantDe(DES_TESTS) },
+      populations: POPULATIONS.map((population) => {
+        const qui = (r: { population: Population }) => r.population === population;
+        return { population, dollars: dollars(microsDe(tout, qui)), appels: appelsDe(tout, qui) };
+      }),
+      /* Un rapport complet du produit : son plan, ses chapitres et la mémoire faite juste après, sur les rapports écrits du produit */
+      parRapport: rapportsDuProduit ? dollars(microsDe((t) => t.startsWith("rapport") || t === "memoire", DU_PRODUIT)) / rapportsDuProduit : null,
+      parVerdict: verdictsDuProduit ? dollars(microsDe((t) => t === "verdict", DU_PRODUIT)) / verdictsDuProduit : null,
       postes: postes.filter((p) => p.appels > 0).sort((a, b) => b.dollars - a.dollars),
     },
     sante: {
@@ -552,9 +639,12 @@ async function pilotageDe(jours: Periode): Promise<Pilotage> {
           `select (j::timestamp at time zone 'Europe/Paris') as debut from generate_series((now() at time zone 'Europe/Paris')::date - ${jours - 1}, (now() at time zone 'Europe/Paris')::date, interval '1 day') as j`,
         );
   const caseDe = (col: string) => sql.raw(pas === "heure" ? `date_trunc('hour', ${col})` : `((${col} at time zone 'Europe/Paris')::date::timestamp at time zone 'Europe/Paris')`);
+  /* Un achat du produit (en SQL brut, `achats` sous l’alias `a0`) : son acheteur rangé par la règle « qui est qui » à l’heure de son paiement, un compte effacé depuis compté client */
+  const achatDuProduit = duProduit(populationEnSQL({ conv: sql`null`, compte: sql`a0.user_id`, instant: sql`a0.paye_le`, sansRien: "prospect" }));
   const [
     parCase,
     argent,
+    argentDuProduit,
     visiteurs,
     dollars,
     tunnel,
@@ -584,13 +674,14 @@ async function pilotageDe(jours: Periode): Promise<Pilotage> {
     parBrasImports,
     contrefactuels,
   ] = await Promise.all([
-    lignes<{ debut: string; visiteurs: string; acheteurs: string; centimes: string; micros: string }>(
+    lignes<{ debut: string; visiteurs: string; acheteurs: string; centimes: string; centimes_produit: string; micros: string; micros_produit: string }>(
       sql`with c as (${cases}),
             v as (select ${caseDe("arrive_le")} as b, count(*) as n from visites where arrive_le >= (select min(debut) from c) group by 1),
-            a as (select ${caseDe("paye_le")} as b, count(distinct user_id) as acheteurs, sum(centimes) as centimes from achats
-                  where paye_le >= (select min(debut) from c) group by 1),
-            i as (select ${caseDe("created_at")} as b, sum(cost_micros) as micros from ai_usage where created_at >= (select min(debut) from c) group by 1)
-          select c.debut, v.n as visiteurs, a.acheteurs, a.centimes, i.micros
+            a as (select ${caseDe("paye_le")} as b, count(distinct user_id) as acheteurs, sum(centimes) as centimes, sum(centimes) filter (where produit) as centimes_produit
+                  from (select a0.paye_le, a0.user_id, a0.centimes, ${achatDuProduit} as produit from achats a0 where a0.paye_le >= (select min(debut) from c)) as payes group by 1),
+            i as (select ${caseDe("created_at")} as b, sum(cost_micros) as micros, sum(cost_micros) filter (where ${duProduit(sql`population`)}) as micros_produit
+                  from ai_usage where created_at >= (select min(debut) from c) group by 1)
+          select c.debut, v.n as visiteurs, a.acheteurs, a.centimes, a.centimes_produit, i.micros, i.micros_produit
           from c left join v on v.b = c.debut left join a on a.b = c.debut left join i on i.b = c.debut order by c.debut`,
     ),
     ligne<Record<"payes" | "payes_c" | "payes_av_c" | "remb" | "remb_c" | "remb_av_c" | "cont" | "cont_c" | "cont_av_c" | "acheteurs" | "acheteurs_av", string | null>>(
@@ -602,6 +693,19 @@ async function pilotageDe(jours: Periode): Promise<Pilotage> {
             sum(centimes) filter (where statut = 'conteste' and ${W("annule_le", 1)}) as cont_av_c,
             count(distinct user_id) filter (where ${W("paye_le")}) as acheteurs, count(distinct user_id) filter (where ${W("paye_le", 1)}) as acheteurs_av
           from achats where paye_le is not null`,
+    ),
+    /*
+     * … et celui du produit : les mêmes achats, sans ceux de l’équipe ni du tournage. Seulement ceux des deux périodes : la
+     * règle se juge achat par achat
+     */
+    ligne<Record<"payes_c" | "payes_av_c" | "remb_c" | "remb_av_c" | "cont_c" | "cont_av_c" | "acheteurs" | "acheteurs_av", string | null>>(
+      sql`with a as (select a0.centimes, a0.statut, a0.paye_le, a0.annule_le, a0.user_id from achats a0
+                     where a0.paye_le is not null and (${W("a0.paye_le")} or ${W("a0.paye_le", 1)} or ${W("a0.annule_le")} or ${W("a0.annule_le", 1)}) and ${achatDuProduit})
+          select sum(centimes) filter (where ${W("paye_le")}) as payes_c, sum(centimes) filter (where ${W("paye_le", 1)}) as payes_av_c,
+            sum(centimes) filter (where statut = 'rembourse' and ${W("annule_le")}) as remb_c, sum(centimes) filter (where statut = 'rembourse' and ${W("annule_le", 1)}) as remb_av_c,
+            sum(centimes) filter (where statut = 'conteste' and ${W("annule_le")}) as cont_c, sum(centimes) filter (where statut = 'conteste' and ${W("annule_le", 1)}) as cont_av_c,
+            count(distinct user_id) filter (where ${W("paye_le")}) as acheteurs, count(distinct user_id) filter (where ${W("paye_le", 1)}) as acheteurs_av
+          from a`,
     ),
     ligne<{ a: string; b: string }>(sql`select count(*) filter (where ${W("arrive_le")}) as a, count(*) filter (where ${W("arrive_le", 1)}) as b from visites`),
     ligne<{ a: string | null; b: string | null }>(
@@ -763,6 +867,8 @@ async function pilotageDe(jours: Periode): Promise<Pilotage> {
 
   const m = (c: unknown) => n(c);
   const net = { valeur: m(argent.payes_c) - m(argent.remb_c) - m(argent.cont_c), avant: m(argent.payes_av_c) - m(argent.remb_av_c) - m(argent.cont_av_c) };
+  const ap = argentDuProduit;
+  const netProduit = { valeur: m(ap.payes_c) - m(ap.remb_c) - m(ap.cont_c), avant: m(ap.payes_av_c) - m(ap.remb_av_c) - m(ap.cont_av_c) };
   const parSource = new Map<SourceVisite | null, { visiteurs: number; acheteurs: number; centimes: number }>();
   const ligneDe = (source: SourceVisite | null) => parSource.get(source) ?? parSource.set(source, { visiteurs: 0, acheteurs: 0, centimes: 0 }).get(source)!;
   for (const v of visiteursParSource) ligneDe(v.source).visiteurs = n(v.n);
@@ -777,8 +883,18 @@ async function pilotageDe(jours: Periode): Promise<Pilotage> {
 
   return {
     pas,
-    cases: parCase.map((c) => ({ le: new Date(c.debut).toISOString(), visiteurs: n(c.visiteurs), acheteurs: n(c.acheteurs), centimes: n(c.centimes), dollars: n(c.micros) / 1e6 })),
+    cases: parCase.map((c) => ({
+      le: new Date(c.debut).toISOString(),
+      visiteurs: n(c.visiteurs),
+      acheteurs: n(c.acheteurs),
+      centimes: n(c.centimes),
+      dollars: n(c.micros) / 1e6,
+      centimesProduit: n(c.centimes_produit),
+      dollarsProduit: n(c.micros_produit) / 1e6,
+    })),
     net,
+    netProduit,
+    acheteursProduit: { valeur: n(ap.acheteurs), avant: n(ap.acheteurs_av) },
     payes: { n: n(argent.payes), centimes: m(argent.payes_c) },
     rembourses: { n: n(argent.remb), centimes: m(argent.remb_c) },
     contestes: { n: n(argent.cont), centimes: m(argent.cont_c) },

@@ -12,6 +12,7 @@ import {
   NOMS_DES_GENRES,
   NOMS_DES_GROUPES,
   NOMS_DES_PAIRES,
+  NOMS_DES_POPULATIONS,
   NOMS_DES_SOURCES,
   NOMS_DES_TYPES_D_IMPORT,
   PAIRES,
@@ -50,14 +51,14 @@ export const OUTILS: readonly OutilMcp[] = [
     name: "pilotage",
     title: "Pilotage",
     description:
-      "L’écran principal de /admin sur la période : « À regarder » (ce qui coince, les bonnes nouvelles), le chiffre d’affaires net (payé − remboursé − contesté), les visiteurs, les acheteurs, le taux d’achat, le revenu par acheteur, la dépense de l’IA et la marge après l’IA (cible comprise), la note des rapports écrits (« Oui, grave », « Bof » et ses raisons, les avis laissés), le tunnel visiteurs → imports → paywall → acheteurs → racheteurs et sa plus grosse fuite, qui importe (des filles ou des garçons, sur un garçon ou une fille, et le taux d’achat de chacun), les sources, ce qui se vend, et la santé. Chaque chiffre avec celui de la période d’avant. À appeler en premier.",
+      "L’écran principal de /admin sur la période : « À regarder » (ce qui coince, les bonnes nouvelles), le chiffre d’affaires net (payé − remboursé − contesté), celui des vrais clients (sans les achats de l’équipe ni du tournage), les visiteurs, les acheteurs, le taux d’achat, le revenu par acheteur, la dépense de l’IA en deux (celle du produit, les clients et les prospects ; celle des tests, l’équipe et le tournage ; puis l’offert aux invités et le non classé) et la marge produit (les ventes des vrais clients face à l’IA du produit, cible comprise), la note des rapports écrits (« Oui, grave », « Bof » et ses raisons, les avis laissés), le tunnel visiteurs → imports → paywall → acheteurs → racheteurs et sa plus grosse fuite, qui importe (des filles ou des garçons, sur un garçon ou une fille, et le taux d’achat de chacun), les sources, ce qui se vend, et la santé. Chaque chiffre avec celui de la période d’avant. À appeler en premier.",
     inputSchema: AVEC_JOURS,
   },
   {
     name: "evolution",
     title: "Évolution",
     description:
-      "Les courbes du pilotage : heure par heure (sur 1 jour) ou jour par jour (7 ou 30), les visiteurs, les acheteurs, le payé en euros et l’IA en dollars de chaque case. La dernière case est en cours.",
+      "Les courbes du pilotage : heure par heure (sur 1 jour) ou jour par jour (7 ou 30), les visiteurs, les acheteurs, le payé en euros et l’IA en dollars de chaque case, en tout et pour le produit seul (les vrais clients, l’IA des clients et des prospects). La dernière case est en cours.",
     inputSchema: AVEC_JOURS,
   },
   {
@@ -85,7 +86,7 @@ export const OUTILS: readonly OutilMcp[] = [
     name: "couts_ia",
     title: "Coûts de l’IA",
     description:
-      "Ce qu’a coûté l’IA sur la période et celle d’avant, en dollars : le total, par rapport, par verdict, par poste (avec le nombre d’appels), la dépense d’aujourd’hui face au budget du jour (et la part sans compte face à la sienne), et l’IA avant l’achat par type d’import (export, captures, vidéo, hors des comptes de l’équipe : les convs importées, leurs écrans et leurs lots par import, l’IA par import, le temps médian jusqu’au paywall, la part au paywall et la part qui paie, à partir de 30 convs, l’IA par acheteur, et ce qui a été lu pour rien), et la lecture partielle des longues vidéos (l’A/B, hors des comptes de l’équipe : pour chaque moitié, entière ou partielle, ses vidéos comptées dès leur plan, importées ou non, celles importées, la part au paywall et qui paie, celles payées plus de 24 h après l’import, l’IA avant l’achat par vidéo, la suite lue après par acheteur, l’IA de lecture par acheteur, le temps médian jusqu’au paywall, les écrans et les lots lus avant, les lots gardés et la part des vidéos coupées, la part du titre « Tendance », les suites lues, incomplètes ou perdues, les titres que la conv entière aurait changés une fois sa suite lue ; et le contrefactuel des vidéos lues en entier).",
+      "Ce qu’a coûté l’IA sur la période et celle d’avant, en dollars, rangée par une seule règle « qui est qui » : le total (la facture), celle du produit (les clients et les prospects) et celle des tests (l’équipe et le tournage), chaque population (clients, prospects, invités, équipe, tournage, non classé), par acheteur, par rapport et par verdict (le produit seul, la même population en haut et en bas), par poste (en tout et pour le produit, avec le nombre d’appels), la dépense d’aujourd’hui face au budget du jour (et la part sans compte face à la sienne), et l’IA avant l’achat par type d’import (export, captures, vidéo, hors des comptes de l’équipe : les convs importées, leurs écrans et leurs lots par import, l’IA par import, le temps médian jusqu’au paywall, la part au paywall et la part qui paie, à partir de 30 convs, l’IA par acheteur, et ce qui a été lu pour rien), et la lecture partielle des longues vidéos (l’A/B, hors des comptes de l’équipe : pour chaque moitié, entière ou partielle, ses vidéos comptées dès leur plan, importées ou non, celles importées, la part au paywall et qui paie, celles payées plus de 24 h après l’import, l’IA avant l’achat par vidéo, la suite lue après par acheteur, l’IA de lecture par acheteur, le temps médian jusqu’au paywall, les écrans et les lots lus avant, les lots gardés et la part des vidéos coupées, la part du titre « Tendance », les suites lues, incomplètes ou perdues, les titres que la conv entière aurait changés une fois sa suite lue ; et le contrefactuel des vidéos lues en entier).",
     inputSchema: AVEC_JOURS,
   },
   {
@@ -155,6 +156,7 @@ const enTete = (s: StatsAdmin) => ({ jours: s.jours, calculeLe: s.le });
 
 function pilotage(s: StatsAdmin) {
   const p = s.pilotage;
+  const c = s.couts;
   const fuite = fuiteDuTunnel(p.tunnel);
   return {
     ...enTete(s),
@@ -162,24 +164,36 @@ function pilotage(s: StatsAdmin) {
     aRegarder: aRegarder(s).map(({ ton, titre, texte }) => ({ ton, titre, texte })),
     chiffreDAffaires: {
       netEuros: { valeur: euros(p.net.valeur), avant: euros(p.net.avant) },
+      /* Celui des vrais clients : sans les achats payés par l’équipe ni par le tournage */
+      netProduitEuros: { valeur: euros(p.netProduit.valeur), avant: euros(p.netProduit.avant) },
       payes: montant(p.payes),
       rembourses: montant(p.rembourses),
       contestes: montant(p.contestes),
     },
     visiteurs: chiffre(p.visiteurs),
     acheteurs: chiffre(p.acheteurs),
+    acheteursDuProduit: chiffre(p.acheteursProduit),
     tauxDAchatPct: { valeur: pourcent(p.acheteurs.valeur, p.visiteurs.valeur), avant: pourcent(p.acheteurs.avant, p.visiteurs.avant) },
     revenuParAcheteurEuros: {
       valeur: arrondi(rapport(euros(p.centimesPayes.valeur), p.acheteurs.valeur), 2),
       avant: arrondi(rapport(euros(p.centimesPayes.avant), p.acheteurs.avant), 2),
     },
+    /* L’IA en deux : le produit (les clients et les prospects) et les tests (l’équipe et le tournage) ; le budget du jour, lui, compte tout */
     ia: {
       dollars: arrondi(p.dollars.valeur, 2),
       avantDollars: arrondi(p.dollars.avant, 2),
+      produitDollars: { valeur: arrondi(c.produit.valeur, 2), avant: arrondi(c.produit.avant, 2) },
+      testsDollars: { valeur: arrondi(c.tests.valeur, 2), avant: arrondi(c.tests.avant, 2) },
+      parPopulation: c.populations.map((x) => ({ population: NOMS_DES_POPULATIONS[x.population], dollars: arrondi(x.dollars, 2) })),
       aujourdhuiDollars: arrondi(p.iaDuJour.dollars, 2),
       budgetDuJourDollars: p.iaDuJour.budget,
     },
-    margeApresIAPct: { valeur: arrondi(margeApresIA(p.net.valeur, p.dollars.valeur)), avant: arrondi(margeApresIA(p.net.avant, p.dollars.avant)), cible: CIBLE_DE_MARGE },
+    /* La marge produit : les ventes des vrais clients face à l’IA du produit, les tests à part */
+    margeProduitPct: {
+      valeur: arrondi(margeApresIA(p.netProduit.valeur, c.produit.valeur)),
+      avant: arrondi(margeApresIA(p.netProduit.avant, c.produit.avant)),
+      cible: CIBLE_DE_MARGE,
+    },
     tunnel: ETAPES_DU_TUNNEL.map(([cle, nom]) => ({ etape: nom, n: p.tunnel[cle] })),
     plusGrosseFuite: fuite
       ? { de: ETAPES_DU_TUNNEL[fuite.etape - 1]![1], vers: ETAPES_DU_TUNNEL[fuite.etape]![1], passentPct: arrondi(fuite.taux * 100), depuis: fuite.depuis, arrivent: fuite.vers }
@@ -220,7 +234,15 @@ function evolution(s: StatsAdmin) {
   return {
     ...enTete(s),
     pas: p.pas,
-    cases: p.cases.map((c) => ({ debut: c.le, visiteurs: c.visiteurs, acheteurs: c.acheteurs, payeEuros: euros(c.centimes), iaDollars: arrondi(c.dollars, 2) })),
+    cases: p.cases.map((c) => ({
+      debut: c.le,
+      visiteurs: c.visiteurs,
+      acheteurs: c.acheteurs,
+      payeEuros: euros(c.centimes),
+      iaDollars: arrondi(c.dollars, 2),
+      payeProduitEuros: euros(c.centimesProduit),
+      iaProduitDollars: arrondi(c.dollarsProduit, 2),
+    })),
   };
 }
 
@@ -279,9 +301,21 @@ function coutsIA(s: StatsAdmin) {
     ...enTete(s),
     totalDollars: arrondi(c.total, 2),
     avantDollars: arrondi(c.avant, 2),
+    /* Le produit (les clients et les prospects) et les tests (l’équipe et le tournage), à part ; puis chaque population */
+    produitDollars: { valeur: arrondi(c.produit.valeur, 2), avant: arrondi(c.produit.avant, 2) },
+    testsDollars: { valeur: arrondi(c.tests.valeur, 2), avant: arrondi(c.tests.avant, 2) },
+    parPopulation: c.populations.map((x) => ({ population: NOMS_DES_POPULATIONS[x.population], dollars: arrondi(x.dollars, 2), appels: x.appels })),
+    /* Les ratios du produit : la même population en haut et en bas */
+    parAcheteurDollars: arrondi(rapport(c.produit.valeur, s.pilotage.acheteursProduit.valeur), 2),
     parRapportDollars: arrondi(c.parRapport, 3),
     parVerdictDollars: arrondi(c.parVerdict, 3),
-    postes: c.postes.map((x) => ({ poste: x.nom, dollars: arrondi(x.dollars, 2), appels: x.appels })),
+    postes: c.postes.map((x) => ({
+      poste: x.nom,
+      dollars: arrondi(x.dollars, 2),
+      appels: x.appels,
+      produitDollars: arrondi(x.produit.dollars, 2),
+      produitAppels: x.produit.appels,
+    })),
     aujourdhui: {
       dollars: arrondi(s.pilotage.iaDuJour.dollars, 2),
       budgetDollars: s.pilotage.iaDuJour.budget,

@@ -1,4 +1,4 @@
-import type { EtapeVisite, GenreVendu, OffreId, SourceVisite, TypeDImport } from "@/types";
+import type { EtapeVisite, GenreVendu, OffreId, Population, SourceVisite, TypeDImport } from "@/types";
 import { CATALOGUE, prixDe } from "./offres";
 
 /*
@@ -23,7 +23,9 @@ export const EUROS_PAR_DOLLAR = 0.86;
 
 /**
  * La marge après l’IA, en % : (CA hors taxes − l’IA en euros) ÷ CA hors taxes. `centimes` : le chiffre d’affaires net,
- * TTC ; `dollars` : ce qu’a coûté l’IA. null sans vente (rien à diviser). Hors frais Whop et hors créatrices.
+ * TTC ; `dollars` : ce qu’a coûté l’IA. null sans vente (rien à diviser). Hors frais Whop et hors créatrices. /admin en
+ * fait la marge produit : les ventes des vrais clients face à l’IA du produit (les clients et les prospects), sans les
+ * achats ni l’IA des tests (src/server/population.ts).
  */
 export function margeApresIA(centimes: number, dollars: number): number | null {
   const ht = centimes / 100 / (1 + TVA);
@@ -62,6 +64,19 @@ export const NOMS_DES_GROUPES: Record<GroupeDOffres, string> = { premium: "Premi
  * centimes, eux, sont ceux payés.
  */
 export const NOM_DU_PASSAGE_EN_PREMIUM = `Premium pour ${prixDe("passe_premium")} de plus (${CATALOGUE.premium_ajout.bulles} bulles pour ${CATALOGUE.premium_ajout.centimes / 100}\u00a0€ avant le 23 octobre)`;
+
+/**
+ * Le nom de chaque population (la règle « qui est qui », src/server/population.ts), dans /admin « Ce que coûte l’IA », le
+ * serveur MCP et le résumé de la nuit.
+ */
+export const NOMS_DES_POPULATIONS: Record<Population, string> = {
+  client: "Clients",
+  prospect: "Prospects",
+  offert: "Invités (offert)",
+  equipe: "L’équipe",
+  tournage: "Le tournage",
+  inconnu: "Non classé",
+};
 
 /** Le nom de chaque type d’import (src/server/imports.ts), dans /admin « L’IA avant l’achat » et le serveur MCP. */
 export const NOMS_DES_TYPES_D_IMPORT: Record<TypeDImport, string> = { export: "Export", captures: "Captures", video: "Vidéo" };

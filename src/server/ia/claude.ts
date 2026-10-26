@@ -433,8 +433,8 @@ export type OptionsAppel = {
   surAvance?: (a: Avance) => void;
   /** L’appel s’arrête quand il n’a plus de raison d’être (l’autre moitié du rapport a échoué). */
   signal?: AbortSignal;
-  /** Sans conv : le compte connecté qui paie (des captures lues avant l’import). */
-  compte?: { email: string } | null;
+  /** Sans conv : le compte connecté qui paie (des captures lues avant l’import), et qui a fait l’appel (sa population, ai_usage). */
+  compte?: { id: string; email: string } | null;
   /** Qui paie, quand ce n’est ni le compte de la conv ni le compte connecté : la suite d’une longue vidéo a sa part à elle (PAYEUR_DE_LA_SUITE, src/server/budget.ts). */
   payeur?: Payeur;
   /** Le suivi des coûts et l’alerte d’un repli passent après la réponse (le chat en flux), au lieu de la retarder. */
@@ -481,7 +481,7 @@ async function envoyerEtLire<S extends z.ZodType>(
   schema: S,
   base: Parametres,
   payeur: Payeur,
-  { storyId, etiquette, partie, surAvance, signal, differer, envoi, lot, auDebut }: OptionsAppel,
+  { storyId, etiquette, partie, surAvance, signal, differer, envoi, lot, auDebut, compte }: OptionsAppel,
 ): Promise<Appel<z.infer<S>>> {
   const prestataire = iaFactice() ? MODELE_FACTICE : fournisseur;
   /* Tout de suite, ou après la réponse */
@@ -513,7 +513,7 @@ async function envoyerEtLire<S extends z.ZodType>(
   /* Le coût d’un appel (fini, ou arrêté en route), sa durée prise tout de suite : la note peut passer après la réponse */
   const noter = (u: Usage, modele: string) => {
     const ms = Date.now() - debut;
-    return ensuite(() => noterUsage(u, Math.round(cout(u, modele) * 1e6), { storyId, payeur, tache: etiquette ?? req.tache, ms, modele, envoi, lot }));
+    return ensuite(() => noterUsage(u, Math.round(cout(u, modele) * 1e6), { storyId, payeur, tache: etiquette ?? req.tache, ms, modele, envoi, lot, compte }));
   };
   let message: MessageRecu;
   try {
@@ -559,7 +559,16 @@ async function envoyerEtLire<S extends z.ZodType>(
 async function noterUsage(
   u: Usage,
   micros: number,
-  { storyId, payeur, tache, ms, modele, envoi, lot }: { storyId?: string; payeur: Payeur; tache: string; ms: number; modele: string; envoi?: string | null; lot?: string | null },
+  {
+    storyId,
+    payeur,
+    tache,
+    ms,
+    modele,
+    envoi,
+    lot,
+    compte,
+  }: { storyId?: string; payeur: Payeur; tache: string; ms: number; modele: string; envoi?: string | null; lot?: string | null; compte?: { id: string } | null },
 ) {
   await noterCout({
     storyId,
@@ -574,6 +583,7 @@ async function noterUsage(
     payeur,
     envoi,
     lot,
+    compte,
   });
 }
 

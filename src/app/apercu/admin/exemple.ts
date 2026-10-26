@@ -43,11 +43,23 @@ function casesDe(jours: Periode, suivi: boolean): CaseDuPilotage[] {
     const acheteurs = Math.round(visiteurs * (0.024 + ((k * 7) % 5) * 0.001));
     /* Un panier qui varie d’un jour à l’autre, autour de 16,50 € */
     const centimes = acheteurs * (1650 + (((k * 5) % 7) - 3) * 40);
-    return { le: iso(debut), visiteurs: suivi ? visiteurs : 0, acheteurs, centimes, dollars: Math.round(centimes * 0.234) / 100 };
+    const dollars = Math.round(centimes * 0.234) / 100;
+    /* Le produit : 96 % du payé (le reste, des achats d’essai de l’équipe), 85 % de l’IA (le reste, les tests, l’offert, le non classé) */
+    return {
+      le: iso(debut),
+      visiteurs: suivi ? visiteurs : 0,
+      acheteurs,
+      centimes,
+      dollars,
+      centimesProduit: Math.round(centimes * 0.96),
+      dollarsProduit: Math.round(dollars * 85) / 100,
+    };
   });
 }
 
 const somme = <T>(xs: readonly T[], f: (x: T) => number) => xs.reduce((t, x) => t + f(x), 0);
+/** `pct` % de `total` dollars, au centime. */
+const partDe = (total: number, pct: number) => Math.round(total * pct) / 100;
 
 /* Qui importe : la part des imports de chaque paire (le reste n’a pas encore dit son genre), et la part de chacune payée */
 const PARTS_DES_PAIRES: Record<Paire, [importees: number, payees: number]> = {
@@ -243,6 +255,8 @@ function pilotageDe(jours: Periode, { calme = false, suivi = true }: Variante): 
     pas: jours === 1 ? "heure" : "jour",
     cases,
     net: { valeur: net, avant: Math.round(net * 0.77) },
+    netProduit: { valeur: Math.round(net * 0.96), avant: Math.round(net * 0.77 * 0.96) },
+    acheteursProduit: { valeur: Math.max(0, acheteurs - 1), avant: Math.max(0, Math.round(acheteurs * 0.8) - 1) },
     payes: { n: premium + rapport + suite + Math.round(bulles / 990), centimes: paye },
     rembourses,
     contestes,
@@ -357,16 +371,34 @@ export function statsDExemple(jours: Periode, variante: Variante = {}): StatsAdm
     couts: {
       total,
       avant: pilotage.dollars.avant,
-      parRapport: rapports ? Math.round(((total * 0.38) / rapports) * 100) / 100 : null,
-      parVerdict: verdicts ? Math.round(((total * 0.11) / verdicts) * 100) / 100 : null,
-      postes: [
-        { nom: "Chat", dollars: Math.round(total * 46) / 100, appels: 412 },
-        { nom: "Rapport", dollars: Math.round(total * 38) / 100, appels: rapports * 2 },
-        { nom: "Verdict", dollars: Math.round(total * 11) / 100, appels: verdicts },
-        { nom: "Mémoire (mise à jour)", dollars: Math.round(total * 2) / 100, appels: 14 },
-        { nom: "Mémoire (création)", dollars: Math.round(total * 2) / 100, appels: rapports },
-        { nom: "Mémoire (en lot)", dollars: Math.round(total * 1) / 100, appels: 11 },
+      /* Le produit fait 85 % de l’IA, les tests 11 % (l’équipe 8, le tournage 3), l’offert et le non classé 2 % chacun */
+      produit: { valeur: partDe(total, 85), avant: partDe(pilotage.dollars.avant, 85) },
+      tests: { valeur: partDe(total, 11), avant: partDe(pilotage.dollars.avant, 14) },
+      populations: [
+        { population: "client", dollars: partDe(total, 62), appels: 380 },
+        { population: "prospect", dollars: partDe(total, 23), appels: 290 },
+        { population: "offert", dollars: partDe(total, 2), appels: 9 },
+        { population: "equipe", dollars: partDe(total, 8), appels: 41 },
+        { population: "tournage", dollars: partDe(total, 3), appels: 12 },
+        { population: "inconnu", dollars: partDe(total, 2), appels: 6 },
       ],
+      parRapport: rapports ? Math.round(((total * 0.85 * 0.38) / rapports) * 100) / 100 : null,
+      parVerdict: verdicts ? Math.round(((total * 0.85 * 0.11) / verdicts) * 100) / 100 : null,
+      postes: (
+        [
+          ["Chat", 46, 412],
+          ["Rapport", 38, rapports * 2],
+          ["Verdict", 11, verdicts],
+          ["Mémoire (mise à jour)", 2, 14],
+          ["Mémoire (création)", 2, rapports],
+          ["Mémoire (en lot)", 1, 11],
+        ] as const
+      ).map(([nom, part, appels]) => ({
+        nom,
+        dollars: partDe(total, part),
+        appels,
+        produit: { dollars: partDe(total * 0.85, part), appels: Math.round(appels * 0.9) },
+      })),
     },
     sante: variante.calme
       ? { echecs: [], pannes: [], enCours: 2, bloquees: 0, enAttente: 1 }
