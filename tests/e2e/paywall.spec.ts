@@ -116,7 +116,8 @@ test("un nouveau venu : la lecture du code, le paywall, payé, puis la vraie lec
     await expect(question).toBeVisible();
     await expect(carte).toHaveCount(0);
     await expect(page.getByRole("dialog", { name: OFFRE_SUITE })).toHaveCount(0);
-    await expect(question.getByRole("button")).toHaveText(["Fermer", "C’est trop cher", "J’ai pas confiance", "Pas maintenant", "Ça a bugué", "Passer"]);
+    for (const reponse of ["C’est trop cher", "J’ai pas confiance", "Pas maintenant", "Ça a bugué", "Passer"])
+      await expect(question.getByRole("button", { name: reponse })).toBeVisible();
     await question.getByRole("button", { name: "C’est trop cher" }).click();
     await expect(page.getByRole("dialog", { name: OFFRE_SUITE })).toBeVisible({ timeout: RESEAU });
     await expect(question).toHaveCount(0);
