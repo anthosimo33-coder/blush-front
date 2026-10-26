@@ -181,9 +181,18 @@ export type Pilotage = {
 /* Les offres qui débloquent le rapport d’une conv : l’entonnoir des achats part des verdicts lus */
 const OFFRES_DU_RAPPORT = OFFRES.filter((o) => CATALOGUE[o].conv);
 
+/**
+ * Minuit à Paris, `jours` jours avant le jour de `maintenant` (une expression SQL : now(), ou un instant figé par un
+ * test). Les jours se retirent de l’heure de Paris, avant d’en refaire un instant : retirés de l’instant, dans une base
+ * réglée sur UTC, ils font 24 h chacun, et la semaine qui suit un changement d’heure commençait à 1 h (ou la veille à
+ * 23 h) au lieu de minuit.
+ */
+export const minuitDeParis = (jours: number, maintenant = "now()") =>
+  sql.raw(`((date_trunc('day', ${maintenant} at time zone 'Europe/Paris') - interval '${jours} days') at time zone 'Europe/Paris')`);
+
 /* Le début du jour de Paris, et celui des 7 derniers jours (aujourd’hui compris) */
-const DEBUT_DU_JOUR = sql.raw(`(date_trunc('day', now() at time zone 'Europe/Paris') at time zone 'Europe/Paris')`);
-const DEBUT_DE_LA_SEMAINE = sql.raw(`(date_trunc('day', now() at time zone 'Europe/Paris') at time zone 'Europe/Paris' - interval '6 days')`);
+const DEBUT_DU_JOUR = minuitDeParis(0);
+const DEBUT_DE_LA_SEMAINE = minuitDeParis(6);
 
 const lignes = async <T>(q: SQL) => (await db().execute(q)).rows as T[];
 /** La ligne d’un agrégat (count, sum sans group by) : il en rend toujours une. */

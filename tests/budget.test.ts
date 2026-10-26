@@ -34,11 +34,13 @@ import { cloreLesAbandons, executerChaine } from "@/server/pipeline";
 import { etatDesTaches, planifier } from "@/server/taches";
 import { retenir } from "@/server/memoire-groupee";
 import { aujourdhuiParis } from "@/server/temps";
+import { jourDeParisAvant } from "@/lib/jours";
 import { echange } from "./aide/fabriques";
 import { avecFactice, compteDeTest, convPrete, histoireLue, ligneEnBase } from "./aide/fixtures";
+import { midiDHier } from "./aide/jours";
 
 const ETIQUETTE = "test-budget";
-const hier = () => aujourdhuiParis(new Date(Date.now() - 86400e3)).iso;
+const hier = () => jourDeParisAvant(1);
 
 /* Les payeurs dont un test a noté une dépense : leurs dépenses du jour (et de la veille) sont effacées après lui */
 const payeurs = new Set<Payeur>([null]);
@@ -85,10 +87,7 @@ async function compteEtConv(acces: "gratuit" | "debloque" = "gratuit"): Promise<
 /** Le lendemain : les tâches de la conv sont d’hier, et les dépenses du jour remises à zéro. */
 async function lendemain(storyId: string): Promise<void> {
   await effacerLesDepenses();
-  await db()
-    .update(schema.tasks)
-    .set({ updatedAt: new Date(Date.now() - 86400e3 - 3600e3) })
-    .where(eq(schema.tasks.storyId, storyId));
+  await db().update(schema.tasks).set({ updatedAt: midiDHier() }).where(eq(schema.tasks.storyId, storyId));
 }
 
 describe("la dépense d’un compte", () => {
