@@ -21,6 +21,7 @@ import {
   ETAPES_DU_TUNNEL,
   JALONS_DE_L_IMPORT,
   JALONS_DU_PAYWALL,
+  PERSONNES_D_UN_TAUX,
   caseNommee,
   dollars,
   ecartEnPoints,
@@ -30,12 +31,14 @@ import {
   fuiteDuTunnel,
   graduations,
   nombre,
+  nomDeLAppli,
   nomsDeLaCase,
   plusGrossePerte,
   pluriel,
   pointsDeLaCourbe,
   pourcent,
   rapport,
+  tauxLisible,
   texteDeLaFuite,
   type Ecart,
 } from "./calculs";
@@ -535,8 +538,8 @@ function Tunnel({ p, jours }: { p: Chiffres; jours: Periode }) {
 
 /* ———— Les jalons : l’import, écran par écran, et le paywall, jusqu’au paiement ———— */
 
-/** Une étape d’une suite de jalons : sa clé, son nom, ses personnes. */
-type EtapeDeLaSuite = { cle: string; nom: string; n: number };
+/** Une étape d’une suite de jalons : sa clé, son nom, ses personnes, et son détail, sous sa barre. */
+type EtapeDeLaSuite = { cle: string; nom: string; n: number; detail?: ReactNode };
 
 /**
  * Une suite d’étapes, en lignes : le nom, ce qui passe de l’étape d’avant, le nombre, et une barre à la mesure de la plus
@@ -575,6 +578,7 @@ function SuiteDEtapes({ etapes, nom }: { etapes: EtapeDeLaSuite[]; nom: string }
               <span className="flex">
                 <Barre part={e.n / reference} couleur={estLaPerte ? ORANGE : ROSE} />
               </span>
+              {e.detail}
             </li>
           );
         })}
@@ -603,9 +607,45 @@ function SansJalons({ depuis }: { depuis: string | null }) {
   );
 }
 
+/**
+ * Sous « Choisissent leur fichier » : le même passage, appli par appli (ceux qui la choisissent → ceux qui choisissent
+ * leur fichier), son taux à partir de PERSONNES_D_UN_TAUX qui la choisissent.
+ */
+function DuChoixAuFichier({ applis }: { applis: Chiffres["jalonsParAppli"] }) {
+  return (
+    <div className="mt-1 border-l-2 border-sep pl-3">
+      <ul aria-label="De l’appli au fichier, appli par appli" className="m-0 flex list-none flex-col gap-1 p-0">
+        {applis.map(({ appli, jalons: j }) => {
+          const taux = tauxLisible(j.fichier, j.appli);
+          return (
+            <li key={appli} className="flex items-baseline justify-between gap-3 text-note font-bold text-soft">
+              <span className="min-w-0">{nomDeLAppli(appli)}</span>
+              <span className="flex shrink-0 items-baseline gap-2 tabular-nums">
+                <span>{`${nombre(j.appli)} → ${nombre(j.fichier)}`}</span>
+                <span className="min-w-[44px] text-right font-black text-ink">{taux === null ? "—" : pourcent(taux * 100, 0)}</span>
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+      {applis.some(({ jalons: j }) => j.appli < PERSONNES_D_UN_TAUX) && (
+        <p className="m-0 mt-1 text-legende font-bold text-grey">{`«\u00a0—\u00a0»\u00a0: moins de ${PERSONNES_D_UN_TAUX}\u00a0personnes, trop peu pour un taux.`}</p>
+      )}
+    </div>
+  );
+}
+
 function ImportEcranParEcran({ p, jours }: { p: Chiffres; jours: Periode }) {
   const j = p.jalons;
-  const etapes: EtapeDeLaSuite[] = [{ cle: "visiteurs", nom: "Visiteurs", n: p.tunnel.visiteurs }, ...JALONS_DE_L_IMPORT.map(([cle, nom]) => ({ cle, nom, n: j[cle] }))];
+  const etapes: EtapeDeLaSuite[] = [
+    { cle: "visiteurs", nom: "Visiteurs", n: p.tunnel.visiteurs },
+    ...JALONS_DE_L_IMPORT.map(([cle, nom]) => ({
+      cle,
+      nom,
+      n: j[cle],
+      ...(cle === "fichier" && p.jalonsParAppli.length ? { detail: <DuChoixAuFichier applis={p.jalonsParAppli} /> } : {}),
+    })),
+  ];
   const rien = JALONS_DE_L_IMPORT.every(([cle]) => j[cle] === 0);
   return (
     <Bloc

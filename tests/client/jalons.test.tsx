@@ -3,9 +3,10 @@ import { useRef } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /*
- * Les jalons du tunnel, côté navigateur (src/lib/jalons.ts) : le nom du jalon, seul, part à POST /api/jalon une fois par
- * page chargée ; jamais depuis les outils de l’équipe ; un jalon « en vue » attend que son élément arrive à l’écran.
- * Chaque test recharge le module : sa mémoire des jalons envoyés est celle d’une page neuve.
+ * Les jalons du tunnel, côté navigateur (src/lib/jalons.ts) : le nom du jalon, seul (et l’appli de l’écran pour ceux de
+ * l’import), part à POST /api/jalon une fois par page chargée (et par appli) ; jamais depuis les outils de l’équipe ; un
+ * jalon « en vue » attend que son élément arrive à l’écran. Chaque test recharge le module : sa mémoire des jalons
+ * envoyés est celle d’une page neuve.
  */
 
 const envoyes = () =>
@@ -54,6 +55,24 @@ describe("les jalons du tunnel, côté navigateur", () => {
     expect(envoyes()).toEqual([{ jalon: "fichier" }, { jalon: "importee" }]);
   });
 
+  it("ceux de l’import avec l’appli de l’écran : une fois par appli, chez PostHog une fois par page", async () => {
+    const { marquerJalon } = await page("/importer/export?app=whatsapp");
+    const analytique = await import("@/lib/analytique");
+    const mesurer = vi.spyOn(analytique, "mesurer");
+    marquerJalon("appli", "whatsapp");
+    marquerJalon("appli", "whatsapp");
+    /* L’écran passe à Instagram, puis revient à WhatsApp */
+    marquerJalon("appli", "instagram");
+    marquerJalon("appli", "whatsapp");
+    marquerJalon("fichier", "instagram");
+    expect(envoyes()).toEqual([
+      { jalon: "appli", appli: "whatsapp" },
+      { jalon: "appli", appli: "instagram" },
+      { jalon: "fichier", appli: "instagram" },
+    ]);
+    expect(mesurer.mock.calls).toEqual([["jalon_appli"], ["jalon_fichier"]]);
+  });
+
   it("rien depuis les outils de l’équipe", async () => {
     const { marquerJalon } = await page("/apercu/paywall");
     marquerJalon("paywall");
@@ -70,6 +89,20 @@ describe("les jalons du tunnel, côté navigateur", () => {
     expect(envoyes()).toEqual([]);
     render(<Ecran jalon="commencer" />);
     expect(envoyes()).toEqual([{ jalon: "commencer" }]);
+  });
+
+  it("à l’arrivée d’un écran de l’import, et à chaque appli qu’il montre", async () => {
+    const { useJalon } = await page("/importer/export?app=whatsapp");
+    function Export({ app }: { app: "whatsapp" | "instagram" }) {
+      useJalon("appli", app);
+      return null;
+    }
+    const { rerender } = render(<Export app="whatsapp" />);
+    rerender(<Export app="instagram" />);
+    expect(envoyes()).toEqual([
+      { jalon: "appli", appli: "whatsapp" },
+      { jalon: "appli", appli: "instagram" },
+    ]);
   });
 
   it("en vue : seulement quand l’élément arrive à l’écran", async () => {

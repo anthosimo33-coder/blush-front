@@ -1,7 +1,8 @@
 import { CATALOGUE, enEuros } from "@/contenu/offres";
+import { TUILES_IMPORT } from "@/contenu/parcours";
 import { NOMS_DES_SOURCES, type GroupeDOffres } from "@/contenu/pilotage";
 import type { Pilotage } from "@/server/stats";
-import { ETAPES_VISITE, type EtapeVisite, type Jalon, type SourceVisite } from "@/types";
+import { APPLIS, ETAPES_VISITE, type AppKind, type EtapeVisite, type Jalon, type SourceVisite } from "@/types";
 import type { Direct, GesteDuFil } from "@/types/api";
 
 /*
@@ -204,6 +205,18 @@ export const JALONS_DU_PAYWALL = [
   ["envoye", "Envoient le paiement"],
   ["paye", "Ont payé"],
 ] as const satisfies readonly (readonly [Jalon, string])[];
+
+/**
+ * Un taux ne se lit qu’à partir de ce nombre de personnes à l’étape d’avant, comme la meilleure source et la plus grosse
+ * fuite (a-regarder.ts) : en dessous, il ne veut rien dire.
+ */
+export const PERSONNES_D_UN_TAUX = 30;
+
+/** Le passage d’une étape à la suivante (`vers` sur `depuis`), ou null avec moins de PERSONNES_D_UN_TAUX à l’étape d’avant. */
+export const tauxLisible = (vers: number, depuis: number): number | null => (depuis >= PERSONNES_D_UN_TAUX ? rapport(vers, depuis) : null);
+
+/** Le nom d’une appli dans le pilotage : celui de sa tuile au choix de l’appli (« Captures ou vidéo »), sinon le sien (« Hinge »). */
+export const nomDeLAppli = (appli: AppKind): string => TUILES_IMPORT.find((t) => t.app === appli)?.title ?? APPLIS[appli];
 
 /**
  * La plus grosse perte d’une suite d’étapes (leurs nombres, dans l’ordre) : l’étape d’arrivée (son indice, 1 ou plus)

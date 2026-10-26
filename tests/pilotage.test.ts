@@ -13,7 +13,7 @@ import { statsAdmin } from "@/server/stats";
 import { attendreLePaiement } from "@/server/taches";
 import { aujourdhuiParis } from "@/server/temps";
 import { noterAchatAuFil, noterAuFil, noterJalon, noterLaSourceDuCompte, noterSigne, sourceDeLaVisite } from "@/server/visites";
-import type { OffreId } from "@/types";
+import { CLES_DES_APPLIS, JALONS_PAR_APPLI, type AppKind, type JalonParAppli, type OffreId } from "@/types";
 import { compteDeTest, convRattachee } from "./aide/fixtures";
 
 /*
@@ -106,10 +106,42 @@ describe("les jalons du tunnel (POST /api/jalon)", () => {
     expect(Object.keys(p.jalons)).toHaveLength(Object.keys(avant).length);
   });
 
+  it("ceux de l’import, appli par appli : une fois par jour et par appli, la même personne sous chaque appli qu’elle ouvre", async () => {
+    const zero: Record<JalonParAppli, number> = { appli: 0, fichier: 0, envoi_rate: 0, importee: 0 };
+    const lire = async () => {
+      const p = (await statsAdmin(1)).pilotage;
+      const de = (appli: AppKind) => p.jalonsParAppli.find((l) => l.appli === appli)?.jalons ?? zero;
+      return { jalons: p.jalons, applis: p.jalonsParAppli.map((l) => l.appli), whatsapp: de("whatsapp"), autre: de("autre"), hinge: de("hinge") };
+    };
+    const ecart = (apres: Record<JalonParAppli, number>, avant: Record<JalonParAppli, number>) => Object.fromEntries(JALONS_PAR_APPLI.map((j) => [j, apres[j] - avant[j]]));
+    const avant = await lire();
+    const ip = ipNeuve();
+    /* WhatsApp, un export trop court, puis des captures */
+    for (const j of ["appli", "fichier", "envoi_rate"]) await jalon(ip, { jalon: j, appli: "whatsapp" });
+    for (const j of ["appli", "fichier", "importee"]) await jalon(ip, { jalon: j, appli: "autre" });
+    /* La page rechargée : rien de plus */
+    await jalon(ip, { jalon: "appli", appli: "whatsapp" });
+    /* Quelqu’un d’autre ouvre l’export WhatsApp, sans choisir de fichier */
+    await jalon(ipNeuve(), { jalon: "appli", appli: "whatsapp" });
+    /* L’appli d’un jalon qui n’est pas de l’import ne compte pas */
+    await jalon(ipNeuve(), { jalon: "paywall", appli: "hinge" });
+    const apres = await lire();
+    expect(ecart(apres.whatsapp, avant.whatsapp)).toEqual({ appli: 2, fichier: 1, envoi_rate: 1, importee: 0 });
+    expect(ecart(apres.autre, avant.autre)).toEqual({ appli: 1, fichier: 1, envoi_rate: 0, importee: 1 });
+    expect(apres.hinge).toEqual(avant.hinge);
+    /* Le tunnel, lui, compte chaque personne une fois par jalon, quelle que soit l’appli */
+    expect(ecart(apres.jalons, avant.jalons)).toEqual({ appli: 2, fichier: 1, envoi_rate: 1, importee: 1 });
+    expect(apres.jalons.paywall - avant.jalons.paywall).toBe(1);
+    /* Les applis dans l’ordre de leur liste, seulement celles qui ont du monde */
+    expect(apres.applis).toEqual(CLES_DES_APPLIS.filter((a) => apres.applis.includes(a)));
+    expect(apres.applis).toEqual(expect.arrayContaining(["whatsapp", "autre"]));
+  });
+
   it("refuse un jalon inconnu, et ignore le mode tournage sans le dire", async () => {
     const avant = (await statsAdmin(1)).pilotage.jalons;
     expect((await jalon(ipNeuve(), { jalon: "inconnu" })).status).toBe(422);
     expect((await jalon(ipNeuve(), { jalon: "paye", en_plus: 1 })).status).toBe(422);
+    expect((await jalon(ipNeuve(), { jalon: "appli", appli: "snapchat" })).status).toBe(422);
     const tournage = await jalon(ipNeuve(), { jalon: "paye" }, { cookie: `${NOMS_DU_TOURNAGE[0]}=lien` });
     expect(await tournage.json()).toEqual({ ok: true });
     expect((await statsAdmin(1)).pilotage.jalons.paye - avant.paye).toBe(0);
@@ -220,7 +252,7 @@ describe("le pilotage (/admin)", () => {
 });
 
 describe("la purge garde peu", () => {
-  it("les signes et le fil deux jours, les visites et les jalons 90 jours, le sel jusqu’au surlendemain", async () => {
+  it("les signes et le fil deux jours, les visites et les jalons (appli par appli aussi) 90 jours, le sel jusqu’au surlendemain", async () => {
     const vieux = new Date(Date.now() - 3 * 86400e3);
     const onglet = randomUUID();
     await db().insert(schema.presences).values({ onglet, minute: vieux, vuLe: vieux, etape: "accueil", source: "direct" });
@@ -236,13 +268,20 @@ describe("la purge garde peu", () => {
         { jour: tresVieux.toISOString().slice(0, 10), empreinte, jalon: "paywall", le: tresVieux },
         { jour: aujourdhuiParis().iso, empreinte, jalon: "paywall" },
       ]);
+    await db()
+      .insert(schema.jalonsParAppli)
+      .values([
+        { jour: tresVieux.toISOString().slice(0, 10), empreinte, jalon: "fichier", appli: "instagram", le: tresVieux },
+        { jour: aujourdhuiParis().iso, empreinte, jalon: "fichier", appli: "instagram" },
+      ]);
     await db().insert(schema.selsDesVisites).values({ jour: "2001-01-01", sel: "x" }).onConflictDoNothing();
     await purger();
     expect(await db().select().from(schema.presences).where(eq(schema.presences.onglet, onglet))).toEqual([]);
     expect(await db().select().from(schema.filDirect).where(eq(schema.filDirect.id, fil!.id))).toEqual([]);
     expect(await db().select().from(schema.visites).where(eq(schema.visites.empreinte, empreinte))).toEqual([]);
-    /* Le jalon de plus de 90 jours part, celui du jour reste */
+    /* Le jalon de plus de 90 jours part, celui du jour reste ; appli par appli aussi */
     expect((await db().select().from(schema.jalons).where(eq(schema.jalons.empreinte, empreinte))).map((l) => l.jour)).toEqual([aujourdhuiParis().iso]);
+    expect((await db().select().from(schema.jalonsParAppli).where(eq(schema.jalonsParAppli.empreinte, empreinte))).map((l) => l.jour)).toEqual([aujourdhuiParis().iso]);
     expect(await db().select().from(schema.selsDesVisites).where(eq(schema.selsDesVisites.jour, "2001-01-01"))).toEqual([]);
     /* Le sel du jour reste */
     expect(

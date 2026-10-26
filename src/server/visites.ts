@@ -1,7 +1,7 @@
 import "server-only";
 import { createHash, randomBytes } from "node:crypto";
 import { and, eq, inArray, sql } from "drizzle-orm";
-import type { EtapeVisite, GenreFil, Jalon, OffreId, SourceVisite } from "@/types";
+import { JALONS_PAR_APPLI, type AppKind, type EtapeVisite, type GenreFil, type Jalon, type JalonParAppli, type OffreId, type SourceVisite } from "@/types";
 import { NOMS_DU_TOURNAGE } from "@/lib/noms-cookies";
 import { db, schema } from "./db";
 import { auMieux } from "./journal";
@@ -18,7 +18,8 @@ import { aujourdhuiParis } from "./temps";
  * - le fil du direct note une ville et un geste (une arrivée, un import, un paiement, un achat, un partage), jamais un
  *   compte ni une conv ;
  * - les jalons du tunnel (un fichier choisi, le paywall vu jusqu’aux avis, le formulaire de Whop affiché…) se comptent
- *   une fois par jour par la même empreinte que la visite : la même personne ne compte qu’une fois à chaque jalon.
+ *   une fois par jour par la même empreinte que la visite : la même personne ne compte qu’une fois à chaque jalon (et
+ *   ceux de l’import, une fois à chaque jalon de chaque appli).
  * Rien de tout ça ne fait échouer ce qu’il compte (auMieux).
  */
 
@@ -192,22 +193,26 @@ export async function noterSigne(req: Request, signe: Signe): Promise<void> {
   ]);
 }
 
+/* Un jalon de l’import, qui se compte aussi appli par appli */
+const estParAppli = (jalon: Jalon): jalon is JalonParAppli => (JALONS_PAR_APPLI as readonly Jalon[]).includes(jalon);
+
 /**
- * Note un jalon du tunnel (POST /api/jalon) : une fois par jour par l’empreinte de la connexion, comme la visite. Ni un
- * navigateur en mode tournage, ni au-delà du garde-fou des signes (les jalons comptent avec eux). Rien ne fait échouer.
+ * Note un jalon du tunnel (POST /api/jalon) : une fois par jour par l’empreinte de la connexion, comme la visite. Un
+ * jalon de l’import (JALONS_PAR_APPLI) avec son appli se note aussi sous elle, une fois par jour et par appli ; l’appli
+ * d’un autre jalon ne compte pas. Ni un navigateur en mode tournage, ni au-delà du garde-fou des signes (les jalons
+ * comptent avec eux). Rien ne fait échouer.
  */
-export async function noterJalon(req: Request, jalon: Jalon): Promise<void> {
+export async function noterJalon(req: Request, jalon: Jalon, appli?: AppKind): Promise<void> {
   if (!signeAdmis(req) || enModeTournage(req)) return;
   await auMieux(
     async () => {
       const jour = aujourdhuiParis().iso;
-      await db()
-        .insert(schema.jalons)
-        .values({ jour, empreinte: await empreinteDe(req, jour), jalon })
-        .onConflictDoNothing();
+      const empreinte = await empreinteDe(req, jour);
+      await db().insert(schema.jalons).values({ jour, empreinte, jalon }).onConflictDoNothing();
+      if (appli && estParAppli(jalon)) await db().insert(schema.jalonsParAppli).values({ jour, empreinte, jalon, appli }).onConflictDoNothing();
     },
     "jalon non noté",
-    { jalon },
+    { jalon, appli },
   );
 }
 

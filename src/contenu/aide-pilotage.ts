@@ -88,11 +88,11 @@ export const AIDES_DU_PILOTAGE = {
     de: "l’import, écran par écran",
     quoi: "Où les visiteurs lâchent entre l’arrivée et la lecture lancée\u00a0: le choix de l’appli, le tuto de l’export, le fichier, «\u00a0Qui es-tu\u00a0?\u00a0», l’email et son code.",
     calcul:
-      "Chaque étape compte les personnes qui l’ont passée sur la période, une fois par jour, par la même empreinte sans cookie que les visiteurs (src/lib/jalons.ts). «\u00a0Conv bien reçue\u00a0»\u00a0: l’envoi a marché. «\u00a0Envois ratés\u00a0»\u00a0: un fichier illisible, une conv trop courte ou de groupe, le réseau. Le pourcentage se fait sur l’étape d’avant.",
+      "Chaque étape compte les personnes qui l’ont passée sur la période, une fois par jour, par la même empreinte sans cookie que les visiteurs (src/lib/jalons.ts). «\u00a0Conv bien reçue\u00a0»\u00a0: l’envoi a marché. «\u00a0Envois ratés\u00a0»\u00a0: un fichier illisible, une conv trop courte ou de groupe, le réseau. Le pourcentage se fait sur l’étape d’avant. Sous «\u00a0Choisissent leur fichier\u00a0», le même passage appli par appli\u00a0: ceux qui ouvrent l’écran de cette appli (l’export WhatsApp ou Instagram, les captures ou la vidéo), puis ceux qui y choisissent un fichier. Qui passe d’une appli à l’autre compte sous chacune\u00a0: les lignes additionnées peuvent dépasser l’étape.",
     repere:
-      "La ligne orange est la plus grosse perte. Un compte déjà connecté passe de «\u00a0Qui es-tu\u00a0?\u00a0» à la lecture sans email ni code\u00a0: ces deux étapes peuvent compter moins que la suivante. Un taux se lit à partir de 30\u00a0personnes.",
+      "La ligne orange est la plus grosse perte. Un compte déjà connecté passe de «\u00a0Qui es-tu\u00a0?\u00a0» à la lecture sans email ni code\u00a0: ces deux étapes peuvent compter moins que la suivante. Un taux se lit à partir de 30\u00a0personnes\u00a0: en dessous, une appli montre «\u00a0—\u00a0».",
     siCaBouge:
-      "Beaucoup choisissent leur appli mais pas de fichier\u00a0: le tuto de l’export est trop dur, revois sa vidéo. Beaucoup demandent un code sans le valider\u00a0: le mail arrive mal (les spams, le délai).",
+      "Beaucoup choisissent leur appli mais pas de fichier\u00a0: le tuto de l’export est trop dur, revois sa vidéo, en commençant par l’appli qui passe le moins au fichier. Beaucoup demandent un code sans le valider\u00a0: le mail arrive mal (les spams, le délai).",
   },
   paywall: {
     titre: "Le paywall, jusqu’au paiement",

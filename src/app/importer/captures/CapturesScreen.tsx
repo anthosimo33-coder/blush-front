@@ -25,7 +25,7 @@ import { ReorderGrid } from "@/components/ui/ReorderGrid";
 import { ParcoursScreen } from "@/components/shell/ParcoursScreen";
 import { Lead, ScreenTitle } from "@/components/shell/Screen";
 import { setJourney, useJourney } from "@/state/journey";
-import { EXPORTS, type AppKind } from "@/types";
+import { EXPORTS, type AppKind, type JalonParAppli } from "@/types";
 import { ErreurApi } from "@/types/erreurs-api";
 import { messagePasAvecElle } from "../autre-conv";
 import { BarreLecture, CarteEnregistrement, CaseAjout, CommentFilmer, Dropzone, TEXTES_GRILLE, VignetteCapture, type Shot } from "./parts";
@@ -86,10 +86,15 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
   const monte = useMonte();
   /* L’accord de l’import : la ligne au-dessus du bouton le dit, « Continuer » le donne (refusé par le serveur, plus rien ne part) */
   const accord = useAccord();
-  /* Le tunnel d’/admin : une appli choisie (cet écran), puis les captures, l’envoi raté ou réussi (src/lib/jalons.ts) ; pas un morceau ajouté */
-  useJalon(addMode ? null : "appli");
-  const jalon = (j: Parameters<typeof marquerJalon>[0]) => !addMode && marquerJalon(j);
   const captureApp = app ?? journey.app ?? "instagram";
+  /*
+   * Le tunnel d’/admin : une appli choisie (cet écran), puis les captures, l’envoi raté ou réussi (src/lib/jalons.ts) ;
+   * pas un morceau ajouté. Sous l’appli de l’adresse ou du parcours, seulement quand on la connaît (pas l’Instagram par
+   * défaut de l’écran)
+   */
+  const appliDuTunnel = app ?? journey.app ?? undefined;
+  useJalon(addMode ? null : "appli", appliDuTunnel);
+  const jalon = (j: JalonParAppli) => !addMode && marquerJalon(j, appliDuTunnel);
   const enregistrement = captureApp === "imessage";
   const all = useRef<Shot[]>([]);
   useEffect(() => {

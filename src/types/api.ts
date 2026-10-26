@@ -8,6 +8,7 @@
 import { z } from "zod";
 import { INVITATIONS_PAR_LOT, NOM_TOURNAGE_MAX, PRENOM_MAX } from "@/lib/limites";
 import {
+  CLES_DES_APPLIS,
   DESINSCRIPTIONS,
   ETAPES_VISITE,
   EVENEMENTS_ECOUTE,
@@ -594,8 +595,11 @@ export const ROUTES = {
       referent: z.string().max(200).optional(),
     }),
   },
-  /** Un jalon du tunnel (src/lib/jalons.ts) : ce que le visiteur vient de faire (un fichier choisi, le paywall vu jusqu’aux avis…), rien d’autre */
-  "POST /api/jalon": { corps: z.strictObject({ jalon: z.enum(JALONS) }) },
+  /**
+   * Un jalon du tunnel (src/lib/jalons.ts) : ce que le visiteur vient de faire (un fichier choisi, le paywall vu jusqu’aux
+   * avis…), et pour ceux de l’import (JALONS_PAR_APPLI), l’appli de l’écran ; rien d’autre
+   */
+  "POST /api/jalon": { corps: z.strictObject({ jalon: z.enum(JALONS), appli: z.enum(CLES_DES_APPLIS).optional() }) },
   "GET /api/tournage/repere": {},
   /** Une erreur du navigateur (src/lib/sentinelle.tsx) : son nom, son message, d’où elle vient, et l’écran. Bornés : le serveur masque le reste. */
   "POST /api/navigateur/erreur": {

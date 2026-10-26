@@ -25,7 +25,7 @@ import { PRESENCES_GARDEES_JOURS, VISITES_GARDEES_JOURS } from "./visites";
  * - les événements des mails que Resend nous rend (evenements_mails) de plus de 30 jours (EVENEMENTS_MAILS_GARDES_JOURS,
  *   src/server/delivrabilite.ts) : /admin n’en lit que les 7 derniers jours ;
  * - pour /admin (src/server/visites.ts) : les signes des onglets et le fil du direct de plus de deux jours
- *   (PRESENCES_GARDEES_JOURS), les visites et les jalons du tunnel de plus de 90 jours (VISITES_GARDEES_JOURS), et le sel
+ *   (PRESENCES_GARDEES_JOURS), les visites et les jalons du tunnel (appli par appli aussi) de plus de 90 jours (VISITES_GARDEES_JOURS), et le sel
  *   des empreintes dès le surlendemain : plus rien ne relie alors une empreinte à une connexion ;
  * - les erreurs et les mesures de vitesse des navigateurs de plus de 30 jours (NAVIGATEUR_GARDE_JOURS, src/server/navigateur.ts) ;
  * - les accès de Claude à /admin (src/server/mcp/acces.ts) : les codes expirés, les accès dont le rafraîchissement a
@@ -117,6 +117,9 @@ export async function purger(maintenant = new Date()) {
     await db()
       .delete(schema.jalons)
       .where(lt(schema.jalons.le, il_y_a(VISITES_GARDEES_JOURS)));
+    await db()
+      .delete(schema.jalonsParAppli)
+      .where(lt(schema.jalonsParAppli.le, il_y_a(VISITES_GARDEES_JOURS)));
   });
   await etape("registre des effacements", async () => {
     await db()
