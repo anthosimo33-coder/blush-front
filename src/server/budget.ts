@@ -183,15 +183,23 @@ async function prevenir(seuil: number, jour: number): Promise<void> {
 }
 
 /**
+ * Ce que coûteront des appels déjà partis, dont le coût n’est pas encore noté (les lots en vol : src/server/memoire-en-lot.ts),
+ * en millionièmes de dollar : pour tous, et pour ce payeur.
+ */
+export type Reserve = Depenses;
+
+/**
  * Avant un appel au modèle : le budget du jour le permet-il, pour tous et pour qui le paie (le compte de la conv
  * `storyId`, sinon le compte `compte`, sinon la part sans compte) ? Sinon l’erreur d’étape « budget », sans rien
- * appeler. Prévient l’équipe des seuils passés, sans attendre. Rend le payeur, pour noterDepense.
+ * appeler. `reserve` : ce que coûteront les appels déjà partis, comptés avec ce qui est dépensé (sans prévenir l’équipe
+ * pour eux : les seuils suivent la dépense notée). Prévient l’équipe des seuils passés, sans attendre. Rend le payeur,
+ * pour noterDepense.
  */
-export async function controlerBudget({ storyId, compte }: { storyId?: string; compte?: { email: string } | null } = {}): Promise<Payeur> {
+export async function controlerBudget({ storyId, compte, reserve }: { storyId?: string; compte?: { email: string } | null; reserve?: Reserve } = {}): Promise<Payeur> {
   const payeur = (await payeurDe(storyId)) ?? (compte ? payeurDuCompte(compte) : null);
   const d = await depenses(payeur);
   for (const seuil of seuilsAtteints(d.jour)) void auMieux(prevenir(seuil, d.jour), "alerte du budget de l’IA", { seuil });
-  const epuise = budgetEpuise(d, payeur);
+  const epuise = budgetEpuise(reserve ? { jour: d.jour + reserve.jour, payeur: d.payeur + reserve.payeur } : d, payeur);
   if (epuise) {
     journal("budget de l’IA atteint", { budget: epuise }, "alerte");
     throw new ErreurTache("budget");

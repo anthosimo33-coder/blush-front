@@ -122,23 +122,25 @@ export async function finir(id: string): Promise<void> {
 
 /**
  * Un échec : la tâche repart en attente, sauf au dernier essai, ou si réessayer ne changerait rien (`definitif` :
- * le modèle a refusé). `code` ne contient jamais de contenu.
+ * le modèle a refusé). `code` ne contient jamais de contenu. La mémoire gardée pour un lot (une réponse de lot que la
+ * base a empêché d’appliquer, reprise en direct) s’efface : rien ne la relira, le direct part de la mémoire du moment.
  */
 export async function echouer(t: Tache, code: string, definitif = false): Promise<void> {
   await db()
     .update(schema.tasks)
-    .set({ status: definitif || t.attempts >= ESSAIS_MAX ? "echec" : "attente", error: code.slice(0, 120), updatedAt: new Date() })
+    .set({ status: definitif || t.attempts >= ESSAIS_MAX ? "echec" : "attente", error: code.slice(0, 120), lotAvant: null, updatedAt: new Date() })
     .where(eq(schema.tasks.id, t.id));
 }
 
 /**
  * Les tâches coupées à leur dernier essai (l’instance arrêtée en pleine étape : `echouer` n’a jamais tourné) passent
- * en échec. Sans ça, elles resteraient « en cours » pour toujours : plus rien ne les reprend, et rien ne le dit.
+ * en échec. Sans ça, elles resteraient « en cours » pour toujours : plus rien ne les reprend, et rien ne le dit. La
+ * mémoire gardée pour un lot s’efface avec (echouer).
  */
 export async function clore(storyId: string): Promise<Tache[]> {
   return db()
     .update(schema.tasks)
-    .set({ status: "echec", error: "coupee", updatedAt: new Date() })
+    .set({ status: "echec", error: "coupee", lotAvant: null, updatedAt: new Date() })
     .where(
       and(
         eq(schema.tasks.storyId, storyId),

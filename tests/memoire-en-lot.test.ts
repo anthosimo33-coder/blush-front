@@ -1,20 +1,23 @@
+import Anthropic from "@anthropic-ai/sdk";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Requete } from "@prompts/lib/contextes";
 import { noterAlerteDuChat } from "@prompts/lib/memoire";
 import { ficheEtMaj } from "@/server/ajouts";
-import { payeurDuCompte, noterDepense, oublierLeBudget } from "@/server/budget";
+import { cleDeDepense, payeurDuCompte, noterDepense, oublierLeBudget } from "@/server/budget";
 import * as coffre from "@/server/coffre";
 import { db, schema } from "@/server/db";
 import { donneesMemoire, modifierMemoire } from "@/server/depot";
 import { fusionnerFaits } from "@/server/fiche";
 import { definirFournisseurDeLots, type FournisseurDeLots } from "@/server/ia/claude";
 import { fournisseurFactice, refusFactice } from "@/server/ia/factice";
+import { compteDe } from "@/server/limites";
 import { LOT_AU_PLUS_S, traiterLesLots } from "@/server/memoire-en-lot";
 import { CALME_S, ECHANGES_PAR_MAJ, retenir } from "@/server/memoire-groupee";
 import { executerChaine, reprendreLesChainesEnPlan } from "@/server/pipeline";
 import { statsAdmin } from "@/server/stats";
 import { aRelancer, prendre } from "@/server/taches";
+import { aujourdhuiParis } from "@/server/temps";
 import { echange, maj } from "./aide/fabriques";
 import { compteDeTest, facticePourChaqueTest, histoireLue, ligneEnBase } from "./aide/fixtures";
 import { fauxLots, reponseDuLot } from "./aide/lots";
@@ -154,7 +157,7 @@ describe("la mise à jour de la mémoire en lot : l’envoi et la réponse", () 
     await executerChaine(id);
     const directes = requetes.filter((r) => r.tache === "07-memoire");
     expect(directes).toHaveLength(1);
-    const { demande } = faux.lots.get(lot)!.requetes[0]!;
+    const demande = faux.lots.get(lot)!.requetes[0]!.demande!;
     /* Comparées par égalité (un booléen) : un échec n’affiche pas la demande dans les journaux de la CI, qui sont publics */
     expect(JSON.stringify(directes[0]) === JSON.stringify({ ...demande.requete, partie: demande.partie })).toBe(true);
     expect(demande.partie).toBe("mise à jour");
@@ -186,14 +189,73 @@ describe("la mise à jour de la mémoire en lot : l’envoi et la réponse", () 
     expect(postes).not.toContain("Mémoire");
   });
 
-  it("le chat qui reprend après le calme, avant le passage des 5 minutes : l’échange la rejoint, et elle attend le calme suivant au lieu de partir en direct", async () => {
+  it("le chat qui reprend après le calme, avant le passage des 5 minutes : l’échange la rejoint, elle garde son heure passée, et le passage l’envoie en lot avec lui, au lieu du direct", async () => {
     const { id } = await convLue();
     const tid = await calmee(id);
     const r = await auChat(id, 3, { neuf: false });
     expect(r).toEqual({ id: tid, part: false });
-    expect((await tache(tid)).dans).toBeGreaterThan(CALME_S - 60);
-    /* Éteinte, la mémoire en lot la faisait partir tout de suite (memoire-groupee.test.ts) */
+    /* Ni reculée de CALME_S (la séance d’avant glisserait hors du fil), ni partie en direct (ce que fait la mémoire en lot éteinte : memoire-groupee.test.ts) */
+    expect((await tache(tid)).dans).toBeLessThan(0);
     expect(majsLues()).toEqual([]);
+    await traiterLesLots();
+    expect(await tache(tid)).toMatchObject({ status: "lot", dits: ["échange numéro 1", "échange numéro 2", "échange numéro 3"] });
+  });
+
+  it("les lots en vol comptent d’avance dans le budget du jour de leur compte : le suivant attend", async () => {
+    const u = await compteDeTest(`lot-${++n}`, "debloque");
+    const [a, b] = [await histoireLue(u, "02-reciproque.txt"), await histoireLue(u, "02-reciproque.txt")];
+    /* 5 centimes sous le budget du compte : un lot part, le suivant compterait 10 centimes de plus */
+    await noterDepense(payeurDuCompte(u), 9_950_000);
+    try {
+      const [ta, tb] = [await calmee(a.id), await calmee(b.id)];
+      await traiterLesLots();
+      expect((await tache(ta)).status).toBe("lot");
+      expect((await tache(tb)).status).toBe("attente");
+      expect(faux.appels.filter((x) => x === "envoyer")).toHaveLength(1);
+    } finally {
+      oublierLeBudget();
+    }
+  });
+
+  it("une erreur passagère à l’envoi (la connexion coupée, le prestataire surchargé) : elle attend le passage suivant, une fois ; la seconde, elle part en direct", async () => {
+    const { id } = await convLue();
+    definirFournisseurDeLots({
+      ...faux.f,
+      envoyer: async () => {
+        throw new Anthropic.APIConnectionError({ message: "coupé" });
+      },
+    });
+    const tid = await calmee(id);
+    await traiterLesLots();
+    expect(await tache(tid)).toMatchObject({ status: "attente", error: "lot:reporte" });
+    expect((await tache(tid)).dans).toBeLessThan(0);
+    expect(relais).not.toContain(id);
+    await traiterLesLots();
+    expect(await tache(tid)).toMatchObject({ status: "attente", dans: null, error: "lot:envoi" });
+    expect(relais).toContain(id);
+  });
+
+  it("prise ailleurs pendant l’envoi (le direct fini entre-temps) : elle ne repasse pas en lot, et le lot est annulé, sans tâche, pour être effacé", async () => {
+    const { id } = await convLue();
+    const tid = await calmee(id);
+    definirFournisseurDeLots({
+      ...faux.f,
+      envoyer: async (r) => {
+        const lot = await faux.f.envoyer(r);
+        await db().update(t).set({ status: "fini", input: null }).where(eq(t.id, tid));
+        return lot;
+      },
+    });
+    await traiterLesLots();
+    const { id: lot } = faux.dernier();
+    expect(await tache(tid)).toMatchObject({ status: "fini", gardee: false });
+    expect(faux.lots.get(lot)!.annule).toBe(true);
+    expect(await lignesDuLot(lot)).toMatchObject([{ tacheId: null }]);
+    definirFournisseurDeLots(faux.f);
+    faux.finir(lot);
+    await traiterLesLots();
+    expect(faux.lots.get(lot)!.efface).toBe(true);
+    expect((await tache(tid)).status).toBe("fini");
   });
 
   it.each([
@@ -278,9 +340,11 @@ describe("la mise à jour de la mémoire en lot : l’envoi et la réponse", () 
     }
   });
 
-  it("la conv effacée pendant son lot : il est annulé, puis effacé chez le prestataire quand il a fini", async () => {
-    const { id } = await convLue();
-    const { lot } = await envoyee(id);
+  it("la conv effacée pendant son lot : il est annulé, puis effacé chez le prestataire quand il a fini ; sa réponse facturée reste au compte de la conv", async () => {
+    const { id, u } = await convLue();
+    const { tache: tid, lot } = await envoyee(id);
+    const cle = cleDeDepense(payeurDuCompte(u), aujourdhuiParis().iso);
+    const avant = await compteDe(cle, { fenetreS: 2 * 86400 });
     await db().delete(schema.stories).where(eq(schema.stories.id, id));
     expect(await lignesDuLot(lot)).toMatchObject([{ tacheId: null, storyId: null }]);
     /* Le temps que l’envoi pose sa tâche passé */
@@ -290,10 +354,115 @@ describe("la mise à jour de la mémoire en lot : l’envoi et la réponse", () 
       .where(eq(schema.lots.id, lot));
     await traiterLesLots();
     expect(faux.lots.get(lot)!.annule).toBe(true);
-    faux.finir(lot);
+    /* Déjà en cours au moment de l’annulation : sa réponse est facturée */
+    faux.finir(lot, { [tid]: { type: "succeeded", message: reponseDuLot(maj()) } });
     await traiterLesLots();
     expect(faux.lots.get(lot)!.efface).toBe(true);
     expect(await lignesDuLot(lot)).toEqual([]);
+    expect((await compteDe(cle, { fenetreS: 2 * 86400 })) - avant).toBe(72_500);
+  });
+});
+
+describe("rien ne reste en lot, rien n’est compté deux fois, rien ne reste chez le prestataire", () => {
+  it("une tâche en lot qui a perdu sa ligne de `lots` part en direct au passage d’après ; son lot, fini, est retrouvé par le ménage : son coût noté une fois, il est effacé", async () => {
+    const { id } = await convLue();
+    const { tache: tid, lot } = await envoyee(id);
+    await db().delete(schema.lots).where(eq(schema.lots.id, lot));
+    await traiterLesLots();
+    /* Pas tout de suite : l’envoi garde le lot avant d’y mettre sa tâche */
+    expect((await tache(tid)).status).toBe("lot");
+    await db()
+      .update(t)
+      .set({ updatedAt: sql`now() - interval '3 minutes'` })
+      .where(eq(t.id, tid));
+    await traiterLesLots();
+    expect(await tache(tid)).toMatchObject({ status: "attente", dans: null, error: "lot:sans_lot", gardee: false });
+    expect(relais).toContain(id);
+    await executerChaine(id);
+    expect((await tache(tid)).status).toBe("fini");
+    /* Le lot, lui, a fini chez le prestataire sans que la base le connaisse */
+    faux.finir(lot);
+    faux.lots.get(lot)!.creeLe = new Date(Date.now() - 3 * 60_000);
+    await traiterLesLots();
+    expect(faux.lots.get(lot)!.efface).toBe(true);
+    expect(await lignesDuLot(lot)).toEqual([]);
+    expect(await coutsDuLot(id)).toHaveLength(1);
+    await traiterLesLots();
+    expect(await coutsDuLot(id)).toHaveLength(1);
+  });
+
+  it("un lot parti sans que sa réponse arrive (la connexion coupée pendant l’envoi) : la mise à jour part en direct ; fini, le ménage le retrouve et l’efface ; celui d’un autre outil n’est jamais touché", async () => {
+    const { id } = await convLue();
+    const autre = faux.etranger(new Date(Date.now() - 10 * 60_000));
+    faux.pannes.envoyerApres = 1;
+    const tid = await calmee(id);
+    await traiterLesLots();
+    expect(await tache(tid)).toMatchObject({ status: "attente", dans: null, error: "lot:envoi" });
+    const { id: perdu } = faux.dernier();
+    expect(await lignesDuLot(perdu)).toEqual([]);
+    await executerChaine(id);
+    faux.finir(perdu);
+    faux.lots.get(perdu)!.creeLe = new Date(Date.now() - 3 * 60_000);
+    await traiterLesLots();
+    expect(faux.lots.get(perdu)!.efface).toBe(true);
+    expect(await coutsDuLot(id)).toHaveLength(1);
+    expect(faux.lots.get(autre)).toMatchObject({ efface: false, annule: false });
+    /* Regardé une fois, il n’est plus relu */
+    const lus = faux.appels.filter((x) => x === "resultats").length;
+    await traiterLesLots();
+    expect(faux.appels.filter((x) => x === "resultats")).toHaveLength(lus);
+  });
+
+  it("l’effacement raté chez le prestataire : un passage d’après l’efface, sans relire ses réponses ni noter leur coût une seconde fois", async () => {
+    const { id } = await convLue();
+    const { tache: tid, lot } = await envoyee(id);
+    faux.finir(lot);
+    faux.pannes.effacer = 1;
+    await traiterLesLots();
+    expect((await tache(tid)).status).toBe("fini");
+    expect(faux.lots.get(lot)!.efface).toBe(false);
+    expect(await lignesDuLot(lot)).toHaveLength(1);
+    await db()
+      .update(schema.lots)
+      .set({ luLe: sql`now() - interval '11 minutes'` })
+      .where(eq(schema.lots.id, lot));
+    await traiterLesLots();
+    expect(faux.lots.get(lot)!.efface).toBe(true);
+    expect(await lignesDuLot(lot)).toEqual([]);
+    expect(await coutsDuLot(id)).toHaveLength(1);
+    expect(faux.appels.filter((x) => x === "resultats")).toHaveLength(1);
+  });
+
+  it("un lot fini sans réponse pour sa tâche : elle part en direct", async () => {
+    const { id } = await convLue();
+    const { tache: tid, lot } = await envoyee(id);
+    faux.lots.get(lot)!.vide = true;
+    faux.finir(lot);
+    await traiterLesLots();
+    expect(await tache(tid)).toMatchObject({ status: "attente", dans: null, error: "lot:sans_reponse" });
+    expect(faux.lots.get(lot)!.efface).toBe(true);
+    expect(relais).toContain(id);
+  });
+
+  it("le prestataire qui ne répond plus pour ce lot : passé l’heure, elle part en direct quand même, et l’annulation se retente au passage d’après", async () => {
+    const { id } = await convLue();
+    const { tache: tid, lot } = await envoyee(id);
+    faux.pannes.etat = 1;
+    await traiterLesLots();
+    /* Une panne d’un passage, avant l’heure : rien ne bouge */
+    expect((await tache(tid)).status).toBe("lot");
+    await db()
+      .update(schema.lots)
+      .set({ envoyeLe: sql`now() - make_interval(secs => ${LOT_AU_PLUS_S + 60})` })
+      .where(eq(schema.lots.id, lot));
+    faux.pannes.etat = 1;
+    faux.pannes.annuler = 1;
+    await traiterLesLots();
+    expect(await tache(tid)).toMatchObject({ status: "attente", dans: null, error: "lot:illisible" });
+    expect(faux.lots.get(lot)!.annule).toBe(false);
+    await traiterLesLots();
+    expect(faux.lots.get(lot)!.annule).toBe(true);
+    expect((await lignesDuLot(lot))[0]!.annuleLe).not.toBeNull();
   });
 });
 
@@ -343,6 +512,42 @@ describe("pendant le lot : ce qui attend, ce qui le rapatrie", () => {
     await traiterLesLots();
     expect(faux.lots.get(lot)!.efface).toBe(true);
     expect(await coutsDuLot(id)).toEqual([]);
+  });
+
+  it(`sa réponse revenue sans être relevée, au ${ECHANGES_PAR_MAJ}e échange depuis le lot : elle s’applique, et la mise à jour d’après reprend son calme au lieu de partir en direct pour trois échanges`, async () => {
+    const { id } = await convLue();
+    const { tache: tid, lot } = await envoyee(id);
+    faux.finir(lot);
+    await auChat(id, 3);
+    await auChat(id, 4, { neuf: false });
+    const r = await auChat(id, ECHANGES_PAR_MAJ, { neuf: false });
+    expect(r.part).toBe(false);
+    expect(faux.appels).not.toContain("annuler");
+    expect((await tache(tid)).status).toBe("fini");
+    expect(await faits(id)).toContain("Adore les soirées improvisées");
+    expect(await tache(r.id!)).toMatchObject({ status: "attente", dits: ["échange numéro 3", "échange numéro 4", `échange numéro ${ECHANGES_PAR_MAJ}`] });
+    expect((await tache(r.id!)).dans).toBeGreaterThan(CALME_S - 60);
+    expect(majsLues()).toEqual([]);
+  });
+
+  it("pendant qu’un passage lit sa réponse, partir tout de suite ne demande rien au prestataire ; ce passage relance ensuite la chaîne de la conv", async () => {
+    const { id } = await convLue();
+    const { tache: tid, lot } = await envoyee(id);
+    await db().update(schema.lots).set({ luLe: new Date() }).where(eq(schema.lots.id, lot));
+    const avant = faux.appels.length;
+    const r = await auChat(id, 3, { maintenant: true });
+    expect(r.part).toBe(true);
+    expect((await ficheEtMaj(await ligneEnBase(id))).updating).toBe(true);
+    expect(faux.appels).toHaveLength(avant);
+    expect((await tache(tid)).status).toBe("lot");
+    /* Ce passage-là, fini (sa lecture rendue), et le lot avec */
+    await db().update(schema.lots).set({ luLe: null }).where(eq(schema.lots.id, lot));
+    faux.finir(lot);
+    await traiterLesLots();
+    expect((await tache(tid)).status).toBe("fini");
+    expect(relais).toContain(id);
+    await executerChaine(id);
+    expect((await tache(r.id!)).status).toBe("fini");
   });
 
   it("sa réponse déjà revenue quand il faut partir : elle s’applique d’abord, rien n’est annulé, les nouveaux partent seuls", async () => {

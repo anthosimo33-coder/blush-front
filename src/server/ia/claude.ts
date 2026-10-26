@@ -6,7 +6,7 @@ import type { z } from "zod";
 import { REGLAGES, systeme, type Requete, type Tache } from "@prompts/lib/contextes";
 import { env, iaFactice } from "../env";
 import { alerter } from "../alertes";
-import { controlerBudget, payeurDe, type Payeur } from "../budget";
+import { controlerBudget, type Payeur, type Reserve } from "../budget";
 import { delaiAppel, tempsRestant } from "../echeance";
 import { ErreurTache } from "../erreurs";
 import { journal, journalErreur } from "../journal";
@@ -463,7 +463,8 @@ async function noterUsage(u: Usage, micros: number, { storyId, payeur, tache, ms
  * bêta) : l’API des lots le refuse. Un refus en lot n’est donc pas repris par un autre modèle : la mise à jour repart en
  * direct, avec lui (le repli ne change que le modèle qui répond à un refus, jamais la requête). Une requête par lot : une
  * mise à jour qu’il faut faire tout de suite annule le sien sans toucher aux autres. Son identifiant (custom_id) est celui
- * de sa tâche.
+ * de sa tâche, précédé de PREFIXE_DES_LOTS : le ménage (src/server/memoire-en-lot.ts) reconnaît ainsi les lots à nous
+ * parmi ceux de l’espace de travail de la clé (les évals des prompts en envoient aussi), sans rien lire de la base.
  */
 
 /** Où en est un lot chez le prestataire : il tourne (ou s’annule), il est fini (ses résultats se lisent), ou il n’existe plus. */
@@ -472,24 +473,54 @@ export type EtatDuLot = "en_cours" | "fini" | "introuvable";
 /** Ce qu’est devenue une requête d’un lot : sa réponse, une erreur (son type, jamais son message), annulée, ou expirée (24 h). */
 export type IssueDuLot = { type: "succeeded"; message: MessageRecu } | { type: "errored"; code: string } | { type: "canceled" } | { type: "expired" };
 
+/** Un lot de l’espace de travail, tel que la liste du prestataire le montre : fini ou non, son nombre de requêtes, sa création. */
+export type LotRecent = { id: string; fini: boolean; requetes: number; creeLe: Date };
+
+/**
+ * Le délai d’un appel à l’API des lots : `court` sur le chemin d’une requête (sa fiche ouverte, le chat : la personne
+ * attend), sinon celui du passage des 5 minutes.
+ */
+export type Presse = { court?: boolean };
+
 /**
  * Ce qui envoie un lot au prestataire et le suit : le SDK (lotsSDK), le modèle factice (ses réponses tout de suite, sans
  * rien envoyer), ou un faux dans les tests (definirFournisseurDeLots). `envoyer` rend l’identifiant du lot ; `resultats`,
- * l’issue de chaque requête (son `id`, le custom_id), une fois le lot fini ; `effacer` le retire de chez le prestataire,
- * ses réponses avec.
+ * l’issue de chaque requête une fois le lot fini, avec l’identifiant de sa tâche (null : une requête qui n’est pas à
+ * nous) ; `effacer` le retire de chez le prestataire, ses réponses avec ; `recents`, les lots de l’espace de travail créés
+ * depuis `depuis`, les plus récents d’abord (le ménage).
  */
 export type FournisseurDeLots = {
   envoyer: (requetes: { id: string; demande: Demande }[]) => Promise<string>;
-  etat: (lot: string) => Promise<EtatDuLot>;
-  resultats: (lot: string) => Promise<{ id: string; issue: IssueDuLot }[]>;
-  annuler: (lot: string) => Promise<void>;
-  effacer: (lot: string) => Promise<void>;
+  etat: (lot: string, o?: Presse) => Promise<EtatDuLot>;
+  resultats: (lot: string, o?: Presse) => Promise<{ id: string | null; issue: IssueDuLot }[]>;
+  annuler: (lot: string, o?: Presse) => Promise<void>;
+  effacer: (lot: string, o?: Presse) => Promise<void>;
+  recents: (depuis: Date) => Promise<LotRecent[]>;
   /** Un prestataire qui ne coûte rien (le modèle factice) : ses réponses ne sont pas notées au suivi des coûts. */
   gratuit?: boolean;
 };
 
-/** Le délai et les nouvelles tentatives de chaque appel à l’API des lots : des requêtes courtes, au passage des 5 minutes. */
-const OPTIONS_LOTS = { timeout: 30_000, maxRetries: 2 };
+/** Ce qui précède l’identifiant de la tâche dans celui de sa requête (custom_id, 64 caractères au plus : 46 avec un uuid). */
+const PREFIXE_DES_LOTS = "blush-maj-";
+
+/** Au passage des 5 minutes : 20 s par appel à l’API des lots, et un nouvel essai. */
+const OPTIONS_LOTS = { timeout: 20_000, maxRetries: 1 };
+/**
+ * L’envoi d’un lot : un seul essai (un nouvel essai après une réponse perdue enverrait un second lot, payé lui aussi), et
+ * 20 s au plus : la tâche prise pour l’envoyer ne passe pas pour abandonnée entre-temps (PERIME_S, 90 s).
+ */
+const OPTIONS_ENVOI = { timeout: 20_000, maxRetries: 0 };
+/** Sur le chemin d’une requête : 5 s, sans nouvel essai ; sans réponse, la mise à jour part en direct. */
+const OPTIONS_COURTES = { timeout: 5_000, maxRetries: 0 };
+const optionsDesLots = ({ court = false }: Presse = {}) => (court ? OPTIONS_COURTES : OPTIONS_LOTS);
+
+/**
+ * Une erreur de l’envoi qui peut passer (trop de requêtes, le prestataire surchargé ou en panne, la connexion coupée ou
+ * trop lente) : la mise à jour retente au passage suivant au lieu de partir en direct, à plein tarif. Une connexion coupée
+ * a pu laisser le lot partir sans que sa réponse arrive : le ménage le reconnaîtra (son identifiant), puis l’effacera.
+ */
+export const erreurPassagere = (e: unknown): boolean =>
+  e instanceof Anthropic.RateLimitError || e instanceof Anthropic.InternalServerError || e instanceof Anthropic.APIConnectionError;
 
 /** L’issue d’une requête d’un lot, telle que le SDK la rend. */
 function issueDe(r: Anthropic.Messages.MessageBatchResult): IssueDuLot {
@@ -505,39 +536,54 @@ function issueDe(r: Anthropic.Messages.MessageBatchResult): IssueDuLot {
 export function lotsSDK(client: () => Anthropic): FournisseurDeLots {
   return {
     async envoyer(requetes) {
-      const lot = await client().messages.batches.create({ requests: requetes.map(({ id, demande }) => ({ custom_id: id, params: demande.params })) }, OPTIONS_LOTS);
+      const lot = await client().messages.batches.create(
+        { requests: requetes.map(({ id, demande }) => ({ custom_id: `${PREFIXE_DES_LOTS}${id}`, params: demande.params })) },
+        OPTIONS_ENVOI,
+      );
       return lot.id;
     },
-    async etat(lot) {
+    async etat(lot, o) {
       try {
-        return (await client().messages.batches.retrieve(lot, {}, OPTIONS_LOTS)).processing_status === "ended" ? "fini" : "en_cours";
+        return (await client().messages.batches.retrieve(lot, {}, optionsDesLots(o))).processing_status === "ended" ? "fini" : "en_cours";
       } catch (e) {
         if (e instanceof Anthropic.NotFoundError) return "introuvable";
         throw e;
       }
     },
-    async resultats(lot) {
-      const lus: { id: string; issue: IssueDuLot }[] = [];
-      for await (const r of await client().messages.batches.results(lot, {}, OPTIONS_LOTS)) lus.push({ id: r.custom_id, issue: issueDe(r.result) });
+    async resultats(lot, o) {
+      const lus: { id: string | null; issue: IssueDuLot }[] = [];
+      for await (const r of await client().messages.batches.results(lot, {}, optionsDesLots(o)))
+        lus.push({ id: r.custom_id.startsWith(PREFIXE_DES_LOTS) ? r.custom_id.slice(PREFIXE_DES_LOTS.length) : null, issue: issueDe(r.result) });
       return lus;
     },
-    async annuler(lot) {
-      await client().messages.batches.cancel(lot, {}, OPTIONS_LOTS);
+    async annuler(lot, o) {
+      await client().messages.batches.cancel(lot, {}, optionsDesLots(o));
     },
-    async effacer(lot) {
+    async effacer(lot, o) {
       try {
-        await client().messages.batches.delete(lot, {}, OPTIONS_LOTS);
+        await client().messages.batches.delete(lot, {}, optionsDesLots(o));
       } catch (e) {
         /* Déjà effacé (un passage coupé après l’effacement) : il n’y est plus, c’est ce qu’on voulait */
         if (!(e instanceof Anthropic.NotFoundError)) throw e;
       }
+    },
+    async recents(depuis) {
+      const lus: LotRecent[] = [];
+      /* Les plus récents d’abord, page après page : on s’arrête au premier créé avant `depuis` */
+      for await (const b of client().messages.batches.list({ limit: 100 }, OPTIONS_LOTS)) {
+        const creeLe = new Date(b.created_at);
+        if (creeLe < depuis) break;
+        const n = b.request_counts;
+        lus.push({ id: b.id, fini: b.processing_status === "ended", requetes: n.processing + n.succeeded + n.errored + n.canceled + n.expired, creeLe });
+      }
+      return lus;
     },
   };
 }
 
 /**
  * Les lots du modèle factice (le dev et les tests, sans prestataire) : chaque requête a sa réponse factice dès l’envoi,
- * gardée par l’instance, et le lot est fini tout de suite.
+ * gardée par l’instance, et le lot est fini tout de suite. Rien à faire au ménage : aucun ne part ailleurs.
  */
 function lotsFactices(prestataire: Fournisseur): FournisseurDeLots {
   const lots = new Map<string, { id: string; issue: IssueDuLot }[]>();
@@ -558,6 +604,7 @@ function lotsFactices(prestataire: Fournisseur): FournisseurDeLots {
     resultats: async (lot) => lots.get(lot) ?? [],
     annuler: async () => {},
     effacer: async (lot) => void lots.delete(lot),
+    recents: async () => [],
   };
 }
 
@@ -577,38 +624,44 @@ const lots = () => lotsDuTest ?? (iaFactice() ? LOTS_FACTICES : LOTS_SDK);
 
 /**
  * Envoie une requête en lot (son identifiant : `id`, celui de sa tâche) et rend l’identifiant du lot. Le budget du jour
- * est contrôlé avant, comme pour un appel direct (ErreurTache « budget ») ; son coût sera noté à la lecture de sa
- * réponse (lireLeResultat).
+ * est contrôlé avant, comme pour un appel direct (ErreurTache « budget »), avec ce que coûteront les lots déjà partis
+ * (`reserve`) : leur coût n’est noté qu’à la lecture de leur réponse (lireLeResultat).
  */
-export async function envoyerEnLot<S extends z.ZodType>(id: string, req: Requete, schema: S, { storyId, partie }: Pick<OptionsAppel, "storyId" | "partie">): Promise<string> {
-  await controlerBudget({ storyId });
+export async function envoyerEnLot<S extends z.ZodType>(
+  id: string,
+  req: Requete,
+  schema: S,
+  { storyId, partie, reserve }: Pick<OptionsAppel, "storyId" | "partie"> & { reserve?: Reserve },
+): Promise<string> {
+  await controlerBudget({ storyId, ...(reserve ? { reserve } : {}) });
   return lots().envoyer([{ id, demande: { requete: req, partie: partie ?? null, params: parametres(req, schema) } }]);
 }
 
 /** Où en est ce lot chez le prestataire. */
-export const etatDuLot = (lot: string): Promise<EtatDuLot> => lots().etat(lot);
+export const etatDuLot = (lot: string, o?: Presse): Promise<EtatDuLot> => lots().etat(lot, o);
 /** L’issue de chaque requête d’un lot fini. */
-export const resultatsDuLot = (lot: string) => lots().resultats(lot);
+export const resultatsDuLot = (lot: string, o?: Presse) => lots().resultats(lot, o);
 /** Annule un lot qui tourne : ce qui n’a pas commencé ne sera ni fait ni facturé ; ce qui est en cours peut encore finir. */
-export const annulerLeLot = (lot: string): Promise<void> => lots().annuler(lot);
+export const annulerLeLot = (lot: string, o?: Presse): Promise<void> => lots().annuler(lot, o);
 /** Efface un lot fini de chez le prestataire, ses réponses avec : elles n’y restent pas 29 jours. */
-export const effacerLeLot = (lot: string): Promise<void> => lots().effacer(lot);
+export const effacerLeLot = (lot: string, o?: Presse): Promise<void> => lots().effacer(lot, o);
+/** Les lots de l’espace de travail créés depuis `depuis`, les plus récents d’abord. */
+export const lotsRecents = (depuis: Date): Promise<LotRecent[]> => lots().recents(depuis);
 
 /**
  * La réponse d’une requête passée en lot, lue comme celle d’un appel direct (lireMessage) : sa sortie vérifiée par son
  * schéma, ou son refus. Son coût, à moitié prix, est noté au suivi (ai_usage, sous `etiquette`) et dans la dépense du
- * jour de qui paie, même quand la réponse ne servira plus (sa tâche partie en direct entre-temps) : elle a été facturée.
- * `ms` : le temps du lot, de l’envoi à la lecture.
+ * jour de qui paie (`payeur` : le compte de la conv à l’envoi, src/server/memoire-en-lot.ts), même quand la réponse ne
+ * servira plus (sa tâche partie en direct entre-temps) : elle a été facturée. L’appelant ne la lit qu’une fois. `ms` : le
+ * temps du lot, de l’envoi à la lecture.
  */
 export async function lireLeResultat<S extends z.ZodType>(
   message: MessageRecu,
   schema: S,
-  { storyId, etiquette, ms }: { storyId?: string; etiquette: string; ms: number },
+  { storyId, payeur, etiquette, ms }: { storyId?: string; payeur: Payeur; etiquette: string; ms: number },
 ): Promise<Appel<z.infer<S>>> {
-  if (!lots().gratuit) {
-    const payeur = await payeurDe(storyId);
+  if (!lots().gratuit)
     await noterUsage(message.usage, Math.round(cout(message.usage, message.model, { lot: true }) * 1e6), { storyId, payeur, tache: etiquette, ms, modele: message.model });
-  }
   const { appel } = lireMessage(message, schema, { lot: true });
   if (appel.refus) journal("refus du modèle", { tache: etiquette, categorie: appel.categorie ?? null, requete: message._request_id ?? null }, "alerte");
   return appel;

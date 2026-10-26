@@ -26,6 +26,7 @@ import { CLES_DES_MAILS, type CleDeMail } from "./sequences";
 import { db, uneLigne } from "./db";
 import { env } from "./env";
 import { actionsRecentes, type ActionRecente } from "./equipe";
+import { LOT_BLOQUE_S } from "./memoire-en-lot";
 import { PERIME_S } from "./taches";
 import { dansLaMoitieAvec, VENTE, type GroupeDeVente } from "./vente";
 
@@ -250,6 +251,12 @@ const DUNE_VRAIE_CONV = (col: string) => `${col} in (select id from stories wher
 const VRAI_COMPTE = `email <> '${COMPTE_DU_TOURNAGE}' and not exists (select 1 from stories s where s.user_id = users.id and (s.tournage_id is not null or s.tournage_le is not null))`;
 /** Une étape arrêtée parce que sa conv est une prise du mode tournage n’est pas un échec (src/server/pipeline.ts). */
 const VRAI_ECHEC = "coalesce(error, '') <> 'tournage'";
+/**
+ * Une tâche bloquée : « en cours » sans battement depuis PERIME_S (son instance arrêtée), ou une mise à jour de la mémoire
+ * encore en lot passé LOT_BLOQUE_S (src/server/memoire-en-lot.ts : le passage des 5 minutes l’aurait remise en direct).
+ * Le prochain passage les relance. En SQL brut, `tasks` sous son nom.
+ */
+const BLOQUEE = `(status = 'en_cours' and heartbeat_at < now() - make_interval(secs => ${PERIME_S})) or (status = 'lot' and updated_at < now() - make_interval(secs => ${LOT_BLOQUE_S}))`;
 
 export async function statsAdmin(jours: Periode): Promise<StatsAdmin> {
   /* La période (k = 0) et celle d’avant (k = 1), sur une colonne de date */
@@ -310,7 +317,7 @@ export async function statsAdmin(jours: Periode): Promise<StatsAdmin> {
     ),
     ligne<{ en_cours: string; bloquees: string; attente: string }>(
       sql`select count(*) filter (where status = 'en_cours') as en_cours,
-            count(*) filter (where status = 'en_cours' and heartbeat_at < now() - make_interval(secs => ${PERIME_S})) as bloquees,
+            count(*) filter (where ${sql.raw(BLOQUEE)}) as bloquees,
             count(*) filter (where status = 'attente') as attente
           from tasks`,
     ),
@@ -489,7 +496,7 @@ async function pilotageDe(jours: Periode): Promise<Pilotage> {
     ligne<{ micros: string | null }>(sql`select sum(cost_micros) as micros from ai_usage where created_at >= ${DEBUT_DU_JOUR}`),
     ligne<{ echecs: string; bloquees: string; echoues: string; alertes: string }>(
       sql`select (select count(*) from tasks where status = 'echec' and ${sql.raw(VRAI_ECHEC)} and ${W("updated_at")}) as echecs,
-            (select count(*) from tasks where status = 'en_cours' and heartbeat_at < now() - make_interval(secs => ${PERIME_S})) as bloquees,
+            (select count(*) from tasks where ${sql.raw(BLOQUEE)}) as bloquees,
             (select count(*) from achats where statut = 'echoue' and ${W("cree_le")}) as echoues,
             (select coalesce(sum(count), 0) from counters where key = ${CLES.alerteChat} and day > (now() at time zone 'Europe/Paris')::date - ${jours}::int) as alertes`,
     ),

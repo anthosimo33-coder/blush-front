@@ -359,17 +359,28 @@ export const tasks = pgTable(
  * d’une mise à jour de la mémoire, tant qu’il existe chez lui : jusqu’à ce que sa réponse soit lue et le lot effacé là-bas
  * (le texte y resterait 29 jours). Son identifiant est celui du prestataire. La tâche ou la conv effacée ne l’efface pas
  * (`set null`) : le passage suivant annule le lot, puis l’efface chez le prestataire. Rien de la conv : des identifiants
- * et des heures.
+ * et des heures. Un lot du prestataire qui n’a pas sa ligne (l’instance coupée juste après l’envoi) y est remis par le
+ * ménage, sans tâche, pour être relevé et effacé comme les autres.
  */
 export const lots = pgTable("lots", {
   id: text("id").primaryKey(),
   tacheId: uuid("tache_id").references(() => tasks.id, { onDelete: "set null" }),
   storyId: uuid("story_id").references(() => stories.id, { onDelete: "set null" }),
+  /**
+   * Le compte de la conv à l’envoi : qui paie sa réponse (le budget du jour), même si la conv est effacée pendant le lot.
+   * Le compte effacé, sa réponse passe dans la part sans compte.
+   */
+  userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
   envoyeLe: quand("envoye_le").notNull().defaultNow(),
   /** L’annulation demandée (sa tâche repartie en direct, ou plus là) : il finira sans elle, puis s’effacera. */
   annuleLe: quand("annule_le"),
-  /** Ses résultats en cours de lecture (et leur coût noté) : un seul passage à la fois, repris 10 minutes après s’il a été coupé. */
+  /** Ses résultats en cours de lecture : un seul passage à la fois, repris 10 minutes après s’il a été coupé. */
   luLe: quand("lu_le"),
+  /**
+   * Ses réponses prises en main (leur coût noté, chacune appliquée ou partie en direct) : un passage qui le relève de
+   * nouveau (son effacement raté, une lecture coupée) ne fait plus que l’effacer, sans noter leur coût une seconde fois.
+   */
+  traiteLe: quand("traite_le"),
 });
 
 /**

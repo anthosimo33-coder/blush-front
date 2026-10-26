@@ -15,18 +15,17 @@ import { renommerLesPrises } from "@/server/tournage";
  * proches ne font rien de plus. Et,
  * au même passage, les chaînes des tâches restées en plan, chacune reprise dans sa fonction (`chaines`, le filet du
  * relais), et les prises du mode tournage qui disent encore le prénom de la source (`prises`, renommerLesPrises). Les
- * lots de la mémoire passent avant les chaînes (traiterLesLots, src/server/memoire-en-lot.ts : relevés, puis les mises à
- * jour calmées envoyées ; `lotsEnvoyes`, `lotsLus`, `lotsAnnules`) : une mise à jour revenue de son lot en direct part par
- * son relais. Elle ne répond que des nombres : les logs de la veille, qui les écrivent, sont publics. Rien à faire : 200,
- * avec des zéros.
+ * lots de la mémoire tournent à côté des chaînes, sans les retarder (traiterLesLots, src/server/memoire-en-lot.ts, qui ne
+ * lève jamais et s’arrête au bout d’une minute : relevés, puis les mises à jour calmées envoyées ; `lotsEnvoyes`,
+ * `lotsLus`, `lotsAnnules`) : une mise à jour revenue de son lot en direct part par son relais. Elle ne répond que des
+ * nombres : les logs de la veille, qui les écrivent, sont publics. Rien à faire : 200, avec des zéros.
  */
 export const GET = route("GET /api/cron/relances", async (req: Request) => {
   const secret = env().CRON_SECRET;
   if (!secret || !memeEmpreinte(req.headers.get("authorization") ?? "", empreinte(`Bearer ${secret}`))) return erreur("interdit");
   /* Les séquences après les relances : la relance d’abord, dans le plafond du jour qu’elles partagent */
   const mails = envoyerLesRelances().then(async (relances) => ({ relances, sequences: await envoyerLesSequences() }));
-  const taches = traiterLesLots().then(async (lots) => ({ lots, chaines: await reprendreLesChainesEnPlan() }));
-  const [{ relances, sequences }, { lots, chaines }, prises] = await Promise.all([mails, taches, renommerLesPrises()]);
+  const [{ relances, sequences }, lots, chaines, prises] = await Promise.all([mails, traiterLesLots(), reprendreLesChainesEnPlan(), renommerLesPrises()]);
   return repondre("GET /api/cron/relances", {
     ...relances,
     chaines,
