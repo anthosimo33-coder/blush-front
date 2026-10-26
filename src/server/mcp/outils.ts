@@ -1,6 +1,6 @@
 import "server-only";
 import { aRegarder } from "@/app/admin/a-regarder";
-import { ETAPES_DU_TUNNEL, JALONS_DE_L_IMPORT, JALONS_DU_PAYWALL, fuiteDuTunnel, rapport, texteDuGeste } from "@/app/admin/calculs";
+import { ETAPES_DU_TUNNEL, JALONS_DE_L_IMPORT, JALONS_DU_PAYWALL, fuiteDuTunnel, nomDeLAppli, rapport, tauxLisible, texteDuGeste } from "@/app/admin/calculs";
 import { AIDES_DU_PILOTAGE } from "@/contenu/aide-pilotage";
 import { NOM_DU_GENRE } from "@/contenu/haut-du-paywall";
 import { NOMS_DES_MAILS } from "@/contenu/mails";
@@ -52,7 +52,7 @@ export const OUTILS: readonly OutilMcp[] = [
     name: "tunnel",
     title: "Tunnel détaillé",
     description:
-      "Le tunnel écran par écran sur la période : les jalons de l’import (du choix de l’appli au lancement de la lecture) et du paywall (de l’arrivée au paiement), les titres du haut du paywall (vus, payés), les offres uniques (montrées, prises), les commandes (payées, échouées, en attente) et jusqu’où vont les convs importées.",
+      "Le tunnel écran par écran sur la période : les jalons de l’import (du choix de l’appli au lancement de la lecture), l’import appli par appli (WhatsApp, Instagram, iMessage, Captures ou vidéo : ceux qui ouvrent son écran, qui y choisissent un fichier, et le taux de passage à partir de 30 personnes, puis les convs bien reçues et les envois ratés), les jalons du paywall (de l’arrivée au paiement), les titres du haut du paywall (vus, payés), les offres uniques (montrées, prises), les commandes (payées, échouées, en attente) et jusqu’où vont les convs importées.",
     inputSchema: AVEC_JOURS,
   },
   {
@@ -194,6 +194,18 @@ function tunnel(s: StatsAdmin) {
     jalonsDepuis: p.jalonsDepuis,
     visiteurs: p.visiteurs.valeur,
     import: JALONS_DE_L_IMPORT.map(([j, nom]) => ({ etape: nom, personnes: p.jalons[j] })),
+    /* Le taux de passage au fichier : null sous les 30 personnes qui ouvrent l’écran de l’appli (comme dans /admin) */
+    importParAppli: p.jalonsParAppli.map(({ appli, jalons: j }) => {
+      const taux = tauxLisible(j.fichier, j.appli);
+      return {
+        appli: nomDeLAppli(appli),
+        ouvrentSonEcran: j.appli,
+        choisissentLeurFichier: j.fichier,
+        passentAuFichierPct: taux === null ? null : arrondi(taux * 100),
+        convBienRecue: j.importee,
+        envoisRates: j.envoi_rate,
+      };
+    }),
     paywall: JALONS_DU_PAYWALL.map(([j, nom]) => ({ etape: nom, personnes: p.jalons[j] })),
     hautsDuPaywall: p.hauts.map((h) => ({ titre: NOM_DU_GENRE[h.genre], vus: h.vus, payes: h.payes })),
     offresUniques: s.offresUniques,

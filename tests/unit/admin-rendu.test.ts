@@ -39,6 +39,13 @@ describe("le pilotage, rendu", () => {
       expect(t, titre).toContain(titre);
     expect(t).toMatch(/La plus grosse perte\u00a0: \d+\u00a0% entre «\u00a0[^»]+\u00a0» et «\u00a0[^»]+\u00a0»\./);
     expect(t).toMatch(/\d+\u00a0envois ratés/);
+    /* Sous « Choisissent leur fichier », appli par appli : ses deux nombres et son taux, « — » sous les 30 personnes */
+    expect(html).toContain('aria-label="De l’appli au fichier, appli par appli"');
+    for (const appli of ["WhatsApp", "Instagram", "Captures ou vidéo"]) expect(t).toMatch(new RegExp(`${appli} [\\d\u202f]+ → [\\d\u202f]+ \\d+\u00a0%`));
+    if (jours === 1) {
+      expect(t).toMatch(/iMessage \d+ → \d+ — Instagram/);
+      expect(t).toContain("«\u00a0—\u00a0»\u00a0: moins de 30\u00a0personnes, trop peu pour un taux.");
+    }
     for (const titre of ["D’où ils viennent", "Ce qui se vend", "Les coups de pouce", "Ce que coûte l’IA", "Santé", "Outils", "Bêta", "Les derniers gestes"])
       expect(t, titre).toContain(titre);
     expect(t).toContain("Que des nombres\u00a0: aucune conv, aucun message, aucun email ne sort d’ici.");

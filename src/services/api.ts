@@ -563,9 +563,9 @@ export function faireSigne(corps: Routes["POST /api/presence"]["corps"]): void {
 }
 
 /** Un jalon du tunnel (src/lib/jalons.ts). Sans réponse attendue : un jalon raté ne se voit pas. */
-export function envoyerJalon(jalon: Jalon): void {
+export function envoyerJalon(jalon: Jalon, appli?: AppKind): void {
   /* keepalive : le jalon d’un bouton qui change de page (ou la quitte, vers Whop) part quand même */
-  void appel("POST /api/jalon", { corps: { jalon }, keepalive: true }).catch((e: unknown) => tracer("jalon", e));
+  void appel("POST /api/jalon", { corps: { jalon, ...(appli ? { appli } : {}) }, keepalive: true }).catch((e: unknown) => tracer("jalon", e));
 }
 
 /** Une erreur du navigateur, pour l’équipe (src/lib/sentinelle.tsx). keepalive : elle part même si la page se ferme ; ratée, rien ne se dit (une erreur de plus ne s’annonce pas). */

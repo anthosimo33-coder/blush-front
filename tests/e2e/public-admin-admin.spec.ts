@@ -1,4 +1,4 @@
-import { ADMIN, compteDe, emailLibre, expect, INVITES, lectureFaite, seConnecter, seConnecterAdmin, sql, test } from "./aide";
+import { ADMIN, compteDe, emailLibre, expect, INVITES, lectureFaite, origine, seConnecter, seConnecterAdmin, sql, test } from "./aide";
 
 /*
  * Le tableau de bord (/admin, le pilotage ; /admin/direct ; l’écran d’avant à ?version=actuelle) : réservé aux emails de
@@ -33,7 +33,7 @@ test("/admin n’existe pas pour qui n’est pas de l’équipe : ni sans compte
 /** Le sous-titre du pilotage : « Mardi 13 octobre, 16:05 · sur 7 jours, vs les 7 jours d’avant », pour une durée (en regex). */
 const sousTitre = (duree: string) => new RegExp(`^\\S+ \\d{1,2} \\S+, \\d{2}:\\d{2} · sur ${duree}, vs les ${duree} d’avant$`);
 
-test("connecté avec l’email de l’équipe, le pilotage s’ouvre : ses cartes, leurs « ? », ses trois périodes, et l’écran d’avant", async ({ page }) => {
+test("connecté avec l’email de l’équipe, le pilotage s’ouvre : ses cartes, leurs « ? », ses trois périodes, et l’écran d’avant", async ({ page }, testInfo) => {
   await seConnecterAdmin(page);
 
   await test.step("les 7 derniers jours, d’office", async () => {
@@ -151,6 +151,16 @@ test("connecté avec l’email de l’équipe, le pilotage s’ouvre : ses carte
     await expect(periodes.getByRole("link", { name: "24 h" })).toHaveAttribute("aria-current", "page");
     await expect(page.getByText(sousTitre("24\\s+h"))).toBeVisible();
     await expect(page.getByRole("table", { name: "Le payé par heure" }).getByRole("row")).toHaveCount(25);
+  });
+
+  await test.step("l’import appli par appli : des jalons notés sous Hinge se lisent sous « Choisissent leur fichier »", async () => {
+    for (const jalon of ["appli", "fichier"]) {
+      const r = await page.request.post("/api/jalon", { headers: origine(testInfo), data: { jalon, appli: "hinge" } });
+      expect(await r.json()).toEqual({ ok: true });
+    }
+    await page.reload();
+    const applis = page.getByRole("list", { name: "De l’appli au fichier, appli par appli" });
+    await expect(applis.getByRole("listitem").filter({ hasText: /^Hinge/ })).toHaveText(/^Hinge\s*\d+ → \d+\s*(—|\d+\s%)$/);
   });
 
   await test.step("l’écran d’avant reste à ?version=actuelle, tel quel", async () => {

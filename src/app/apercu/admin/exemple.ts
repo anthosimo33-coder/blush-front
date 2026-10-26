@@ -1,4 +1,5 @@
 import type { CaseDuPilotage, Periode, Pilotage, StatsAdmin } from "@/server/stats";
+import type { AppKind } from "@/types";
 import type { Direct, GesteDuFil } from "@/types/api";
 import type { Delivrabilite } from "@/server/delivrabilite";
 import type { SanteDesNavigateurs } from "@/server/navigateur";
@@ -121,6 +122,23 @@ function pilotageDe(jours: Periode, { calme = false, suivi = true }: Variante): 
     ferme: pw(0.07),
     page_whop: 0,
   };
+  /*
+   * L’import appli par appli : la part de chaque appli parmi ceux qui en choisissent une, et son passage au fichier.
+   * L’iMessage de 24 h reste sous les 30 personnes d’un taux ; rien tant que les visites ne se comptent pas
+   */
+  const applis: [AppKind, number, number][] = [
+    ["whatsapp", 0.52, 0.66],
+    ["imessage", 0.05, 0.4],
+    ["instagram", 0.27, 0.38],
+    ["autre", 0.16, 0.71],
+  ];
+  const jalonsParAppli = applis
+    .map(([appli, part, passe]) => {
+      const choisie = Math.round(jalons.appli * part);
+      const fichier = Math.round(choisie * passe);
+      return { appli, jalons: { appli: choisie, fichier, envoi_rate: Math.round(fichier * 0.12), importee: Math.round(fichier * 0.88) } };
+    })
+    .filter((l) => l.jalons.appli > 0);
   return {
     pas: jours === 1 ? "heure" : "jour",
     cases,
@@ -135,6 +153,7 @@ function pilotageDe(jours: Periode, { calme = false, suivi = true }: Variante): 
     tunnel: { visiteurs, imports, paywall: Math.round(imports * 0.86), acheteurs, racheteurs: Math.round(acheteurs * 0.145) },
     jalons,
     jalonsDepuis: suivi ? "2026-10-18" : null,
+    jalonsParAppli,
     sources,
     mix: [
       { groupe: "premium", n: premium, centimes: premium * 1990 },

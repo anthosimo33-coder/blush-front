@@ -294,6 +294,8 @@ describe("les outils", () => {
     expect(p).toMatchObject({ jours: 30, margeApresIAPct: { cible: 80 } });
     expect(p).toHaveProperty("chiffreDAffaires.netEuros.valeur");
     expect(p).toHaveProperty("tunnel");
+    /* Le tunnel détaillé : l’import appli par appli aussi */
+    expect(contenu((await mcp("tools/call", { name: "tunnel", arguments: { jours: 30 } }, acces)).json!)).toHaveProperty("importParAppli");
     const faux = (await mcp("tools/call", { name: "pilotage", arguments: { jours: 5 } }, acces)).json?.result as { isError: boolean; content: { text: string }[] };
     expect(faux.isError).toBe(true);
     expect(faux.content[0]!.text).toContain("1, 7, 30");

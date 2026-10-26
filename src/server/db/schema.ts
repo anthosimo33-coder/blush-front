@@ -21,12 +21,14 @@ import {
 } from "drizzle-orm/pg-core";
 /* En chemin relatif : drizzle-kit lit ce fichier hors de Next, sans l’alias @/ */
 import {
+  CLES_DES_APPLIS,
   ETAPES_VISITE,
   EVENEMENTS_ECOUTE,
   FAMILLES_NAVIGATEUR,
   GENRES_FIL,
   GENRES_VENDUS,
   JALONS,
+  JALONS_PAR_APPLI,
   LOTS_DE_LA_ROUE,
   METRIQUES_WEB,
   OFFRES,
@@ -682,6 +684,24 @@ export const jalons = pgTable(
     le: quand("le").notNull().defaultNow(),
   },
   (t) => [primaryKey({ columns: [t.jour, t.empreinte, t.jalon] }), index("jalons_le_idx").on(t.le)],
+);
+
+/**
+ * Les jalons de l’import, appli par appli (JALONS_PAR_APPLI, noterJalon) : une ligne par personne, par jour, par jalon
+ * et par appli, par la même empreinte que les jalons. Une personne qui passe d’une appli à l’autre (WhatsApp, puis des
+ * captures) compte sous chacune ; `jalons` la compte, lui, une fois. Ni compte, ni conv, ni adresse IP. Gardés
+ * VISITES_GARDEES_JOURS, comme les jalons.
+ */
+export const jalonsParAppli = pgTable(
+  "jalons_par_appli",
+  {
+    jour: date("jour").notNull(),
+    empreinte: text("empreinte").notNull(),
+    jalon: text("jalon", { enum: JALONS_PAR_APPLI }).notNull(),
+    appli: text("appli", { enum: CLES_DES_APPLIS }).notNull(),
+    le: quand("le").notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.jour, t.empreinte, t.jalon, t.appli] }), index("jalons_par_appli_le_idx").on(t.le)],
 );
 
 /** Le sel du jour (de Paris) des empreintes des visites : tiré au hasard, effacé le surlendemain (la purge). */

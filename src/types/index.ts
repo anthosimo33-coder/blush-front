@@ -7,11 +7,16 @@ import type { CodeErreur, CodePublic } from "./erreurs-api";
  * qu’ils restent les mêmes.
  */
 
+/** Les applis d’où vient une conv, en liste (les z.enum, la base) ; leurs noms : APPLIS, qui les a toutes. */
+export const CLES_DES_APPLIS = ["whatsapp", "imessage", "instagram", "hinge", "autre"] as const;
 /**
  * Les applis d’où vient une conv, et leur nom. Des captures d’une autre appli (« autre ») se disent « Captures » une
  * fois importées ; là où on choisit son appli, « Autre appli » (NOM_AUTRE_APPLI).
  */
-export const APPLIS = { whatsapp: "WhatsApp", imessage: "iMessage", instagram: "Instagram", hinge: "Hinge", autre: "Captures" } as const;
+export const APPLIS = { whatsapp: "WhatsApp", imessage: "iMessage", instagram: "Instagram", hinge: "Hinge", autre: "Captures" } as const satisfies Record<
+  (typeof CLES_DES_APPLIS)[number],
+  string
+>;
 export type AppKind = keyof typeof APPLIS;
 /** « autre », là où on choisit son appli (« Vous vous parlez où ? ») : des captures d’une appli qu’on ne nomme pas. */
 export const NOM_AUTRE_APPLI = "Autre appli";
@@ -142,6 +147,13 @@ export const JALONS = [
   "page_whop",
 ] as const;
 export type Jalon = (typeof JALONS)[number];
+/**
+ * Les jalons de l’import comptés aussi appli par appli (jalons_par_appli, /admin « L’import, écran par écran ») : l’appli
+ * choisie, le fichier, l’envoi raté ou réussi, chacun avec l’appli de l’écran où il se passe (celui de l’export ou des
+ * captures). Les autres jalons se comptent seuls.
+ */
+export const JALONS_PAR_APPLI = ["appli", "fichier", "envoi_rate", "importee"] as const satisfies readonly Jalon[];
+export type JalonParAppli = (typeof JALONS_PAR_APPLI)[number];
 
 /** Les mesures de vitesse que les navigateurs envoient (les Web Vitals : src/lib/sentinelle.tsx), en millisecondes sauf CLS. */
 export const METRIQUES_WEB = ["LCP", "INP", "CLS", "FCP", "TTFB"] as const;

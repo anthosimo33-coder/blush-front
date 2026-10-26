@@ -33,6 +33,11 @@ test("export .txt : Maëlys importe, en couple, puis parcourt son verdict dans l
   const email = emailLibre(testInfo, "import-txt");
   /* 64 messages entre Noé et Maëlys, du 4 au 7 septembre, dont 2 vocaux : c’est Maëlys qui importe */
   const conv = exportWhatsApp(testInfo, { format: "txt" });
+  /* Les jalons du tunnel d’/admin que la page envoie */
+  const jalons: unknown[] = [];
+  page.on("request", (r) => {
+    if (new URL(r.url()).pathname === "/api/jalon") jalons.push(r.postDataJSON());
+  });
 
   await test.step("les étapes de l’export, celles de l’appareil : l’iPhone sur un iPhone, iPhone et Android ailleurs", async () => {
     await ouvrirExportWhatsApp(page);
@@ -55,6 +60,19 @@ test("export .txt : Maëlys importe, en couple, puis parcourt son verdict dans l
     await expect(page.getByText(String(conv.messages), { exact: true })).toBeVisible();
     await expect(page.getByText(`messages · ${conv.vocaux} vocaux`)).toBeVisible();
     await page.getByRole("link", { name: "Continuer" }).click();
+  });
+
+  await test.step("le tunnel d’/admin : l’appli choisie, le fichier et la conv reçue, chacun sous WhatsApp", async () => {
+    await expect
+      .poll(() => jalons)
+      .toEqual(
+        expect.arrayContaining([
+          { jalon: "appli", appli: "whatsapp" },
+          { jalon: "fichier", appli: "whatsapp" },
+          { jalon: "importee", appli: "whatsapp" },
+        ]),
+      );
+    expect(jalons).not.toContainEqual(expect.objectContaining({ appli: "instagram" }));
   });
 
   await test.step("qui es-tu : une réponse par question, et « Continuer » attend les quatre", async () => {

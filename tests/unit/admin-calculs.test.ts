@@ -13,11 +13,13 @@ import {
   JALONS_DU_PAYWALL,
   plusGrossePerte,
   ilYa,
+  nomDeLAppli,
   nomsDeLaCase,
   pluriel,
   pointsDeLaCourbe,
   pourcent,
   rapport,
+  tauxLisible,
   texteDeLaFuite,
   texteDuGeste,
 } from "@/app/admin/calculs";
@@ -152,6 +154,19 @@ describe("les jalons du tunnel", () => {
   it("chaque jalon montré une fois, dans un seul des deux blocs", () => {
     const cles = [...JALONS_DE_L_IMPORT, ...JALONS_DU_PAYWALL].map(([cle]) => cle);
     expect(new Set(cles).size).toBe(cles.length);
+  });
+
+  it("appli par appli : le taux ne se lit qu’à partir de 30 personnes, et chaque appli a le nom de sa tuile", () => {
+    expect(tauxLisible(12, 30)).toBe(0.4);
+    expect(tauxLisible(12, 29)).toBeNull();
+    expect(tauxLisible(0, 0)).toBeNull();
+    expect((["whatsapp", "imessage", "instagram", "autre", "hinge"] as const).map((a) => nomDeLAppli(a))).toEqual([
+      "WhatsApp",
+      "iMessage",
+      "Instagram",
+      "Captures ou vidéo",
+      "Hinge",
+    ]);
   });
 });
 

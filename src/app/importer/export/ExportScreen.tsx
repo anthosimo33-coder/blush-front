@@ -24,7 +24,7 @@ import { Sheet } from "@/components/ui/surfaces";
 import { ParcoursScreen } from "@/components/shell/ParcoursScreen";
 import { ScreenTitle } from "@/components/shell/Screen";
 import { setJourney } from "@/state/journey";
-import { APPLIS, type ExportApp, type Story } from "@/types";
+import { APPLIS, type ExportApp, type JalonParAppli, type Story } from "@/types";
 import { messagePasAvecElle } from "../autre-conv";
 import { ChoixConv } from "./ChoixConv";
 import type { ConvInstagram } from "@/services/preparer-export";
@@ -60,9 +60,12 @@ export function ExportScreen({ initialApp, tournage = false, ajout = false }: { 
   /* Un export Instagram complet : la feuille « Quelle conv ? », qui répond à l’envoi en cours (null : on a renoncé) */
   const [choix, setChoix] = useState<{ convs: ConvInstagram[]; repondre: (id: string | null) => void } | null>(null);
   const choisir = (convs: ConvInstagram[]) => new Promise<string | null>((repondre) => setChoix({ convs, repondre }));
-  /* Le tunnel d’/admin : une appli choisie (cet écran), puis le fichier, l’envoi raté ou réussi (src/lib/jalons.ts) ; pas un morceau ajouté */
-  useJalon(ajout ? null : "appli");
-  const jalon = (j: Parameters<typeof marquerJalon>[0]) => !ajout && marquerJalon(j);
+  /*
+   * Le tunnel d’/admin : une appli choisie (cet écran, sous chaque appli qu’il montre), puis le fichier, l’envoi raté ou
+   * réussi, sous l’appli de ce moment (src/lib/jalons.ts) ; pas un morceau ajouté
+   */
+  useJalon(ajout ? null : "appli", app);
+  const jalon = (j: JalonParAppli) => !ajout && marquerJalon(j, app);
   /* L’adresse de cet écran, son appli et son mode */
   const ici = (a: ExportApp) => `/importer/export?app=${a}${ajout ? "&mode=ajout" : ""}` as const;
   const fermerChoix = (id: string | null) => {

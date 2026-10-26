@@ -3,7 +3,21 @@ import { sql, type SQL } from "drizzle-orm";
 import { GENRES_DU_HAUT, type GenreDuHaut } from "@/contenu/haut-du-paywall";
 import { CATALOGUE } from "@/contenu/offres";
 import { GROUPE_DE_L_OFFRE, GROUPES_D_OFFRES, type GroupeDOffres } from "@/contenu/pilotage";
-import { GENRES_VENDUS, JALONS, OFFRES, OFFRES_UNIQUES, type GenreVendu, type Jalon, type OffreId, type OffreUnique, type SourceVisite } from "@/types";
+import {
+  CLES_DES_APPLIS,
+  GENRES_VENDUS,
+  JALONS,
+  JALONS_PAR_APPLI,
+  OFFRES,
+  OFFRES_UNIQUES,
+  type AppKind,
+  type GenreVendu,
+  type Jalon,
+  type JalonParAppli,
+  type OffreId,
+  type OffreUnique,
+  type SourceVisite,
+} from "@/types";
 import { etatDeLaListe } from "./attente";
 import { BUDGET_IA } from "./budget";
 import { COMPTE_DU_TOURNAGE } from "./compte-du-tournage";
@@ -128,6 +142,12 @@ export type Pilotage = {
   jalons: Record<Jalon, number>;
   /** Le premier jour où les jalons se comptent (AAAA-MM-JJ), ou null : aucun encore. */
   jalonsDepuis: string | null;
+  /**
+   * L’import appli par appli (jalons_par_appli) : pour chaque appli qui a du monde sur la période, dans l’ordre de
+   * CLES_DES_APPLIS, les personnes passées par chaque jalon de JALONS_PAR_APPLI sous elle, une fois par jour. Une
+   * personne qui passe d’une appli à l’autre compte sous chacune : additionnées, les applis peuvent dépasser `jalons`.
+   */
+  jalonsParAppli: { appli: AppKind; jalons: Record<JalonParAppli, number> }[];
   /**
    * Les sources : leurs visiteurs, et les acheteurs (et leur payé) d’après la source de leur compte (users.source).
    * `source` null : les acheteurs dont le compte date d’avant le suivi des visites. Classées par payé.
@@ -400,6 +420,7 @@ async function pilotageDe(jours: Periode): Promise<Pilotage> {
     tunnel,
     jalons,
     jalonsDepuis,
+    parAppli,
     visiteursParSource,
     achatsParSource,
     parOffre,
@@ -452,6 +473,7 @@ async function pilotageDe(jours: Periode): Promise<Pilotage> {
     ),
     lignes<{ jalon: Jalon; n: string }>(sql`select jalon, count(*) as n from jalons where ${W("le")} group by jalon`),
     ligne<{ depuis: string | null }>(sql`select to_char(min(jour), 'YYYY-MM-DD') as depuis from jalons`),
+    lignes<{ appli: AppKind; jalon: JalonParAppli; n: string }>(sql`select appli, jalon, count(*) as n from jalons_par_appli where ${W("le")} group by appli, jalon`),
     lignes<{ source: SourceVisite; n: string }>(sql`select source, count(*) as n from visites where ${W("arrive_le")} group by source`),
     lignes<{ source: SourceVisite | null; acheteurs: string; centimes: string }>(
       sql`select u.source, count(distinct a.user_id) as acheteurs, sum(a.centimes) as centimes
@@ -532,6 +554,10 @@ async function pilotageDe(jours: Periode): Promise<Pilotage> {
     tunnel: { visiteurs: n(visiteurs.a), imports: n(tunnel.imports), paywall: n(tunnel.paywall), acheteurs: n(argent.acheteurs), racheteurs: n(tunnel.racheteurs) },
     jalons: Object.fromEntries(JALONS.map((j) => [j, n(jalons.find((l) => l.jalon === j)?.n)])) as Record<Jalon, number>,
     jalonsDepuis: jalonsDepuis.depuis,
+    jalonsParAppli: CLES_DES_APPLIS.filter((appli) => parAppli.some((l) => l.appli === appli)).map((appli) => ({
+      appli,
+      jalons: Object.fromEntries(JALONS_PAR_APPLI.map((j) => [j, n(parAppli.find((l) => l.appli === appli && l.jalon === j)?.n)])) as Record<JalonParAppli, number>,
+    })),
     sources: [...parSource]
       .map(([source, l]) => ({ source, ...l }))
       .sort((a, b) => b.centimes - a.centimes || b.visiteurs - a.visiteurs || (a.source === null ? 1 : b.source === null ? -1 : 0)),
