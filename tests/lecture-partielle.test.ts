@@ -10,7 +10,7 @@ import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
  * partagent un écran, comme ceux du navigateur. Chaque test filme sa vidéo à lui (sa série d’écrans). Aucun appel ne sort.
  * L’interrupteur (BLUSH_LECTURE_PARTIELLE) est celui du test (`etat.mode`, « ab » par défaut).
  */
-const etat = vi.hoisted(() => ({ cookies: new Map<string, string>(), mode: "ab" as "0" | "mesure" | "ab" }));
+const etat = vi.hoisted(() => ({ cookies: new Map<string, string>(), mode: "ab" as "0" | "mesure" | "ab", equipe: [] as string[] }));
 vi.mock("next/headers", () => ({
   cookies: async () => ({
     get: (n: string) => (etat.cookies.has(n) ? { name: n, value: etat.cookies.get(n)! } : undefined),
@@ -20,14 +20,37 @@ vi.mock("next/headers", () => ({
   }),
   headers: async () => new Headers(),
 }));
+/* L’équipe (BLUSH_ACCES_LIBRE) : les comptes que le test y met (`etat.equipe`) */
 vi.mock("@/server/env", async (original) => {
   const o = await original<typeof import("@/server/env")>();
-  return { ...o, env: () => ({ ...o.env(), BLUSH_LECTURE_PARTIELLE: etat.mode }) };
+  return {
+    ...o,
+    env: () => ({ ...o.env(), BLUSH_LECTURE_PARTIELLE: etat.mode, BLUSH_ACCES_LIBRE: etat.equipe }),
+    accesLibre: (email: string) => etat.equipe.includes(email.toLowerCase()),
+  };
+});
+/* Le relais de la chaîne (src/server/relais.ts) : chaque passage de main noté, sans appel réseau */
+const relais = vi.hoisted(() => [] as string[]);
+vi.mock("@/server/relais", () => ({ RELAIS_MAX: 5, passerLaMain: async (histoire: string) => (relais.push(histoire), true) }));
+/* Un lot gardé qui s’écrit : ce qui arrive pendant son écriture (l’abandon de la page fermée, en même temps que lui) */
+const course = vi.hoisted(() => ({ pendantLEcriture: null as null | (() => Promise<unknown>) }));
+vi.mock("@/server/ecrans-gardes", async (original) => {
+  const o = await original<typeof import("@/server/ecrans-gardes")>();
+  return {
+    ...o,
+    garderUnLot: async (...a: Parameters<typeof o.garderUnLot>) => {
+      const pendant = course.pendantLEcriture;
+      course.pendantLEcriture = null;
+      await pendant?.();
+      return o.garderUnLot(...a);
+    },
+  };
 });
 /* Les alertes de l’équipe, relevées au lieu de partir */
 const alertes = vi.hoisted(() => [] as string[]);
 vi.mock("@/server/alertes", async (original) => ({ ...(await original<typeof import("@/server/alertes")>()), alerter: async (sujet: string) => void alertes.push(sujet) }));
 
+import Anthropic from "@anthropic-ai/sdk";
 import type { Requete } from "@prompts/lib/contextes";
 import type { Captures } from "@prompts/lib/schemas";
 import { POST as postEcrans } from "@/app/api/captures/ecrans/route";
@@ -36,21 +59,22 @@ import { POST as postLot } from "@/app/api/captures/lot/route";
 import { POST as postPlan } from "@/app/api/captures/video/plan/route";
 import { POST as postVideo } from "@/app/api/captures/video/route";
 import { CASE_IMPORT } from "@/contenu/consentements";
-import { ecrireLeContexte } from "@/server/analyse";
+import { ecrireLeContexte, poserLeVerdict } from "@/server/analyse";
 import { ouvrirSession, type Utilisateur } from "@/server/auth";
 import { empreinte } from "@/server/chiffrement";
 import * as coffre from "@/server/coffre";
 import { db, schema } from "@/server/db";
-import { garderJusquALaLecture, purgerLesEcrans } from "@/server/ecrans-gardes";
+import { garderJusquALaLecture, ouEnEstLaSuite, purgerLesEcrans } from "@/server/ecrans-gardes";
+import { ErreurTache } from "@/server/erreurs";
 import { contexteDe, definirQui, metaDe, rattacherBrouillon, supprimerHistoire } from "@/server/histoires";
 import { fournisseurFactice, refusFactice } from "@/server/ia/factice";
 import { envoiDe } from "@/server/imports";
 import { brasDe } from "@/server/lecture-partielle";
 import { LIMITES } from "@/server/limites";
-import { executerChaine, lancerApresPaiement } from "@/server/pipeline";
+import { executerChaine, lancerApresPaiement, reprendreLesChainesEnPlan } from "@/server/pipeline";
 import { statsAdmin, type Pilotage } from "@/server/stats";
 import { lireLaSuite } from "@/server/suite-video";
-import { attendreLePaiement } from "@/server/taches";
+import { etatDesTaches } from "@/server/taches";
 import { aujourdhuiParis } from "@/server/temps";
 import type { BrasDeLaLecture } from "@/types";
 import { captures, msg } from "./aide/fabriques";
@@ -121,6 +145,7 @@ beforeEach(async () => {
 
 afterAll(async () => {
   await db().delete(schema.imports).where(gte(schema.imports.creeLe, debut));
+  await db().delete(schema.plansVideo).where(gte(schema.plansVideo.creeLe, debut));
 });
 
 /** Une empreinte de vidéo qui tombe dans cette moitié de l’A/B. */
@@ -158,7 +183,7 @@ const fin = async (corps: Record<string, unknown>) => {
   expect(r.status).toBe(200);
   return (await r.json()) as { story?: { id: string }; source?: { suiteVideo?: boolean }; suite?: string; lots?: number; messagesRead?: number };
 };
-/** Le plan d’une longue vidéo (/api/captures/video/plan). */
+/** Le plan d’une longue vidéo (/api/captures/video/plan) : `cle`, celle de l’envoi, que le navigateur envoie toujours. */
 const plan = async (video: string, autres: Record<string, unknown> = {}) =>
   (
     (await (await postPlan(requete("/api/captures/video/plan", json({ lots: LOTS, video, sensSur: true, consentement: CASE_IMPORT.version, ...autres })))).json()) as {
@@ -173,9 +198,10 @@ const nee = (r: Awaited<ReturnType<typeof fin>>) => {
   return r.story!.id;
 };
 
-/** La vidéo lue en entier avant l’achat, comme avant : tous ses lots, puis leur fin (la longue vidéo dite). */
+/** La vidéo lue en entier avant l’achat, comme avant : son plan, tous ses lots, puis leur fin (la longue vidéo dite). */
 async function importEntier(serie: string, video = videoDe("entiere")): Promise<{ id: string; cle: string }> {
   const cle = randomUUID();
+  expect(await plan(video, { cle })).toBe("entiere");
   const lots: Captures[] = [];
   for (let j = 0; j < LOTS; j++) lots.push(await lireLeLot(serie, cle, j));
   return { id: nee(await fin({ lots, cle, partiel: { restants: 0, ecrans: ECRANS, video, sensSur: true } })), cle };
@@ -188,7 +214,7 @@ async function importEntier(serie: string, video = videoDe("entiere")): Promise<
 async function importPartiel(serie: string): Promise<{ id: string; cle: string; secret: string; recents: Captures[]; video: string }> {
   const cle = randomUUID();
   const video = videoDe("partielle");
-  expect(await plan(video)).toBe("partielle");
+  expect(await plan(video, { cle })).toBe("partielle");
   const recents: Captures[] = [];
   for (let j = LOTS - 1; j >= 3; j--) recents.unshift(await lireLeLot(serie, cle, j));
   const partiel = { restants: 3, ecrans: ECRANS, video, sensSur: true };
@@ -218,7 +244,7 @@ describe("une longue vidéo lue en deux fois", () => {
     const { id } = await importPartiel(serie);
     /* Les lots récents étaient déjà lus (le même lot, ses mêmes images : jamais relu, src/server/lots.ts) */
     expect(lus).toEqual([]);
-    /* Avant l’achat : la partie récente seulement, et la suite qui attend, rattachée à la conv, 24 h au plus */
+    /* Avant l’achat : la partie récente seulement, et la suite qui attend, rattachée à la conv, 48 h au plus avant « Qui es-tu ? » */
     const avant = metaDe(await ligneEnBase(id));
     const complete = metaDe(await ligneEnBase(entiere.id));
     expect(avant.resume.total).toBeLessThan(complete.resume.total);
@@ -229,7 +255,7 @@ describe("une longue vidéo lue en deux fois", () => {
       [1, 12, false],
       [2, 12, false],
     ]);
-    expect(gardes.every((g) => g.expireLe.getTime() > Date.now() + 23 * 3600e3 && g.expireLe.getTime() < Date.now() + 25 * 3600e3)).toBe(true);
+    expect(gardes.every((g) => g.expireLe.getTime() > Date.now() + 47 * 3600e3 && g.expireLe.getTime() < Date.now() + 49 * 3600e3)).toBe(true);
     expect(await suiteDe(id)).toMatchObject({ appli: "imessage", ecrans: ECRANS, lots: 3, payeeLe: null });
     expect(await mesureDe(id)).toMatchObject({ type: "video", bras: "partielle", lots: 5, ecrans: 56, lotsGardes: 3, suite: "attente", contrefactuel: null });
     /* « Qui es-tu ? » rempli (son prénom), puis la suite lue */
@@ -265,8 +291,12 @@ describe("une longue vidéo lue en deux fois", () => {
     const { id, secret } = await importPartiel(serie);
     expect(await rattacherBrouillon(compte, secret)).toBe(id);
     await definirQui(id, { moi: 0, pronom: "il", devinette: "vus", objectif: "ensemble", prenom: "Tom" });
-    await attendreLePaiement(id, "verdict");
-    await ecrireLeContexte(id);
+    /* Le paywall (« Qui es-tu ? ») : la suite attend le paiement le temps des relances, 11 jours, ses écrans avec elle */
+    expect(await poserLeVerdict(id)).toBe("paiement");
+    const auPaywall = await suiteDe(id);
+    expect(auPaywall?.payeeLe).toBeNull();
+    expect(auPaywall!.expireLe.getTime()).toBeGreaterThan(Date.now() + 10.9 * 86400e3);
+    expect((await ecransGardes(id)).every((g) => g.expireLe.getTime() === auPaywall!.expireLe.getTime())).toBe(true);
     /* Le titre que le paywall a montré (celui de la partie lue), gardé et noté conv par conv */
     const vu = contexteDe(await ligneEnBase(id))!.accroche!;
     expect((await mesureDe(id))?.titre).toBe(vu);
@@ -276,6 +306,9 @@ describe("une longue vidéo lue en deux fois", () => {
     const payee = await suiteDe(id);
     expect(payee?.payeeLe).not.toBeNull();
     expect(payee!.expireLe.getTime()).toBeGreaterThan(Date.now() + 6 * 86400e3);
+    expect(payee!.expireLe.getTime()).toBeLessThan(Date.now() + 7.1 * 86400e3);
+    /* L’écran de lecture le dit : BLUSH lit d’abord le début de la conv, aucun lot lu encore */
+    expect(await ouEnEstLaSuite(id)).toEqual({ faits: 0, total: 3 });
     await executerChaine(id);
     expect(await db().select().from(schema.verdicts).where(eq(schema.verdicts.storyId, id))).toHaveLength(1);
     expect((await ligneEnBase(id)).messageCount).toBe((await ligneEnBase(entiere.id)).messageCount);
@@ -286,6 +319,31 @@ describe("une longue vidéo lue en deux fois", () => {
     await definirQui(entiere.id, { moi: 0, pronom: "il", devinette: "vus", objectif: "ensemble", prenom: "Tom" });
     await ecrireLeContexte(entiere.id);
     expect((await mesureDe(id))?.titreEntier).toBe(contexteDe(await ligneEnBase(entiere.id))!.accroche);
+  });
+
+  it("la fin avec un lot gardé qui manque (jamais arrivé) : rien ne naît, elle répond « lire » comme une question, et le navigateur lit le reste", async () => {
+    const serie = randomUUID();
+    const cle = randomUUID();
+    const video = videoDe("partielle");
+    expect(await plan(video, { cle })).toBe("partielle");
+    const recents: Captures[] = [];
+    for (let j = LOTS - 1; j >= 3; j--) recents.unshift(await lireLeLot(serie, cle, j));
+    const partiel = { restants: 3, ecrans: ECRANS, video, sensSur: true };
+    expect(await fin({ lots: recents, cle, partiel })).toEqual({ suite: "garder", lots: 3 });
+    for (let j = 0; j < 2; j++) expect(await garderLeLot(serie, cle, j)).toBe(200);
+    etat.cookies.delete("blush-brouillon");
+    expect(await fin({ lots: recents, cle, partiel: { ...partiel, gardes: true } })).toEqual({ suite: "lire", lots: 3 });
+    expect(etat.cookies.has("blush-brouillon")).toBe(false);
+    /* Le reste lu, la fin crée la conv, sans suite ; les écrans envoyés pour rien s’effacent */
+    const lots = [...(await Promise.all([0, 1, 2].map((j) => lireLeLot(serie, cle, j)))), ...recents];
+    const id = nee(await fin({ lots, cle, partiel: { ...partiel, restants: 0 } }));
+    expect(await mesureDe(id)).toMatchObject({ bras: "partielle", lotsGardes: 0, suite: null });
+    expect(
+      await db()
+        .select()
+        .from(schema.ecransGardes)
+        .where(eq(schema.ecransGardes.envoi, envoiDe(cle)!)),
+    ).toEqual([]);
   });
 
   it("la fin renvoyée après une coupure du réseau retrouve la conv née avec sa suite, sans rien demander ni relire", async () => {
@@ -300,7 +358,7 @@ describe("une longue vidéo lue en deux fois", () => {
 });
 
 describe("les écrans d’un envoi qu’aucune conv ne prend s’effacent tout de suite", () => {
-  const abandon = (cle: string) => postAbandon(requete("/api/captures/lot/abandon", json({ cle })));
+  const abandon = (cle: string, raison: "page" | "echec") => postAbandon(requete("/api/captures/lot/abandon", json({ cle, raison })));
   const orphelinsDe = (cle: string) =>
     db()
       .select()
@@ -308,13 +366,25 @@ describe("les écrans d’un envoi qu’aucune conv ne prend s’effacent tout d
       .where(and(eq(schema.ecransGardes.envoi, envoiDe(cle)!), isNull(schema.ecransGardes.storyId)));
 
   it("l’enregistrement abandonné (la page fermée, un lot en échec) : ses écrans gardés partent, un lot encore en route n’est plus écrit", async () => {
+    for (const raison of ["page", "echec"] as const) {
+      const serie = randomUUID();
+      const cle = randomUUID();
+      expect(await garderLeLot(serie, cle, 0)).toBe(200);
+      expect(await orphelinsDe(cle)).toHaveLength(1);
+      expect((await abandon(cle, raison)).status).toBe(200);
+      expect(await orphelinsDe(cle)).toEqual([]);
+      expect(await garderLeLot(serie, cle, 1)).toBe(409);
+      expect(await orphelinsDe(cle)).toEqual([]);
+    }
+  });
+
+  it("l’abandon arrivé pendant l’écriture d’un lot (la page fermée pendant son envoi) : le lot écrit s’efface aussi, rien n’attend son heure", async () => {
     const serie = randomUUID();
     const cle = randomUUID();
-    expect(await garderLeLot(serie, cle, 0)).toBe(200);
-    expect(await orphelinsDe(cle)).toHaveLength(1);
-    expect((await abandon(cle)).status).toBe(200);
-    expect(await orphelinsDe(cle)).toEqual([]);
-    expect(await garderLeLot(serie, cle, 1)).toBe(409);
+    /* L’abandon passe après la vérification de la route, juste avant l’écriture du lot */
+    course.pendantLEcriture = () => abandon(cle, "page");
+    expect(await garderLeLot(serie, cle, 0)).toBe(409);
+    expect(course.pendantLEcriture).toBeNull();
     expect(await orphelinsDe(cle)).toEqual([]);
   });
 
@@ -343,7 +413,7 @@ describe("les écrans d’un envoi qu’aucune conv ne prend s’effacent tout d
 });
 
 describe("les écrans gardés ne restent pas", () => {
-  it("un import non payé efface ses écrans 24 h après, sans les avoir lus ; des écrans sans import partent au bout d’une heure ; la conv effacée les emporte", async () => {
+  it("un import sans « Qui es-tu ? » efface ses écrans 48 h après, sans les avoir lus ; des écrans sans import partent au bout d’une heure ; la conv effacée les emporte", async () => {
     const { id } = await importPartiel(randomUUID());
     /* Des écrans envoyés pour un import jamais venu */
     const seul = randomUUID();
@@ -359,12 +429,14 @@ describe("les écrans gardés ne restent pas", () => {
     expect(await ecransGardes(id)).toHaveLength(3);
     lus.length = 0;
     await purgerLesEcrans(new Date(Date.now() + 25 * 3600e3));
+    expect(await ecransGardes(id)).toHaveLength(3);
+    await purgerLesEcrans(new Date(Date.now() + 49 * 3600e3));
     expect(await ecransGardes(id)).toEqual([]);
     expect(await suiteDe(id)).toBeNull();
     /* Jamais lus, la conv reste (sa partie récente) */
     expect(lus).toEqual([]);
     expect(await convDe(id)).not.toBeNull();
-    /* Payée ensuite : la suite est perdue, le verdict part sur la partie lue */
+    /* Payée ensuite (son paywall passé depuis longtemps) : la suite est perdue, le verdict part sur la partie lue */
     expect(await lireLaSuite(id)).toBe("perdue");
     expect((await mesureDe(id))?.suite).toBe("perdue");
     /* « Supprimer l’histoire » : ses écrans gardés partent avec elle */
@@ -376,6 +448,39 @@ describe("les écrans gardés ne restent pas", () => {
         .from(schema.ecransGardes)
         .where(eq(schema.ecransGardes.envoi, envoiDe(autre.cle)!)),
     ).toEqual([]);
+  });
+});
+
+describe("au paywall", () => {
+  const QUI = { moi: 0, pronom: "il", devinette: "vus", objectif: "ensemble", prenom: "Tom" } as const;
+
+  it("la suite attend la fin des relances, 11 jours après le paywall (« Qui es-tu ? » renvoyé n’y change rien), puis s’efface sans avoir été lue ; payée, le paywall ne la raccourcit plus", async () => {
+    const { id, secret } = await importPartiel(randomUUID());
+    expect(await rattacherBrouillon(compte, secret)).toBe(id);
+    await definirQui(id, QUI);
+    expect(await poserLeVerdict(id)).toBe("paiement");
+    const echeance = (await suiteDe(id))!.expireLe.getTime();
+    /* Le paywall d’il y a un jour, puis « Qui es-tu ? » renvoyé : l’échéance part toujours du paywall */
+    await db()
+      .update(schema.tasks)
+      .set({ createdAt: new Date(Date.now() - 86400e3) })
+      .where(and(eq(schema.tasks.storyId, id), eq(schema.tasks.kind, "verdict")));
+    expect(await poserLeVerdict(id)).toBe("paiement");
+    expect((await suiteDe(id))!.expireLe.getTime()).toBeLessThan(echeance - 23 * 3600e3);
+    lus.length = 0;
+    await purgerLesEcrans(new Date(Date.now() + 9 * 86400e3));
+    expect(await ecransGardes(id)).toHaveLength(3);
+    await purgerLesEcrans(new Date(Date.now() + 11 * 86400e3));
+    expect(await ecransGardes(id)).toEqual([]);
+    expect(lus).toEqual([]);
+    /* Payée, puis « Qui es-tu ? » renvoyé (deux onglets) : elle garde les 7 jours de sa lecture */
+    const payee = await importPartiel(randomUUID());
+    expect(await rattacherBrouillon(compte, payee.secret)).toBe(payee.id);
+    await definirQui(payee.id, QUI);
+    await garderJusquALaLecture(payee.id);
+    const avant = (await suiteDe(payee.id))!.expireLe.getTime();
+    expect(await poserLeVerdict(payee.id)).toBe("paiement");
+    expect((await suiteDe(payee.id))!.expireLe.getTime()).toBe(avant);
   });
 });
 
@@ -423,12 +528,13 @@ describe("une panne après le paiement", () => {
     const { id } = await importPartiel(serie);
     await garderJusquALaLecture(id);
     lus.length = 0;
-    /* Le lot du milieu tombe en panne, deux fois de suite (un nouvel essai, puis l’étape échoue) */
+    /* Le lot du milieu tombe en panne (le prestataire surchargé), deux fois de suite : l’étape échoue sur son erreur, telle quelle */
+    const surcharge = new Anthropic.InternalServerError(529, undefined, "surcharge", new Headers());
     lireUnLot = (ecrans) => {
-      if (ecrans[0] === 11) throw new Error("panne du prestataire");
+      if (ecrans[0] === 11) throw surcharge;
       return lecture(ecrans);
     };
-    await expect(lireLaSuite(id)).rejects.toMatchObject({ code: "suite_video" });
+    await expect(lireLaSuite(id)).rejects.toBe(surcharge);
     expect([...lus].sort((a, b) => a - b)).toEqual([0, 11, 11, 22]);
     expect((await ecransGardes(id)).map((g) => [g.rang, !!g.lu])).toEqual([
       [0, true],
@@ -441,6 +547,51 @@ describe("une panne après le paiement", () => {
     expect(await lireLaSuite(id)).toBe("lue");
     expect(lus).toEqual([11]);
     expect(await convDe(id)).toBe(await convDe(entiere.id));
+  });
+
+  it("une surcharge sur un lot de la suite aux trois essais du verdict : un échec passager (« api:529 »), que le passage des 5 minutes reprend comme un verdict ordinaire", async () => {
+    const { id, secret } = await importPartiel(randomUUID());
+    expect(await rattacherBrouillon(compte, secret)).toBe(id);
+    await definirQui(id, { moi: 0, pronom: "il", devinette: "vus", objectif: "ensemble", prenom: "Tom" });
+    expect(await poserLeVerdict(id)).toBe("paiement");
+    await debloquerLaConv(id);
+    expect(await lancerApresPaiement({ id, userId: compte.id })).toBe(true);
+    lus.length = 0;
+    lireUnLot = (ecrans) => {
+      if (ecrans[0] === 11) throw new Anthropic.InternalServerError(529, undefined, "surcharge", new Headers());
+      return lecture(ecrans);
+    };
+    await executerChaine(id);
+    /* Trois essais du verdict, deux lectures du lot en panne chacun ; les autres lots lus une fois, jamais repayés */
+    expect((await etatDesTaches(id, ["verdict"])).verdict).toMatchObject({ status: "echec", error: "api:529", attempts: 3 });
+    expect(lus.filter((k) => k === 11)).toHaveLength(6);
+    expect(lus.filter((k) => k !== 11).sort((a, b) => a - b)).toEqual([0, 22]);
+    /* Dix minutes plus tard, la panne passée : le passage des 5 minutes remet le verdict en attente, et la chaîne repart */
+    lireUnLot = lecture;
+    await db()
+      .update(schema.tasks)
+      .set({ updatedAt: new Date(Date.now() - 15 * 60_000) })
+      .where(eq(schema.tasks.storyId, id));
+    relais.length = 0;
+    await reprendreLesChainesEnPlan();
+    expect(relais).toContain(id);
+    expect((await etatDesTaches(id, ["verdict"])).verdict?.status).toBe("attente");
+    lus.length = 0;
+    await executerChaine(id);
+    expect((await etatDesTaches(id, ["verdict"])).verdict?.status).toBe("fini");
+    expect(lus).toEqual([11]);
+    expect((await mesureDe(id))?.suite).toBe("lue");
+  });
+
+  it("le budget du jour atteint sur un lot, une panne sur un autre : c’est le budget qui arrête l’étape (elle attend minuit sans user un essai)", async () => {
+    const { id } = await importPartiel(randomUUID());
+    await garderJusquALaLecture(id);
+    lireUnLot = (ecrans) => {
+      if (ecrans[0] === 11) throw new Anthropic.InternalServerError(529, undefined, "surcharge", new Headers());
+      if (ecrans[0] === 22) throw new ErreurTache("budget");
+      return lecture(ecrans);
+    };
+    await expect(lireLaSuite(id)).rejects.toMatchObject({ code: "budget" });
   });
 
   it("un lot refusé est sauté, une fois : la suite est incomplète, la conv a un trou", async () => {
@@ -496,37 +647,113 @@ describe("l’A/B et son interrupteur", () => {
   });
 });
 
+describe("un compte de l’équipe", () => {
+  it("son rapport ouvert d’avance : le verdict part tout de suite, la suite attend sa lecture 7 jours comme payée ; son plan ne compte pas dans l’A/B", async () => {
+    const equipe = await compteDeTest("equipe-partielle");
+    etat.equipe = [equipe.email.toLowerCase()];
+    try {
+      const { id, secret } = await importPartiel(randomUUID());
+      expect(await rattacherBrouillon(equipe, secret)).toBe(id);
+      expect(await poserLeVerdict(id)).toBe("parti");
+      const s = await suiteDe(id);
+      expect(s?.payeeLe).not.toBeNull();
+      expect(s!.expireLe.getTime()).toBeGreaterThan(Date.now() + 6 * 86400e3);
+      expect((await ecransGardes(id)).every((g) => g.expireLe.getTime() === s!.expireLe.getTime())).toBe(true);
+      expect((await etatDesTaches(id, ["verdict"])).verdict?.status).toBe("attente");
+      /* Connecté, son plan ne se note pas (tests ≠ clients) */
+      etat.cookies.set("blush-session", (await ouvrirSession(equipe.id)).secret);
+      const cle = randomUUID();
+      expect(await plan(videoDe("partielle"), { cle })).toBe("partielle");
+      expect(
+        await db()
+          .select()
+          .from(schema.plansVideo)
+          .where(eq(schema.plansVideo.envoi, envoiDe(cle)!)),
+      ).toEqual([]);
+    } finally {
+      etat.equipe = [];
+    }
+  });
+});
+
 describe("/admin compare les deux moitiés", () => {
   /** Ce que /admin dit de la lecture partielle sur 24 h. */
   const lecturePartielle = async (): Promise<Pilotage["lecturePartielle"]> => (await statsAdmin(1)).pilotage.lecturePartielle;
 
-  it("chaque moitié compte ses longues vidéos, ses lots lus et gardés, ses suites ; le contrefactuel compte les vidéos lues en entier", async () => {
+  it("chaque moitié compte ses longues vidéos dès leur plan (importées ou non, ses essais réunis), ses lots lus et gardés, ses suites ; le contrefactuel compte les vidéos lues en entier", async () => {
     const avant = await lecturePartielle();
     const serie = randomUUID();
     await importEntier(serie);
-    const { id } = await importPartiel(serie);
-    await lireLaSuite(id);
-    const apres = await lecturePartielle();
-    const ecart = (bras: BrasDeLaLecture) => {
-      const [a, b] = [avant.bras.find((x) => x.bras === bras)!, apres.bras.find((x) => x.bras === bras)!];
-      return {
-        videos: b.videos - a.videos,
-        lots: b.lots - a.lots,
-        ecrans: b.ecrans - a.ecrans,
-        gardes: b.lotsGardes - a.lotsGardes,
-        coupees: b.coupees - a.coupees,
-        lues: b.suites.lues - a.suites.lues,
+    const { id, secret } = await importPartiel(serie);
+    /* Une vidéo planifiée deux fois (un nouvel essai, sous une autre clé), jamais importée : une vidéo, aucun import */
+    const abandonnee = videoDe("partielle");
+    for (let k = 0; k < 2; k++) expect(await plan(abandonnee, { cle: randomUUID() })).toBe("partielle");
+    /* La partielle payée, son import d’il y a deux jours : un achat venu des relances */
+    expect(await rattacherBrouillon(compte, secret)).toBe(id);
+    await definirQui(id, { moi: 0, pronom: "il", devinette: "vus", objectif: "ensemble", prenom: "Tom" });
+    expect(await poserLeVerdict(id)).toBe("paiement");
+    await db()
+      .update(schema.imports)
+      .set({ creeLe: new Date(Date.now() - 2 * 86400e3) })
+      .where(eq(schema.imports.storyId, id));
+    const [achat] = await db()
+      .insert(schema.achats)
+      .values({ userId: compte.id, storyId: id, offre: "rapport", centimes: 990, bulles: 10, fournisseur: "factice", statut: "paye", payeLe: new Date() })
+      .returning({ id: schema.achats.id });
+    try {
+      await lireLaSuite(id);
+      const apres = await lecturePartielle();
+      const ecart = (bras: BrasDeLaLecture) => {
+        const [a, b] = [avant.bras.find((x) => x.bras === bras)!, apres.bras.find((x) => x.bras === bras)!];
+        return {
+          videos: b.videos - a.videos,
+          importees: b.importees - a.importees,
+          paywall: b.paywall - a.paywall,
+          payes: b.payes - a.payes,
+          payesTard: b.payesTard - a.payesTard,
+          lots: b.lots - a.lots,
+          ecrans: b.ecrans - a.ecrans,
+          gardes: b.lotsGardes - a.lotsGardes,
+          coupees: b.coupees - a.coupees,
+          lues: b.suites.lues - a.suites.lues,
+        };
       };
-    };
-    expect(apres.bras.map((b) => b.bras)).toEqual(["entiere", "partielle"]);
-    expect(ecart("entiere")).toEqual({ videos: 1, lots: LOTS, ecrans: ECRANS, gardes: 0, coupees: 0, lues: 0 });
-    expect(ecart("partielle")).toEqual({ videos: 1, lots: 5, ecrans: 56, gardes: 3, coupees: 1, lues: 1 });
-    expect(apres.contrefactuel.videos - avant.contrefactuel.videos).toBe(1);
-    expect(apres.contrefactuel.lotsEpargnables - avant.contrefactuel.lotsEpargnables).toBe(3);
-    /* Le temps jusqu’au paywall ne se compte qu’avec une première lecture notée (le modèle factice n’en note pas) */
-    expect(apres.bras.every((b) => b.secondesAuPaywall === null || b.secondesAuPaywall >= 0)).toBe(true);
-    /* Rien d’autre que des nombres : ni conv, ni identifiant */
-    expect(JSON.stringify(apres)).not.toMatch(new RegExp([id, serie].join("|")));
+      expect(apres.bras.map((b) => b.bras)).toEqual(["entiere", "partielle"]);
+      expect(ecart("entiere")).toEqual({ videos: 1, importees: 1, paywall: 0, payes: 0, payesTard: 0, lots: LOTS, ecrans: ECRANS, gardes: 0, coupees: 0, lues: 0 });
+      expect(ecart("partielle")).toEqual({ videos: 2, importees: 1, paywall: 1, payes: 1, payesTard: 1, lots: 5, ecrans: 56, gardes: 3, coupees: 1, lues: 1 });
+      expect(apres.contrefactuel.videos - avant.contrefactuel.videos).toBe(1);
+      expect(apres.contrefactuel.lotsEpargnables - avant.contrefactuel.lotsEpargnables).toBe(3);
+      /* Le temps jusqu’au paywall ne se compte qu’avec une première lecture notée (le modèle factice n’en note pas) */
+      expect(apres.bras.every((b) => b.secondesAuPaywall === null || b.secondesAuPaywall >= 0)).toBe(true);
+      /* Rien d’autre que des nombres : ni conv, ni identifiant, ni empreinte de vidéo */
+      expect(JSON.stringify(apres)).not.toMatch(new RegExp([id, serie, abandonnee].join("|")));
+    } finally {
+      /* L’achat, et la mesure vieillie de deux jours (le nettoyage de la fin ne prend que celles d’après le début du fichier) */
+      await db().delete(schema.achats).where(eq(schema.achats.id, achat!.id));
+      await db().delete(schema.imports).where(eq(schema.imports.storyId, id));
+    }
+  });
+
+  it("le plan se note une fois par envoi, dans l’A/B seulement : ni en « mesure », ni pour un morceau ajouté", async () => {
+    const plansDe = (cle: string) =>
+      db()
+        .select()
+        .from(schema.plansVideo)
+        .where(eq(schema.plansVideo.envoi, envoiDe(cle)!));
+    const cle = randomUUID();
+    const video = videoDe("entiere");
+    expect([await plan(video, { cle }), await plan(video, { cle })]).toEqual(["entiere", "entiere"]);
+    const notes = await plansDe(cle);
+    expect(notes.map((l) => l.bras)).toEqual(["entiere"]);
+    /* L’empreinte de la vidéo repassée par la clé du serveur : jamais celle du navigateur */
+    expect(notes[0]!.video).not.toContain(video);
+    const ajout = randomUUID();
+    expect(await plan(video, { cle: ajout, mode: "ajout" })).toBe("entiere");
+    expect(await plansDe(ajout)).toEqual([]);
+    etat.mode = "mesure";
+    const mesure = randomUUID();
+    expect(await plan(video, { cle: mesure })).toBe("entiere");
+    expect(await plansDe(mesure)).toEqual([]);
   });
 });
 

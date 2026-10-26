@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { heureDuRendu } from "@/lib/rendu";
 import { CHAPITRES_OFFERTS, NB_CHAPITRES, PREMIER_PAYANT } from "@/contenu/chapitres";
 import { suiteSure } from "@/lib/suite";
+import { suiteQuiAttend } from "@/server/ecrans-gardes";
 import { getAchatPaye, getReport } from "@/services/serveur";
 import { EcranDebloque } from "./EcranDebloque";
 import { PageDeConv } from "@/components/shell/PageDeConv";
@@ -51,6 +52,7 @@ export default async function Page({ searchParams }: PageProps<"/rapport/debloqu
         restants={restants}
         total={restants + offerts}
         reprise={avantLecture ? 1 : PREMIER_PAYANT}
+        avecLeDebut={avantLecture && (await suiteQuiAttend(achat.storyId))}
       />
     </PageDeConv>
   );

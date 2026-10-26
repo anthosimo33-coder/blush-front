@@ -295,8 +295,8 @@ describe("uploadRecording : une longue vidéo lue en partie avant l’achat", ()
     const avance: AvanceVideo[] = [];
     await expect(uploadRecording(VIDEO, "imessage", CASE_IMPORT.version, (a) => avance.push(a))).resolves.toEqual(IMPORTEE);
     const cle = champs[0]!.cle;
-    /* Le plan : la longue vidéo, l’empreinte de son lot le plus récent, son sens */
-    expect(plans).toEqual([{ lots: 8, video: expect.stringContaining(`:${sel}:77`), sensSur: true, consentement: CASE_IMPORT.version }]);
+    /* Le plan : la longue vidéo, l’empreinte de son lot le plus récent, son sens, et la clé de l’envoi (sa moitié s’y note) */
+    expect(plans).toEqual([{ lots: 8, video: expect.stringContaining(`:${sel}:77`), sensSur: true, cle, consentement: CASE_IMPORT.version }]);
     /* Du plus récent au plus ancien, le plus récent d’abord (« premier ») */
     expect(champs.map((c) => [c.indice, c.ordre])).toEqual([
       [7, "premier"],
@@ -313,10 +313,33 @@ describe("uploadRecording : une longue vidéo lue en partie avant l’achat", ()
     /* Ses trois lots plus anciens, gardés tels quels (jamais lus avant l’achat), sous la même clé, un à la fois, du plus ancien au plus récent */
     expect(gardes.map((g) => g.rang)).toEqual([0, 1, 2]);
     expect(gardes.every((g) => g.cle === cle && g.images === 12 && g.priorite === "low")).toBe(true);
-    /* Partis pendant la lecture, juste derrière les cinq lots à lire, avant la question */
+    /* Partis pendant la lecture, une fois la première lecture rendue (les images à lire d’abord), avant la question */
     expect(appels.slice(0, 7)).toEqual(["plan", ...[1, 2, 3, 4, 5].map((n) => `lot ${n} · essai 1`), "ecrans 0"]);
     expect(appels.filter((a) => a.startsWith("lot"))).toHaveLength(5);
-    expect(avance.filter((a) => a.etape === "lecture").at(-1)).toEqual({ etape: "lecture", faits: 5, total: 5 });
+    /* La jauge compte toute la vidéo dès le départ (« 5 sur 8 », jamais « 5 sur 5 »), puis passe au bout à « assez » */
+    const lecture = avance.filter((a) => a.etape === "lecture");
+    expect(lecture.every((a) => a.total === 8)).toBe(true);
+    expect(lecture.map((a) => a.faits)).toEqual([0, 1, 2, 3, 4, 5, 8]);
+  });
+
+  it("les lots à garder attendent la première lecture rendue : ils ne partagent pas le réseau avec les images du premier tour", async () => {
+    let rendre = () => {};
+    const rendues = new Promise<void>((ok) => (rendre = ok));
+    const { appels } = serveur({
+      lot: async (n, essai, indice) => {
+        await rendues;
+        return lu(n, essai, indice);
+      },
+      plan: () => json({ lecture: "partielle" }),
+      video: (_corps, k) => (k === 1 ? json({ suite: "garder", lots: 3 }) : json(IMPORTEE)),
+    });
+    const envoi = uploadRecording(VIDEO, "imessage", CASE_IMPORT.version);
+    await vi.waitFor(() => expect(appels.filter((a) => a.startsWith("lot"))).toHaveLength(5));
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(appels.some((a) => a.startsWith("ecrans"))).toBe(false);
+    rendre();
+    await expect(envoi).resolves.toEqual(IMPORTEE);
+    expect(appels.filter((a) => a.startsWith("ecrans"))).toEqual(["ecrans 0", "ecrans 1", "ecrans 2"]);
   });
 
   it("les lots à garder encore en route quand la lecture finit : la personne voit leur envoi, puis la fin avec eux", async () => {

@@ -449,14 +449,18 @@ export async function uploadRecording(
   const longue = !!empreinteVideo;
   const partielle =
     longue &&
-    (await appel("POST /api/captures/video/plan", { corps: { lots: lots.length, video: empreinteVideo, sensSur, consentement } }).then(
+    (await appel("POST /api/captures/video/plan", { corps: { lots: lots.length, video: empreinteVideo, sensSur, cle, consentement } }).then(
       (r) => r.lecture === "partielle",
       () => false,
     ));
 
-  /* Où en est la lecture : les lots lus, sur ceux qu’on lira avant l’achat (une longue vidéo lue en partie : ceux du plan, pour l’instant) */
+  /*
+   * Où en est la lecture : les lots lus, sur tous ceux de la vidéo. Une longue vidéo lue en partie aussi : un total qui
+   * grandissait à chaque tour (« 5 sur 5 », puis « 5 sur 10 ») faisait croire que la lecture repartait de zéro, juste
+   * avant le paywall ; quand le serveur dit « assez », la jauge passe d’un coup à la fin
+   */
   let faits = 0;
-  let total = 0;
+  const total = lots.length;
   /*
    * Un lot qui échoue encore après un nouvel essai (ou la page fermée, plus bas) : les autres s’arrêtent (pas d’appels
    * payés pour rien), ici et chez le serveur
@@ -483,10 +487,12 @@ export async function uploadRecording(
     if (o) fd.append("ordre", o);
     return (await appel("POST /api/captures/lot", { corps: fd, signal: arret.signal })).lot;
   };
+  /* La première lecture rendue (ses images parties, et sans doute celles des lots partis avec elle) : les lots à garder peuvent partir */
+  let direPremiereRendue = () => {};
+  const premiereRendue = new Promise<void>((ok) => (direPremiereRendue = ok));
   /* Les lots `tour` (dans l’ordre où ils partent) qui ne sont pas encore lus, LECTEURS_DE_LOTS à la fois */
   const lire = async (tour: number[]) => {
     const aLire = tour.filter((k) => lus[k] === undefined);
-    total += tour.length;
     faits += tour.length - aLire.length;
     if (premier === undefined) premier = aLire.length < 2 ? null : aLire[0]!;
     onAvance?.({ etape: "lecture", faits, total });
@@ -511,6 +517,7 @@ export async function uploadRecording(
           throw e;
         }
         garderLeLot(empreintes[k] ?? null, { lot: lus[k], cle });
+        direPremiereRendue();
         onAvance?.({ etape: "lecture", faits: ++faits, total });
       }
     };
@@ -539,10 +546,12 @@ export async function uploadRecording(
   /*
    * Les lots plus anciens d’une longue vidéo lue en partie, envoyés tels quels pour après le paiement
    * (POST /api/captures/ecrans) pendant que BLUSH lit les plus récents : pendant ses 25 à 30 s de lecture, le réseau est
-   * libre. Un à la fois, en priorité basse (les lots à lire passent d’abord), du plus ancien au plus récent : les plus
-   * anciens sont ceux qu’aucun tour ne lira. `borne` : les lots qu’on garde encore, ceux qu’aucun tour de lecture ne
-   * prendra (le serveur qui dit d’en lire plus la fait descendre ; les lots envoyés au-delà, il les efface à l’import).
-   * Un envoi qui échoue arrête la file : ces lots se liront avant l’achat, comme avant.
+   * libre. Seulement une fois la première lecture rendue (ou le tour fini) : sur un réseau montant faible, ils
+   * partageaient la bande avec les images du premier tour, encore en route (la priorité basse ne règle pas l’envoi du
+   * corps d’une requête). Un à la fois, en priorité basse, du plus ancien au plus récent : les plus anciens sont ceux
+   * qu’aucun tour ne lira. `borne` : les lots qu’on garde encore, ceux qu’aucun tour de lecture ne prendra (le serveur
+   * qui dit d’en lire plus la fait descendre ; les lots envoyés au-delà, il les efface à l’import). Un envoi qui échoue
+   * arrête la file : ces lots se liront avant l’achat, comme avant.
    */
   let borne = 0;
   let envoyes = 0;
@@ -594,7 +603,11 @@ export async function uploadRecording(
         /* Le premier tour parti, ses lots à lire en route : les plus anciens partent derrière eux, pour être gardés */
         if (debut === lots.length && de > 0) {
           borne = de;
-          fileDEnvoi = garderEnFond();
+          const finDuTour = lecture.then(
+            () => {},
+            () => {},
+          );
+          fileDEnvoi = Promise.race([premiereRendue, finDuTour]).then(garderEnFond);
         }
         await lecture;
         debut = de;
@@ -603,9 +616,13 @@ export async function uploadRecording(
         if (!("suite" in r)) return r;
         if (r.suite === "garder") {
           /*
-           * Ses lots plus anciens tous partis (on attend les derniers, en disant où ils en sont), puis la fin, qui crée la
-           * conv avec eux ; un envoi raté, ou un lot que le serveur n’a plus : on les lit, comme avant
+           * Assez lu : la jauge de lecture va au bout. Ses lots plus anciens tous partis (on attend les derniers, en disant
+           * où ils en sont), puis la fin, qui crée la conv avec eux ; un envoi raté, ou un lot que le serveur n’a plus : on
+           * les lit, comme avant
            */
+          const lusAvant = faits;
+          faits = total;
+          onAvance?.({ etape: "lecture", faits, total });
           borne = Math.min(borne, debut);
           if (envoyes < borne) {
             enAttente = true;
@@ -615,6 +632,8 @@ export async function uploadRecording(
           enAttente = false;
           const creee = tousPartis ? await fin(debut, true) : null;
           if (creee && !("suite" in creee)) return creee;
+          /* Ils se lisent finalement avant l’achat : la jauge reprend où elle en était */
+          faits = lusAvant;
           borne = 0;
           tour = debut;
         } else {

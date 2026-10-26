@@ -79,7 +79,8 @@ export function ConvOkScreen({ story, source, ajout }: { story: Story; source: S
 
       {/*
        * Une longue vidéo lue en partie avant l’achat (src/server/lecture-partielle.ts) : ses nombres sont ceux de la partie
-       * lue, on dit pourquoi, et que le début n’est pas perdu (inutile de l’ajouter).
+       * lue, on dit pourquoi, et que le début n’est pas perdu (inutile de l’ajouter). Vrai tant que la conv peut être
+       * achetée : son début est gardé 11 jours après le paywall, le temps des relances (src/server/ecrans-gardes.ts).
        * TODO(produit): texte nouveau (26 octobre, la lecture partielle des longues vidéos), absent de la maquette
        */}
       {source.suiteVideo && (

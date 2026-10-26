@@ -35,8 +35,9 @@ const APPLIS_CAPTURES: AppKind[] = ["instagram", "hinge", "imessage"];
 
 /**
  * Où en est un enregistrement, dit simplement : la vidéo regardée dans le téléphone, puis lue par BLUSH ; une longue
- * vidéo lue en partie, puis le reste de ses écrans envoyé pour après le paiement.
- * TODO(produit): « J’envoie la suite de ta conv » (26 octobre, la lecture partielle des longues vidéos), à valider.
+ * vidéo lue en partie, puis le reste de ses écrans envoyé pour après le paiement : les plus anciens, « le début » de la
+ * conv, le même mot que l’écran « C’est bon » (la suite, pour la personne, ce sont les messages d’après).
+ * TODO(produit): « J’envoie le début de ta conv » (26 octobre, la lecture partielle des longues vidéos), à valider.
  */
 const texteAvance = (a: AvanceVideo) =>
   a.etape === "reprise"
@@ -44,7 +45,7 @@ const texteAvance = (a: AvanceVideo) =>
     : a.etape === "video"
       ? `Je regarde ton enregistrement · ${Math.round(a.p * 100)}\u00a0%`
       : a.etape === "envoi"
-        ? `J’envoie la suite de ta conv · ${a.faits} sur ${a.total}`
+        ? `J’envoie le début de ta conv · ${a.faits} sur ${a.total}`
         : a.total > 1
           ? `BLUSH lit ta conv · ${a.faits} sur ${a.total}`
           : "BLUSH lit ta conv";

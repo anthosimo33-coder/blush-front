@@ -4,6 +4,7 @@ import { versTexteCaptures } from "@prompts/lib/captures";
 import type { Image } from "@prompts/lib/contextes";
 import { LECTEURS_DE_LOTS } from "@/lib/limites";
 import type { IssueDeLaSuite } from "@/types";
+import { PAYEUR_DE_LA_SUITE } from "./budget";
 import { lireLot } from "./captures";
 import * as coffre from "./coffre";
 import { db, schema } from "./db";
@@ -14,6 +15,7 @@ import { completerLaConv } from "./histoires";
 import { ErreurImport } from "./import";
 import { noterLaSuite } from "./imports";
 import { journal } from "./journal";
+import { pause } from "./temps";
 import { fusionnerLots } from "./video";
 
 /*
@@ -27,8 +29,10 @@ import { fusionnerLots } from "./video";
 
 /** Les essais d’un lot de la suite avant que l’étape échoue (et reparte, sur les lots qui manquent). */
 const ESSAIS_PAR_LOT = 2;
+/** La pause entre ces deux essais (une surcharge, une coupure : elle a souvent passé), comme la chaîne entre deux essais d’une étape. */
+const PAUSE_ENTRE_DEUX_ESSAIS_MS = 3000;
 /** Au plus, ce que la suite attend le début de son premier lot avant de lancer les autres (comme ATTENTE_DU_PREMIER_MS, src/server/lots.ts). */
-const ATTENTE_DU_PREMIER_MS = 8_000;
+const ATTENTE_DU_PREMIER_MS = 6_000;
 
 /* ———— La lecture, avant le verdict ———— */
 
@@ -41,8 +45,11 @@ type LotGarde = { rang: number; medias: string[]; tailles: number[]; lu: Buffer 
  * puis les autres, LECTEURS_DE_LOTS à la fois, chacun avec la requête de l’import (le jour de l’import, l’appli, rien de ce qu’on a appris
  * depuis) : le modèle lit chaque écran comme il l’aurait lu à l’import. Chaque lecture s’écrit dès qu’elle arrive : un
  * nouvel essai de l’étape ne paie jamais deux fois un lot. Un lot refusé ou illisible est sauté (un trou dans la conv,
- * « incomplete »). Une panne passagère, deux fois de suite : l’étape échoue (« suite_video ») et repart sur ceux qui
- * manquent ; le budget du jour atteint l’arrête comme tout appel.
+ * « incomplete »). Une panne, deux fois de suite (après une pause) : l’étape échoue avec l’erreur du prestataire telle
+ * quelle (son code, « api:529… », est celui d’un échec passager, que le passage des 5 minutes reprend : ECHEC_PASSAGER,
+ * src/server/pipeline.ts), et repart sur ceux qui manquent ; le budget du jour atteint l’arrête comme tout appel (parmi
+ * plusieurs lots en échec, c’est lui qui l’emporte : l’étape attend minuit au lieu d’user un essai). La suite se paie
+ * sur sa part du budget du jour (PAYEUR_DE_LA_SUITE, src/server/budget.ts), pas sur celle du compte de l’acheteur.
  * Puis les lectures, des lots gardés et des lots déjà lus, se rassemblent dans l’ordre de la vidéo (fusionnerLots) : la
  * même conv, à l’octet, qu’une vidéo lue d’un coup. Le nom de l’autre reste celui de l’import (le paywall l’a montré,
  * « Qui es-tu ? » s’en est servi). Les écrans et la suite s’effacent dans la même transaction. `surAvance` : les lots
@@ -100,15 +107,18 @@ export async function lireLaSuite(storyId: string, surAvance?: (faits: number, t
       while (suivant < autres.length) await lireUn(autres[suivant++]!);
     };
     const issues = await Promise.allSettled([lePremier.then(lecteur), ...Array.from({ length: Math.min(LECTEURS_DE_LOTS - 1, autres.length) }, lecteur)]);
-    const echec = issues.find((i) => i.status === "rejected");
-    if (echec) throw echec.reason;
+    const echecs = issues.flatMap((i) => (i.status === "rejected" ? [i.reason as unknown] : []));
+    /* Le budget du jour d’abord : l’étape attend minuit sans user un essai, au lieu d’échouer sur la panne d’un autre lot */
+    const [echec] = [...echecs.filter((e) => e instanceof ErreurTache && estBudget(e)), ...echecs];
+    if (echec !== undefined) throw echec;
   }
   return completer(storyId, suite);
 }
 
 /**
  * Lit un lot de la suite, et garde sa lecture (chiffrée) sur sa ligne. Refusé ou illisible : sauté (marqué, pour ne pas
- * le relire). Une panne passagère : un nouvel essai, puis l’étape échoue. Le budget du jour atteint : l’erreur remonte.
+ * le relire). Une panne : une pause, un nouvel essai, puis l’étape échoue sur l’erreur telle quelle. Le budget du jour
+ * atteint, ou l’échéance : l’erreur remonte tout de suite.
  */
 async function lireUnLot(storyId: string, suite: typeof schema.suitesVideo.$inferSelect, l: LotGarde, auDebut?: () => void): Promise<void> {
   const ou = and(eq(schema.ecransGardes.storyId, storyId), eq(schema.ecransGardes.rang, l.rang));
@@ -118,7 +128,7 @@ async function lireUnLot(storyId: string, suite: typeof schema.suitesVideo.$infe
   const images: Image[] = coffre.lireImages(ligne.data, l.tailles).map((o, k) => ({ media: mediaDe(l.medias[k]), base64: o.toString("base64") }));
   for (let essai = 1; ; essai++) {
     try {
-      const lu = await lireLot(images, suite.appli, "captures_suite", { storyId, jour: suite.jour, ...(auDebut ? { auDebut } : {}) });
+      const lu = await lireLot(images, suite.appli, "captures_suite", { storyId, payeur: PAYEUR_DE_LA_SUITE, jour: suite.jour, ...(auDebut ? { auDebut } : {}) });
       await db()
         .update(schema.ecransGardes)
         .set({ lu: coffre.ecrire("ecrans_gardes.lu", lu) })
@@ -131,7 +141,12 @@ async function lireUnLot(storyId: string, suite: typeof schema.suitesVideo.$infe
         await db().update(schema.ecransGardes).set({ saute: true }).where(ou);
         return;
       }
-      if ((e instanceof ErreurTache && (estBudget(e) || e.code === "delai")) || essai >= ESSAIS_PAR_LOT) throw e instanceof ErreurTache ? e : new ErreurTache("suite_video");
+      /*
+       * Jamais un code à nous à la place de celui du prestataire : « api:529 » (une surcharge) se reprend seul 10 minutes
+       * après, un code inconnu de ECHEC_PASSAGER laissait le verdict d’un acheteur en échec pour de bon
+       */
+      if ((e instanceof ErreurTache && (estBudget(e) || e.code === "delai")) || essai >= ESSAIS_PAR_LOT) throw e;
+      await pause(PAUSE_ENTRE_DEUX_ESSAIS_MS);
     }
   }
 }
@@ -169,8 +184,9 @@ async function completer(storyId: string, suite: typeof schema.suitesVideo.$infe
 
 /**
  * Une conv sans suite en base : si la mesure dit qu’elle en attendait une (des lots gardés, jamais lus), ses écrans ont été
- * effacés avant le paiement (payée après 24 h). Le verdict part sur la partie lue avant l’achat : « perdue ».
- * TODO(produit): le dire au modèle (comme un export coupé, meta.coupe), ou à l’écran ? Et garder plus de 24 h les suites des comptes que les mails S1 relancent ?
+ * effacés avant le paiement (payée plus de 11 jours après le paywall, la fin des relances : src/server/ecrans-gardes.ts).
+ * Le verdict part sur la partie lue avant l’achat : « perdue ». Rare depuis que la suite attend la fin des relances.
+ * TODO(produit): le dire au modèle et à l’écran (une suite perdue, ou incomplète : un lot sauté), par la ligne « d’où vient chaque morceau » de la conv en morceaux (blush-front#124, pas encore fusionnée) ?
  */
 async function suitePerdue(storyId: string): Promise<IssueDeLaSuite | null> {
   const [m] = await db()

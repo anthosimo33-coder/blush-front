@@ -4,6 +4,7 @@ import type { GenreDuHaut } from "@/contenu/haut-du-paywall";
 import type { AppKind, BrasDeLaLecture, Contrefactuel, IssueDeLaSuite, TypeDImport } from "@/types";
 import { empreinte, jeton } from "./chiffrement";
 import { db, schema } from "./db";
+import { estEquipe } from "./droits";
 import { auMieux } from "./journal";
 
 /*
@@ -91,6 +92,27 @@ export async function noterImport({ storyId, type, appli, ecrans, lots, envoi, r
     },
     "import non mesuré",
     { type },
+  );
+}
+
+/**
+ * Le plan d’une longue vidéo de l’A/B (POST /api/captures/video/plan, src/server/lecture-partielle.ts), noté avant toute
+ * lecture : l’empreinte de son envoi, sa moitié, et l’empreinte de la vidéo (`video`, celle de son lot le plus récent,
+ * que le navigateur calcule sur ses images : repassée par la clé du serveur, elle ne se compare à rien d’autre). /admin
+ * compare les deux moitiés sur les vidéos planifiées, une vidéo renvoyée comptée une fois, et non sur les seules convs
+ * nées. Pas un compte de l’équipe (`compte`, celui de la session : tests ≠ clients). Le même envoi replanifié ne s’écrit
+ * pas deux fois. Ne lève jamais.
+ */
+export async function noterLePlan({ envoi, video, bras, compte }: { envoi: string; video: string; bras: BrasDeLaLecture; compte: { email: string } | null }): Promise<void> {
+  if (compte && estEquipe(compte)) return;
+  await auMieux(
+    () =>
+      db()
+        .insert(schema.plansVideo)
+        .values({ envoi, video: empreinte(`video:${video}`), bras })
+        .onConflictDoNothing(),
+    "plan de la vidéo non noté",
+    { bras },
   );
 }
 

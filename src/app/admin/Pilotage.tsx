@@ -1346,9 +1346,10 @@ function IAAvantLAchat({ p }: { p: Chiffres }) {
 
 /**
  * Les deux moitiés de l’A/B de la lecture partielle (src/server/lecture-partielle.ts), côte à côte : la moitié qui lit
- * tout avant l’achat, celle qui n’en lit que la partie récente (le reste lu après le paiement). Ce qu’elles coûtent avant
- * l’achat, ce qu’elles vendent, en combien de temps elles arrivent au paywall, et le titre qu’elles y montrent. Puis le
- * contrefactuel des vidéos lues en entier : ce que la lecture partielle leur aurait changé.
+ * tout avant l’achat, celle qui n’en lit que la partie récente (le reste lu après le paiement). Comptées dès leur plan
+ * (importées ou non) : ce qu’elles coûtent avant l’achat, ce qu’elles vendent (avec les effectifs, un taux n’étant
+ * lisible qu’à partir de PERSONNES_D_UN_TAUX vidéos), en combien de temps elles arrivent au paywall, et le titre qu’elles y
+ * montrent. Puis le contrefactuel des vidéos lues en entier : ce que la lecture partielle leur aurait changé.
  */
 function LecturePartielle({ p }: { p: Chiffres }) {
   const { bras, contrefactuel: c } = p.lecturePartielle;
@@ -1360,16 +1361,19 @@ function LecturePartielle({ p }: { p: Chiffres }) {
     return t === null ? "—" : pourcent(t * 100, 0);
   };
   const lignes: [string, (b: (typeof bras)[number]) => string][] = [
-    ["Longues vidéos", (b) => nombre(b.videos)],
-    ["Au paywall", (b) => taux(b.paywall, b.videos)],
+    ["Longues vidéos (au plan)", (b) => nombre(b.videos)],
+    ["Importées", (b) => `${nombre(b.importees)} · ${taux(b.importees, b.videos)}`],
+    ["Au paywall", (b) => `${nombre(b.paywall)} · ${taux(b.paywall, b.videos)}`],
     ["Paient", (b) => `${nombre(b.payes)} · ${taux(b.payes, b.videos)}`],
+    /* L’achat venu des relances (la suite gardée 11 jours après le paywall pour lui) */
+    ["Paient plus de 24\u00a0h après", (b) => nombre(b.payesTard)],
     ["IA avant l’achat, par vidéo", (b) => (rapport(b.dollarsAvant, b.videos) === null ? "—" : dollars(b.dollarsAvant / b.videos))],
     ["Suite lue après, par acheteur", (b) => (rapport(b.dollarsSuite, b.payes) === null ? "—" : dollars(b.dollarsSuite / b.payes))],
     ["IA de lecture par acheteur", (b) => (rapport(b.dollarsAvant + b.dollarsSuite, b.payes) === null ? "—" : dollars((b.dollarsAvant + b.dollarsSuite) / b.payes))],
     ["Jusqu’au paywall (médiane)", (b) => (b.secondesAuPaywall === null ? "—" : duree(b.secondesAuPaywall))],
-    ["Lus avant l’achat, par vidéo", (b) => (b.videos ? `${pluriel(moyenne(b.ecrans / b.videos), "écran")}, ${pluriel(moyenne(b.lots / b.videos), "lot")}` : "—")],
-    ["Coupées avant l’achat", (b) => (b.bras === "partielle" ? taux(b.coupees, b.videos) : "—")],
-    ["Lots gardés, par vidéo", (b) => (b.videos ? nombre(moyenne(b.lotsGardes / b.videos)) : "—")],
+    ["Lus avant l’achat, par import", (b) => (b.importees ? `${pluriel(moyenne(b.ecrans / b.importees), "écran")}, ${pluriel(moyenne(b.lots / b.importees), "lot")}` : "—")],
+    ["Coupées avant l’achat", (b) => (b.bras === "partielle" ? taux(b.coupees, b.importees) : "—")],
+    ["Lots gardés, par import", (b) => (b.importees ? nombre(moyenne(b.lotsGardes / b.importees)) : "—")],
     ["Titre «\u00a0Tendance\u00a0»", (b) => taux(b.tendance, b.titres)],
     ["Suites lues, incomplètes, perdues", (b) => (b.bras === "partielle" ? `${nombre(b.suites.lues)}, ${nombre(b.suites.incompletes)}, ${nombre(b.suites.perdues)}` : "—")],
     /* La conv entière, une fois sa suite lue : un autre titre que celui que le paywall a montré (la moitié entière : le contrefactuel, plus bas) */

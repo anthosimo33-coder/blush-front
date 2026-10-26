@@ -15,8 +15,9 @@ import { fusionnerLots } from "./video";
 /*
  * La lecture partielle d’une longue vidéo (#3 de l’audit des coûts, 26 octobre 2026). Avant l’achat, BLUSH ne lit mot
  * pour mot que la partie la plus récente d’un long enregistrement d’écran : assez d’écrans pour les chiffres du haut du
- * paywall. Le reste de ses écrans est gardé, chiffré (src/server/suite-video.ts), et lu après le paiement, avant le
- * verdict ; effacé si rien n’est payé dans les 24 h. Le rapport, la mémoire et le chat d’un acheteur lisent toute la conv,
+ * paywall. Le reste de ses écrans est gardé, chiffré (src/server/ecrans-gardes.ts), et lu après le paiement, avant le
+ * verdict (src/server/suite-video.ts) ; effacé si rien n’est payé tant que la conv peut l’être (11 jours après le
+ * paywall, le temps des relances). Le rapport, la mémoire et le chat d’un acheteur lisent toute la conv,
  * comme avant. Ce que le modèle lit pour un écran ne change pas : seulement quand.
  *
  * Ce module dit, sans modèle ni base : si une vidéo est longue et dans quelle moitié de l’A/B elle tombe (brasDe), son
@@ -66,7 +67,7 @@ export const planDeLecture = (v: VideoAPlanifier): BrasDeLaLecture => (brasDeLaV
 /* ———— La règle d’arrêt ———— */
 
 const J = 86400e3;
-/** Une conv lue sur 24 semaines datées : les 8 de référence et les 16 de la courbe du haut du paywall. Au-delà, on s’arrête. */
+/** Une conv lue sur 24 semaines datées : les 8 de référence et les 16 de la courbe du haut du paywall. Au-delà, on s’arrête (une chute plus ancienne est perdue : decider). */
 const SEMAINES_ASSEZ = 24;
 /** La tendance du haut du paywall demande 7 semaines au moins (4 avant la chute, 3 depuis) : en dessous, elle est impossible. */
 const SEMAINES_D_UNE_TENDANCE = 7;
@@ -78,8 +79,9 @@ export type OuEnEst = { restants: number; ecrans: number; appli: string; jour: s
 
 /**
  * Faut-il lire plus loin avant l’achat ? `lus` : les lots les plus récents de la vidéo, déjà lus, dans son ordre (du plus
- * ancien au plus récent). « assez » : la partie lue donne les mêmes chiffres au haut du paywall que toute la vidéo ;
- * « encore » : un tour de plus (les lots juste avant) ; « tout » : on lit tout, comme avant. Dans l’ordre :
+ * ancien au plus récent). « assez » : la partie lue donne presque toujours les mêmes chiffres au haut du paywall que
+ * toute la vidéo (pas toujours : voir les 24 semaines, plus bas, et le contrefactuel qui le mesure) ; « encore » : un
+ * tour de plus (les lots juste avant) ; « tout » : on lit tout, comme avant. Dans l’ordre :
  * - plus rien à lire : « assez » ;
  * - le sens douteux (le navigateur le dit, ou des dates qui reculent d’un lot au suivant, ou après le jour de l’import) :
  *   « tout » (on garderait peut-être des écrans récents) ;
@@ -88,7 +90,10 @@ export type OuEnEst = { restants: number; ecrans: number; appli: string; jour: s
  * - une chute trouvée : « assez » avec ses huit semaines de référence (les mêmes chiffres que sur toute la conv), sinon
  *   « encore » (elle serait mal datée) ;
  * - aucun message daté à l’heure : « assez » (une tendance est impossible sur toute la vidéo, la même appli) ;
- * - 24 semaines datées lues : « assez » ;
+ * - 24 semaines datées lues : « assez ». Une chute plus ancienne (il en faut 4 avant elle dans la partie lue, soit plus
+ *   d’une vingtaine de semaines avant l’import), que tendance() trouverait sur toute la conv, est alors perdue : le titre
+ *   devient « Sans assez de chiffres ». Le cas des longues convs qui se sont refroidies, celles des ex : le contrefactuel
+ *   le compte (« tendance perdue »), à regarder pendant la mesure, avant de relever SEMAINES_ASSEZ ;
  * - toute la vidéo, d’après la durée lue par écran (et une marge), dure moins de 7 semaines : « assez » ;
  * - sinon, « encore ».
  * Sans modèle : quelques millisecondes, les mêmes fonctions que le haut du paywall.

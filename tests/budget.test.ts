@@ -27,6 +27,7 @@ import {
   controlerBudget,
   noterDepense,
   oublierLeBudget,
+  PAYEUR_DE_LA_SUITE,
   payeurDuCompte,
   partSansCompteDuJour,
   reserver,
@@ -152,6 +153,24 @@ describe("la dépense d’un compte", () => {
     await depense(null, BUDGET_IA.anonyme);
     expect(await controle()).toBe("budget");
     expect(await controle(a.id)).toBe("ok");
+  });
+
+  it("la suite d’une longue vidéo, lue après le paiement, a sa part à elle : le compte de l’acheteur au bout de son budget n’arrête pas sa lecture, et elle ne lui coûte rien", async () => {
+    const a = await compteEtConv();
+    await depense(a.payeur, BUDGET_IA.compte);
+    oublierLeBudget();
+    expect(await controle(a.id)).toBe("budget");
+    const suite = () =>
+      controlerBudget({ storyId: a.id, payeur: PAYEUR_DE_LA_SUITE }).then(
+        (p) => p,
+        (e: unknown) => (e instanceof ErreurTache ? e.code : "autre"),
+      );
+    expect(await suite()).toBe(PAYEUR_DE_LA_SUITE);
+    /* Sa part épuisée, elle attend minuit comme les autres, sans toucher à la part sans compte */
+    await depense(PAYEUR_DE_LA_SUITE, BUDGET_IA.suite);
+    oublierLeBudget();
+    expect(await suite()).toBe("budget");
+    expect(await controle()).toBe("ok");
   });
 
   it("au-delà du budget du jour pour tous, plus personne n’appelle le modèle", async () => {

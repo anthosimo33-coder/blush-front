@@ -164,16 +164,19 @@ export const LIMITES = {
   lotParIp: { max: 600, fenetreS: 3600 },
   /*
    * Les écrans gardés d’une longue vidéo lue en partie avant l’achat (POST /api/captures/ecrans, src/server/suite-video.ts) :
-   * des lots d’images que le modèle ne lit pas tout de suite, chiffrés en base 24 h au plus. Rien n’y coûte une lecture,
-   * mais tout y prend de la place chez Neon. Par heure et par adresse, autant que de lots (une longue vidéo en garde dix au
-   * plus). Leurs octets, en Ko, comme ceux des imports (S-02) : par adresse IP et par 24 h, de quoi passer le NAT d’un
-   * opérateur mobile (une longue vidéo en garde 15 à 30 Mo, 60 au pire) ; pour tous, par jour de Paris, une centaine de
-   * longues vidéos (prévenu à `alerteA`, puis au premier refus). Au-delà, l’envoi est refusé : le navigateur lit alors le
-   * reste avant l’achat, comme avant (rien n’est perdu, c’est seulement plus cher).
+   * des lots d’images que le modèle ne lit pas tout de suite, chiffrés en base le temps que la conv puisse être achetée
+   * (src/server/ecrans-gardes.ts). Rien n’y coûte une lecture, mais tout y prend de la place chez Neon, et son historique
+   * de restauration en garde la trace toute sa fenêtre : un abus sans compte remplirait la base dont dépend toute
+   * l’appli. Par heure et par adresse, autant que de lots (une longue vidéo en garde dix au plus). Leurs octets, en Ko,
+   * comme ceux des imports (S-02) : par adresse IP et par 24 h, cinq à dix longues vidéos (une longue vidéo en garde 15
+   * à 30 Mo, 60 au pire), de quoi passer le NAT d’un opérateur mobile ; pour tous, par jour de Paris, 300 Mo, dix fois
+   * ce qu’on attend (une à deux longues vidéos par jour dans la moitié partielle ; ramené de 3 Go le 26 octobre),
+   * prévenu à `alerteA`, puis au premier refus. Au-delà, l’envoi est refusé : le navigateur lit alors le reste avant
+   * l’achat, comme avant (rien n’est perdu ni refusé à la personne, c’est seulement plus cher).
    */
   ecransParIp: { max: 600, fenetreS: 3600 },
-  koEcransParIp: { max: 300_000, fenetreS: 86400 },
-  koEcransParJour: { max: 3_000_000, fenetreS: 2 * 86400, alerteA: 0.8 },
+  koEcransParIp: { max: 150_000, fenetreS: 86400 },
+  koEcransParJour: { max: 300_000, fenetreS: 2 * 86400, alerteA: 0.8 },
   /** Des captures ou un export envoyés après l’import (dans le chat ou pour sa fiche) : les lire coûte plus qu’un message. */
   ajoutParCompte: { max: 40, fenetreS: 86400 },
   /**

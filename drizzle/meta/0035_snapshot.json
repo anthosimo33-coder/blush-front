@@ -1,5 +1,5 @@
 {
-  "id": "2f4e49b9-0432-4546-81aa-169cc8bef208",
+  "id": "d4506604-4927-4617-be3f-9dd2de9fa819",
   "prevId": "23600fb6-668b-475c-ae3e-f97a69de22d9",
   "version": "7",
   "dialect": "postgresql",
@@ -2480,6 +2480,60 @@
           ]
         }
       },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.plans_video": {
+      "name": "plans_video",
+      "schema": "",
+      "columns": {
+        "envoi": {
+          "name": "envoi",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "video": {
+          "name": "video",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "bras": {
+          "name": "bras",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "cree_le": {
+          "name": "cree_le",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "plans_video_cree_idx": {
+          "name": "plans_video_cree_idx",
+          "columns": [
+            {
+              "expression": "cree_le",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},

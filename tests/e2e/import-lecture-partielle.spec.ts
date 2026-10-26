@@ -42,6 +42,12 @@ test("une longue vidéo lue en partie : ses lots récents lus, les autres gardé
       timeout: RESEAU,
     });
     expect(qui.status()).toBe(200);
+    /* Le paywall : la suite attend le paiement le temps des relances (11 jours), et la moitié de la vidéo est notée dès son plan */
+    const [auPaywall] = await sql()<{ jours: number }[]>`
+      select extract(epoch from expire_le - now()) / 86400 as jours from suites_video where story_id = ${histoire}`;
+    expect(Number(auPaywall?.jours)).toBeGreaterThan(10.9);
+    const [plan] = await sql()<{ bras: string }[]>`select p.bras from plans_video p join imports i on i.envoi = p.envoi where i.story_id = ${histoire}`;
+    expect(plan?.bras).toBe("partielle");
     await payer(page, "rapport");
     const taches = await attendreTaches(email, { timeout: 2 * RESEAU });
     expect(taches.find((t) => t.genre === "verdict")?.statut).toBe("fini");

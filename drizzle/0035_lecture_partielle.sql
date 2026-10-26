@@ -12,6 +12,13 @@ CREATE TABLE "ecrans_gardes" (
 	CONSTRAINT "ecrans_gardes_envoi_rang_pk" PRIMARY KEY("envoi","rang")
 );
 --> statement-breakpoint
+CREATE TABLE "plans_video" (
+	"envoi" text PRIMARY KEY NOT NULL,
+	"video" text NOT NULL,
+	"bras" text NOT NULL,
+	"cree_le" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
 CREATE TABLE "suites_video" (
 	"story_id" uuid PRIMARY KEY NOT NULL,
 	"envoi" text NOT NULL,
@@ -36,4 +43,5 @@ ALTER TABLE "ecrans_gardes" ADD CONSTRAINT "ecrans_gardes_story_id_stories_id_fk
 ALTER TABLE "suites_video" ADD CONSTRAINT "suites_video_story_id_stories_id_fk" FOREIGN KEY ("story_id") REFERENCES "public"."stories"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 CREATE INDEX "ecrans_gardes_story_idx" ON "ecrans_gardes" USING btree ("story_id");--> statement-breakpoint
 CREATE INDEX "ecrans_gardes_expire_idx" ON "ecrans_gardes" USING btree ("expire_le");--> statement-breakpoint
+CREATE INDEX "plans_video_cree_idx" ON "plans_video" USING btree ("cree_le");--> statement-breakpoint
 CREATE INDEX "suites_video_expire_idx" ON "suites_video" USING btree ("expire_le");

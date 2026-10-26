@@ -240,13 +240,16 @@ export type Pilotage = {
     pourRien: number;
   }[];
   /**
-   * La lecture partielle des longues vidéos (src/server/lecture-partielle.ts), sur la période. `bras` : chaque moitié de
-   * l’A/B (BRAS_DE_LA_LECTURE, dans l’ordre, même vide) : ses longues vidéos importées, celles arrivées au paywall et
-   * payées (comme importsParType), ce qu’ont coûté leurs lectures d’avant l’achat et la suite lue après (en dollars), leurs
-   * écrans et leurs lots lus avant, leurs lots gardés et combien en ont gardé (`coupees` : la règle s’est arrêtée avant
-   * la fin, les autres ont tout lu), combien ont vu le titre « Tendance » parmi celles dont le titre est noté, le temps
-   * médian de la première lecture au paywall (en secondes, null sans aucune), leurs suites lues, incomplètes ou perdues,
-   * et, parmi les suites lues, combien de titres la conv entière aurait changés (`titres.entiers`, `titres.changes`).
+   * La lecture partielle des longues vidéos (src/server/lecture-partielle.ts), sur la période, hors de l’équipe. `bras` :
+   * chaque moitié de l’A/B (BRAS_DE_LA_LECTURE, dans l’ordre, même vide). Comptées dès leur plan, qu’elles aillent ou non
+   * jusqu’à l’import (plans_video : la moitié entière, lue plus longtemps, perd plus de monde en route) : ses longues
+   * vidéos (`videos`, une vidéo renvoyée comptée une fois), celles importées, arrivées au paywall, payées, et payées plus
+   * de 24 h après leur import (`payesTard` : l’achat venu des relances), et ce qu’ont coûté leurs lectures d’avant
+   * l’achat (importées ou non) et la suite lue après (en dollars). Par import : leurs écrans et leurs lots lus avant,
+   * leurs lots gardés et combien en ont gardé (`coupees` : la règle s’est arrêtée avant la fin, les autres ont tout lu),
+   * combien ont vu le titre « Tendance » parmi celles dont le titre est noté, le temps médian de la première lecture au
+   * paywall (en secondes, null sans aucune), leurs suites lues, incomplètes ou perdues, et, parmi les suites lues, combien
+   * de titres la conv entière aurait changés (`titres.entiers`, `titres.changes`).
    * `contrefactuel` : les longues vidéos lues en entier (le mode « mesure », la moitié entière), ce qu’aurait montré le
    * haut de leur paywall sur leur seule partie récente, et les lots que la règle aurait épargnés.
    */
@@ -254,8 +257,10 @@ export type Pilotage = {
     bras: {
       bras: BrasDeLaLecture;
       videos: number;
+      importees: number;
       paywall: number;
       payes: number;
+      payesTard: number;
       dollarsAvant: number;
       dollarsSuite: number;
       ecrans: number;
@@ -576,6 +581,7 @@ async function pilotageDe(jours: Periode): Promise<Pilotage> {
     pourRien,
     sansCompte,
     parBras,
+    parBrasImports,
     contrefactuels,
   ] = await Promise.all([
     lignes<{ debut: string; visiteurs: string; acheteurs: string; centimes: string; micros: string }>(
@@ -693,17 +699,34 @@ async function pilotageDe(jours: Periode): Promise<Pilotage> {
     ),
     partSansCompteDuJour(),
     /*
-     * Les deux moitiés de la lecture partielle : leurs longues vidéos de la période, ce qu’ont coûté leurs lectures d’avant
-     * l’achat (sous l’empreinte de l’envoi) et leur suite (« captures_suite », sous la conv), et le temps de leur première
-     * lecture (le début de son appel : sa fin moins sa durée) jusqu’au paywall (la tâche du verdict posée)
+     * Les deux moitiés de la lecture partielle, vidéo par vidéo : leurs longues vidéos planifiées sur la période (une par
+     * empreinte de vidéo : ses essais réunis), sans celles dont une conv est à l’équipe ; celles qui ont donné une conv,
+     * arrivée au paywall (la tâche du verdict posée), payée, payée plus de 24 h après l’import ; ce qu’ont coûté les
+     * lectures de leurs envois (sous leur empreinte, importés ou non) et leur suite (« captures_suite », sous la conv)
+     */
+    lignes<{ bras: BrasDeLaLecture; videos: string; importees: string; paywall: string; payes: string; tard: string; avant: string; suite: string }>(
+      sql`with pl as (select envoi, video, bras from plans_video where ${W("cree_le")}),
+            i as (select i.story_id, i.cree_le, pl.video from imports i join pl on pl.envoi = i.envoi),
+            equipe as (select distinct video from i where not (${horsEquipe(sql.raw("i.story_id"))})),
+            v as (select video, min(bras) as bras from pl where video not in (select video from equipe) group by video),
+            c as (select pl.video, sum(u.cost_micros) as micros from ai_usage u join pl on pl.envoi = u.envoi group by pl.video),
+            s as (select i.video, sum(u.cost_micros) as micros from ai_usage u join i on i.story_id = u.story_id where u.task = 'captures_suite' group by i.video),
+            e as (select i.video,
+                    bool_or(exists (select 1 from tasks t where t.story_id = i.story_id and t.kind = 'verdict')) as paywall,
+                    bool_or(exists (select 1 from achats a where a.story_id = i.story_id and a.paye_le is not null)) as paye,
+                    bool_or(exists (select 1 from achats a where a.story_id = i.story_id and a.paye_le > i.cree_le + interval '24 hours')) as tard
+                  from i group by i.video)
+          select v.bras, count(*) as videos, count(e.video) as importees, count(*) filter (where e.paywall) as paywall,
+            count(*) filter (where e.paye) as payes, count(*) filter (where e.tard) as tard,
+            coalesce(sum(c.micros), 0) as avant, coalesce(sum(s.micros), 0) as suite
+          from v left join e on e.video = v.video left join c on c.video = v.video left join s on s.video = v.video group by v.bras`,
+    ),
+    /*
+     * … et import par import, ceux des mêmes plans (hors de l’équipe) : ce qu’ils ont lu avant l’achat, gardé, montré au
+     * paywall, et le temps de leur première lecture (le début de son appel : sa fin moins sa durée) jusqu’au paywall
      */
     lignes<{
       bras: BrasDeLaLecture;
-      videos: string;
-      paywall: string;
-      payes: string;
-      avant: string;
-      suite: string;
       ecrans: string;
       lots: string;
       gardes: string;
@@ -717,19 +740,17 @@ async function pilotageDe(jours: Periode): Promise<Pilotage> {
       entiers: string;
       changes: string;
     }>(
-      sql`with i as (select bras, envoi, story_id, ecrans, lots, lots_gardes, suite, titre, titre_entier from imports where ${W("cree_le")} and type = 'video' and bras is not null and ${horsEquipe(sql.raw("imports.story_id"))}),
-            c as (select envoi, sum(cost_micros) as micros, min(created_at - ms * interval '1 millisecond') as debut from ai_usage where envoi in (select envoi from i) group by envoi),
-            s as (select story_id, sum(cost_micros) as micros from ai_usage where task = 'captures_suite' and story_id in (select story_id from i) group by story_id),
+      sql`with i as (select pl.bras, i.envoi, i.story_id, i.ecrans, i.lots, i.lots_gardes, i.suite, i.titre, i.titre_entier
+                     from imports i join plans_video pl on pl.envoi = i.envoi
+                     where ${W("pl.cree_le")} and i.type = 'video' and ${horsEquipe(sql.raw("i.story_id"))}),
+            c as (select envoi, min(created_at - ms * interval '1 millisecond') as debut from ai_usage where envoi in (select envoi from i) group by envoi),
             p as (select story_id, min(created_at) as le from tasks where kind = 'verdict' and story_id in (select story_id from i) group by story_id)
-          select i.bras, count(*) as videos, count(p.story_id) as paywall,
-            count(*) filter (where exists (select 1 from achats a where a.story_id = i.story_id and a.paye_le is not null)) as payes,
-            coalesce(sum(c.micros), 0) as avant, coalesce(sum(s.micros), 0) as suite,
-            sum(i.ecrans) as ecrans, sum(i.lots) as lots, sum(i.lots_gardes) as gardes, count(*) filter (where i.lots_gardes > 0) as coupees,
+          select i.bras, sum(i.ecrans) as ecrans, sum(i.lots) as lots, sum(i.lots_gardes) as gardes, count(*) filter (where i.lots_gardes > 0) as coupees,
             count(*) filter (where i.titre = 'tendance') as tendance, count(i.titre) as titres,
             count(i.titre_entier) as entiers, count(*) filter (where i.titre_entier is not null and i.titre is distinct from i.titre_entier) as changes,
             percentile_cont(0.5) within group (order by extract(epoch from p.le - c.debut)) filter (where p.le is not null and c.debut is not null) as secondes,
             count(*) filter (where i.suite = 'lue') as lues, count(*) filter (where i.suite = 'incomplete') as incompletes, count(*) filter (where i.suite = 'perdue') as perdues
-          from i left join c on c.envoi = i.envoi left join s on s.story_id = i.story_id left join p on p.story_id = i.story_id group by i.bras`,
+          from i left join c on c.envoi = i.envoi left join p on p.story_id = i.story_id group by i.bras`,
     ),
     /* Le contrefactuel des longues vidéos lues en entier de la période (« mesure », la moitié entière) */
     ligne<{ videos: string; pareil: string; perdue: string; decalee: string; autre: string; lots: string; epargnables: string }>(
@@ -822,14 +843,17 @@ async function pilotageDe(jours: Periode): Promise<Pilotage> {
     }),
     lecturePartielle: {
       bras: BRAS_DE_LA_LECTURE.map((bras) => {
-        const l = parBras.find((x) => x.bras === bras);
+        const v = parBras.find((x) => x.bras === bras);
+        const l = parBrasImports.find((x) => x.bras === bras);
         return {
           bras,
-          videos: n(l?.videos),
-          paywall: n(l?.paywall),
-          payes: n(l?.payes),
-          dollarsAvant: n(l?.avant) / 1e6,
-          dollarsSuite: n(l?.suite) / 1e6,
+          videos: n(v?.videos),
+          importees: n(v?.importees),
+          paywall: n(v?.paywall),
+          payes: n(v?.payes),
+          payesTard: n(v?.tard),
+          dollarsAvant: n(v?.avant) / 1e6,
+          dollarsSuite: n(v?.suite) / 1e6,
           ecrans: n(l?.ecrans),
           lots: n(l?.lots),
           lotsGardes: n(l?.gardes),

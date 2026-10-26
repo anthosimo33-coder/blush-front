@@ -7,7 +7,7 @@ import { humainRefuse } from "@/server/captcha";
 import { cleEnvoi, enTexte, lecturePermise, uneSeuleLecture, unSeulAjout } from "@/server/captures";
 import { compterImportVenuDuPartage } from "@/server/compteurs";
 import { lireBrouillon, poserBrouillon } from "@/server/cookies";
-import { oublierLesEcransDe, rattacherLaSuite, SuiteIncomplete, type SuiteAGarder } from "@/server/ecrans-gardes";
+import { oublierLesEcransDe, rattacherLaSuite, SuiteIncomplete, tousLesLotsGardes, type SuiteAGarder } from "@/server/ecrans-gardes";
 import { ErreurPublique } from "@/server/erreurs";
 import { erreur, lireCorps, repondre, route } from "@/server/http";
 import { envoiDe, noterAjout, noterImport } from "@/server/imports";
@@ -86,18 +86,31 @@ export const POST = route("POST /api/captures/video", async (req: Request) => {
   const consentement = consentementImport(envoi.consentement);
   if (!consentement) return erreur("consentement");
   const { app, lots, cle, partiel, repris = [] } = envoi;
+  /* Le mode tournage (src/server/tournage.ts) : ses lots n’ont rien lu, le brouillon reprend la conv de tournage */
+  const tournage = await tournageDuNavigateur();
   /*
-   * Une question sur une longue vidéo (ses lots plus anciens ni lus ni gardés) ne crée rien : elle passe comme un lot, le
-   * laissez-passer et la limite de l’adresse des lots, sans user ceux d’un import
+   * Une longue vidéo (src/server/lecture-partielle.ts) : sa moitié de l’A/B, et, dans la moitié partielle, ce qu’il reste
+   * à faire de ses lots plus anciens. Hors de la moitié partielle (l’interrupteur coupé entre-temps, le mode tournage),
+   * ils se lisent tous, comme avant.
    */
-  const question = envoi.mode !== "ajout" && !!partiel?.restants && !partiel.gardes;
+  const jour = aujourdhuiParis().iso;
+  const e = envoiDe(cleEnvoi(cle));
+  const video = partiel ? { lots: lots.length + partiel.restants, video: partiel.video, sensSur: partiel.sensSur, ajout: false, tournage: !!tournage } : null;
+  const bras = video ? brasDeLaVideo(video) : null;
+  const partielle = !!video && !!e && planDeLecture(video) === "partielle";
+  /*
+   * Une question sur une longue vidéo ne crée rien : ses lots plus anciens ni lus ni gardés (quoi en faire ?), ou gardés
+   * mais qui se liront quand même (hors de la moitié partielle, ou un lot gardé qui manque : ceux de l’envoi, rattachés à
+   * sa conv ou non, puisqu’un nouvel essai de cette fin doit retrouver la conv née). Elle passe comme un lot, le
+   * laissez-passer et la limite de l’adresse des lots, sans user ceux d’un import : sinon la fin qui suit, tous ses lots
+   * déjà lus et payés, recevait « captcha » au premier nouvel essai réseau
+   */
+  const question = envoi.mode !== "ajout" && !!partiel?.restants && (!partiel.gardes || !partielle || !e || !(await tousLesLotsGardes(e, partiel.restants)));
   /* Sans compte, le laissez-passer du CAPTCHA qui a servi aux lots (src/server/captcha.ts), avant toute limite */
   const captcha = await humainRefuse(question ? "lot" : "brouillon");
   if (captcha) return captcha;
   /* La limite de l’adresse IP, une fois l’envoi vérifié : un envoi invalide ne compte pas */
   if (!(await (question ? sousLaLimiteDeLIp(req, "lot", LIMITES.lotParIp) : sousLaLimiteDeLIp(req, "import", LIMITES.importParIp)))) return erreur("trop");
-  /* Le mode tournage (src/server/tournage.ts) : ses lots n’ont rien lu, le brouillon reprend la conv de tournage */
-  const tournage = await tournageDuNavigateur();
   /*
    * Ses octets dans le budget du jour de l’adresse et de tous (S-02), comme /api/import : ce texte entre en base tel
    * quel. Comptés une seule fois par envoi (un nouvel essai qui retrouve le brouillon, ou le morceau, ne recompte rien).
@@ -142,25 +155,18 @@ export const POST = route("POST /api/captures/video", async (req: Request) => {
     const { story, source } = storyEtSource(lu.id, lu.meta);
     return repondre("POST /api/captures/video", { source, messagesRead: lu.messages, story });
   }
-  /*
-   * Une longue vidéo (src/server/lecture-partielle.ts) : sa moitié de l’A/B, et, dans la moitié partielle, ce qu’il reste
-   * à faire de ses lots plus anciens. Hors de la moitié partielle (l’interrupteur coupé entre-temps, le mode tournage),
-   * ils se lisent tous, comme avant.
-   */
-  const jour = aujourdhuiParis().iso;
-  const e = envoiDe(cleEnvoi(cle));
-  const video = partiel ? { lots: lots.length + partiel.restants, video: partiel.video, sensSur: partiel.sensSur, ajout: false, tournage: !!tournage } : null;
-  const bras = video ? brasDeLaVideo(video) : null;
   const suite = (s: SuiteDeLaVideo) => repondre("POST /api/captures/video", s);
   let aGarder: SuiteAGarder | null = null;
   if (partiel?.restants) {
     const lire = { suite: "lire", lots: partiel.restants } as const;
-    if (!video || !e || planDeLecture(video) !== "partielle") return suite(lire);
+    if (!partielle || !e) return suite(lire);
+    /* Des lots gardés qui manquent : on les lit (la question ci-dessus) */
+    if (partiel.gardes && question) return suite(lire);
     if (partiel.gardes) {
       /*
-       * Ses lots plus anciens envoyés (/api/captures/ecrans) : la conv naît avec eux, tous là (sinon SuiteIncomplete, plus
-       * bas : le navigateur les lit). Pas de compte d’avance : un nouvel essai de cette fin, après une coupure, doit
-       * retrouver la conv déjà née (uneSeuleLecture), dont ils sont maintenant la suite
+       * Ses lots plus anciens envoyés (/api/captures/ecrans), tous là : la conv naît avec eux (effacé entre-temps :
+       * SuiteIncomplete, plus bas, et le navigateur les lit). Un nouvel essai de cette fin, après une coupure, retrouve la
+       * conv déjà née (uneSeuleLecture), dont ils sont maintenant la suite
        */
       aGarder = { envoi: e, recents: lots, appli: app, jour, ecrans: partiel.ecrans, lots: partiel.restants };
     } else {

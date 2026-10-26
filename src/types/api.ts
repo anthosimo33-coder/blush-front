@@ -576,14 +576,16 @@ export const ROUTES = {
     }),
   },
   /*
-   * Avant de lire une longue vidéo : ses lots, l’empreinte de son lot le plus récent (`video`), si son sens est sûr, et
-   * l’accord de l’import ; `mode: "ajout"`, un morceau de plus (lu en entier)
+   * Avant de lire une longue vidéo : ses lots, l’empreinte de son lot le plus récent (`video`), si son sens est sûr, la
+   * clé de l’envoi (`cle`, celle de ses lots : sa moitié de l’A/B s’y note) et l’accord de l’import ; `mode: "ajout"`, un
+   * morceau de plus (lu en entier)
    */
   "POST /api/captures/video/plan": {
     corps: z.object({
       lots: z.number().int().min(1).max(LOTS_MAX),
       video: z.string().min(16).max(128),
       sensSur: z.boolean(),
+      cle: z.string().max(64).optional(),
       consentement: z.string().max(40).optional(),
       mode: z.literal("ajout").optional(),
     }),

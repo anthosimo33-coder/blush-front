@@ -85,7 +85,7 @@ export const OUTILS: readonly OutilMcp[] = [
     name: "couts_ia",
     title: "Coûts de l’IA",
     description:
-      "Ce qu’a coûté l’IA sur la période et celle d’avant, en dollars : le total, par rapport, par verdict, par poste (avec le nombre d’appels), la dépense d’aujourd’hui face au budget du jour (et la part sans compte face à la sienne), et l’IA avant l’achat par type d’import (export, captures, vidéo, hors des comptes de l’équipe : les convs importées, leurs écrans et leurs lots par import, l’IA par import, le temps médian jusqu’au paywall, la part au paywall et la part qui paie, à partir de 30 convs, l’IA par acheteur, et ce qui a été lu pour rien), et la lecture partielle des longues vidéos (l’A/B : pour chaque moitié, entière ou partielle, ses vidéos, la part au paywall et qui paie, l’IA avant l’achat par vidéo, la suite lue après par acheteur, l’IA de lecture par acheteur, le temps médian jusqu’au paywall, les écrans et les lots lus avant, les lots gardés et la part des vidéos coupées, la part du titre « Tendance », les suites lues, incomplètes ou perdues, les titres que la conv entière aurait changés une fois sa suite lue ; et le contrefactuel des vidéos lues en entier).",
+      "Ce qu’a coûté l’IA sur la période et celle d’avant, en dollars : le total, par rapport, par verdict, par poste (avec le nombre d’appels), la dépense d’aujourd’hui face au budget du jour (et la part sans compte face à la sienne), et l’IA avant l’achat par type d’import (export, captures, vidéo, hors des comptes de l’équipe : les convs importées, leurs écrans et leurs lots par import, l’IA par import, le temps médian jusqu’au paywall, la part au paywall et la part qui paie, à partir de 30 convs, l’IA par acheteur, et ce qui a été lu pour rien), et la lecture partielle des longues vidéos (l’A/B, hors des comptes de l’équipe : pour chaque moitié, entière ou partielle, ses vidéos comptées dès leur plan, importées ou non, celles importées, la part au paywall et qui paie, celles payées plus de 24 h après l’import, l’IA avant l’achat par vidéo, la suite lue après par acheteur, l’IA de lecture par acheteur, le temps médian jusqu’au paywall, les écrans et les lots lus avant, les lots gardés et la part des vidéos coupées, la part du titre « Tendance », les suites lues, incomplètes ou perdues, les titres que la conv entière aurait changés une fois sa suite lue ; et le contrefactuel des vidéos lues en entier).",
     inputSchema: AVEC_JOURS,
   },
   {
@@ -310,7 +310,7 @@ function coutsIA(s: StatsAdmin) {
         luPourRienDollars: arrondi(t.pourRien, 2),
       };
     }),
-    /* Les deux moitiés de l’A/B, avec les mêmes taux (null sous les 30 vidéos) ; le contrefactuel des vidéos lues en entier */
+    /* Les deux moitiés de l’A/B, comptées dès leur plan, avec les mêmes taux (null sous les 30 vidéos) et leurs effectifs ; le contrefactuel des vidéos lues en entier */
     lecturePartielle: {
       moities: s.pilotage.lecturePartielle.bras.map((b) => {
         const taux = (n: number, sur: number) => {
@@ -320,17 +320,20 @@ function coutsIA(s: StatsAdmin) {
         return {
           moitie: b.bras,
           videos: b.videos,
+          importees: b.importees,
+          arrivees: b.paywall,
           arriventAuPaywallPct: taux(b.paywall, b.videos),
           payes: b.payes,
           paientPct: taux(b.payes, b.videos),
+          payesPlusDe24h: b.payesTard,
           dollarsAvantParVideo: arrondi(rapport(b.dollarsAvant, b.videos), 3),
           dollarsSuiteParAcheteur: arrondi(rapport(b.dollarsSuite, b.payes), 2),
           dollarsLectureParAcheteur: arrondi(rapport(b.dollarsAvant + b.dollarsSuite, b.payes), 2),
           secondesJusquAuPaywall: b.secondesAuPaywall,
-          ecransLusParVideo: arrondi(rapport(b.ecrans, b.videos)),
-          lotsLusParVideo: arrondi(rapport(b.lots, b.videos)),
-          lotsGardesParVideo: arrondi(rapport(b.lotsGardes, b.videos)),
-          coupeesPct: taux(b.coupees, b.videos),
+          ecransLusParImport: arrondi(rapport(b.ecrans, b.importees)),
+          lotsLusParImport: arrondi(rapport(b.lots, b.importees)),
+          lotsGardesParImport: arrondi(rapport(b.lotsGardes, b.importees)),
+          coupeesPct: taux(b.coupees, b.importees),
           titreTendancePct: taux(b.tendance, b.titres),
           suites: b.suites,
           titresChangesParLaSuite: b.titresEntiers,

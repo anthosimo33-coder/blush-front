@@ -435,6 +435,8 @@ export type OptionsAppel = {
   signal?: AbortSignal;
   /** Sans conv : le compte connecté qui paie (des captures lues avant l’import). */
   compte?: { email: string } | null;
+  /** Qui paie, quand ce n’est ni le compte de la conv ni le compte connecté : la suite d’une longue vidéo a sa part à elle (PAYEUR_DE_LA_SUITE, src/server/budget.ts). */
+  payeur?: Payeur;
   /** Le suivi des coûts et l’alerte d’un repli passent après la réponse (le chat en flux), au lieu de la retarder. */
   differer?: (tache: () => Promise<unknown>) => void;
   /** Une lecture d’avant l’import : l’empreinte de son envoi, notée avec son coût (ai_usage.envoi, src/server/imports.ts). */
@@ -462,7 +464,7 @@ export type OptionsAppel = {
  * fait jamais échouer un appel déjà payé (auMieux) : sa lecture serait relue, et payée deux fois.
  */
 export async function appeler<S extends z.ZodType>(req: Requete, schema: S, options: OptionsAppel = {}): Promise<Appel<z.infer<S>>> {
-  const payeur = await controlerBudget({ storyId: options.storyId, compte: options.compte });
+  const payeur = await controlerBudget({ storyId: options.storyId, compte: options.compte, ...(options.payeur === undefined ? {} : { payeur: options.payeur }) });
   if (tempsRestant() < TEMPS_MIN_APPEL) throw new ErreurTache("delai");
   const base = parametres(req, schema);
   const reservation = !options.storyId || payeur === null ? await reserver(payeur, coutMaximal(base) * 1e6) : null;

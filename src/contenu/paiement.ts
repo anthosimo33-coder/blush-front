@@ -362,7 +362,17 @@ export const DEBLOQUE = {
   phrase: (chapitres: number, bulles: number) => `Les ${chapitres} chapitres sont à toi. Et ${bulles} bulles pour en parler avec BLUSH.`,
   /** `tous` : rien n’était encore lu (le paywall d’abord), le rapport entier s’ouvre. */
   restants: (chapitres: number, tous = false) => (tous ? `Tes ${chapitres} chapitres` : `Les ${chapitres} chapitres qui restent`),
-  reprise: (chapitre: number) => (chapitre === 1 ? "BLUSH lit ta conv\u00a0: ton verdict arrive dans une minute" : `Ta lecture reprend au chapitre ${chapitre}`),
+  /**
+   * Où la lecture reprend. `avecLeDebut` : une longue vidéo dont BLUSH lit d’abord le début, gardé pour après le paiement
+   * (src/server/suite-video.ts) : une à deux minutes de plus.
+   * TODO(produit): « toute ta conv… dans deux minutes » (26 octobre, la lecture partielle des longues vidéos), à valider.
+   */
+  reprise: (chapitre: number, avecLeDebut = false) =>
+    chapitre === 1
+      ? avecLeDebut
+        ? "BLUSH lit toute ta conv\u00a0: ton verdict arrive dans deux minutes"
+        : "BLUSH lit ta conv\u00a0: ton verdict arrive dans une minute"
+      : `Ta lecture reprend au chapitre ${chapitre}`,
   bulles: (bulles: number) => `${bulles} bulles pour parler à BLUSH`,
   bullesSous: "1 bulle = 1 réponse · elles n’expirent jamais",
   avance: "1 rapport d’avance",

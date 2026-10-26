@@ -11,6 +11,7 @@ import { etapeDeLecture, LECTURE_ATTENTE, LECTURE_DEPART, LECTURE_MAX, LECTURE_R
 import * as coffre from "./coffre";
 import { donneesMemoire, donneesVerdict, ligneRapport } from "./depot";
 import { compteAffiche, rapportOuvert } from "./droits";
+import { ouEnEstLaSuite } from "./ecrans-gardes";
 import { echecDe } from "./erreurs";
 import { ficheAffichee } from "./ecrans/fiche";
 import { verdictAffiche } from "./ecrans/rapport";
@@ -128,6 +129,8 @@ export async function progression(story: Ligne): Promise<AnalysisProgress> {
   const ecoule = verdict ? (Date.now() - verdict.updatedAt.getTime()) / 1000 : 0;
   const lecture = verdict?.status === "en_cours" ? Math.min(LECTURE_MAX, LECTURE_DEPART + ecoule / LECTURE_RYTHME_S) : LECTURE_ATTENTE;
   const p = fini ? 1 : Math.max(lecture, (verdict?.progress ?? 0) / 100);
+  /* Une longue vidéo payée dont le verdict lit d’abord le début (src/server/suite-video.ts) : l’écran dit ce qui se passe */
+  const debut = verdict?.status === "en_cours" || verdict?.status === "attente" ? await ouEnEstLaSuite(story.id) : null;
   return {
     progress: p,
     messagesRead: Math.round(Math.min(1, p / (VERDICT_REFLEXION / 100)) * total),
@@ -137,6 +140,7 @@ export async function progression(story: Ligne): Promise<AnalysisProgress> {
     ...(echec ? { failed: true, failReason: echecDe(verdict?.error) } : {}),
     /* Une prise du mode tournage : sa lecture, recopiée (src/server/tournage.ts), est finie ; l’écran qui vient de la lancer la déroule lui-même */
     ...(story.tournageLe ? { rejouee: true } : {}),
+    ...(debut ? { debut } : {}),
   };
 }
 

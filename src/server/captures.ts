@@ -85,10 +85,10 @@ export async function lireCaptures(images: Image[], appli: string, envoi: string
  * pour un lot d’enregistrement (src/server/lots.ts) la sienne (`lot` : un nouvel essai qui le reprend en prend le coût),
  * de quoi l’arrêter (`signal` : son envoi abandonné), suivre son flux (`surAvance`) et dire quand sa réponse commence
  * (`auDebut` : le premier lot de l’envoi). Un lot gardé d’une longue vidéo, lu après le paiement
- * (src/server/suite-video.ts) : sa conv (`storyId`) et le jour de son import (`jour`, AAAA-MM-JJ : « hier » s’y date
- * comme à l’import).
+ * (src/server/suite-video.ts) : sa conv (`storyId`), qui paie (`payeur` : la part des suites), et le jour de son import
+ * (`jour`, AAAA-MM-JJ : « hier » s’y date comme à l’import).
  */
-type SuiviDuLot = Pick<OptionsAppel, "envoi" | "lot" | "signal" | "surAvance" | "auDebut" | "storyId"> & { jour?: string };
+type SuiviDuLot = Pick<OptionsAppel, "envoi" | "lot" | "signal" | "surAvance" | "auDebut" | "storyId" | "payeur"> & { jour?: string };
 
 /**
  * La lecture brute d’un lot d’images (des captures, ou les images d’un enregistrement d’écran). Les lots d’un
@@ -105,8 +105,8 @@ export async function lireLot(
   { jour, ...suivi }: SuiviDuLot = {},
 ): Promise<Captures> {
   /*
-   * Le budget de l’IA du jour (src/server/budget.ts) : la suite d’une vidéo est payée par le compte de sa conv (lue hors
-   * de toute requête du navigateur : la chaîne), une autre lecture par le compte connecté, sinon par la part sans compte
+   * Le budget de l’IA du jour (src/server/budget.ts) : la suite d’une vidéo a sa part à elle (`payeur` ; lue hors de toute
+   * requête du navigateur : la chaîne), une autre lecture est payée par le compte connecté, sinon par la part sans compte
    */
   const compte = suivi.storyId ? undefined : await utilisateurDeSession(await lireSession());
   const aujourdhui = jour ? Date.parse(`${jour}T00:00:00Z`) : aujourdhuiParis().t;

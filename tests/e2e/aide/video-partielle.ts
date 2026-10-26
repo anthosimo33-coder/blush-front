@@ -43,14 +43,17 @@ const poster = (page: Page, testInfo: TestInfo, chemin: string, corps: FormData 
 export async function importerUneVideoPartielle(page: Page, testInfo: TestInfo): Promise<{ histoire: string; serie: string; cle: string }> {
   await prouverHumain(page.request, testInfo);
   const serie = randomUUID();
-  const cle = randomUUID();
-  /* La moitié se tire de l’empreinte de la vidéo : on en essaie jusqu’à tomber dans la partielle (une sur deux) */
+  /*
+   * La moitié se tire de l’empreinte de la vidéo : on en essaie jusqu’à tomber dans la partielle (une sur deux), chacune
+   * sous sa clé d’envoi, comme autant d’enregistrements (le plan se note par envoi : /admin compte chaque vidéo planifiée)
+   */
   let video = "";
+  let cle = "";
   for (let essai = 0; essai < 30 && !video; essai++) {
-    const v = randomUUID();
-    const r = await poster(page, testInfo, "/api/captures/video/plan", { lots: LOTS_DE_LA_VIDEO, video: v, sensSur: true, consentement: CASE_IMPORT.version });
+    const [v, c] = [randomUUID(), randomUUID()];
+    const r = await poster(page, testInfo, "/api/captures/video/plan", { lots: LOTS_DE_LA_VIDEO, video: v, sensSur: true, cle: c, consentement: CASE_IMPORT.version });
     expect(r.status(), "le plan d’une longue vidéo").toBe(200);
-    if (((await r.json()) as { lecture: string }).lecture === "partielle") video = v;
+    if (((await r.json()) as { lecture: string }).lecture === "partielle") [video, cle] = [v, c];
   }
   expect(video, "une vidéo de la moitié partielle").not.toBe("");
   /* Ses cinq lots les plus récents, lus par BLUSH, le plus récent d’abord */

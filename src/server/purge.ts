@@ -34,7 +34,7 @@ import { PRESENCES_GARDEES_JOURS, VISITES_GARDEES_JOURS } from "./visites";
  * - les accès de Claude à /admin (src/server/mcp/acces.ts) : les codes expirés, les accès dont le rafraîchissement a
  *   expiré, et les clients restés sans accès ;
  * - le registre des effacements de plus de 90 jours (EFFACEMENTS_GARDES_JOURS) : plus long que la fenêtre de restauration de la base ;
- * - la mesure des imports (src/server/imports.ts) de plus de 90 jours (IMPORTS_GARDES_JOURS) : /admin n’en lit que les 30 derniers ;
+ * - la mesure des imports (src/server/imports.ts), et les plans des longues vidéos de l’A/B, de plus de 90 jours (IMPORTS_GARDES_JOURS) : /admin n’en lit que les 30 derniers ;
  * - les lectures des lots d’un enregistrement dont les dix minutes sont passées (src/server/lots.ts), que la purge des
  *   5 minutes (GET /api/cron/relances) aurait laissées (une panne) : un filet.
  * - les écrans gardés des longues vidéos (src/server/ecrans-gardes.ts) dont l’heure est passée : la purge des 5 minutes
@@ -133,6 +133,9 @@ export async function purger(maintenant = new Date()) {
     await db()
       .delete(schema.imports)
       .where(lt(schema.imports.creeLe, il_y_a(IMPORTS_GARDES_JOURS)));
+    await db()
+      .delete(schema.plansVideo)
+      .where(lt(schema.plansVideo.creeLe, il_y_a(IMPORTS_GARDES_JOURS)));
   });
   await etape("lectures des lots", async () => {
     await purgerLesLecturesDesLots(maintenant);

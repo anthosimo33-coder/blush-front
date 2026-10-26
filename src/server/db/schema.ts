@@ -606,8 +606,8 @@ export const imports = pgTable(
  * une fois faite après le paiement (`lu`, chiffrée : un nouvel essai du verdict ne la repaie pas). `envoi` : l’empreinte
  * de l’envoi (envoiDe, src/server/imports.ts), jamais sa clé ; `rang` : la place du lot dans la vidéo (0, le plus ancien).
  * Sans conv tant que l’import n’a pas eu lieu (effacés au bout d’une heure), puis rattachés à elle (effacés avec elle).
- * `expire_le` : l’heure où la purge des 5 minutes les efface, lus ou non (24 h après l’import ; 7 jours une fois payés).
- * Jamais vers le navigateur ni le journal.
+ * `expire_le` : l’heure où la purge des 5 minutes les efface, lus ou non (48 h après l’import, 11 jours après le paywall,
+ * 7 jours après le paiement : src/server/ecrans-gardes.ts). Jamais vers le navigateur ni le journal.
  */
 export const ecransGardes = pgTable(
   "ecrans_gardes",
@@ -632,7 +632,7 @@ export const ecransGardes = pgTable(
  * le paiement comme elle l’aurait été à l’import. Les lectures des lots déjà lus, chiffrées (`recents`, dans l’ordre de
  * la vidéo), son appli, le jour de Paris de l’import (« hier » se date d’après lui), ses écrans et les lots gardés
  * (ecrans_gardes). Effacée une fois la suite lue, ou avec ses écrans (`expire_le`), ou avec sa conv. `payee_le` : le
- * paiement l’a gardée plus longtemps (7 jours, le temps du verdict).
+ * rapport ouvert (payé, ou ouvert d’avance) l’a gardée le temps de sa lecture (7 jours au plus, le temps du verdict).
  */
 export const suitesVideo = pgTable(
   "suites_video",
@@ -651,6 +651,26 @@ export const suitesVideo = pgTable(
     creeLe: quand("cree_le").notNull().defaultNow(),
   },
   (t) => [index("suites_video_expire_idx").on(t.expireLe)],
+);
+
+/**
+ * Les longues vidéos de l’A/B de la lecture partielle, au moment de leur plan (POST /api/captures/video/plan,
+ * src/server/lecture-partielle.ts), avant toute lecture : une ligne par envoi (`envoi`, son empreinte, envoiDe), sa moitié
+ * (`bras`), et l’empreinte de la vidéo (`video` : celle de son lot le plus récent, repassée par la clé du serveur, rien
+ * de ses images), qui réunit les essais d’une même vidéo. /admin compare les deux moitiés sur les vidéos planifiées, et
+ * non sur les seules convs nées : la moitié entière, lue plus longtemps, perd plus de monde en route, et ce qu’elle a lu
+ * pour rien compte avec elle. Ni compte, ni email, ni conv ; pas les comptes de l’équipe. Gardées IMPORTS_GARDES_JOURS
+ * (la purge de la nuit).
+ */
+export const plansVideo = pgTable(
+  "plans_video",
+  {
+    envoi: text("envoi").primaryKey(),
+    video: text("video").notNull(),
+    bras: text("bras", { enum: BRAS_DE_LA_LECTURE }).notNull(),
+    creeLe: quand("cree_le").notNull().defaultNow(),
+  },
+  (t) => [index("plans_video_cree_idx").on(t.creeLe)],
 );
 
 /**

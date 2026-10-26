@@ -634,4 +634,6 @@ export type AnalysisProgress = {
   paiement?: boolean;
   /** Une prise du mode tournage : sa lecture, recopiée de la conv de tournage, est déjà finie. L’écran qui vient de la lancer la déroule en quelques secondes. */
   rejouee?: boolean;
+  /** Une longue vidéo payée : BLUSH lit d’abord le début de la conv (les lots gardés), avant le verdict. Ses lots lus, sur combien. */
+  debut?: { faits: number; total: number };
 };
