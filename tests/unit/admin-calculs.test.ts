@@ -157,25 +157,26 @@ describe("les jalons du tunnel", () => {
 
 describe("le tunnel", () => {
   it("la plus grosse fuite : le passage au plus petit taux, entre l’arrivée et l’achat", () => {
-    expect(fuiteDuTunnel({ visiteurs: 4820, imports: 702, verdicts: 604, acheteurs: 131, racheteurs: 19 })).toEqual({ etape: 1, taux: 702 / 4820, depuis: 4820, vers: 702 });
-    expect(fuiteDuTunnel({ visiteurs: 100, imports: 80, verdicts: 20, acheteurs: 10, racheteurs: 0 })?.etape).toBe(2);
-    expect(fuiteDuTunnel({ visiteurs: 100, imports: 80, verdicts: 70, acheteurs: 5, racheteurs: 0 })?.etape).toBe(3);
+    expect(fuiteDuTunnel({ visiteurs: 4820, imports: 702, paywall: 604, acheteurs: 131, racheteurs: 19 })).toEqual({ etape: 1, taux: 702 / 4820, depuis: 4820, vers: 702 });
+    expect(fuiteDuTunnel({ visiteurs: 100, imports: 80, paywall: 20, acheteurs: 10, racheteurs: 0 })?.etape).toBe(2);
+    expect(fuiteDuTunnel({ visiteurs: 100, imports: 80, paywall: 70, acheteurs: 5, racheteurs: 0 })?.etape).toBe(3);
   });
 
   it("sans visiteurs comptés, l’arrivée ne compte pas ; rien à comparer, ou rien qui fuit : null", () => {
-    expect(fuiteDuTunnel({ visiteurs: 0, imports: 80, verdicts: 20, acheteurs: 10, racheteurs: 1 })?.etape).toBe(2);
-    expect(fuiteDuTunnel({ visiteurs: 0, imports: 0, verdicts: 0, acheteurs: 0, racheteurs: 0 })).toBeNull();
-    expect(fuiteDuTunnel({ visiteurs: 10, imports: 12, verdicts: 12, acheteurs: 12, racheteurs: 0 })).toBeNull();
+    expect(fuiteDuTunnel({ visiteurs: 0, imports: 80, paywall: 20, acheteurs: 10, racheteurs: 1 })?.etape).toBe(2);
+    expect(fuiteDuTunnel({ visiteurs: 0, imports: 0, paywall: 0, acheteurs: 0, racheteurs: 0 })).toBeNull();
+    expect(fuiteDuTunnel({ visiteurs: 10, imports: 12, paywall: 12, acheteurs: 12, racheteurs: 0 })).toBeNull();
     /* À égalité, la première */
-    expect(fuiteDuTunnel({ visiteurs: 100, imports: 50, verdicts: 25, acheteurs: 20, racheteurs: 0 })?.etape).toBe(1);
+    expect(fuiteDuTunnel({ visiteurs: 100, imports: 50, paywall: 25, acheteurs: 20, racheteurs: 0 })?.etape).toBe(1);
   });
 
   it("ce que dit la fuite, à chaque étape : la part perdue, et les deux nombres", () => {
     expect(texteDeLaFuite({ etape: 1, taux: 0.146, depuis: 4820, vers: 702 }).titre).toBe(`85${NB}% des visiteurs repartent sans importer`);
     expect(texteDeLaFuite({ etape: 1, taux: 0.146, depuis: 4820, vers: 702 }).texte).toContain(`702${NB}imports pour 4${MILLE}820${NB}visiteurs`);
-    expect(texteDeLaFuite({ etape: 2, taux: 0.5, depuis: 2, vers: 1 }).titre).toBe(`50${NB}% des convs importées n’arrivent pas au verdict`);
-    expect(texteDeLaFuite({ etape: 2, taux: 0.5, depuis: 2, vers: 1 }).texte).toContain(`1${NB}verdict pour 2${NB}convs importées`);
-    expect(texteDeLaFuite({ etape: 3, taux: 0.2, depuis: 5, vers: 1 }).titre).toBe(`80${NB}% des verdicts ne finissent pas en achat`);
+    expect(texteDeLaFuite({ etape: 2, taux: 0.5, depuis: 2, vers: 1 }).titre).toBe(`50${NB}% des convs importées n’arrivent pas au paywall`);
+    expect(texteDeLaFuite({ etape: 2, taux: 0.5, depuis: 2, vers: 1 }).texte).toContain(`1${NB}conv au paywall pour 2${NB}convs importées`);
+    expect(texteDeLaFuite({ etape: 3, taux: 0.2, depuis: 5, vers: 1 }).titre).toBe(`80${NB}% de ceux qui voient le paywall n’achètent pas`);
+    expect(texteDeLaFuite({ etape: 3, taux: 0.2, depuis: 5, vers: 1 }).texte).toContain(`1${NB}acheteur pour 5${NB}convs au paywall`);
   });
 });
 

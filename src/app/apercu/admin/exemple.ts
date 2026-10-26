@@ -132,7 +132,7 @@ function pilotageDe(jours: Periode, { calme = false, suivi = true }: Variante): 
     acheteurs: { valeur: acheteurs, avant: Math.round(acheteurs * 0.8) },
     centimesPayes: { valeur: paye, avant: Math.round(paye * 0.76) },
     dollars: { valeur: dollars, avant: Math.round(dollars * 71) / 100 },
-    tunnel: { visiteurs, imports, verdicts: Math.round(imports * 0.86), acheteurs, racheteurs: Math.round(acheteurs * 0.145) },
+    tunnel: { visiteurs, imports, paywall: Math.round(imports * 0.86), acheteurs, racheteurs: Math.round(acheteurs * 0.145) },
     jalons,
     jalonsDepuis: suivi ? "2026-10-18" : null,
     sources,
@@ -204,7 +204,7 @@ export function statsDExemple(jours: Periode, variante: Variante = {}): StatsAdm
     return { jour: d.toISOString().slice(0, 10), imports: vague + 3, verdicts: vague, rapports: Math.max(0, vague - 3) };
   });
   const total = pilotage.dollars.valeur;
-  const verdicts = pilotage.tunnel.verdicts;
+  const verdicts = Math.round(pilotage.acheteurs.valeur * 1.1);
   const rapports = Math.round(pilotage.acheteurs.valeur * 0.9);
   return {
     jours,

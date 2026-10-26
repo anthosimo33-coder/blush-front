@@ -116,10 +116,10 @@ export type Pilotage = {
   /** Ce qu’a coûté l’IA, en dollars, sur la période et celle d’avant (comme couts.total et couts.avant). */
   dollars: Chiffre;
   /**
-   * Le tunnel de la période : les visiteurs, les convs importées, celles qui ont leur verdict, les acheteurs, et ceux
-   * d’entre eux qui ont payé au moins deux achats (depuis toujours).
+   * Le tunnel de la période : les visiteurs, les convs importées, celles qui sont arrivées au paywall (leur lecture
+   * lancée), les acheteurs, et ceux d’entre eux qui ont payé au moins deux achats (depuis toujours).
    */
-  tunnel: { visiteurs: number; imports: number; verdicts: number; acheteurs: number; racheteurs: number };
+  tunnel: { visiteurs: number; imports: number; paywall: number; acheteurs: number; racheteurs: number };
   /**
    * Les jalons du tunnel (src/server/visites.ts, noterJalon) : pour chacun, les personnes qui l’ont passé sur la période,
    * une fois par jour (comme les visiteurs : la même personne revenue un autre jour compte une fois de plus). Tous les
@@ -438,9 +438,15 @@ async function pilotageDe(jours: Periode): Promise<Pilotage> {
     ligne<{ a: string | null; b: string | null }>(
       sql`select sum(cost_micros) filter (where ${W("created_at")}) as a, sum(cost_micros) filter (where ${W("created_at", 1)}) as b from ai_usage`,
     ),
-    ligne<{ imports: string; verdicts: string; racheteurs: string }>(
+    /*
+     * Arrivée au paywall : sa lecture lancée, donc une tâche « verdict », quel que soit son état. Depuis le paywall
+     * d’avant la lecture (16 octobre), elle attend le paiement (« paiement ») : le verdict écrit ne compte plus que les
+     * convs payées. Avant, le verdict offert venait avant le paywall : la tâche le compte aussi
+     */
+    ligne<{ imports: string; paywall: string; racheteurs: string }>(
       sql`select (select count(*) from stories s where ${W("s.created_at")} and ${sql.raw(VRAIE_CONV_S)}) as imports,
-            (select count(*) from stories s where ${W("s.created_at")} and ${sql.raw(VRAIE_CONV_S)} and exists (select 1 from verdicts v where v.story_id = s.id)) as verdicts,
+            (select count(*) from stories s where ${W("s.created_at")} and ${sql.raw(VRAIE_CONV_S)}
+              and exists (select 1 from tasks t where t.story_id = s.id and t.kind = 'verdict')) as paywall,
             (select count(*) from (select user_id from achats where paye_le is not null and user_id in (select user_id from achats where ${W("paye_le")})
               group by user_id having count(*) >= 2) as r) as racheteurs`,
     ),
@@ -523,7 +529,7 @@ async function pilotageDe(jours: Periode): Promise<Pilotage> {
     acheteurs: { valeur: n(argent.acheteurs), avant: n(argent.acheteurs_av) },
     centimesPayes: { valeur: m(argent.payes_c), avant: m(argent.payes_av_c) },
     dollars: { valeur: n(dollars.a) / 1e6, avant: n(dollars.b) / 1e6 },
-    tunnel: { visiteurs: n(visiteurs.a), imports: n(tunnel.imports), verdicts: n(tunnel.verdicts), acheteurs: n(argent.acheteurs), racheteurs: n(tunnel.racheteurs) },
+    tunnel: { visiteurs: n(visiteurs.a), imports: n(tunnel.imports), paywall: n(tunnel.paywall), acheteurs: n(argent.acheteurs), racheteurs: n(tunnel.racheteurs) },
     jalons: Object.fromEntries(JALONS.map((j) => [j, n(jalons.find((l) => l.jalon === j)?.n)])) as Record<Jalon, number>,
     jalonsDepuis: jalonsDepuis.depuis,
     sources: [...parSource]

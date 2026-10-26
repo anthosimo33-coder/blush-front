@@ -32,7 +32,7 @@ function vide(p: Partial<Pilotage> = {}): StatsAdmin {
     acheteurs: zero,
     centimesPayes: zero,
     dollars: zero,
-    tunnel: { visiteurs: 0, imports: 0, verdicts: 0, acheteurs: 0, racheteurs: 0 },
+    tunnel: { visiteurs: 0, imports: 0, paywall: 0, acheteurs: 0, racheteurs: 0 },
     sources: [],
     mix: [],
     sante: { echecs: 0, bloquees: 0, paiementsEchoues: 0, alertes: 0, pannes: 0, pannesDuJour: 0 },
@@ -125,18 +125,18 @@ describe("« À regarder »", () => {
     const pleines = aRegarder(
       vide({
         sante: { echecs: 1, bloquees: 1, paiementsEchoues: 1, alertes: 0, pannes: 0, pannesDuJour: 0 },
-        tunnel: { visiteurs: 1000, imports: 100, verdicts: 90, acheteurs: 20, racheteurs: 0 },
+        tunnel: { visiteurs: 1000, imports: 100, paywall: 90, acheteurs: 20, racheteurs: 0 },
         suiviDepuis: null,
       }),
     );
     expect(pleines).toHaveLength(3);
     expect(pleines.map((c) => c.ton)).toEqual(["mal", "mal", "neutre"]);
     /* Des visiteurs sans suivi (impossible, sauf en cas de bug) ne font pas une fuite à l’arrivée */
-    expect(pleines[1]?.titre).toBe(`78${NB}% des verdicts ne finissent pas en achat`);
+    expect(pleines[1]?.titre).toBe(`78${NB}% de ceux qui voient le paywall n’achètent pas`);
   });
 
   it("une fuite sur trop peu de monde ne se signale pas", () => {
-    const cartes = aRegarder(vide({ visiteurs: { valeur: 1, avant: 0 }, tunnel: { visiteurs: 1, imports: 0, verdicts: 0, acheteurs: 0, racheteurs: 0 } }));
+    const cartes = aRegarder(vide({ visiteurs: { valeur: 1, avant: 0 }, tunnel: { visiteurs: 1, imports: 0, paywall: 0, acheteurs: 0, racheteurs: 0 } }));
     expect(cartes.some((c) => c.titre.includes("repartent"))).toBe(false);
   });
 

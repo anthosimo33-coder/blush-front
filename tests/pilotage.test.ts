@@ -10,6 +10,7 @@ import { purger } from "@/server/purge";
 import { compterUnClicDeMail } from "@/server/compteurs";
 import { CLES_DES_MAILS } from "@/server/sequences";
 import { statsAdmin } from "@/server/stats";
+import { attendreLePaiement } from "@/server/taches";
 import { aujourdhuiParis } from "@/server/temps";
 import { noterAchatAuFil, noterAuFil, noterJalon, noterLaSourceDuCompte, noterSigne, sourceDeLaVisite } from "@/server/visites";
 import type { OffreId } from "@/types";
@@ -167,6 +168,9 @@ describe("le pilotage (/admin)", () => {
     const u = await compteDeTest("pilotage-argent");
     await noterLaSourceDuCompte(requete(ip, SAFARI), u.id);
     const conv = await convRattachee(u, "01-a-deux-doigts.txt");
+    /* Une seconde conv importée, sa lecture lancée : elle attend son paiement, sans verdict, mais elle a vu le paywall */
+    const auPaywall = await convRattachee(u, "01-a-deux-doigts.txt");
+    await attendreLePaiement(auPaywall.id, "verdict");
     const maintenant = new Date();
     const ilYa = (jours: number) => new Date(maintenant.getTime() - jours * 86400e3);
     const achat = (offre: OffreId, centimes: number, plus: Partial<typeof schema.achats.$inferInsert> = {}) =>
@@ -189,7 +193,8 @@ describe("le pilotage (/admin)", () => {
     expect(d((p) => p.acheteurs.valeur)).toBe(1);
     expect(d((p) => p.tunnel.acheteurs)).toBe(1);
     expect(d((p) => p.tunnel.racheteurs)).toBe(1);
-    expect(d((p) => p.tunnel.imports)).toBe(1);
+    expect(d((p) => p.tunnel.imports)).toBe(2);
+    expect(d((p) => p.tunnel.paywall)).toBe(1);
     expect(d((p) => p.visiteurs.valeur)).toBe(1);
     expect(d((p) => p.sante.paiementsEchoues)).toBe(1);
     const snap = (p: typeof avant) => p.sources.find((s) => s.source === "snapchat") ?? { visiteurs: 0, acheteurs: 0, centimes: 0 };
