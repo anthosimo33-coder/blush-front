@@ -4,7 +4,18 @@ import { Icon } from "@/components/ui/icons";
 import { NOM_DU_GENRE } from "@/contenu/haut-du-paywall";
 import { NOMS_DES_MAILS } from "@/contenu/mails";
 import { prixDe } from "@/contenu/offres";
-import { CIBLE_DE_MARGE, EUROS_PAR_DOLLAR, NOMS_DES_GROUPES, NOMS_DES_SOURCES, NOMS_DES_VENTES, SOURCE_INCONNUE, margeApresIA } from "@/contenu/pilotage";
+import {
+  CIBLE_DE_MARGE,
+  EUROS_PAR_DOLLAR,
+  NOMS_DES_GENRES,
+  NOMS_DES_GROUPES,
+  NOMS_DES_PAIRES,
+  NOMS_DES_SOURCES,
+  NOMS_DES_VENTES,
+  PAIRES,
+  SOURCE_INCONNUE,
+  margeApresIA,
+} from "@/contenu/pilotage";
 import { cn } from "@/lib/cn";
 import { NBSP } from "@/lib/format";
 import { jourDeParisAvant } from "@/lib/jours";
@@ -53,7 +64,7 @@ import { SondeDuDirect } from "./SondeDuDirect";
 /*
  * Le pilotage (/admin) : ce qui se passe sur la période, d’un coup d’œil. En haut, « À regarder » (ce qui coince, puis
  * les bonnes nouvelles) ; puis l’argent (le chiffre d’affaires net, case par case) à côté du direct ; les quatre chiffres
- * clés ; le tunnel, puis le détail de l’import et du paywall (leurs jalons) ; les mails des séquences et leur délivrabilité ; d’où viennent les visiteurs et ce qui se vend ; ce que coûte l’IA et la santé ; enfin les outils de
+ * clés ; le tunnel, puis le détail de l’import et du paywall (leurs jalons), et qui importe ; les mails des séquences et leur délivrabilité ; d’où viennent les visiteurs et ce qui se vend ; ce que coûte l’IA et la santé ; enfin les outils de
  * l’équipe. Que des nombres : aucune conv, aucun message, aucun email. Chaque carte a son « ? » (src/contenu/aide-pilotage.ts).
  * Maquette validée le 13 octobre ; l’écran d’avant reste à /admin?version=actuelle.
  * TODO(produit): textes du pilotage à valider.
@@ -139,6 +150,7 @@ export function Pilotage({
             <ImportEcranParEcran p={p} jours={s.jours} />
             <PaywallJusquAuPaiement p={p} jours={s.jours} />
           </div>
+          <QuiImporte p={p} jours={s.jours} />
           <HautsDuPaywall p={p} />
           <VentesDuChat p={p} />
           <MailsDesSequences p={p} />
@@ -700,6 +712,108 @@ function PaywallJusquAuPaiement({ p, jours }: { p: Chiffres; jours: Periode }) {
               </div>
             ))}
           </dl>
+        </>
+      )}
+    </Bloc>
+  );
+}
+
+/* ———— Qui importe ———— */
+
+/** Une ligne de « Qui importe » : son nom, ses convs importées et celles payées depuis ; `sansTaux` : aucune ne peut l’être. */
+type LigneDesGenres = { cle: string; nom: string; importees: number; payees: number; sansTaux?: boolean };
+
+/**
+ * Les convs importées sur la période et payées depuis, par genre de celui qui importe, puis par paire : la part des
+ * importées (sur `total`), et le taux d’achat de la ligne à partir de PERSONNES_D_UN_TAUX convs.
+ */
+function TableDesGenres({ titre, lignes, total }: { titre: string; lignes: LigneDesGenres[]; total: number }) {
+  const max = Math.max(1, ...lignes.map((l) => l.importees));
+  return (
+    <div role="region" aria-label={`${titre}, à faire défiler`} tabIndex={0} className="-mx-2 overflow-x-auto px-2">
+      <table className="w-full min-w-[440px] border-collapse text-left">
+        <caption className="sr-only">{`${titre}\u00a0: les convs importées, leur part, celles payées depuis et le taux d’achat`}</caption>
+        <thead>
+          <tr className="text-micro font-black uppercase tracking-[0.06em] text-grey">
+            <th scope="col" className="pb-2.5 font-black">
+              {titre}
+            </th>
+            <th scope="col" className="w-[36%] pb-2.5 font-black">
+              Importées
+            </th>
+            <th scope="col" className="pb-2.5 text-right font-black">
+              Payées
+            </th>
+            <th scope="col" className="pb-2.5 text-right font-black">
+              Taux
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {lignes.map((l) => {
+            const taux = l.sansTaux ? null : tauxLisible(l.payees, l.importees);
+            return (
+              <tr key={l.cle} className="border-t border-sep text-detail font-extrabold">
+                <th scope="row" className="py-3 pr-3 text-left font-extrabold">
+                  {l.nom} <span className="text-legende text-grey">· {part(l.importees, total)}</span>
+                </th>
+                <td className="py-3 pr-3">
+                  <span className="flex items-center gap-2.5">
+                    <Barre part={l.importees / max} couleur="var(--elle)" />
+                    <span className="min-w-[40px] text-right tabular-nums">{nombre(l.importees)}</span>
+                  </span>
+                </td>
+                <td className="py-3 pr-3 text-right tabular-nums">{nombre(l.payees)}</td>
+                <td className="py-3 text-right tabular-nums">{taux === null ? "—" : pourcent(taux * 100)}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function QuiImporte({ p, jours }: { p: Chiffres; jours: Periode }) {
+  const { importees: i, payees: a } = p.quiImporte;
+  /* Les convs où « Qui es-tu ? » est rempli : elles seules ont un genre, l’autre et sa paire */
+  const dites = i.moi.elle + i.moi.il;
+  const filles = rapport(i.moi.elle, dites);
+  /* Sans « Qui es-tu ? », pas de paywall : « Pas encore dit » n’a pas de taux */
+  const genres: LigneDesGenres[] = (["elle", "il", "inconnu"] as const).map((g) => ({
+    cle: g,
+    nom: NOMS_DES_GENRES[g],
+    importees: i.moi[g],
+    payees: a.moi[g],
+    sansTaux: g === "inconnu",
+  }));
+  const paires: LigneDesGenres[] = PAIRES.map((x) => ({ cle: x, nom: NOMS_DES_PAIRES[x], importees: i.paires[x], payees: a.paires[x] }));
+  return (
+    <Bloc
+      id="qui-importe"
+      titre="Qui importe"
+      sous={`Les convs importées, et celles payées depuis · ${PERIODES[jours].sur}`}
+      aide={{
+        cle: "quiImporte",
+        valeur: filles === null ? "—" : `${pourcent(filles * 100, 0)} de filles`,
+        contexte: `sur ${pluriel(dites, "conv")} où «\u00a0Qui es-tu\u00a0?\u00a0» est rempli`,
+      }}
+    >
+      {i.convs === 0 ? (
+        <p className="m-0 mt-[18px] text-note font-bold text-grey">Aucune conv importée sur la période.</p>
+      ) : (
+        <>
+          <div className="mt-[18px] grid gap-6 xl:grid-cols-2">
+            <TableDesGenres titre="Qui importe" lignes={genres} total={i.convs} />
+            <TableDesGenres titre="Et sur qui" lignes={paires} total={dites} />
+          </div>
+          <p className="m-0 mt-4 text-note font-bold text-soft">
+            <span className="font-black text-ink">L’autre{NBSP}:</span> {pluriel(i.autre.il, "garçon")}, {pluriel(i.autre.elle, "fille")}, dont{" "}
+            {pluriel(i.autre.devines, "deviné", "devinés")} (ni sa fiche ni la conv ne le disent{NBSP}: l’opposé de celui qui importe).
+          </p>
+          {[...genres, ...paires].some((l) => !l.sansTaux && l.importees < PERSONNES_D_UN_TAUX) && (
+            <p className="m-0 mt-1 text-legende font-bold text-grey">{`«\u00a0—\u00a0»\u00a0: moins de ${PERSONNES_D_UN_TAUX}\u00a0convs, trop peu pour un taux.`}</p>
+          )}
         </>
       )}
     </Bloc>

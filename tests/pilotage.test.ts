@@ -6,15 +6,16 @@ import { POST as postPresence } from "@/app/api/presence/route";
 import { NOMS_DU_TOURNAGE } from "@/lib/noms-cookies";
 import { db, schema } from "@/server/db";
 import { direct } from "@/server/direct";
+import { definirPronomAutre, importer } from "@/server/histoires";
 import { purger } from "@/server/purge";
 import { compterUnClicDeMail } from "@/server/compteurs";
 import { CLES_DES_MAILS } from "@/server/sequences";
-import { statsAdmin } from "@/server/stats";
+import { statsAdmin, type Genres } from "@/server/stats";
 import { attendreLePaiement } from "@/server/taches";
 import { aujourdhuiParis } from "@/server/temps";
 import { noterAchatAuFil, noterAuFil, noterJalon, noterLaSourceDuCompte, noterSigne, sourceDeLaVisite } from "@/server/visites";
 import { CLES_DES_APPLIS, JALONS_PAR_APPLI, type AppKind, type JalonParAppli, type OffreId } from "@/types";
-import { compteDeTest, convRattachee } from "./aide/fixtures";
+import { accordDeTest, compteDeTest, convPrete, convRattachee, ligneEnBase } from "./aide/fixtures";
 
 /*
  * Le pilotage d’/admin : les signes des onglets, les visites du jour (une par empreinte de connexion), le fil du direct,
@@ -354,5 +355,85 @@ describe("les mails des séquences (/admin)", () => {
       .values({ userId: avec.id, storyId: conv.id, offre: "suite", centimes: 1090, bulles: 10, fournisseur: "factice", statut: "paye", payeLe: ilYa(5) });
     const apres = (await statsAdmin(7)).pilotage.abDerniere;
     expect([apres.avec.n - avant.avec.n, apres.avec.payes - avant.avec.payes, apres.sans.n - avant.sans.n, apres.sans.payes - avant.sans.payes]).toEqual([1, 1, 1, 0]);
+  });
+});
+
+describe("qui importe (/admin)", () => {
+  const p2 = (n: number) => String(n).padStart(2, "0");
+  /** Un export WhatsApp (iPhone) inventé de ces échanges, un message toutes les 7 minutes. */
+  const exportDe = (echanges: [string, string][]) =>
+    echanges
+      .map(([qui, texte], k) => {
+        const d = new Date(Date.UTC(2026, 9, 1, 18, 0) + k * 7 * 60e3);
+        return `[${p2(d.getUTCDate())}/${p2(d.getUTCMonth() + 1)}/${d.getUTCFullYear()} ${p2(d.getUTCHours())}:${p2(d.getUTCMinutes())}:00] ${qui}: ${texte}`;
+      })
+      .join("\n");
+  /* Sacha et Nina, sans un accord : la conv ne dit le genre de personne. Léa et Inès se disent au féminin */
+  const SANS_ACCORD = Array.from({ length: 60 }, (_, k): [string, string] => [k % 2 ? "Nina" : "Sacha", `message ${k + 1}`]);
+  const ENTRE_FILLES: [string, string][] = [
+    ["Léa", "coucou ma belle"],
+    ["Inès", "je suis rentrée du taff, je suis crevée"],
+    ["Léa", "t’es prête pour samedi ?"],
+    ["Inès", "désolée j’ai pas répondu hier"],
+    ["Léa", "je suis trop contente qu’on y aille"],
+    ["Inès", "je me suis endormie direct"],
+    ["Inès", "t’es rentrée ?"],
+    ["Léa", "je suis sortie avec les filles"],
+    ["Léa", "je suis arrivée à l’instant"],
+    ...Array.from({ length: 50 }, (_, k): [string, string] => [k % 2 ? "Léa" : "Inès", `message ${k + 1}`]),
+  ];
+  const importe = (echanges: [string, string][]) => importer({ nom: "WhatsApp Chat.txt", appli: "whatsapp", texte: exportDe(echanges) }, accordDeTest());
+  /** Ce qui a bougé entre deux lectures, champ par champ. */
+  const ecart = (apres: Genres, avant: Genres) => {
+    const moins = <T extends Record<string, number>>(a: T, b: T) => Object.fromEntries(Object.entries(a).map(([k, v]) => [k, v - b[k]!]));
+    return { convs: apres.convs - avant.convs, moi: moins(apres.moi, avant.moi), autre: moins(apres.autre, avant.autre), paires: moins(apres.paires, avant.paires) };
+  };
+
+  it("celui qui importe, l’autre et leur paire, puis les convs payées, sans les prises du tournage", async () => {
+    const lire = async () => (await statsAdmin(1)).pilotage.quiImporte;
+    const avant = await lire();
+    const u = await compteDeTest("qui-importe");
+    /* Laissée avant « Qui es-tu ? » */
+    await convRattachee(u, await importe(SANS_ACCORD));
+    /* Une fille, sur quelqu’un que rien ne dit : un garçon, deviné */
+    const fille = await convPrete(u, await importe(SANS_ACCORD), { moi: "Sacha", pronom: "elle" });
+    /* Deux filles, que la conv dit */
+    const filles = await convPrete(u, await importe(ENTRE_FILLES), { moi: "Léa", pronom: "elle" });
+    /* Deux garçons, dit sur sa fiche */
+    const garcons = await convPrete(u, await importe(SANS_ACCORD), { moi: "Nina", pronom: "il" });
+    await definirPronomAutre(garcons.id, "il");
+    /* Une prise du tournage, « Qui es-tu ? » rempli et payée : elle ne compte pas */
+    const [prise] = await db()
+      .insert(schema.stories)
+      .values({ userId: u.id, messageCount: 60, meta: (await ligneEnBase(fille.id)).meta, tournageLe: new Date() })
+      .returning({ id: schema.stories.id });
+
+    const achat = (storyId: string, offre: OffreId, plus: Partial<typeof schema.achats.$inferInsert> = {}) =>
+      db()
+        .insert(schema.achats)
+        .values({ userId: u.id, storyId, offre, centimes: 990, bulles: 3, fournisseur: "factice", statut: "paye", payeLe: new Date(), ...plus });
+    /* Deux achats sur la conv des deux filles : payée une fois */
+    await achat(filles.id, "premium");
+    await achat(filles.id, "pack10");
+    /* Des bulles payées depuis le chat ne paient pas le rapport, une commande abandonnée non plus */
+    await achat(fille.id, "pack10");
+    await achat(fille.id, "rapport", { statut: "en_attente", payeLe: null });
+    /* Un rapport d’avance utilisé sur la conv des deux garçons, remboursé depuis : elle a été payée */
+    await achat(garcons.id, "second", { utiliseLe: new Date(), statut: "rembourse", annuleLe: new Date() });
+    await achat(prise!.id, "rapport");
+
+    const apres = await lire();
+    expect(ecart(apres.importees, avant.importees)).toEqual({
+      convs: 4,
+      moi: { elle: 2, il: 1, inconnu: 1 },
+      autre: { elle: 1, il: 2, devines: 1 },
+      paires: { fille_garcon: 1, garcon_fille: 0, deux_filles: 1, deux_garcons: 1 },
+    });
+    expect(ecart(apres.payees, avant.payees)).toEqual({
+      convs: 2,
+      moi: { elle: 1, il: 1, inconnu: 0 },
+      autre: { elle: 1, il: 1, devines: 0 },
+      paires: { fille_garcon: 0, garcon_fille: 0, deux_filles: 1, deux_garcons: 1 },
+    });
   });
 });

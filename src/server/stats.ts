@@ -1,8 +1,9 @@
 import "server-only";
 import { sql, type SQL } from "drizzle-orm";
+import type { Pronom } from "@prompts/lib/conv";
 import { GENRES_DU_HAUT, type GenreDuHaut } from "@/contenu/haut-du-paywall";
-import { CATALOGUE } from "@/contenu/offres";
-import { GROUPE_DE_L_OFFRE, GROUPES_D_OFFRES, type GroupeDOffres } from "@/contenu/pilotage";
+import { CATALOGUE, RAPPORT_D_AVANCE } from "@/contenu/offres";
+import { GROUPE_DE_L_OFFRE, GROUPES_D_OFFRES, PAIRES, type GroupeDOffres, type Paire } from "@/contenu/pilotage";
 import {
   CLES_DES_APPLIS,
   GENRES_VENDUS,
@@ -18,6 +19,7 @@ import {
   type OffreUnique,
   type SourceVisite,
 } from "@/types";
+import { pronomDeLAutreLu } from "./accords";
 import { etatDeLaListe } from "./attente";
 import { BUDGET_IA } from "./budget";
 import { COMPTE_DU_TOURNAGE } from "./compte-du-tournage";
@@ -26,6 +28,7 @@ import { CLES_DES_MAILS, type CleDeMail } from "./sequences";
 import { db, uneLigne } from "./db";
 import { env } from "./env";
 import { actionsRecentes, type ActionRecente } from "./equipe";
+import { metaDe, personnesDe, type Meta } from "./histoires";
 import { LOT_BLOQUE_S } from "./memoire-en-lot";
 import { PERIME_S } from "./taches";
 import { dansLaMoitieAvec, VENTE, type GroupeDeVente } from "./vente";
@@ -110,6 +113,18 @@ export type CaseDuPilotage = {
 };
 
 /**
+ * Des convs (importées sur la période, ou celles d’entre elles payées), par genre. `moi` : le pronom de celui qui importe
+ * (« Qui es-tu ? »), `inconnu` tant qu’il ne l’a pas rempli. `autre` et `paires`, sur les convs où il l’est : le pronom de
+ * l’autre tel que la lecture le prend (pronomDeLAutre : sa fiche, sinon la conv, sinon l’opposé du tien, `devines`).
+ */
+export type Genres = {
+  convs: number;
+  moi: Record<Pronom | "inconnu", number>;
+  autre: Record<Pronom, number> & { devines: number };
+  paires: Record<Paire, number>;
+};
+
+/**
  * Le pilotage, sur la période (`jours`, une fenêtre glissante comme les autres chiffres) et celle d’avant. L’argent est
  * TTC, en centimes ; l’IA en dollars (couts). La marge en sort par margeApresIA (src/contenu/pilotage.ts).
  */
@@ -154,6 +169,12 @@ export type Pilotage = {
    * `source` null : les acheteurs dont le compte date d’avant le suivi des visites. Classées par payé.
    */
   sources: { source: SourceVisite | null; visiteurs: number; acheteurs: number; centimes: number }[];
+  /**
+   * Qui importe : les convs importées sur la période (sans les prises du tournage), et celles d’entre elles payées depuis
+   * (PAYEE_S), par genre. Leur meta est chiffrée : chacune se déchiffre à chaque calcul, sur toutes les convs de la
+   * période, et il n’en sort que des totaux.
+   */
+  quiImporte: { importees: Genres; payees: Genres };
   /** Le payé par groupe d’offres (GROUPES_D_OFFRES), dans l’ordre des groupes, même vides. */
   mix: { groupe: GroupeDOffres; n: number; centimes: number }[];
   /**
@@ -201,6 +222,14 @@ export type Pilotage = {
 
 /* Les offres qui débloquent le rapport d’une conv : l’entonnoir des achats part des verdicts lus */
 const OFFRES_DU_RAPPORT = OFFRES.filter((o) => CATALOGUE[o].conv);
+/**
+ * Une conv payée (en SQL brut, `stories` sous l’alias `s`) : une offre de son rapport payée, ou un rapport d’avance
+ * utilisé sur elle (il n’a sa conv qu’alors), même remboursés depuis. Une conv offerte (l’équipe, la bêta) ne l’est pas.
+ */
+const PAYEE_S = sql`exists (select 1 from achats a where a.story_id = s.id and a.paye_le is not null and a.offre in (${sql.join(
+  [...OFFRES_DU_RAPPORT, RAPPORT_D_AVANCE.offre].map((o) => sql`${o}`),
+  sql`, `,
+)}))`;
 
 /**
  * Minuit à Paris, `jours` jours avant le jour de `maintenant` (une expression SQL : now(), ou un instant figé par un
@@ -448,6 +477,7 @@ async function pilotageDe(jours: Periode): Promise<Pilotage> {
     ventesCompteurs,
     ventesPayees,
     abChat,
+    convsDeLaPeriode,
   ] = await Promise.all([
     lignes<{ debut: string; visiteurs: string; acheteurs: string; centimes: string; micros: string }>(
       sql`with c as (${cases}),
@@ -538,6 +568,7 @@ async function pilotageDe(jours: Periode): Promise<Pilotage> {
           select ${dansLaMoitieAvec(sql`c.user_id`)} as avec, count(*) as comptes, count(p.user_id) as acheteurs, coalesce(sum(p.centimes), 0) as centimes
           from c left join p on p.user_id = c.user_id group by 1`,
     ),
+    lignes<{ meta: Buffer; payee: boolean }>(sql`select s.meta, ${PAYEE_S} as payee from stories s where ${W("s.created_at")} and ${sql.raw(VRAIE_CONV_S)}`),
   ]);
 
   const m = (c: unknown) => n(c);
@@ -552,6 +583,7 @@ async function pilotageDe(jours: Periode): Promise<Pilotage> {
     g.n += n(o.n);
     g.centimes += n(o.centimes);
   }
+  const convs = convsDeLaPeriode.map((c) => ({ meta: metaDe(c), payee: c.payee }));
 
   return {
     pas,
@@ -574,6 +606,7 @@ async function pilotageDe(jours: Periode): Promise<Pilotage> {
     sources: [...parSource]
       .map(([source, l]) => ({ source, ...l }))
       .sort((a, b) => b.centimes - a.centimes || b.visiteurs - a.visiteurs || (a.source === null ? 1 : b.source === null ? -1 : 0)),
+    quiImporte: { importees: genresDe(convs.map((c) => c.meta)), payees: genresDe(convs.filter((c) => c.payee).map((c) => c.meta)) },
     mix: GROUPES_D_OFFRES.map((groupe) => ({ groupe, ...groupes.get(groupe)! })),
     hauts: GENRES_DU_HAUT.map((genre) => ({
       genre,
@@ -608,6 +641,31 @@ async function pilotageDe(jours: Periode): Promise<Pilotage> {
     },
     suiviDepuis: suivi.depuis,
   };
+}
+
+/* La paire d’une conv : le pronom de celui qui importe, puis celui de l’autre */
+const PAIRE: Record<Pronom, Record<Pronom, Paire>> = { elle: { il: "fille_garcon", elle: "deux_filles" }, il: { elle: "garcon_fille", il: "deux_garcons" } };
+
+/** Les genres de ces convs (Genres), d’après leur meta déchiffrée. */
+function genresDe(metas: Meta[]): Genres {
+  const g: Genres = {
+    convs: metas.length,
+    moi: { elle: 0, il: 0, inconnu: 0 },
+    autre: { elle: 0, il: 0, devines: 0 },
+    paires: Object.fromEntries(PAIRES.map((p) => [p, 0])) as Record<Paire, number>,
+  };
+  for (const meta of metas) {
+    if (!meta.pronom) {
+      g.moi.inconnu += 1;
+      continue;
+    }
+    g.moi[meta.pronom] += 1;
+    const autre = pronomDeLAutreLu(meta, personnesDe(meta));
+    g.autre[autre.pronom] += 1;
+    if (autre.source === "devine") g.autre.devines += 1;
+    g.paires[PAIRE[meta.pronom][autre.pronom]] += 1;
+  }
+  return g;
 }
 
 /**

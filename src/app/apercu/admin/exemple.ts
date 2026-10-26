@@ -1,4 +1,5 @@
-import type { CaseDuPilotage, Periode, Pilotage, StatsAdmin } from "@/server/stats";
+import { PAIRES, type Paire } from "@/contenu/pilotage";
+import type { CaseDuPilotage, Genres, Periode, Pilotage, StatsAdmin } from "@/server/stats";
 import type { AppKind } from "@/types";
 import type { Direct, GesteDuFil } from "@/types/api";
 import type { Delivrabilite } from "@/server/delivrabilite";
@@ -46,7 +47,33 @@ function casesDe(jours: Periode, suivi: boolean): CaseDuPilotage[] {
   });
 }
 
-const somme = <T>(xs: T[], f: (x: T) => number) => xs.reduce((t, x) => t + f(x), 0);
+const somme = <T>(xs: readonly T[], f: (x: T) => number) => xs.reduce((t, x) => t + f(x), 0);
+
+/* Qui importe : la part des imports de chaque paire (le reste n’a pas encore dit son genre), et la part de chacune payée */
+const PARTS_DES_PAIRES: Record<Paire, [importees: number, payees: number]> = {
+  fille_garcon: [0.56, 0.17],
+  garcon_fille: [0.24, 0.11],
+  deux_filles: [0.05, 0.2],
+  deux_garcons: [0.03, 0.12],
+};
+
+/** Les genres d’exemple, retombés sur leurs paires : celui qui importe et l’autre en sortent, un sur trois devinés. */
+function genresDesPaires(paires: Record<Paire, number>, inconnu: number): Genres {
+  const dites = somme(PAIRES, (x) => paires[x]);
+  return {
+    convs: dites + inconnu,
+    moi: { elle: paires.fille_garcon + paires.deux_filles, il: paires.garcon_fille + paires.deux_garcons, inconnu },
+    autre: { il: paires.fille_garcon + paires.deux_garcons, elle: paires.garcon_fille + paires.deux_filles, devines: Math.round(dites * 0.34) },
+    paires,
+  };
+}
+
+/** Qui importe, sur les imports de la période : les convs importées, et celles payées depuis. */
+function quiImporteDe(imports: number): Pilotage["quiImporte"] {
+  const importees = Object.fromEntries(PAIRES.map((x) => [x, Math.round(imports * PARTS_DES_PAIRES[x][0])])) as Record<Paire, number>;
+  const payees = Object.fromEntries(PAIRES.map((x) => [x, Math.round(importees[x] * PARTS_DES_PAIRES[x][1])])) as Record<Paire, number>;
+  return { importees: genresDesPaires(importees, imports - somme(PAIRES, (x) => importees[x])), payees: genresDesPaires(payees, 0) };
+}
 
 /** Le pilotage d’exemple de la période. */
 function pilotageDe(jours: Periode, { calme = false, suivi = true }: Variante): Pilotage {
@@ -154,6 +181,7 @@ function pilotageDe(jours: Periode, { calme = false, suivi = true }: Variante): 
     jalons,
     jalonsDepuis: suivi ? "2026-10-18" : null,
     jalonsParAppli,
+    quiImporte: quiImporteDe(imports),
     sources,
     mix: [
       { groupe: "premium", n: premium, centimes: premium * 1990 },
