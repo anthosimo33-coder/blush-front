@@ -5,7 +5,7 @@ import { erreur, repondre, route } from "@/server/http";
 import { envoiDe } from "@/server/imports";
 import { consentementImport } from "@/server/juridique";
 import { LIMITES } from "@/server/limites";
-import { attendreLePremier, empreinteDuLot, envoiAbandonne, ErreurLot, premierLot, unSeulLot } from "@/server/lots";
+import { attendreLePremier, empreinteDuLot, envoiArrete, ErreurLot, premierLot, unSeulLot } from "@/server/lots";
 import { garde, sousLaLimiteDeLIp } from "@/server/requete";
 import { lecturePayeeRefusee, tournageDuNavigateur } from "@/server/tournage";
 import { utilisateurDeSession } from "@/server/auth";
@@ -22,10 +22,11 @@ const LOT_DU_TOURNAGE = { appli: null, autre: null, captures: [], blocs: [], pro
 /**
  * Un lot d’images tirées d’un enregistrement d’écran (dans le navigateur) : BLUSH les lit (prompt 01) et rend
  * sa lecture brute. Les images ne sont gardées nulle part. Les lots sont ensuite rassemblés (/api/captures/video).
- * Jamais payé deux fois (src/server/lots.ts) : un lot déjà lu (ses images, son appli, le jour) revient sans rappeler le
- * modèle ni compter les plafonds de lecture. `cle` : celle de l’envoi (la même pour tous ses lots, et pour leur fin),
- * dont l’empreinte range le coût de chaque lot (src/server/imports.ts) ; `ordre` : « premier » pour le lot qui part
- * d’abord, « suite » pour ceux qui attendent que sa réponse commence. Un envoi abandonné par le navigateur : 409 `abandon`.
+ * Jamais payé deux fois (src/server/lots.ts) : un lot déjà lu (ses images, son appli, le jour), ici ou sur une autre
+ * instance, revient sans rappeler le modèle ni compter les plafonds de lecture. `cle` : celle de l’envoi (la même pour
+ * tous ses lots, et pour leur fin), dont l’empreinte range le coût de chaque lot (src/server/imports.ts) ; `ordre` :
+ * « premier » pour le lot qui part d’abord, « suite » pour ceux qui attendent que sa réponse commence. Un envoi
+ * abandonné par le navigateur (pour de bon, ou sa page fermée avant que le lot appelle le modèle) : 409 `abandon`.
  */
 async function traiter(req: Request) {
   const g = await garde(req, { session: "aucune" });
@@ -56,13 +57,17 @@ async function traiter(req: Request) {
   /* Le premier lot de l’envoi dit aux autres quand sa réponse commence, ou qu’il a fini (lu, retrouvé, refusé, en échec) */
   const commence = ordre === "premier" && envoi ? premierLot(envoi) : null;
   try {
-    const lot = await unSeulLot(empreinteDuLot(images, app, aujourdhuiParis().iso), envoi, async ({ signal, surAvance }) => {
+    const empreinte = empreinteDuLot(images, app, aujourdhuiParis().iso);
+    const lot = await unSeulLot(empreinte, envoi, async ({ signal, surAvance, partir }) => {
       if (ordre === "suite" && envoi) await attendreLePremier(envoi, signal);
-      if (envoi && (signal.aborted || (await envoiAbandonne(envoi)))) throw new ErreurLot("abandon");
+      if (envoi && (signal.aborted || (await envoiArrete(envoi)))) throw new ErreurLot("abandon");
       /* Le modèle va lire pour de bon : les plafonds de lecture (bêta, compte, sans compte), une fois par lot lu */
       const permis = await lecturePermise("lots");
       if (permis !== "ok") throw new LectureRefusee(permis);
-      return lireLot(images, app, "captures_video", { envoi, signal, ...(surAvance ? { surAvance } : {}), ...(commence ? { auDebut: commence } : {}) });
+      /* Dès ici, son entrée se paie : la page fermée ne l’arrête plus (le nouvel essai de la page rechargée le retrouvera) */
+      partir();
+      if (signal.aborted) throw new ErreurLot("abandon");
+      return lireLot(images, app, "captures_video", { envoi, lot: empreinte, signal, ...(surAvance ? { surAvance } : {}), ...(commence ? { auDebut: commence } : {}) });
     });
     return repondre("POST /api/captures/lot", { lot });
   } finally {

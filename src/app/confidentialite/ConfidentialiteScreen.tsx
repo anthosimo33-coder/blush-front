@@ -50,9 +50,15 @@ export function ConfidentialiteScreen() {
         <Ligne icone="file" ton="toi" titre="Le texte de votre conv">
           Ton export est ouvert sur ton appareil{NBSP}: seuls les messages partent. Les photos, les vidéos et les vocaux ne quittent jamais ton téléphone.
         </Ligne>
+        {/*
+         * Les lots d’un enregistrement (src/server/lots.ts) : leur texte lu, gardé chiffré dix minutes en base (lectures_des_lots),
+         * pour qu’un nouvel essai ne les relise pas ; jamais les images.
+         * TODO(produit): la phrase sur les dix minutes (26 octobre), à valider avec le juriste ; le PDF de Whop à refaire
+         */}
         <Ligne icone="photo" ton="elle" titre="Ou des captures, ou un enregistrement de l’écran">
           Les captures sont lues une fois pour en tirer le texte, puis oubliées{NBSP}: on ne garde aucune image. Un enregistrement ne quitte pas ton téléphone{NBSP}: seuls les
-          écrans de la conv en partent, et ils sont lus puis oubliés de la même façon.
+          écrans de la conv en partent, et ils sont lus puis oubliés de la même façon. Le texte lu de ces écrans attend dix minutes au plus, chiffré, le temps de rassembler ta conv
+          {NBSP}: si ta connexion coupe, rien n’est relu.
         </Ligne>
         {/* Resend l’envoie (les mails) et Whop le reçoit (le reçu) : « il ne part que chez Whop » contredisait la liste des prestataires, plus bas */}
         <Ligne icone="mail" titre="Ton email">

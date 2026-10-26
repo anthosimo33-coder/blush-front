@@ -20,8 +20,10 @@ import { aujourdhuiParis, DEBUT_DU_JOUR } from "./temps";
  *
  * Qui paie un appel : le compte de sa conv, ou le compte connecté qui envoie des captures avant l’import (`compte`,
  * src/server/captures.ts). Sans l’un ni l’autre, l’appel est « sans compte » : il a sa part à lui, prise dans le budget
- * du jour, et il en réserve d’abord ce qu’il peut coûter au plus (reserverSansCompte : n’importe qui peut en lancer, en
- * rafale). Ce qui est dépensé pour tous se lit dans ai_usage (une conv effacée y laisse ses lignes, sans conv : elles
+ * du jour. Une lecture d’avant l’import (sans conv), et tout appel sans compte, en réserve d’abord ce qu’il peut coûter au
+ * plus (reserver : n’importe qui peut en lancer, en rafale, sans compte ou d’un compte gratuit). La part sans compte
+ * prévient l’équipe à 80 %, puis au premier refus : tous les visiteurs d’avant l’email s’arrêtent alors jusqu’à minuit.
+ * Ce qui est dépensé pour tous se lit dans ai_usage (une conv effacée y laisse ses lignes, sans conv : elles
  * comptent encore pour le jour). Ce qu’a dépensé un compte, ou la part sans compte, se compte à part au moment de
  * l’appel (noterDepense, dans rate_limits) : effacer une conv ne rend pas au compte ce qu’elle a coûté, et ne le fait
  * pas passer dans la part sans compte. Un compte se range sur son email canonique (cleDuCompte), comme ses limites : un
@@ -34,7 +36,12 @@ export const BUDGET_IA = {
   jour: 500,
   /** Les appels pour un compte (décidé : 10 $ pour l’ouverture, le 13 octobre ; ce sont les bulles qui comptent ce qu’on paie). */
   compte: 10,
-  /** Les appels sans compte (les captures lues avant l’email), pris dans le budget du jour ; relevé pour l’ouverture. */
+  /**
+   * Les appels sans compte (les captures lues avant l’email), pris dans le budget du jour ; relevé pour l’ouverture.
+   * Réservée avant chaque lecture (reserver), elle est la vraie borne de tout import de captures ou de vidéo d’avant
+   * l’email : environ quarante longues vidéos par jour pour tous les visiteurs.
+   * TODO(produit): son montant avant de lancer les pubs (50 $, environ quarante longues vidéos par jour).
+   */
   anonyme: 50,
   /**
    * Les lectures des convs de tournage préparées par l’API (COMPTE_DU_TOURNAGE) : une lecture entière par lien et par
@@ -43,6 +50,8 @@ export const BUDGET_IA = {
   tournage: 40,
   /** L’équipe est prévenue à 50 % et 80 % (décidé), puis quand le budget du jour est atteint. */
   seuils: [0.5, 0.8, 1],
+  /** La part sans compte prévient l’équipe à 80 % (les lectures en cours comprises), puis à son premier refus. */
+  alerteSansCompte: 0.8,
 } as const;
 
 /** Qui paie un appel : un compte (sa clé, cleDuCompte), ou null (sans compte). */
@@ -208,28 +217,60 @@ export async function controlerBudget({ storyId, compte, reserve }: { storyId?: 
   return payeur;
 }
 
-/** Une part du budget sans compte réservée pour un appel (reserverSansCompte), à rendre une fois l’appel fini. */
+/** Une part du budget du jour réservée pour un appel (reserver), à rendre une fois l’appel fini. */
 export type Reservation = { rendre: () => Promise<void> };
 
 /**
- * Avant un appel sans compte (des captures, un lot d’enregistrement, lus avant l’email) : réserve d’un coup ce qu’il
- * peut coûter au plus (`micros`, src/server/ia/claude.ts), dans la dépense du jour de la part sans compte, en base
- * (comme la voix réserve ses caractères, src/server/ia/voix.ts). Deux appels lancés ensemble ne passent pas ensemble
- * au-delà du budget : sans elle, la dépense n’était notée qu’après l’appel, sur une valeur gardée 30 secondes, et une
- * rafale de lots pouvait le dépasser de beaucoup. Au-delà : rendue aussitôt, et l’erreur d’étape « budget » (« souffle »
- * pour le navigateur), sans rien appeler. La réservation se rend une fois l’appel fini, réussi ou non, après que sa vraie
- * dépense s’est ajoutée (noterDepense) : il ne reste que ce qu’il a coûté.
+ * Avant une lecture d’avant l’import (des captures, un lot d’enregistrement : sans conv) ou un appel sans compte :
+ * réserve d’un coup ce qu’il peut coûter au plus (`micros`, src/server/ia/claude.ts), dans la dépense du jour de qui le
+ * paie (le compte connecté, sinon la part sans compte), en base (comme la voix réserve ses caractères,
+ * src/server/ia/voix.ts). Deux appels lancés ensemble ne passent pas ensemble au-delà de son budget : sans elle, la
+ * dépense n’était notée qu’après l’appel, sur une valeur gardée 30 secondes, et une rafale de lots (sans compte, ou d’un
+ * compte gratuit : un email suffit) pouvait le dépasser de beaucoup. Au-delà : rendue aussitôt, et l’erreur d’étape
+ * « budget » (« souffle » pour le navigateur), sans rien appeler. La réservation se rend une fois l’appel fini, réussi ou
+ * non, après que sa vraie dépense s’est ajoutée (noterDepense) : il ne reste que ce qu’il a coûté. La part sans compte
+ * prévient l’équipe quand elle passe BUDGET_IA.alerteSansCompte, puis à son premier refus (prevenirSansCompte, sans
+ * attendre).
  */
-export async function reserverSansCompte(micros: number): Promise<Reservation> {
-  const cle = cleDeDepense(null, gardeDuJour());
+export async function reserver(payeur: Payeur, micros: number): Promise<Reservation> {
+  const jour = gardeDuJour();
+  const cle = cleDeDepense(payeur, jour);
   const reserve = Math.max(0, Math.round(micros));
-  if ((await compter(cle, FENETRE_DEPENSE, reserve)) > plafondDe(null)) {
+  const plafond = plafondDe(payeur);
+  const total = await compter(cle, FENETRE_DEPENSE, reserve);
+  if (total > plafond) {
     await rendre(cle, reserve);
-    journal("budget de l’IA atteint", { budget: "anonyme" }, "alerte");
+    if (payeur === null) void auMieux(prevenirSansCompte(jour, 1, total - reserve), "alerte de la part sans compte", { seuil: 1 });
+    journal("budget de l’IA atteint", { budget: payeur ? "compte" : "anonyme" }, "alerte");
     throw new ErreurTache("budget");
   }
+  const seuil = BUDGET_IA.alerteSansCompte * plafond;
+  if (payeur === null && total - reserve < seuil && total >= seuil)
+    void auMieux(prevenirSansCompte(jour, BUDGET_IA.alerteSansCompte, total), "alerte de la part sans compte", { seuil: BUDGET_IA.alerteSansCompte });
   return { rendre: () => rendre(cle, reserve) };
 }
+
+/**
+ * Prévient l’équipe que la part sans compte de ce jour a passé ce seuil (1 : un appel refusé), une fois par seuil et par
+ * jour, pour toutes les instances. `micros` : la part, les lectures en cours comprises (leurs réservations).
+ */
+async function prevenirSansCompte(jour: string, seuil: number, micros: number): Promise<void> {
+  if (!(await sousLaLimite(`budget-ia:sans-compte:alerte:${jour}:${seuil}`, { max: 1, fenetreS: 2 * 86400 }))) return;
+  await alerter(
+    seuil >= 1 ? "budget de l’IA : la part sans compte du jour est atteinte" : `budget de l’IA : ${Math.round(seuil * 100)} % de la part sans compte du jour`,
+    [
+      `Part sans compte aujourd’hui : ${(micros / 1e6).toFixed(2)} $ sur ${BUDGET_IA.anonyme} $, lectures en cours comprises.`,
+      seuil >= 1
+        ? `Les captures et les vidéos des visiteurs sans compte répondent « ${SOUFFLE} » jusqu’à minuit (heure de Paris) : avec des pubs en cours, c’est leur budget perdu.`
+        : `Au-delà de ${BUDGET_IA.anonyme} $, les captures et les vidéos des visiteurs sans compte s’arrêtent jusqu’à minuit (heure de Paris).`,
+      `Le montant : BUDGET_IA.anonyme (src/server/budget.ts).`,
+    ],
+    { importante: true },
+  );
+}
+
+/** La part sans compte d’aujourd’hui, en millionièmes de dollar : sa dépense, et les réservations des lectures en cours (/admin). */
+export const partSansCompteDuJour = (): Promise<number> => compteDe(cleDeDepense(null, aujourdhuiParis().iso), FENETRE_DEPENSE);
 
 /**
  * Après un appel : ce qu’il a coûté (en millionièmes de dollar) s’ajoute tout de suite à ce que l’instance garde, puis

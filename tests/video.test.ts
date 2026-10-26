@@ -172,12 +172,13 @@ describe("l’enregistrement, découpé et mesuré dans le navigateur", () => {
     ).toBe(3);
   });
 
-  it("un lot lu reste dans l’onglet, frais une heure ; sans empreinte, rien n’est gardé", () => {
+  it("un lot lu reste dans l’onglet, frais une heure, avec la clé de l’envoi qui l’a lu ; sans empreinte, rien n’est gardé", () => {
     const lot = { blocs: [] };
-    garderLeLot("lot-a", lot);
-    expect(lotDejaLu("lot-a")).toBe(lot);
+    garderLeLot("lot-a", { lot, cle: "cle-de-l-envoi" });
+    expect(lotDejaLu("lot-a")).toEqual({ lot, cle: "cle-de-l-envoi" });
+    expect(lotDejaLu("lot-a")?.lot).toBe(lot);
     expect(lotDejaLu("lot-b")).toBeUndefined();
-    garderLeLot(null, lot);
+    garderLeLot(null, { lot, cle: "cle-de-l-envoi" });
     expect(lotDejaLu(null)).toBeUndefined();
     const maintenant = Date.now();
     const horloge = vi.spyOn(Date, "now").mockReturnValue(maintenant + 61 * 60e3);

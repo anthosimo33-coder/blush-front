@@ -185,9 +185,11 @@ describe("uploadRecording : un lot n’est jamais payé deux fois", () => {
     expect(cle).toEqual(expect.stringMatching(/^[0-9a-f-]{16,64}$/i));
     expect(champs.every((c) => c.cle === cle)).toBe(true);
     expect(corpsVideo).toEqual([expect.objectContaining({ cle })]);
+    /* Rien de repris d’un envoi d’avant */
+    expect(corpsVideo[0]).not.toHaveProperty("repris");
   });
 
-  it("un lot en échec pour de bon : l’envoi abandonné le dit au serveur une fois (sa clé, en keepalive) ; la même vidéo renvoyée ne relit que ce qui manque", async () => {
+  it("un lot en échec pour de bon : l’envoi abandonné le dit au serveur une fois (sa clé, « echec », en keepalive) ; la même vidéo renvoyée ne relit que ce qui manque, et dit d’où vient le lot repris", async () => {
     /* Le lot 2 échoue un peu après la lecture du lot 1 : un lot encore en cours à l’abandon s’arrête, et n’est pas gardé */
     const { appels, champs, abandons, corpsVideo } = serveur({
       lot: (n, essai) => (n === 2 && essai === 1 ? new Promise((ok) => setTimeout(() => ok(json({ erreur: "capture" }, 422)), 100)) : json({ lot: `lecture ${n}` })),
@@ -195,16 +197,18 @@ describe("uploadRecording : un lot n’est jamais payé deux fois", () => {
     const premier = uploadRecording(VIDEO, "imessage", CASE_IMPORT.version).catch((e: unknown) => e);
     await vi.advanceTimersByTimeAsync(100);
     expect(await premier).toMatchObject({ code: "capture", status: 422 });
-    expect(abandons).toEqual([{ corps: { cle: champs[0]!.cle }, keepalive: true }]);
+    expect(abandons).toEqual([{ corps: { cle: champs[0]!.cle, raison: "echec" }, keepalive: true }]);
     /* Le même enregistrement, choisi de nouveau : le lot 1 est déjà lu dans l’onglet, seul le lot 2 repart, seul (sans ordre) */
     await expect(uploadRecording(VIDEO, "imessage", CASE_IMPORT.version)).resolves.toMatchObject({ messagesRead: 42 });
     expect(appels).toEqual(["lot 1 · essai 1", "lot 2 · essai 1", "lot 2 · essai 2", "video"]);
     expect(champs.at(-1)).toMatchObject({ n: 2, ordre: null });
-    expect(corpsVideo).toEqual([expect.objectContaining({ lots: ["lecture 1", "lecture 2"] })]);
+    /* Le lot 1 repris vient du premier envoi : sa clé part avec la fin (la mesure range son coût sous ce nouvel import) */
+    expect(champs.at(-1)!.cle).not.toBe(champs[0]!.cle);
+    expect(corpsVideo).toEqual([expect.objectContaining({ lots: ["lecture 1", "lecture 2"], cle: champs.at(-1)!.cle, repris: [champs[0]!.cle] })]);
     expect(abandons).toHaveLength(1);
   });
 
-  it("la page fermée pendant la lecture : l’envoi abandonné le dit au serveur, ses lots en cours s’arrêtent ; pas une page mise de côté, ni une page fermée après", async () => {
+  it("la page fermée pendant la lecture : l’envoi abandonné le dit au serveur (« page » : seuls ses lots pas encore partis chez le prestataire s’arrêtent) ; pas une page mise de côté, ni une page fermée après", async () => {
     /** Un pagehide, comme le navigateur l’envoie : `persisted`, la page gardée pour revenir. */
     const quitter = (persisted: boolean) => window.dispatchEvent(Object.assign(new Event("pagehide"), { persisted }));
     const { abandons, champs, signaux } = serveur({ lot: () => "pend" });
@@ -218,7 +222,7 @@ describe("uploadRecording : un lot n’est jamais payé deux fois", () => {
     expect([...signaux.values()].some((s) => s.aborted)).toBe(false);
     quitter(false);
     await vi.advanceTimersByTimeAsync(50);
-    expect(abandons).toEqual([{ corps: { cle: champs[0]!.cle }, keepalive: true }]);
+    expect(abandons).toEqual([{ corps: { cle: champs[0]!.cle, raison: "page" }, keepalive: true }]);
     expect([...signaux.values()].every((s) => s.aborted)).toBe(true);
     expect(await envoi).toBeInstanceOf(Error);
     /* Une lecture finie n’écoute plus la page : la quitter ensuite n’abandonne rien */

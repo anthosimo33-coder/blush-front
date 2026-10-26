@@ -8,11 +8,13 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
  * par leurs routes, appelées comme le ferait le navigateur (cookies simulés). Le modèle factice est éteint : le
  * prestataire est un faux (definirFournisseur), qui coûte (ses lignes d’ai_usage, la dépense du jour de qui paie) et que
  * chaque test règle : ce qu’il reçoit, quand, et de quoi le faire attendre, refuser ou s’arrêter. Aucun appel ne sort.
- * Ce que ce fichier note dans ai_usage, dans la mesure des imports et dans la part sans compte du budget est effacé à la
- * fin : le budget du jour des autres fichiers n’en porte rien. /admin se lit avant et après (la base des tests garde
- * tout d’un lancement à l’autre).
+ * Une autre instance se joue en oubliant ce que garde celle-ci (oublierLesLots) : il ne reste que la base. Ce que ce
+ * fichier note dans ai_usage, dans la mesure des imports, dans les lectures gardées et dans la part sans compte du
+ * budget est effacé à la fin : le budget du jour des autres fichiers n’en porte rien. /admin se lit avant et après (la
+ * base des tests garde tout d’un lancement à l’autre). Les invités de l’équipe (BLUSH_ACCES_LIBRE, que /admin lit) sont
+ * ceux que le test pose (`etat.equipe`).
  */
-const etat = vi.hoisted(() => ({ cookies: new Map<string, string>() }));
+const etat = vi.hoisted(() => ({ cookies: new Map<string, string>(), equipe: [] as string[] }));
 vi.mock("next/headers", () => ({
   cookies: async () => ({
     get: (n: string) => (etat.cookies.has(n) ? { name: n, value: etat.cookies.get(n)! } : undefined),
@@ -25,7 +27,7 @@ vi.mock("next/headers", () => ({
 vi.mock("@/server/env", async (original) => {
   const o = await original<typeof import("@/server/env")>();
   /* iaFactice lit l’env() de son module, pas celui-ci : on le remplace aussi */
-  return { ...o, env: () => ({ ...o.env(), BLUSH_IA_FACTICE: false, ANTHROPIC_API_KEY: "cle-fictive" }), iaFactice: () => false };
+  return { ...o, env: () => ({ ...o.env(), BLUSH_IA_FACTICE: false, ANTHROPIC_API_KEY: "cle-fictive", BLUSH_ACCES_LIBRE: etat.equipe }), iaFactice: () => false };
 });
 
 import type { Captures } from "@prompts/lib/schemas";
@@ -43,7 +45,7 @@ import { cleDeLimiteDuCompte } from "@/server/email-canonique";
 import { definirFournisseur, type Ecoute, type MessageRecu } from "@/server/ia/claude";
 import { envoiDe } from "@/server/imports";
 import { compteDe, LIMITES } from "@/server/limites";
-import { attendreLePremier, premierLot } from "@/server/lots";
+import { attendreLePremier, oublierLesLots, premierLot } from "@/server/lots";
 import { purger } from "@/server/purge";
 import { statsAdmin, type Pilotage } from "@/server/stats";
 import { attendreLePaiement } from "@/server/taches";
@@ -92,6 +94,9 @@ const conv = async (r: Response): Promise<string> => {
   return story.id;
 };
 const json = (corps: unknown): RequestInit => ({ method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(corps) });
+
+/** Un abandon de l’envoi de clé `cle`, comme le navigateur l’envoie : pour de bon (un lot en échec), ou la page fermée. */
+const abandon = (cle: string, raison: "echec" | "page") => postAbandon(requete("/api/captures/lot/abandon", json({ cle, raison })));
 
 /* ———— Le faux prestataire ———— */
 
@@ -151,29 +156,31 @@ afterAll(async () => {
     .delete(schema.aiUsage)
     .where(and(gte(schema.aiUsage.createdAt, debut), inArray(schema.aiUsage.task, ["captures", "captures_video"])));
   await db().delete(schema.imports).where(gte(schema.imports.creeLe, debut));
+  await db().delete(schema.lecturesDesLots).where(gte(schema.lecturesDesLots.expireLe, debut));
   await effacerLaPartSansCompte();
 });
 
-/** Les lignes d’ai_usage de l’envoi de clé `cle` (son empreinte, envoiDe). */
+/** Les lignes d’ai_usage de l’envoi de clé `cle` (son empreinte, envoiDe), dans l’ordre où elles ont été notées. */
 const lignesDe = (cle: string) =>
   db()
     .select()
     .from(schema.aiUsage)
-    .where(eq(schema.aiUsage.envoi, envoiDe(cle)!));
+    .where(eq(schema.aiUsage.envoi, envoiDe(cle)!))
+    .orderBy(schema.aiUsage.id);
 
 describe("un lot d’enregistrement n’est jamais lu deux fois", () => {
   it("le même lot renvoyé (la réponse perdue) revient sans rappeler le modèle ni compter les plafonds ; une autre appli le relit", async () => {
     const cle = randomUUID();
     const images = ecrans(2);
     const plafond = () => compteDe(cleDeLimiteDuCompte("lotsParCompte", compte.email), LIMITES.lotsParCompte);
-    const avant = await plafond();
+    const [avant, partis] = [await plafond(), envois.length];
     const premiere = await luDe(await lot(images, { cle }));
-    expect(envois).toHaveLength(1);
+    expect(envois.length - partis).toBe(1);
     expect(await luDe(await lot(images, { cle }))).toEqual(premiere);
-    expect(envois).toHaveLength(1);
+    expect(envois.length - partis).toBe(1);
     /* Une autre appli : la lecture n’est plus la même demande */
     await luDe(await lot(images, { cle, app: "instagram" }));
-    expect(envois).toHaveLength(2);
+    expect(envois.length - partis).toBe(2);
     expect((await plafond()) - avant).toBe(2);
     /* Chaque vraie lecture est notée sous l’empreinte de l’envoi, à son prix */
     expect((await lignesDe(cle)).map((l) => [l.task, l.costMicros, l.storyId])).toEqual([
@@ -224,7 +231,7 @@ describe("un lot d’enregistrement n’est jamais lu deux fois", () => {
     const recus = envois.slice(avant);
     expect(recus.map((e) => e.images).sort()).toEqual([2, 3, 4]);
     for (const e of recus.filter((x) => x.images !== 2)) expect(e.le).toBeGreaterThanOrEqual(commence);
-    /* Libérés par le début du premier, pas par la fin de l’attente (8 s) */
+    /* Libérés par le début du premier, pas par la fin de l’attente (6 s) */
     expect(Date.now() - t0).toBeLessThan(3_000);
   });
 
@@ -246,33 +253,128 @@ describe("un lot d’enregistrement n’est jamais lu deux fois", () => {
     expect(Date.now() - t0).toBeLessThan(1_000);
   });
 
-  it("un envoi abandonné : sa lecture en cours s’arrête chez le prestataire (409 abandon), aucun autre de ses lots ne part ; un lot déjà lu reste", async () => {
+  it("un envoi abandonné pour de bon : sa lecture en cours s’arrête chez le prestataire (409 abandon), son début noté ; aucun autre de ses lots ne part ; un lot déjà lu reste", async () => {
     const cle = randomUUID();
     const dejaLus = ecrans(2);
     const deja = await luDe(await lot(dejaLus, { cle }));
-    /* Le prochain lot ne répond pas avant 5 s, sauf si on l’arrête */
-    prestataire = (images, signal) =>
+    /* Le prochain lot annonce son entrée lue, écrit un peu, puis ne répond pas avant 5 s, sauf si on l’arrête */
+    prestataire = (images, signal, ecoute) =>
       new Promise((ok, ko) => {
+        ecoute?.usage?.({ input_tokens: 8_000, output_tokens: 1, cache_creation_input_tokens: 0, cache_read_input_tokens: 0 }, "claude-sonnet-5-5");
+        ecoute?.texte("x".repeat(400));
         signal?.addEventListener("abort", () => ko(new APIUserAbortError()));
         setTimeout(() => ok(lue(images)), 5_000);
       });
     const avant = envois.length;
     const enCours = lot(ecrans(3), { cle });
     while (envois.length === avant) await attendre(10);
-    const abandon = await postAbandon(requete("/api/captures/lot/abandon", json({ cle })));
-    expect(await abandon.json()).toEqual({ ok: true });
+    expect(await (await abandon(cle, "echec")).json()).toEqual({ ok: true });
     const r = await enCours;
     expect(r.status).toBe(409);
     expect(await r.json()).toEqual({ erreur: "abandon" });
     expect(envois.at(-1)!.signal?.aborted).toBe(true);
+    /* Ce qu’il a déjà coûté (8 000 jetons lus, une centaine écrits) est noté sous l’envoi : /admin le compte, lu pour rien */
+    expect((await lignesDe(cle)).map((l) => [l.inputTokens, l.outputTokens, l.costMicros])).toEqual([
+      [10_000, 2_000, COUT_MICROS],
+      [8_000, 100, 8_000 * 2 + 100 * 10],
+    ]);
     /* Un autre lot du même envoi : refusé sans appel */
     const apres = await lot(ecrans(4), { cle });
     expect(apres.status).toBe(409);
     expect(envois.length - avant).toBe(1);
     /* Le lot déjà lu revient toujours (un nouvel essai de l’enregistrement le retrouve) */
     expect(await luDe(await lot(dejaLus, { cle }))).toEqual(deja);
-    /* Une clé qui n’en est pas une n’arrête rien */
-    expect(await (await postAbandon(requete("/api/captures/lot/abandon", json({ cle: "pas une clé" })))).json()).toEqual({ ok: true });
+    /* Une clé qui n’en est pas une n’arrête rien ; sans raison, l’abandon est refusé */
+    expect(await (await abandon("pas une clé", "echec")).json()).toEqual({ ok: true });
+    expect(await (await postAbandon(requete("/api/captures/lot/abandon", json({ cle })))).json()).toEqual({ erreur: "invalide" });
+  });
+
+  it("la page fermée (un rechargement) : le lot déjà parti chez le prestataire va au bout et reste gardé, celui qui attend le premier s’arrête (409) ; la page rechargée retrouve le premier sans le repayer", async () => {
+    const cle = randomUUID();
+    const [premierEcrans, suiteEcrans] = [ecrans(2), ecrans(3)];
+    /* Le premier lot met 400 ms à répondre, sans rien annoncer avant : la suite l’attend */
+    let fermer: () => void = () => {};
+    const fermee = new Promise<void>((ok) => (fermer = ok));
+    prestataire = async (images, signal) => {
+      if (images === 2) {
+        await fermee;
+        await attendre(400);
+        if (signal?.aborted) throw new APIUserAbortError();
+      }
+      return lue(images);
+    };
+    const avant = envois.length;
+    const premier = lot(premierEcrans, { cle, ordre: "premier" });
+    const suite = lot(suiteEcrans, { cle, ordre: "suite" });
+    while (envois.length === avant) await attendre(10);
+    expect(await (await abandon(cle, "page")).json()).toEqual({ ok: true });
+    fermer();
+    const [r1, r2] = await Promise.all([premier, suite]);
+    const lu = await luDe(r1);
+    expect(r2.status).toBe(409);
+    expect(await r2.json()).toEqual({ erreur: "abandon" });
+    /* Le premier n’a pas été arrêté ; la suite n’est jamais partie ; un lot de l’envoi arrivé après ne part pas non plus */
+    expect(envois.slice(avant).map((e) => [e.images, e.signal?.aborted ?? false])).toEqual([[2, false]]);
+    expect((await lot(ecrans(4), { cle })).status).toBe(409);
+    expect(envois.length - avant).toBe(1);
+    /* La page rechargée renvoie la même vidéo, sous une nouvelle clé : le premier revient tel quel, et son coût passe sous elle ; la suite se lit */
+    const recharge = randomUUID();
+    expect(await luDe(await lot(premierEcrans, { cle: recharge }))).toEqual(lu);
+    await luDe(await lot(suiteEcrans, { cle: recharge }));
+    expect(envois.slice(avant).map((e) => e.images)).toEqual([2, 3]);
+    expect(await lignesDe(cle)).toEqual([]);
+    expect((await lignesDe(recharge)).map((l) => l.costMicros)).toEqual([COUT_MICROS, COUT_MICROS]);
+  });
+
+  it("une autre instance : un lot déjà lu ailleurs revient de la base (sans rappeler le modèle), et son coût passe sous le nouvel envoi", async () => {
+    const [a, b] = [randomUUID(), randomUUID()];
+    const images = ecrans(2);
+    const avant = envois.length;
+    const lu = await luDe(await lot(images, { cle: a }));
+    oublierLesLots();
+    expect(await luDe(await lot(images, { cle: b }))).toEqual(lu);
+    expect(envois.length - avant).toBe(1);
+    expect(await lignesDe(a)).toEqual([]);
+    expect((await lignesDe(b)).map((l) => l.costMicros)).toEqual([COUT_MICROS]);
+    /* Gardée chiffrée en base, jamais en clair */
+    const [garde] = await db()
+      .select()
+      .from(schema.lecturesDesLots)
+      .where(eq(schema.lecturesDesLots.envoi, envoiDe(a)!));
+    expect(garde).toBeDefined();
+    expect(Buffer.from(garde!.lu).toString("utf8")).not.toContain("Léa");
+  });
+
+  it("une autre instance, pendant la lecture : le nouvel essai attend sa fin au lieu de la payer ; si elle échoue, il le lit lui-même", async () => {
+    const images = ecrans(3);
+    prestataire = async (n, signal) => {
+      await attendre(600);
+      if (signal?.aborted) throw new APIUserAbortError();
+      return lue(n);
+    };
+    const avant = envois.length;
+    const premiere = lot(images, { cle: randomUUID() });
+    while (envois.length === avant) await attendre(10);
+    oublierLesLots();
+    const seconde = lot(images, { cle: randomUUID() });
+    expect(await luDe(await seconde)).toEqual(await luDe(await premiere));
+    expect(envois.length - avant).toBe(1);
+    /* La lecture de l’autre instance échoue (un refus) : la marque tombe, celui qui attendait le lit */
+    const autres = ecrans(3);
+    let appels = 0;
+    prestataire = async (n) => {
+      await attendre(300);
+      if (++appels === 1) return { content: [], usage: USAGE, model: "claude-sonnet-5-5", stop_reason: "refusal", stop_details: { category: "general_harms" } };
+      return lue(n);
+    };
+    const depart = envois.length;
+    const refusee = lot(autres, { cle: randomUUID() });
+    while (envois.length === depart) await attendre(10);
+    oublierLesLots();
+    const reprise = lot(autres, { cle: randomUUID() });
+    expect((await refusee).status).toBe(502);
+    await luDe(await reprise);
+    expect(envois.length - depart).toBe(2);
   });
 
   it("sans compte : chaque lecture réserve d’abord ce qu’elle peut coûter au plus ; la part épuisée, rien ne part (503 souffle) ; une lecture finie ne garde que son coût", async () => {
@@ -330,12 +432,40 @@ describe("la mesure des imports", () => {
     expect(mesure).toMatchObject({ storyId: id, type: "video", appli: "imessage", ecrans: 4, lots: 2 });
     expect((await lignesDe(cle)).map((l) => l.storyId)).toEqual([id, id]);
     expect(ecart(avant, await duType("video"))).toEqual({ imports: 1, ecrans: 4, lots: 2, micros: 2 * COUT_MICROS, paywall: 0, payes: 0, pourRien: 0 });
-    /* Puis le paywall (la lecture attend le paiement), puis le rapport payé */
+    /* Puis le paywall (la lecture attend le paiement) et le temps pour y arriver, puis le rapport payé */
     await attendreLePaiement(id, "verdict");
+    expect((await duType("video")).secondesAuPaywall).toEqual(expect.any(Number));
     await db()
       .insert(schema.achats)
       .values({ userId: compte.id, storyId: id, offre: "rapport", centimes: 990, bulles: 10, fournisseur: "factice", statut: "paye", payeLe: new Date() });
     expect(ecart(avant, await duType("video"))).toMatchObject({ imports: 1, paywall: 1, payes: 1 });
+  });
+
+  it("un enregistrement qui reprend des lots lus par un envoi d’avant (l’onglet, après un lot en échec) : leur coût passe sous son import, rien de lu pour rien", async () => {
+    const avant = await duType("video");
+    const [ancien, nouveau] = [randomUUID(), randomUUID()];
+    const repris = await luDe(await lot(ecrans(2), { cle: ancien }));
+    const lu = await luDe(await lot(ecrans(3), { cle: nouveau }));
+    const fin = { app: "imessage", lots: [repris, lu], cle: nouveau, repris: [ancien, "pas une clé"], consentement: CASE_IMPORT.version };
+    const id = await conv(await postVideo(requete("/api/captures/video", json(fin))));
+    expect(await lignesDe(ancien)).toEqual([]);
+    expect((await lignesDe(nouveau)).map((l) => l.storyId)).toEqual([id, id]);
+    expect(ecart(avant, await duType("video"))).toMatchObject({ imports: 1, lots: 2, micros: 2 * COUT_MICROS, pourRien: 0 });
+  });
+
+  it("les imports d’un compte de l’équipe ou d’un invité ne comptent pas (ils ne paient jamais) ; un brouillon jamais rattaché, si", async () => {
+    const avant = await duType("captures");
+    const id = await conv(await postCaptures(requete("/api/captures", { method: "POST", body: formulaire(ecrans(2), { app: "instagram", cle: randomUUID() }) })));
+    expect(ecart(avant, await duType("captures"))).toMatchObject({ imports: 1, micros: COUT_MICROS });
+    const membre = await compteDeTest("lots-equipe");
+    await db().update(schema.stories).set({ userId: membre.id }).where(eq(schema.stories.id, id));
+    etat.equipe = [membre.email];
+    try {
+      expect(ecart(avant, await duType("captures"))).toMatchObject({ imports: 0, micros: 0, pourRien: 0 });
+    } finally {
+      etat.equipe = [];
+    }
+    expect(ecart(avant, await duType("captures"))).toMatchObject({ imports: 1 });
   });
 
   it("des captures : la lecture se note sous l’empreinte de l’envoi, puis la conv ; un morceau ajouté avant « Qui es-tu ? » ajoute ses écrans, son lot et son coût à ceux de la conv", async () => {

@@ -21,7 +21,18 @@ vi.mock("next/headers", () => ({
 
 import type { Utilisateur } from "@/server/auth";
 import { ouvrirSession } from "@/server/auth";
-import { BUDGET_IA, cleDeDepense, controlerBudget, noterDepense, oublierLeBudget, payeurDuCompte, reserverSansCompte, type Payeur, type Reservation } from "@/server/budget";
+import {
+  BUDGET_IA,
+  cleDeDepense,
+  controlerBudget,
+  noterDepense,
+  oublierLeBudget,
+  payeurDuCompte,
+  partSansCompteDuJour,
+  reserver,
+  type Payeur,
+  type Reservation,
+} from "@/server/budget";
 import { lireCaptures } from "@/server/captures";
 import { empreinte } from "@/server/chiffrement";
 import { db, schema } from "@/server/db";
@@ -188,24 +199,42 @@ describe("avant l’appel", () => {
     expect(modele).not.toHaveBeenCalled();
   });
 
-  it("sans compte, une rafale de réservations lancées ensemble s’arrête à la part sans compte : seules celles qui tiennent passent, les autres sont rendues aussitôt", async () => {
-    /* 3 $ de place, douze appels qui réservent 1 $ chacun au même instant (douze lots d’une rafale, sur autant d’instances) */
-    await depense(null, BUDGET_IA.anonyme - 3);
-    const part = () => compteDe(cleDeDepense(null, aujourdhuiParis().iso), { fenetreS: 2 * 86400 });
-    const avant = await part();
-    const issues = await Promise.all(
+  /** Douze réservations de 1 $ lancées au même instant pour ce payeur (douze lots d’une rafale, sur autant d’instances). */
+  const rafale = (payeur: Payeur) =>
+    Promise.all(
       Array.from({ length: 12 }, () =>
-        reserverSansCompte(1e6).then(
-          (r) => r,
+        reserver(payeur, 1e6).then(
+          (r): Reservation | string => r,
           (e: unknown) => (e instanceof ErreurTache ? e.code : "autre"),
         ),
       ),
     );
+
+  it("sans compte, une rafale de réservations lancées ensemble s’arrête à la part sans compte : seules celles qui tiennent passent, les autres sont rendues aussitôt", async () => {
+    /* 3 $ de place */
+    await depense(null, BUDGET_IA.anonyme - 3);
+    const avant = await partSansCompteDuJour();
+    const issues = await rafale(null);
     const passees = issues.filter((x): x is Reservation => typeof x !== "string");
     expect(passees).toHaveLength(3);
     expect(issues.filter((x) => x === "budget")).toHaveLength(9);
     /* Les refusées n’ont rien laissé ; les passées tiennent leur place jusqu’à ce qu’elles la rendent */
+    expect(await partSansCompteDuJour()).toBe(avant + 3e6);
+    await Promise.all(passees.map((r) => r.rendre()));
+    expect(await partSansCompteDuJour()).toBe(avant);
+  });
+
+  it("un compte connecté aussi (un email suffit à en ouvrir un) : sa rafale s’arrête à son budget du jour, sans toucher à la part sans compte", async () => {
+    const { payeur } = await compteEtConv();
+    await depense(payeur, BUDGET_IA.compte - 3);
+    const part = () => compteDe(cleDeDepense(payeur, aujourdhuiParis().iso), { fenetreS: 2 * 86400 });
+    const [avant, sansCompte] = [await part(), await partSansCompteDuJour()];
+    const issues = await rafale(payeur);
+    const passees = issues.filter((x): x is Reservation => typeof x !== "string");
+    expect(passees).toHaveLength(3);
+    expect(issues.filter((x) => x === "budget")).toHaveLength(9);
     expect(await part()).toBe(avant + 3e6);
+    expect(await partSansCompteDuJour()).toBe(sansCompte);
     await Promise.all(passees.map((r) => r.rendre()));
     expect(await part()).toBe(avant);
   });
@@ -308,11 +337,19 @@ describe("des mises à jour de la mémoire arrêtées par le budget", () => {
 });
 
 describe("l’alerte à l’équipe", () => {
+  const titres = ["budget de l’IA : 80 % de la part sans compte du jour", "budget de l’IA : la part sans compte du jour est atteinte"];
   /*
    * Les alertes des fichiers de tests déjà passés comptent dans le budget des alertes du jour, et le seuil a pu être dit
    * par un passage précédent : ce test remet à zéro ces trois compteurs (src/server/limites.ts les range sous leur empreinte)
    */
-  const cles = () => ["alertes", "alertes:sujet:budget de l’IA : 50 % du jour", `budget-ia:alerte:${aujourdhuiParis().iso}:0.5`].map((c) => empreinte(`limite:${c}`));
+  const cles = () =>
+    [
+      "alertes",
+      "alertes:sujet:budget de l’IA : 50 % du jour",
+      `budget-ia:alerte:${aujourdhuiParis().iso}:0.5`,
+      ...titres.map((t) => `alertes:sujet:${t}`),
+      ...[0.8, 1].map((seuil) => `budget-ia:sans-compte:alerte:${aujourdhuiParis().iso}:${seuil}`),
+    ].map((c) => empreinte(`limite:${c}`));
   beforeEach(async () => {
     await db().delete(schema.rateLimits).where(inArray(schema.rateLimits.key, cles()));
   });
@@ -332,5 +369,24 @@ describe("l’alerte à l’équipe", () => {
     await new Promise((ok) => setTimeout(ok, 200));
     expect(dites.filter((l) => l.includes("50 % du jour"))).toHaveLength(1);
     expect(dites.some((l) => l.includes("80 %"))).toBe(false);
+  });
+
+  it("la part sans compte prévient à 80 %, une fois, puis à son premier refus : les visiteurs d’avant l’email s’arrêtent jusqu’à minuit", async () => {
+    const dites: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((ligne: unknown) => void dites.push(String(ligne)));
+    const [quatreVingts, atteinte] = titres as [string, string];
+    /* Juste sous 80 % : la réservation qui passe le seuil le dit, la suivante non */
+    await depense(null, BUDGET_IA.anonyme * BUDGET_IA.alerteSansCompte - 0.5);
+    const tenues = [await reserver(null, 1e6), await reserver(null, 1e6)];
+    await vi.waitFor(() => expect(dites.filter((l) => l.includes(quatreVingts))).toHaveLength(1));
+    expect(dites.some((l) => l.includes(atteinte))).toBe(false);
+    /* La part pleine : le refus le dit, une fois */
+    await depense(null, BUDGET_IA.anonyme * (1 - BUDGET_IA.alerteSansCompte));
+    for (let k = 0; k < 2; k++) await expect(reserver(null, 1e6)).rejects.toMatchObject({ code: "budget" });
+    await vi.waitFor(() => expect(dites.filter((l) => l.includes(atteinte))).toHaveLength(1));
+    await new Promise((ok) => setTimeout(ok, 200));
+    expect(dites.filter((l) => l.includes(atteinte))).toHaveLength(1);
+    expect(dites.filter((l) => l.includes(quatreVingts))).toHaveLength(1);
+    await Promise.all(tenues.map((r) => r.rendre()));
   });
 });

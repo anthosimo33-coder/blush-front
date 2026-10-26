@@ -1,5 +1,5 @@
 {
-  "id": "ab4828de-ba6d-4aca-b4c7-9f1cd31dd435",
+  "id": "23600fb6-668b-475c-ae3e-f97a69de22d9",
   "prevId": "0c99f59b-850c-461c-b538-b3b46a5ef1ac",
   "version": "7",
   "dialect": "postgresql",
@@ -403,6 +403,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "lot": {
+          "name": "lot",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -447,6 +453,21 @@
           "columns": [
             {
               "expression": "envoi",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "ai_usage_lot_idx": {
+          "name": "ai_usage_lot_idx",
+          "columns": [
+            {
+              "expression": "lot",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -1426,6 +1447,59 @@
           ]
         }
       },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.lectures_des_lots": {
+      "name": "lectures_des_lots",
+      "schema": "",
+      "columns": {
+        "lot": {
+          "name": "lot",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "envoi": {
+          "name": "envoi",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "lu": {
+          "name": "lu",
+          "type": "bytea",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "expire_le": {
+          "name": "expire_le",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "lectures_des_lots_expire_idx": {
+          "name": "lectures_des_lots_expire_idx",
+          "columns": [
+            {
+              "expression": "expire_le",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},

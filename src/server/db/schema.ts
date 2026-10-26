@@ -519,14 +519,39 @@ export const aiUsage = pgTable(
      * elle a été lue pour rien. Vide pour tout autre appel.
      */
     envoi: text("envoi"),
+    /**
+     * Un lot d’enregistrement d’écran : son empreinte (empreinteDuLot, src/server/lots.ts, passée par la clé du serveur :
+     * rien n’y reconnaît des images). Un nouvel essai de l’enregistrement qui reprend ce lot déjà lu (un autre envoi)
+     * range alors son coût sous le sien (reprendreLeLot, src/server/imports.ts). Vide pour tout autre appel.
+     */
+    lot: text("lot"),
     createdAt: quand("created_at").notNull().defaultNow(),
   },
   /*
    * Supprimer une histoire met ses lignes à vide (set null) : sans index, toute la table serait parcourue. La dépense du
    * jour (src/server/budget.ts) et le tableau de bord (src/server/stats.ts) la lisent par date ; la mesure des imports,
-   * par envoi.
+   * par envoi et par lot.
    */
-  (t) => [index("ai_usage_story_idx").on(t.storyId), index("ai_usage_created_idx").on(t.createdAt), index("ai_usage_envoi_idx").on(t.envoi)],
+  (t) => [index("ai_usage_story_idx").on(t.storyId), index("ai_usage_created_idx").on(t.createdAt), index("ai_usage_envoi_idx").on(t.envoi), index("ai_usage_lot_idx").on(t.lot)],
+);
+
+/**
+ * Les lectures des lots d’un enregistrement d’écran (src/server/lots.ts), gardées dix minutes (`expire_le`) : un nouvel
+ * essai du même lot qui arrive sur une autre instance (le réseau coupé, la page rechargée) la retrouve au lieu de la
+ * payer une seconde fois. Le texte lu seulement, chiffré (`lu`), jamais les images. `lot` : l’empreinte du lot
+ * (empreinteDuLot, passée par la clé du serveur) ; `envoi` : celle de l’envoi qui l’a payé (envoiDe, src/server/imports.ts),
+ * jamais sa clé. Jamais vers le journal ; vers le navigateur, seulement à qui renvoie les mêmes images. Effacées par la
+ * purge des 5 minutes, une fois leur heure passée (purgerLesLecturesDesLots).
+ */
+export const lecturesDesLots = pgTable(
+  "lectures_des_lots",
+  {
+    lot: text("lot").primaryKey(),
+    envoi: text("envoi"),
+    lu: chiffre("lu").notNull(),
+    expireLe: quand("expire_le").notNull(),
+  },
+  (t) => [index("lectures_des_lots_expire_idx").on(t.expireLe)],
 );
 
 /**

@@ -1246,10 +1246,13 @@ function CeQuiSeVend({ s }: { s: StatsAdmin }) {
 /* Une moyenne par import : à l’unité, à la décimale sous 10 (des exports dont quelques-uns ont reçu un morceau de captures : « 0,4 écran ») */
 const moyenne = (v: number) => (v < 10 ? Math.round(v * 10) / 10 : Math.round(v));
 
+/* Une durée en secondes : « 45 s », « 2 min 5 s » */
+const duree = (secondes: number) => (secondes >= 60 ? `${Math.floor(secondes / 60)}\u00a0min ${secondes % 60}\u00a0s` : `${secondes}\u00a0s`);
+
 /**
  * Ce que coûtent les convs avant que la personne paie, par type d’import (src/server/imports.ts) : combien sont arrivées,
- * ce que leurs lectures ont coûté par import, la part qui arrive au paywall et celle qui paie (à partir de
- * PERSONNES_D_UN_TAUX convs), et ce que coûte un acheteur, lu pour rien compris.
+ * ce que leurs lectures ont coûté par import, le temps médian jusqu’au paywall, la part qui y arrive et celle qui paie (à
+ * partir de PERSONNES_D_UN_TAUX convs), et ce que coûte un acheteur, lu pour rien compris.
  */
 function IAAvantLAchat({ p }: { p: Chiffres }) {
   const types = p.importsParType;
@@ -1265,8 +1268,10 @@ function IAAvantLAchat({ p }: { p: Chiffres }) {
     >
       {lignes.length ? (
         <div role="region" aria-label="L’IA avant l’achat, par type d’import, à faire défiler" tabIndex={0} className="-mx-2 mt-[18px] overflow-x-auto px-2">
-          <table className="w-full min-w-[620px] border-collapse text-left">
-            <caption className="sr-only">Par type d’import, les convs importées, l’IA par import, la part au paywall et la part qui paie, l’IA par acheteur</caption>
+          <table className="w-full min-w-[720px] border-collapse text-left">
+            <caption className="sr-only">
+              Par type d’import, les convs importées, l’IA par import, le temps médian jusqu’au paywall, la part au paywall et la part qui paie, l’IA par acheteur
+            </caption>
             <thead>
               <tr className="text-micro font-black uppercase tracking-[0.06em] text-grey">
                 <th scope="col" className="pb-2.5 pr-3 font-black">
@@ -1277,6 +1282,9 @@ function IAAvantLAchat({ p }: { p: Chiffres }) {
                 </th>
                 <th scope="col" className="pb-2.5 pr-3 text-right font-black">
                   IA par import
+                </th>
+                <th scope="col" className="pb-2.5 pr-3 text-right font-black">
+                  Jusqu’au paywall
                 </th>
                 <th scope="col" className="pb-2.5 pr-3 text-right font-black">
                   Paywall
@@ -1307,6 +1315,7 @@ function IAAvantLAchat({ p }: { p: Chiffres }) {
                     </th>
                     <td className="py-3 pr-3 text-right tabular-nums">{nombre(x.imports)}</td>
                     <td className="py-3 pr-3 text-right tabular-nums">{parImport === null ? "—" : dollars(parImport)}</td>
+                    <td className="py-3 pr-3 text-right tabular-nums">{x.secondesAuPaywall === null ? "—" : duree(x.secondesAuPaywall)}</td>
                     <td className="py-3 pr-3 text-right tabular-nums">{auPaywall === null ? "—" : pourcent(auPaywall * 100, 0)}</td>
                     <td className="py-3 pr-3 text-right tabular-nums">
                       {nombre(x.payes)}
@@ -1340,6 +1349,7 @@ function Couts({ s }: { s: StatsAdmin }) {
   const parAcheteur = rapport(c.total, p.acheteurs.valeur);
   const max = Math.max(0.0001, ...c.postes.map((x) => x.dollars));
   const jour = rapport(p.iaDuJour.dollars, p.iaDuJour.budget);
+  const sansCompte = rapport(p.iaDuJour.sansCompte.dollars, p.iaDuJour.sansCompte.budget);
   const ecart = ecartRelatif(c.total, c.avant, dollars, null);
   return (
     <Bloc
@@ -1390,6 +1400,23 @@ function Couts({ s }: { s: StatsAdmin }) {
         >
           <div className="h-full rounded-full" style={{ width: `${Math.min(1, jour ?? 0) * 100}%`, background: (jour ?? 0) >= 0.8 ? ORANGE : "var(--ink)" }} />
         </div>
+        {/* La part sans compte (src/server/budget.ts) : atteinte, tous les visiteurs d’avant l’email voient « souffle » jusqu’à minuit */}
+        <p className="m-0 mt-3.5 flex justify-between gap-3 text-detail font-extrabold">
+          <span>Sans compte</span>
+          <span className="tabular-nums">
+            {dollars(p.iaDuJour.sansCompte.dollars)} sur {dollars(p.iaDuJour.sansCompte.budget)}
+          </span>
+        </p>
+        <div
+          role="img"
+          aria-label={`${dollars(p.iaDuJour.sansCompte.dollars)} de la part sans compte sur ${dollars(p.iaDuJour.sansCompte.budget)} aujourd’hui`}
+          className="mt-2.5 h-3 overflow-hidden rounded-full bg-paper"
+        >
+          <div className="h-full rounded-full" style={{ width: `${Math.min(1, sansCompte ?? 0) * 100}%`, background: (sansCompte ?? 0) >= 0.8 ? ORANGE : "var(--ink)" }} />
+        </div>
+        <p className="m-0 mt-2 text-legende font-bold text-grey">
+          Les captures et les vidéos d’avant l’email, celles en cours comprises. Atteinte, elles s’arrêtent jusqu’à minuit.
+        </p>
       </div>
     </Bloc>
   );

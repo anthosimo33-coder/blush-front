@@ -2,10 +2,10 @@ import { APIUserAbortError } from "@anthropic-ai/sdk";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 /*
- * Le budget de l’IA lit la base : ici, sans base, tout le monde paie, personne n’est arrêté (la part sans compte se
- * réserve sans rien compter). Le suivi des coûts aussi : on regarde s’il est appelé
+ * Le budget de l’IA lit la base : ici, sans base, tout le monde paie, personne n’est arrêté (une lecture d’avant l’import
+ * se réserve sans rien compter). Le suivi des coûts aussi : on regarde s’il est appelé
  */
-vi.mock("@/server/budget", () => ({ controlerBudget: async () => null, reserverSansCompte: async () => ({ rendre: async () => {} }) }));
+vi.mock("@/server/budget", () => ({ controlerBudget: async () => null, reserver: async () => ({ rendre: async () => {} }) }));
 vi.mock("@/server/ia/usage", () => ({ noterCout: vi.fn(async () => {}) }));
 import type { Requete } from "@prompts/lib/contextes";
 import { Etape05, Maj07, Sortie01, Sortie04, Sortie05, Sortie06, Sortie07, Sortie10 } from "@prompts/lib/schemas";

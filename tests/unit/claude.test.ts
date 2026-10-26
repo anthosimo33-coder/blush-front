@@ -14,11 +14,11 @@ vi.mock("@/server/env", async (original) => {
   /* iaFactice lit l’env() de son module, pas celui-ci : on le remplace aussi */
   return { ...o, env: () => ({ ...o.env(), BLUSH_IA_FACTICE: false, ANTHROPIC_API_KEY: "cle-fictive" }), iaFactice: () => false };
 });
-/* La réservation d’un appel sans compte (reserverSansCompte) : on regarde ce qu’elle reçoit, et quand elle est rendue */
+/* La réservation d’une lecture d’avant l’import ou d’un appel sans compte (reserver) : ce qu’elle reçoit, et quand elle est rendue */
 const reservation = vi.hoisted(() => ({ rendue: 0 }));
 vi.mock("@/server/budget", () => ({
   controlerBudget: vi.fn(async (): Promise<string | null> => "payeur"),
-  reserverSansCompte: vi.fn(async () => ({ rendre: async () => void reservation.rendue++ })),
+  reserver: vi.fn(async () => ({ rendre: async () => void reservation.rendue++ })),
 }));
 vi.mock("@/server/ia/usage", () => ({ noterCout: vi.fn(async () => {}) }));
 vi.mock("@/server/alertes", () => ({ alerter: vi.fn(async () => {}) }));
@@ -26,7 +26,7 @@ vi.mock("@/server/journal", async (original) => ({ ...(await original<typeof imp
 
 import type { Requete } from "@prompts/lib/contextes";
 import { alerter } from "@/server/alertes";
-import { controlerBudget, reserverSansCompte } from "@/server/budget";
+import { controlerBudget, reserver } from "@/server/budget";
 import { avecEcheance } from "@/server/echeance";
 import { ErreurTache } from "@/server/erreurs";
 import { journal } from "@/server/journal";
@@ -142,16 +142,53 @@ describe("appeler : l’envoi", () => {
     await expect(appeler(VERDICT, Format)).rejects.toBeInstanceOf(Anthropic.InternalServerError);
   });
 
-  it("d’un bloc ou en flux : le flux pour les longues sorties (le rapport) et pour une sortie suivie", async () => {
+  it("d’un bloc ou en flux : le flux pour les longues sorties (le rapport) et pour une sortie suivie, toujours écouté (ce qu’un arrêt en route a coûté)", async () => {
     const envois = faux(...Array.from({ length: 3 }, () => rend(message([texte('{"ok":true}')]))));
     await appeler(VERDICT, Format);
     await appeler({ tache: "05-rapport", blocs: [{ texte: "la conv" }] }, Format);
     await appeler(VERDICT, Format, { surAvance: () => {} });
     expect(envois.map(([, , e]) => [e.flux, !!e.ecoute])).toEqual([
       [false, false],
-      [true, false],
+      [true, true],
       [true, true],
     ]);
+  });
+
+  it("arrêté en route : ce que le prestataire a annoncé (l’entrée) et la sortie estimée sur ce qui s’est écrit sont notés, au compte de qui paie, sous l’envoi et le lot ; sans début de réponse, rien", async () => {
+    faux(
+      async (_p, _o, { ecoute }) => {
+        ecoute!.usage!({ input_tokens: 10_000, output_tokens: 1, cache_creation_input_tokens: 2_000, cache_read_input_tokens: null }, "claude-sonnet-5-5");
+        ecoute!.reflexion("r".repeat(300));
+        ecoute!.texte("t".repeat(100));
+        throw new Anthropic.APIUserAbortError();
+      },
+      async () => {
+        throw new Anthropic.APIUserAbortError();
+      },
+    );
+    const lecture = { tache: "01-captures" as const, blocs: [{ texte: "les captures" }] };
+    const options = { etiquette: "captures_video", envoi: "empreinte-de-l-envoi", lot: "empreinte-du-lot", surAvance: () => {} };
+    await expect(appeler(lecture, Format, options)).rejects.toBeInstanceOf(Anthropic.APIUserAbortError);
+    /* 400 caractères écrits : une centaine de jetons ; 10 000 lus à 2 $ et 2 000 écrits en cache à 2,5 $ (le million), 100 écrits à 10 $ */
+    expect(noterCout).toHaveBeenCalledTimes(1);
+    expect(noterCout).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tache: "captures_video",
+        modele: "claude-sonnet-5-5",
+        entree: 10_000,
+        sortie: 100,
+        cacheEcrit: 2_000,
+        cacheLu: 0,
+        micros: 10_000 * 2 + 2_000 * 2.5 + 100 * 10,
+        payeur: "payeur",
+        envoi: "empreinte-de-l-envoi",
+        lot: "empreinte-du-lot",
+      }),
+    );
+    /* La réservation se rend après la note */
+    expect(reservation.rendue).toBe(1);
+    await expect(appeler(lecture, Format, options)).rejects.toBeInstanceOf(Anthropic.APIUserAbortError);
+    expect(noterCout).toHaveBeenCalledTimes(1);
   });
 
   it("suit ce qui s’écrit ; un repli repart de zéro ; un suivi qui plante ne fait pas échouer la réponse", async () => {
@@ -281,26 +318,41 @@ describe("appeler : l’envoi", () => {
     erreur.mockRestore();
   });
 
-  it("sans compte : réserve d’abord ce que l’appel peut coûter au plus (coutMaximal), puis le rend, réussi ou en échec ; un compte ne réserve rien", async () => {
+  it("une lecture d’avant l’import (sans conv), sans compte ou d’un compte : réserve d’abord ce qu’elle peut coûter au plus (coutMaximal) au budget de qui la paie, puis le rend, réussie ou en échec ; une conv à un compte ne réserve rien", async () => {
     const lecture = { tache: "01-captures" as const, blocs: [{ texte: "les captures" }, { image: { media: "image/jpeg" as const, base64: "AA==" } }] };
     const envois = faux(rend(message([texte('{"ok":true}')])), async () => {
       throw new Anthropic.InternalServerError(500, undefined, "panne", new Headers());
     });
-    vi.mocked(controlerBudget).mockResolvedValueOnce(null).mockResolvedValueOnce(null);
+    vi.mocked(controlerBudget).mockResolvedValueOnce(null);
     await appeler(lecture, Format);
-    expect(vi.mocked(reserverSansCompte)).toHaveBeenCalledWith(coutMaximal(envois[0]![0].params) * 1e6);
+    expect(vi.mocked(reserver)).toHaveBeenCalledWith(null, coutMaximal(envois[0]![0].params) * 1e6);
     expect(reservation.rendue).toBe(1);
-    await expect(appeler(lecture, Format)).rejects.toBeInstanceOf(Anthropic.InternalServerError);
+    /* Le compte connecté qui envoie ses captures : sa réservation à lui */
+    await expect(appeler(lecture, Format, { compte: { email: "lea@exemple.test" } })).rejects.toBeInstanceOf(Anthropic.InternalServerError);
+    expect(vi.mocked(reserver)).toHaveBeenLastCalledWith("payeur", expect.any(Number));
     expect(reservation.rendue).toBe(2);
-    /* Le compte de la conv paie : rien à réserver */
-    faux(rend(message([texte('{"ok":true}')])));
+    /* Le compte de la conv paie : rien à réserver ; une conv sans compte, la part sans compte */
+    faux(rend(message([texte('{"ok":true}')])), rend(message([texte('{"ok":true}')])));
     await appeler(lecture, Format, { storyId: "histoire" });
-    expect(vi.mocked(reserverSansCompte)).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(reserver)).toHaveBeenCalledTimes(2);
+    vi.mocked(controlerBudget).mockResolvedValueOnce(null);
+    await appeler(lecture, Format, { storyId: "brouillon" });
+    expect(vi.mocked(reserver)).toHaveBeenLastCalledWith(null, expect.any(Number));
+  });
+
+  it("la réservation qui ne se rend pas (la base coupée) : la lecture, déjà payée, revient quand même, et le journal le dit", async () => {
+    faux(rend(message([texte('{"ok":true}')])));
+    vi.mocked(controlerBudget).mockResolvedValueOnce(null);
+    vi.mocked(reserver).mockResolvedValueOnce({ rendre: () => Promise.reject(new Error("connexion coupée")) });
+    const erreur = vi.spyOn(console, "error").mockImplementation(() => {});
+    expect((await appeler({ tache: "01-captures", blocs: [{ texte: "les captures" }] }, Format)).sortie).toEqual({ ok: true });
+    expect(erreur.mock.calls.map((c) => (JSON.parse(String(c[0])) as { evenement: string }).evenement)).toEqual(["réservation du budget de l’IA non rendue"]);
+    erreur.mockRestore();
   });
 
   it("sans compte, la part du budget épuisée par la réservation : « budget », et rien ne part", async () => {
     vi.mocked(controlerBudget).mockResolvedValueOnce(null);
-    vi.mocked(reserverSansCompte).mockRejectedValueOnce(new ErreurTache("budget"));
+    vi.mocked(reserver).mockRejectedValueOnce(new ErreurTache("budget"));
     const envois = faux();
     await expect(appeler({ tache: "01-captures", blocs: [{ texte: "les captures" }] }, Format)).rejects.toMatchObject({ code: "budget" });
     expect(envois).toHaveLength(0);
@@ -369,10 +421,15 @@ function clientSDK(...reponses: (() => Response)[]) {
   return { sdk: prestataireSDK(() => client), recus };
 }
 
-/** Un suivi qui note tout ce qu’il reçoit, dans l’ordre. */
+/** Un suivi qui note tout ce qu’il reçoit, dans l’ordre (l’usage : son modèle, ses jetons lus et écrits). */
 function ecouteNotee() {
   const vu: string[] = [];
-  const ecoute: Ecoute = { bloc: (t) => vu.push(`bloc ${t}`), reflexion: (d) => vu.push(`réflexion ${d}`), texte: (d) => vu.push(`texte ${d}`) };
+  const ecoute: Ecoute = {
+    bloc: (t) => vu.push(`bloc ${t}`),
+    reflexion: (d) => vu.push(`réflexion ${d}`),
+    texte: (d) => vu.push(`texte ${d}`),
+    usage: (u, m) => vu.push(`usage ${m ?? "-"} ${u.input_tokens ?? "?"}/${u.output_tokens ?? "?"}`),
+  };
   return { ecoute, vu };
 }
 
@@ -424,7 +481,7 @@ describe("prestataireSDK : le vrai client du SDK", () => {
     const { ecoute, vu } = ecouteNotee();
     const m = await sdk.envoyer(DEMANDE, OPTIONS, { flux: true, ecoute });
     expect(recus[0]!.corps.stream).toBe(true);
-    expect(vu).toEqual(["bloc thinking", "réflexion hmm", "bloc fallback", "bloc text", 'texte {"ok":', "texte true}"]);
+    expect(vu).toEqual(["usage claude-opus-5-5 10/5", "bloc thinking", "réflexion hmm", "bloc fallback", "bloc text", 'texte {"ok":', "texte true}", "usage - ?/5"]);
     expect(m.content.map((b) => b.type)).toEqual(["thinking", "fallback", "text"]);
     expect(m.content.at(-1)).toMatchObject({ type: "text", text: '{"ok":true}' });
     expect(m.stop_reason).toBe("end_turn");

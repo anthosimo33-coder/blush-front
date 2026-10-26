@@ -82,10 +82,11 @@ export async function lireCaptures(images: Image[], appli: string, envoi: string
 
 /**
  * Ce qui accompagne la lecture d’un lot : l’empreinte de son envoi (la mesure des imports, src/server/imports.ts), et
- * pour un lot d’enregistrement (src/server/lots.ts) de quoi l’arrêter (`signal` : son envoi abandonné), suivre son flux
- * (`surAvance`) et dire quand sa réponse commence (`auDebut` : le premier lot de l’envoi).
+ * pour un lot d’enregistrement (src/server/lots.ts) la sienne (`lot` : un nouvel essai qui le reprend en prend le coût),
+ * de quoi l’arrêter (`signal` : son envoi abandonné), suivre son flux (`surAvance`) et dire quand sa réponse commence
+ * (`auDebut` : le premier lot de l’envoi).
  */
-type SuiviDuLot = Pick<OptionsAppel, "envoi" | "signal" | "surAvance" | "auDebut">;
+type SuiviDuLot = Pick<OptionsAppel, "envoi" | "lot" | "signal" | "surAvance" | "auDebut">;
 
 /**
  * La lecture brute d’un lot d’images (des captures, ou les images d’un enregistrement d’écran). Les lots d’un

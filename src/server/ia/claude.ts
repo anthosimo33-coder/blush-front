@@ -6,10 +6,10 @@ import type { z } from "zod";
 import { REGLAGES, systeme, type Requete, type Tache } from "@prompts/lib/contextes";
 import { env, iaFactice } from "../env";
 import { alerter } from "../alertes";
-import { controlerBudget, reserverSansCompte, type Payeur, type Reserve } from "../budget";
+import { controlerBudget, reserver, type Payeur, type Reserve } from "../budget";
 import { delaiAppel, tempsRestant } from "../echeance";
 import { ErreurTache } from "../erreurs";
-import { journal, journalErreur } from "../journal";
+import { auMieux, journal, journalErreur } from "../journal";
 import { fournisseurFactice, prestataireFactice, type RequeteFactice } from "./factice";
 import { noterCout } from "./usage";
 import { TEXTES } from "./textes.generated";
@@ -90,8 +90,17 @@ export function definirFactice(f: Factice | null) {
 type Parametres = Anthropic.Beta.Messages.MessageCreateParamsNonStreaming & Anthropic.Messages.MessageCreateParamsNonStreaming;
 /** Ce que l’envoi passe au SDK : son délai, ses nouvelles tentatives, et de quoi l’arrêter. */
 type OptionsEnvoi = { timeout: number; maxRetries: number; signal?: AbortSignal };
-/** Ce qu’on suit d’un appel en flux : un bloc qui commence (son type : « fallback » pour un repli), la réflexion, le texte. */
-export type Ecoute = { bloc: (type: string) => void; reflexion: (morceau: string) => void; texte: (morceau: string) => void };
+/**
+ * Ce qu’on suit d’un appel en flux : un bloc qui commence (son type : « fallback » pour un repli), la réflexion, le texte,
+ * et l’usage que le prestataire annonce en route (`usage` : au début de la réponse, l’entrée lue et son modèle ; à la fin,
+ * la sortie), pour noter ce qu’un appel arrêté en route a déjà coûté.
+ */
+export type Ecoute = {
+  bloc: (type: string) => void;
+  reflexion: (morceau: string) => void;
+  texte: (morceau: string) => void;
+  usage?: (u: Tokens, modele?: string) => void;
+};
 /** Ce qu’un appel envoie au prestataire : la requête et sa partie (le modèle factice les lit), et ses paramètres (le SDK les lit). */
 export type Demande = { requete: Requete; partie: Partie | null; params: Parametres };
 /**
@@ -151,6 +160,8 @@ export function prestataireSDK(client: () => Anthropic): Fournisseur {
     if (ecoute) {
       f.on("streamEvent", (ev) => {
         if (ev.type === "content_block_start") ecoute.bloc(ev.content_block.type);
+        else if (ev.type === "message_start") ecoute.usage?.(ev.message.usage, ev.message.model);
+        else if (ev.type === "message_delta") ecoute.usage?.(ev.usage);
       });
       f.on("thinking", (d) => ecoute.reflexion(d));
       f.on("text", (d) => ecoute.texte(d));
@@ -255,17 +266,32 @@ function parametres(req: Requete, schema: z.ZodType) {
   } satisfies Parametres;
 }
 
+/*
+ * Un appel en flux arrêté en route (son envoi abandonné, l’échéance, une panne pendant la réponse) a déjà coûté : son
+ * entrée, que le prestataire annonce au début de la réponse, et ce qu’il a écrit. La sortie n’est dite qu’à la fin : on
+ * l’estime d’après les caractères reçus, environ quatre par jeton en français (la réflexion résumée en compte moins
+ * que la vraie : l’estimation reste basse). Sans début de réponse, on ne sait rien : rien n’est noté.
+ */
+const CARACTERES_PAR_JETON = 4;
+
+/** Ce que suit un appel en flux : l’écoute passée au prestataire, et ce qu’il a déjà coûté s’il s’arrête en route (`partiel`). */
+type Suivi = { ecoute: Ecoute; partiel: () => { usage: Tokens; modele: string } | null };
+
 /**
  * Ce qui s’écrit pendant un appel en flux, rendu à `surAvance` à chaque morceau. Un repli sur un autre modèle repart de
  * zéro, la jauge aussi. `auDebut` : appelé une fois, au premier événement de la réponse (le prestataire a lu toute la
- * demande : son texte système est en cache pour les appels suivants). Le suivi ne doit jamais faire échouer la réponse :
- * une erreur de `surAvance` ou de `auDebut` est passée, et dite au journal une fois par appel (elle reviendrait à chaque
- * morceau).
+ * demande : son texte système est en cache pour les appels suivants). L’usage annoncé en route est retenu (`partiel`).
+ * Le suivi ne doit jamais faire échouer la réponse : une erreur de `surAvance` ou de `auDebut` est passée, et dite au
+ * journal une fois par appel (elle reviendrait à chaque morceau).
  */
-function suivreFlux(surAvance: ((a: Avance) => void) | undefined, tache: string, auDebut?: () => void): Ecoute {
+function suivreFlux(surAvance: ((a: Avance) => void) | undefined, tache: string, auDebut?: () => void): Suivi {
   let a: Avance = { reflexion: 0, texte: 0, ecrit: "" };
   let dite = false;
   let debut = !auDebut;
+  /* L’usage annoncé (le dernier chiffre de chaque champ), son modèle, et tout ce qui s’est écrit, repli compris */
+  let usage: Tokens | null = null;
+  let modele = "";
+  let ecrits = 0;
   const sansFaute = (f: () => void) => {
     try {
       f();
@@ -282,7 +308,7 @@ function suivreFlux(surAvance: ((a: Avance) => void) | undefined, tache: string,
   const suivre = () => {
     if (surAvance) sansFaute(() => surAvance({ ...a }));
   };
-  return {
+  const ecoute: Ecoute = {
     bloc: (type) => {
       commencer();
       if (type === "fallback") a = { reflexion: 0, texte: 0, ecrit: "" };
@@ -290,15 +316,24 @@ function suivreFlux(surAvance: ((a: Avance) => void) | undefined, tache: string,
     reflexion: (d) => {
       commencer();
       a.reflexion += d.length;
+      ecrits += d.length;
       suivre();
     },
     texte: (d) => {
       commencer();
       a.texte += d.length;
       a.ecrit += d;
+      ecrits += d.length;
       suivre();
     },
+    usage: (u, m) => {
+      commencer();
+      usage = { ...usage, ...Object.fromEntries(Object.entries(u).filter(([, v]) => typeof v === "number")) };
+      if (m) modele = m;
+    },
   };
+  const partiel = () => (usage && modele ? { usage: { ...usage, output_tokens: Math.max(usage.output_tokens ?? 0, Math.ceil(ecrits / CARACTERES_PAR_JETON)) }, modele } : null);
+  return { ecoute, partiel };
 }
 
 /** Le repli sur un autre modèle qu’une réponse annonce : la catégorie du refus qui l’a causé, et les deux modèles. */
@@ -404,6 +439,8 @@ export type OptionsAppel = {
   differer?: (tache: () => Promise<unknown>) => void;
   /** Une lecture d’avant l’import : l’empreinte de son envoi, notée avec son coût (ai_usage.envoi, src/server/imports.ts). */
   envoi?: string | null;
+  /** Un lot d’enregistrement : son empreinte, notée avec son coût (ai_usage.lot : un nouvel essai qui le reprend en prend le coût, src/server/lots.ts). */
+  lot?: string | null;
   /**
    * Appelé une fois, quand la réponse commence (le premier événement du flux : la demande est lue, son texte système en
    * cache). Le premier lot d’un enregistrement le dit aux autres, qui l’attendent (src/server/lots.ts). La réponse passe
@@ -418,19 +455,21 @@ export type OptionsAppel = {
  * envoie des captures avant l’import ; sans compte, la part sans compte), l’appel ne part pas (ErreurTache « budget »,
  * src/server/budget.ts), en mode factice aussi. Les autres options : OptionsAppel.
  * Avec une échéance (src/server/echeance.ts), l’appel s’arrête avant elle, et ne part pas s’il n’a plus le temps (en
- * mode factice aussi : il passe par le même chemin, prestataireFactice à la place du SDK). Sans compte (des captures
- * lues avant l’email), l’appel réserve d’abord ce qu’il peut coûter au plus dans la part sans compte du budget
- * (reserverSansCompte, src/server/budget.ts), rendue une fois l’appel fini : au-delà, « budget », sans rien appeler.
+ * mode factice aussi : il passe par le même chemin, prestataireFactice à la place du SDK). Une lecture d’avant l’import
+ * (sans conv : des captures, un lot, que n’importe qui peut lancer en rafale, sans compte ou d’un compte gratuit), ou un
+ * appel sans compte, réserve d’abord ce qu’il peut coûter au plus dans le budget du jour de qui le paie (reserver,
+ * src/server/budget.ts), rendu une fois l’appel fini : au-delà, « budget », sans rien appeler. Rendre la réservation ne
+ * fait jamais échouer un appel déjà payé (auMieux) : sa lecture serait relue, et payée deux fois.
  */
 export async function appeler<S extends z.ZodType>(req: Requete, schema: S, options: OptionsAppel = {}): Promise<Appel<z.infer<S>>> {
   const payeur = await controlerBudget({ storyId: options.storyId, compte: options.compte });
   if (tempsRestant() < TEMPS_MIN_APPEL) throw new ErreurTache("delai");
   const base = parametres(req, schema);
-  const reservation = payeur === null ? await reserverSansCompte(coutMaximal(base) * 1e6) : null;
+  const reservation = !options.storyId || payeur === null ? await reserver(payeur, coutMaximal(base) * 1e6) : null;
   try {
     return await envoyerEtLire(req, schema, base, payeur, options);
   } finally {
-    await reservation?.rendre();
+    if (reservation) await auMieux(() => reservation.rendre(), "réservation du budget de l’IA non rendue", { tache: req.tache });
   }
 }
 
@@ -440,7 +479,7 @@ async function envoyerEtLire<S extends z.ZodType>(
   schema: S,
   base: Parametres,
   payeur: Payeur,
-  { storyId, etiquette, partie, surAvance, signal, differer, envoi, auDebut }: OptionsAppel,
+  { storyId, etiquette, partie, surAvance, signal, differer, envoi, lot, auDebut }: OptionsAppel,
 ): Promise<Appel<z.infer<S>>> {
   const prestataire = iaFactice() ? MODELE_FACTICE : fournisseur;
   /* Tout de suite, ou après la réponse */
@@ -468,12 +507,29 @@ async function envoyerEtLire<S extends z.ZodType>(
     maxRetries,
     ...(signaux.length ? { signal: AbortSignal.any(signaux) } : {}),
   };
-  const ecoute = surAvance || auDebut ? suivreFlux(surAvance, req.tache, auDebut) : null;
-  const message = await prestataire.envoyer({ requete: req, partie: partie ?? null, params: base }, options, { flux, ecoute });
+  const suivi = flux ? suivreFlux(surAvance, req.tache, auDebut) : null;
+  /* Le coût d’un appel (fini, ou arrêté en route), sa durée prise tout de suite : la note peut passer après la réponse */
+  const noter = (u: Usage, modele: string) => {
+    const ms = Date.now() - debut;
+    return ensuite(() => noterUsage(u, Math.round(cout(u, modele) * 1e6), { storyId, payeur, tache: etiquette ?? req.tache, ms, modele, envoi, lot }));
+  };
+  let message: MessageRecu;
+  try {
+    message = await prestataire.envoyer({ requete: req, partie: partie ?? null, params: base }, options, { flux, ecoute: suivi?.ecoute ?? null });
+  } catch (e) {
+    /*
+     * Arrêté en route (l’envoi abandonné, l’échéance, une panne pendant la réponse) : ce que le prestataire a déjà
+     * facturé se note quand même (le suivi des coûts, la dépense du jour de qui paie), avant que la réservation se rende
+     */
+    const partiel = suivi?.partiel();
+    if (partiel && !prestataire.gratuit) {
+      journal("appel arrêté en route, son début noté", { tache: req.tache });
+      await noter(partiel.usage, partiel.modele);
+    }
+    throw e;
+  }
   const { usage, model } = message;
-  const ms = Date.now() - debut;
-  if (!prestataire.gratuit)
-    await ensuite(() => noterUsage(usage, Math.round(cout(usage, model) * 1e6), { storyId, payeur, tache: etiquette ?? req.tache, ms, modele: model, envoi }));
+  if (!prestataire.gratuit) await noter(usage, model);
   const { appel, repli } = lireMessage(message, schema);
   /*
    * Un repli a eu lieu : le premier modèle a refusé, un autre a pris le relais. On note pourquoi (la catégorie, jamais le
@@ -501,7 +557,7 @@ async function envoyerEtLire<S extends z.ZodType>(
 async function noterUsage(
   u: Usage,
   micros: number,
-  { storyId, payeur, tache, ms, modele, envoi }: { storyId?: string; payeur: Payeur; tache: string; ms: number; modele: string; envoi?: string | null },
+  { storyId, payeur, tache, ms, modele, envoi, lot }: { storyId?: string; payeur: Payeur; tache: string; ms: number; modele: string; envoi?: string | null; lot?: string | null },
 ) {
   await noterCout({
     storyId,
@@ -515,6 +571,7 @@ async function noterUsage(
     ms,
     payeur,
     envoi,
+    lot,
   });
 }
 

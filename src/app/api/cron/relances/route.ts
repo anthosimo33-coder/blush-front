@@ -1,6 +1,8 @@
 import { empreinte, memeEmpreinte } from "@/server/chiffrement";
 import { env } from "@/server/env";
 import { erreur, repondre, route } from "@/server/http";
+import { auMieux } from "@/server/journal";
+import { purgerLesLecturesDesLots } from "@/server/lots";
 import { traiterLesLots } from "@/server/memoire-en-lot";
 import { reprendreLesChainesEnPlan } from "@/server/pipeline";
 import { envoyerLesRelances } from "@/server/relances";
@@ -17,15 +19,22 @@ import { renommerLesPrises } from "@/server/tournage";
  * relais), et les prises du mode tournage qui disent encore le prénom de la source (`prises`, renommerLesPrises). Les
  * lots de la mémoire tournent à côté des chaînes, sans les retarder (traiterLesLots, src/server/memoire-en-lot.ts, qui ne
  * lève jamais et s’arrête au bout d’une minute : relevés, puis les mises à jour calmées envoyées ; `lotsEnvoyes`,
- * `lotsLus`, `lotsAnnules`) : une mise à jour revenue de son lot en direct part par son relais. Elle ne répond que des
- * nombres : les logs de la veille, qui les écrivent, sont publics. Rien à faire : 200, avec des zéros.
+ * `lotsLus`, `lotsAnnules`) : une mise à jour revenue de son lot en direct part par son relais. Et les lectures des lots
+ * d’un enregistrement dont les dix minutes sont passées (`lecturesEffacees`, purgerLesLecturesDesLots, src/server/lots.ts :
+ * leur texte ne reste pas plus en base, à 5 minutes près ; une panne de la base n’arrête pas le reste, la purge de la
+ * nuit repasse). Elle ne répond que des nombres : les logs de la veille, qui les écrivent, sont publics. Rien à faire :
+ * 200, avec des zéros.
  */
 export const GET = route("GET /api/cron/relances", async (req: Request) => {
   const secret = env().CRON_SECRET;
   if (!secret || !memeEmpreinte(req.headers.get("authorization") ?? "", empreinte(`Bearer ${secret}`))) return erreur("interdit");
   /* Les séquences après les relances : la relance d’abord, dans le plafond du jour qu’elles partagent */
   const mails = envoyerLesRelances().then(async (relances) => ({ relances, sequences: await envoyerLesSequences() }));
-  const [{ relances, sequences }, lots, chaines, prises] = await Promise.all([mails, traiterLesLots(), reprendreLesChainesEnPlan(), renommerLesPrises()]);
+  let lecturesEffacees = 0;
+  const lectures = auMieux(async () => {
+    lecturesEffacees = await purgerLesLecturesDesLots();
+  }, "purge des lectures des lots en échec");
+  const [{ relances, sequences }, lots, chaines, prises] = await Promise.all([mails, traiterLesLots(), reprendreLesChainesEnPlan(), renommerLesPrises(), lectures]);
   return repondre("GET /api/cron/relances", {
     ...relances,
     chaines,
@@ -34,5 +43,6 @@ export const GET = route("GET /api/cron/relances", async (req: Request) => {
     lotsEnvoyes: lots.envoyes,
     lotsLus: lots.lus,
     lotsAnnules: lots.annules,
+    lecturesEffacees,
   });
 });

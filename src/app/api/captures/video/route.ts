@@ -82,7 +82,7 @@ export const POST = route("POST /api/captures/video", async (req: Request) => {
   if (captcha) return captcha;
   /* La limite de l’adresse IP, une fois l’envoi vérifié : un envoi invalide ne compte pas */
   if (!(await sousLaLimiteDeLIp(req, "import", LIMITES.importParIp))) return erreur("trop");
-  const { app, lots, cle } = envoi;
+  const { app, lots, cle, repris = [] } = envoi;
   /* Le mode tournage (src/server/tournage.ts) : ses lots n’ont rien lu, le brouillon reprend la conv de tournage */
   const tournage = await tournageDuNavigateur();
   /*
@@ -96,9 +96,15 @@ export const POST = route("POST /api/captures/video", async (req: Request) => {
   };
   /*
    * La mesure des imports (src/server/imports.ts) : l’empreinte de l’envoi, celle sous laquelle ses lots ont rangé leur
-   * coût, et ce qu’ils ont lu (les écrans, sans l’image partagée par deux lots voisins, et les lots)
+   * coût, ce qu’ils ont lu (les écrans, sans l’image partagée par deux lots voisins, et les lots), et les envois d’avant
+   * dont l’onglet a repris des lots déjà lus (leur coût passe sous cet import ; une clé qui n’en a pas la forme est ignorée)
    */
-  const mesure = (f: ReturnType<typeof fusionnerLots>) => ({ ecrans: f.captures.length, lots: lots.length, envoi: envoiDe(cleEnvoi(cle)) });
+  const mesure = (f: ReturnType<typeof fusionnerLots>) => ({
+    ecrans: f.captures.length,
+    lots: lots.length,
+    envoi: envoiDe(cleEnvoi(cle)),
+    repris: repris.flatMap((c) => envoiDe(cleEnvoi(c)) ?? []),
+  });
   /* Un morceau de plus (pas en mode tournage : sa conv n’est pas lue) */
   if (envoi.mode === "ajout") {
     const brouillon = await lireBrouillon();

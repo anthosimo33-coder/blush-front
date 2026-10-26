@@ -2,7 +2,7 @@ import "server-only";
 import { z } from "zod";
 import { estFaite, type Echange, type MemoireFaite } from "@prompts/lib/memoire";
 import { GENRES_DU_HAUT } from "@/contenu/haut-du-paywall";
-import type { Memoire, Plan, Rapport, Verdict } from "@prompts/lib/schemas";
+import type { Captures, Memoire, Plan, Rapport, Verdict } from "@prompts/lib/schemas";
 import type { BlushAnswer, Chapter, ScoreRow, SoberReport, VocalLigne } from "@/types";
 import { chiffrer, chiffrerCompresse, chiffrerOctets, dechiffrer, dechiffrerOctets } from "./chiffrement";
 import { ErreurInvariant } from "./erreurs";
@@ -69,6 +69,8 @@ export type Formes = {
   "waitlist.email": string;
   /** Le secret du lien d’une conv de tournage (src/server/tournage.ts), que /admin remontre. */
   "tournages.cle": string;
+  /** La lecture d’un lot d’enregistrement d’écran (prompt 01), gardée dix minutes : un nouvel essai ne la repaie pas (src/server/lots.ts). */
+  "lectures_des_lots.lu": Captures;
 };
 export type Colonne = keyof Formes;
 
@@ -185,6 +187,8 @@ const REGISTRE: { [C in Colonne]: Regle<Formes[C]> } = {
   "vocals.data": { relecture: VocalGarde },
   "waitlist.email": {},
   "tournages.cle": {},
+  /* Quelques dizaines de Ko de texte (les messages d’une douzaine d’écrans), qui se compressent bien */
+  "lectures_des_lots.lu": { compressee: true },
 };
 
 /** Les colonnes d’audio (des MP3) : chiffrées telles quelles, sans JSON (ecrireAudio, lireAudio). */

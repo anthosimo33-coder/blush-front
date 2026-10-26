@@ -129,7 +129,7 @@ describe("le pilotage, rendu", () => {
       sources: [],
       quiImporte: { importees: personne, payees: personne },
       mix: s.pilotage.mix.map((m) => ({ ...m, n: 0, centimes: 0 })),
-      iaDuJour: { dollars: 0, budget: 30 },
+      iaDuJour: { dollars: 0, budget: 30, sansCompte: { dollars: 0, budget: 50 } },
       suiviDepuis: null,
     };
     s.couts = { total: 0, avant: 0, parRapport: null, parVerdict: null, postes: [] };

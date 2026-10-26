@@ -167,9 +167,9 @@ export const LIMITES = {
    * Bêta ouverte : les lectures de captures et de lots par des visiteurs sans compte, pour tous et par jour. Chacune fait
    * travailler le modèle payant avant l’email : changer d’adresse IP ne doit pas faire grimper la facture sans fin.
    * Relevés pour l’ouverture (13 octobre) : le CAPTCHA arrête les robots, et la part sans compte du budget de l’IA
-   * (BUDGET_IA.anonyme), réservée avant chaque lecture (reserverSansCompte), tient la facture. Les lots, ramenés de
-   * 16 000 à 3 000 le 26 octobre (l’audit des coûts, 1.25) : deux cents longs enregistrements par jour, plus que le
-   * budget sans compte n’en paie ; un lot déjà lu (src/server/lots.ts) n’y compte pas.
+   * (BUDGET_IA.anonyme), réservée avant chaque lecture (reserver, src/server/budget.ts), tient la facture. Les lots,
+   * ramenés de 16 000 à 3 000 le 26 octobre (l’audit des coûts, 1.25) : deux cents longs enregistrements par jour, plus
+   * que le budget sans compte n’en paie ; un lot déjà lu (src/server/lots.ts) n’y compte pas.
    */
   capturesAnonymesParJour: { max: 1000, fenetreS: 86400 },
   lotsAnonymesParJour: { max: 3000, fenetreS: 86400 },

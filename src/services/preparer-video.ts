@@ -210,9 +210,10 @@ export const tailleDesLots = (ecrans: number, lecteurs: number) => Math.min(ECRA
  * en échec, la même vidéo choisie de nouveau) ne renvoie que ceux qui manquent. La même vidéo donne les mêmes images,
  * octet pour octet : la lire pas à pas est déterministe. En mémoire de la page seulement (ce sont des messages de leur
  * conv) : jamais dans le stockage du navigateur, oubliés au bout d’une heure ou en fermant l’onglet. Un échec n’est
- * jamais gardé. Le serveur garde aussi les siens (src/server/lots.ts).
+ * jamais gardé. Chacun garde la clé de l’envoi qui l’a lu : la fin de l’enregistrement qui le reprend la donne au serveur,
+ * qui range son coût sous le nouvel import (src/server/imports.ts). Le serveur garde aussi les siens (src/server/lots.ts).
  */
-const LUS = new Map<string, { lot: unknown; jusqua: number }>();
+const LUS = new Map<string, LotLu & { jusqua: number }>();
 const GARDE_LU_MS = 60 * 60e3;
 /* Une quarantaine de lots : deux ou trois longs enregistrements */
 const LUS_MAX = 40;
@@ -236,20 +237,23 @@ export async function empreinteDuLot(images: Blob[], appli: string, jour: string
   }
 }
 
-/** La lecture d’un lot déjà lu dans cet onglet (encore fraîche), ou undefined. */
-export function lotDejaLu(empreinte: string | null): unknown {
+/** Un lot lu : sa lecture brute, et la clé de l’envoi qui l’a lu. */
+export type LotLu = { lot: unknown; cle: string };
+
+/** Le lot déjà lu dans cet onglet (encore frais), ou undefined. */
+export function lotDejaLu(empreinte: string | null): LotLu | undefined {
   if (!empreinte) return undefined;
   const l = LUS.get(empreinte);
-  if (l && l.jusqua > Date.now()) return l.lot;
+  if (l && l.jusqua > Date.now()) return { lot: l.lot, cle: l.cle };
   LUS.delete(empreinte);
   return undefined;
 }
 
-/** Garde la lecture d’un lot lu avec succès (les plus anciennes partent au-delà de LUS_MAX). */
-export function garderLeLot(empreinte: string | null, lot: unknown): void {
+/** Garde la lecture d’un lot lu avec succès, et la clé de son envoi (les plus anciennes partent au-delà de LUS_MAX). */
+export function garderLeLot(empreinte: string | null, { lot, cle }: LotLu): void {
   if (!empreinte) return;
   LUS.delete(empreinte);
-  LUS.set(empreinte, { lot, jusqua: Date.now() + GARDE_LU_MS });
+  LUS.set(empreinte, { lot, cle, jusqua: Date.now() + GARDE_LU_MS });
   for (const k of LUS.keys()) {
     if (LUS.size <= LUS_MAX) break;
     LUS.delete(k);

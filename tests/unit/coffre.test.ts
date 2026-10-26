@@ -8,6 +8,7 @@ import * as coffre from "@/server/coffre";
 import * as schema from "@/server/db/schema";
 import type { Meta } from "@/server/histoires";
 import type { Chapter } from "@/types";
+import { lotVideo } from "../aide/fabriques";
 
 /*
  * Le coffre (src/server/coffre.ts) : chaque colonne chiffrée a sa forme, s’écrit et se relit par elle. Les lignes
@@ -132,6 +133,7 @@ const EXEMPLES: { [C in coffre.Colonne]: coffre.Formes[C] } = {
   "vocals.data": { sobre: false, lignes: [{ texte: "Elle relance.", punch: true, debut: 0, fin: 1.2, mots: [{ t: "Elle", debut: 0 }] }], version: 2 },
   "waitlist.email": "tom@exemple.fr",
   "tournages.cle": "x".repeat(43),
+  "lectures_des_lots.lu": lotVideo("Léa"),
 };
 
 describe("le coffre", () => {
