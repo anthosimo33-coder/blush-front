@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Icon } from "@/components/ui/icons";
 import { NOM_DU_GENRE } from "@/contenu/haut-du-paywall";
 import { NOMS_DES_MAILS } from "@/contenu/mails";
+import { NOTE_DU_RAPPORT } from "@/contenu/mesures";
 import { prixDe } from "@/contenu/offres";
 import {
   CIBLE_DE_MARGE,
@@ -152,6 +153,7 @@ export function Pilotage({
           </div>
           <QuiImporte p={p} jours={s.jours} />
           <HautsDuPaywall p={p} />
+          <NotesDuRapport p={p} jours={s.jours} />
           <VentesDuChat p={p} />
           <MailsDesSequences p={p} />
           {delivrabilite && <Delivrabilite d={delivrabilite} />}
@@ -690,6 +692,10 @@ function PaywallJusquAuPaiement({ p, jours }: { p: Chiffres; jours: Periode }) {
     ["La formule", `Premium au bouton ${part(j.payer_premium, j.payer)} · cartes touchées\u00a0: Le rapport ${nombre(j.touche_rapport)}, Premium ${nombre(j.touche_premium)}`],
     ["Sans payer", `${pluriel(j.ferme, "refermé", "refermés")}, ${pluriel(j.refuse, "refus", "refus")} de la banque, ${pluriel(j.page_whop, "parti", "partis")} payer chez Whop`],
     ["La carte de Whop", `${pluriel(j.carte, "feuille ouverte", "feuilles ouvertes")}`],
+    [
+      "Qu’est-ce qui coince\u00a0?",
+      `${pluriel(j.coince, "question posée", "questions posées")} · trop cher ${nombre(j.coince_cher)}, pas confiance ${nombre(j.coince_confiance)}, pas maintenant ${nombre(j.coince_plus_tard)}, ça a bugué ${nombre(j.coince_bug)}`,
+    ],
   ];
   return (
     <Bloc
@@ -815,6 +821,48 @@ function QuiImporte({ p, jours }: { p: Chiffres; jours: Periode }) {
             <p className="m-0 mt-1 text-legende font-bold text-grey">{`«\u00a0—\u00a0»\u00a0: moins de ${PERSONNES_D_UN_TAUX}\u00a0convs, trop peu pour un taux.`}</p>
           )}
         </>
+      )}
+    </Bloc>
+  );
+}
+
+/* ———— La note du rapport ———— */
+
+/** Ce qui n’allait pas, en clair, dans l’ordre de RAISONS_DE_LA_NOTE (les textes des pastilles du rapport). */
+const NOM_DE_LA_RAISON = NOTE_DU_RAPPORT.raisons;
+
+function NotesDuRapport({ p, jours }: { p: Chiffres; jours: Periode }) {
+  const { oui, bof, avis, raisons } = p.note;
+  const notes = oui + bof;
+  const taux = tauxLisible(oui, notes);
+  const maxRaisons = Math.max(1, ...raisons.map((r) => r.n));
+  return (
+    <Bloc
+      id="note"
+      titre={"Le rapport t’a parlé\u00a0?"}
+      sous={`La note en bas des rapports écrits, une par conv · ${PERIODES[jours].sur}`}
+      aide={{ cle: "note", valeur: taux === null ? "—" : pourcent(taux * 100, 0), contexte: "de «\u00a0Oui, grave\u00a0»" }}
+    >
+      {notes === 0 ? (
+        <p className="m-0 mt-[18px] text-note font-bold text-grey">Aucune note sur la période.</p>
+      ) : (
+        <div className="mt-[18px] flex flex-col gap-4">
+          <p className="m-0 text-detail font-bold text-soft">
+            <span className="font-black text-ink">{pluriel(notes, "note", "notes")}</span>
+            {` · Oui, grave ${nombre(oui)} · Bof ${nombre(bof)} · ${pluriel(avis, "avis laissé", "avis laissés")} (partis par mail à l’équipe)`}
+          </p>
+          {bof > 0 && (
+            <ul aria-label="Ce qui n’allait pas" className="m-0 flex list-none flex-col gap-2 p-0">
+              {raisons.map((r) => (
+                <li key={r.raison} className="flex items-center gap-2.5 text-detail font-extrabold">
+                  <span className="w-[200px] shrink-0">{NOM_DE_LA_RAISON[r.raison]}</span>
+                  <Barre part={r.n / maxRaisons} couleur="var(--flou)" />
+                  <span className="min-w-[32px] text-right tabular-nums">{nombre(r.n)}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       )}
     </Bloc>
   );

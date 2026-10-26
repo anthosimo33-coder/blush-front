@@ -145,6 +145,12 @@ export const JALONS = [
   "refuse",
   "ferme",
   "page_whop",
+  /* « Qu’est-ce qui coince ? » (FeuilleQuiCoince) : posée, puis la réponse touchée */
+  "coince",
+  "coince_cher",
+  "coince_confiance",
+  "coince_plus_tard",
+  "coince_bug",
 ] as const;
 export type Jalon = (typeof JALONS)[number];
 /**
@@ -154,6 +160,15 @@ export type Jalon = (typeof JALONS)[number];
  */
 export const JALONS_PAR_APPLI = ["appli", "fichier", "envoi_rate", "importee"] as const satisfies readonly Jalon[];
 export type JalonParAppli = (typeof JALONS_PAR_APPLI)[number];
+
+/** Les réponses de « Qu’est-ce qui coince ? » (FeuilleQuiCoince), chacune avec son jalon (`coince_<réponse>`). */
+export type RaisonDeCoincer = "cher" | "confiance" | "plus_tard" | "bug";
+
+/** La note d’un rapport écrit (NoteDuRapport) : « Oui, grave » ou « Bof », puis, après « Bof », ce qui n’allait pas. */
+export const NOTES_DU_RAPPORT = ["oui", "bof"] as const;
+export type NoteDuRapport = (typeof NOTES_DU_RAPPORT)[number];
+export const RAISONS_DE_LA_NOTE = ["precis", "a_cote", "dur", "long", "autre"] as const;
+export type RaisonDeLaNote = (typeof RAISONS_DE_LA_NOTE)[number];
 
 /** Les mesures de vitesse que les navigateurs envoient (les Web Vitals : src/lib/sentinelle.tsx), en millisecondes sauf CLS. */
 export const METRIQUES_WEB = ["LCP", "INP", "CLS", "FCP", "TTFB"] as const;

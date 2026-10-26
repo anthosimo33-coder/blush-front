@@ -99,11 +99,21 @@ export const AIDES_DU_PILOTAGE = {
     de: "le paywall, jusqu’au paiement",
     quoi: "Ce qui se passe entre l’arrivée au paywall et le paiement\u00a0: jusqu’où l’on descend, la formule touchée, le bouton qui paie, le formulaire de Whop et ce qu’il devient.",
     calcul:
-      "Les personnes qui ont passé chaque étape sur la période, une fois par jour (la même empreinte que les visiteurs). «\u00a0Voient le formulaire de Whop\u00a0»\u00a0: la carte de Whop affichée, ou Apple Pay ouvert. «\u00a0Refermé sans payer\u00a0»\u00a0: la feuille de la carte refermée, ou Apple Pay annulé. Seul le paywall d’avant la lecture compte ici (son offre ① comprise, depuis le 21 octobre), ni la feuille du rapport, ni les recharges.",
+      "Les personnes qui ont passé chaque étape sur la période, une fois par jour (la même empreinte que les visiteurs). «\u00a0Voient le formulaire de Whop\u00a0»\u00a0: la carte de Whop affichée, ou Apple Pay ouvert. «\u00a0Refermé sans payer\u00a0»\u00a0: la feuille de la carte refermée, ou Apple Pay annulé. Seul le paywall d’avant la lecture compte ici (son offre ① comprise, depuis le 21 octobre), ni la feuille du rapport, ni les recharges. «\u00a0Qu’est-ce qui coince\u00a0?\u00a0» (depuis le 26 octobre)\u00a0: la question posée une fois par visite (la carte refermée sans payer, 40\u00a0s sans payer, ou le retour sur l’onglet), puis la réponse touchée\u00a0; l’offre ① ne vient plus qu’après «\u00a0C’est trop cher\u00a0».",
     repere:
       "Plus de feuilles de carte ouvertes que de formulaires affichés\u00a0: la carte de Whop charge mal. «\u00a0Premium au bouton\u00a0» se compare à «\u00a0Ce qui se vend\u00a0». Un taux se lit à partir de 30\u00a0personnes.",
     siCaBouge:
-      "Peu de monde descend jusqu’aux avis\u00a0: remonte une preuve. Beaucoup voient le formulaire sans envoyer\u00a0: le prix ou la confiance coince au dernier moment. Beaucoup de refus\u00a0: regarde Whop.",
+      "Peu de monde descend jusqu’aux avis\u00a0: remonte une preuve. Beaucoup voient le formulaire sans envoyer\u00a0: le prix ou la confiance coince au dernier moment. Beaucoup de refus\u00a0: regarde Whop. Beaucoup de «\u00a0trop cher\u00a0»\u00a0: regarde ce que l’offre ① en fait («\u00a0Les coups de pouce\u00a0»)\u00a0; beaucoup de «\u00a0pas confiance\u00a0»\u00a0: remonte les avis et la discrétion\u00a0; des «\u00a0ça a bugué\u00a0»\u00a0: regarde la santé et Whop.",
+  },
+  note: {
+    titre: "Le rapport t’a parlé\u00a0?",
+    de: "la note du rapport",
+    quoi: "Ce que les clients disent de leur rapport, en un toucher au bas du rapport écrit\u00a0: «\u00a0Oui, grave\u00a0» ou «\u00a0Bof\u00a0», ce qui n’allait pas, et les avis laissés.",
+    calcul:
+      "Des compteurs par jour (src/server/note-du-rapport.ts), une fois par conv chacun, sans rien de la conv ni du compte\u00a0: la note au premier toucher d’une tuile, la raison à «\u00a0Envoyer\u00a0», l’avis à «\u00a0Publier\u00a0». Un avis part à l’équipe par mail\u00a0: le relire avant de le mettre sur le site.",
+    repere: "La part de «\u00a0Oui, grave\u00a0» se lit à partir de 30\u00a0notes. Sous les deux tiers, le rapport déçoit\u00a0: lis les raisons.",
+    siCaBouge:
+      "Beaucoup de «\u00a0À côté de notre histoire\u00a0» ou de «\u00a0Pas assez précis\u00a0»\u00a0: le rapport (le prompt) est à revoir. Beaucoup de «\u00a0Trop dur\u00a0»\u00a0: le ton.",
   },
   quiImporte: {
     titre: "Qui importe",

@@ -19,9 +19,11 @@ import {
   ISSUES_DU_FAUX_WHOP,
   JALONS,
   METRIQUES_WEB,
+  NOTES_DU_RAPPORT,
   OFFRES,
   OFFRES_PROPOSEES,
   PRONOMS,
+  RAISONS_DE_LA_NOTE,
   SECTIONS_FICHE,
 } from "@/types";
 import type {
@@ -409,6 +411,8 @@ type Reponses = {
   "POST /api/presence": Ok;
   /** Toujours `{ ok: true }` : un jalon ignoré (la limite d’une adresse, le mode tournage) ne se dit pas. */
   "POST /api/jalon": Ok;
+  /** Toujours `{ ok: true }` : une note déjà donnée pour cette conv ne se compte pas deux fois, sans le dire. */
+  "POST /api/rapport/note": Ok;
   /** Le nom du lien de tournage de ce navigateur, pour un compte de BLUSH_ADMINS seulement ; null pour tous les autres. */
   "GET /api/tournage/repere": { nom: string | null };
   /** Toujours `{ ok: true }` : une erreur ignorée (la limite d’une adresse) ne se dit pas. */
@@ -601,6 +605,13 @@ export const ROUTES = {
    * avis…), et pour ceux de l’import (JALONS_PAR_APPLI), l’appli de l’écran ; rien d’autre
    */
   "POST /api/jalon": { corps: z.strictObject({ jalon: z.enum(JALONS), appli: z.enum(CLES_DES_APPLIS).optional() }) },
+  "POST /api/rapport/note": {
+    corps: z.union([
+      z.strictObject({ note: z.enum(NOTES_DU_RAPPORT) }),
+      z.strictObject({ raison: z.enum(RAISONS_DE_LA_NOTE) }),
+      z.strictObject({ avis: z.strictObject({ prenom: z.string().trim().min(1).max(30), phrase: z.string().trim().min(1).max(200) }) }),
+    ]),
+  },
   "GET /api/tournage/repere": {},
   /** Une erreur du navigateur (src/lib/sentinelle.tsx) : son nom, son message, d’où elle vient, et l’écran. Bornés : le serveur masque le reste. */
   "POST /api/navigateur/erreur": {

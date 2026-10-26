@@ -27,10 +27,13 @@ import { CASES_DE_LA_ROUE } from "../../src/contenu/roue";
  * Le paywall avant toute lecture (décidé le 16 octobre), de bout en bout, comme un nouveau venu : l’import, « Qui
  * es-tu ? », le code reçu par email, puis la lecture, que le code déroule seul (rien ne part au modèle), « Voir mon
  * rapport », le paywall prime (les deux formules et le bouton qui paie) et sa roue des cadeaux par-dessus (au bout de 5 s
- * ou à la moitié de la page, jamais sur la carte ; refusée, ou tournée), l’offre ① au retour sur l’onglet (seulement
- * sans lot gagné), le paiement au faux Whop, « C’est débloqué » (le rapport entier), puis la vraie lecture et le verdict.
+ * ou à la moitié de la page, jamais sur la carte ; refusée, ou tournée), « Qu’est-ce qui coince ? » (la carte refermée
+ * sans payer, le retour sur l’onglet) et l’offre ① après « C’est trop cher » (sans lot gagné ; avec, le rapport seul), le
+ * paiement au faux Whop, « C’est débloqué » (le rapport entier), puis la vraie lecture et le verdict.
  */
 
+/** « Qu’est-ce qui coince ? » (FeuilleQuiCoince) : le titre de sa feuille. */
+const QUESTION = "Qu’est-ce qui coince\u00a0?";
 /** Les verdicts écrits pour les convs de ce compte : aucun tant que rien n’est payé (le modèle n’a rien lu). */
 const verdictsEcrits = async (email: string) =>
   (
@@ -98,8 +101,8 @@ test("un nouveau venu : la lecture du code, le paywall, payé, puis la vraie lec
     expect(await verdictsEcrits(email)).toBe(0);
   });
 
-  await test.step("l’onglet quitté puis retrouvé pendant qu’on remplit sa carte : l’offre ① attend, et vient une fois la carte refermée sans payer", async () => {
-    /* Le 21 octobre, elle couvrait la carte 19 s après « Débloquer » : jamais pendant le paiement */
+  await test.step("la carte refermée sans payer (l’onglet quitté et retrouvé pendant qu’on la remplit) : « Qu’est-ce qui coince ? », jamais sur la carte ; « C’est trop cher » : l’offre ①", async () => {
+    /* Le 21 octobre, l’offre ① couvrait la carte 19 s après « Débloquer » : rien ne vient pendant le paiement */
     await page.getByRole("main").getByRole("button", { name: "Débloquer · 19,90\u00a0€" }).click();
     const carte = page.getByRole("dialog", { name: CARTE });
     await expect(carte).toBeVisible();
@@ -108,8 +111,16 @@ test("un nouveau venu : la lecture du code, le paywall, payé, puis la vraie lec
     await expect(page.getByRole("dialog")).toHaveCount(1);
     await expect(carte).toBeVisible();
     await carte.getByRole("button", { name: "Revenir" }).click();
-    await expect(page.getByRole("dialog", { name: OFFRE_SUITE })).toBeVisible();
+    /* Depuis le 26 octobre, l’offre ① ne vient plus d’elle-même : la question d’abord, et l’offre seulement après « trop cher » */
+    const question = page.getByRole("dialog", { name: QUESTION });
+    await expect(question).toBeVisible();
     await expect(carte).toHaveCount(0);
+    await expect(page.getByRole("dialog", { name: OFFRE_SUITE })).toHaveCount(0);
+    for (const reponse of ["C’est trop cher", "J’ai pas confiance", "Pas maintenant", "Ça a bugué", "Passer"])
+      await expect(question.getByRole("button", { name: reponse })).toBeVisible();
+    await question.getByRole("button", { name: "C’est trop cher" }).click();
+    await expect(page.getByRole("dialog", { name: OFFRE_SUITE })).toBeVisible({ timeout: RESEAU });
+    await expect(question).toHaveCount(0);
   });
 
   await test.step("l’offre ①, « Offre unique sur ton rapport », une fois ; « Non merci »", async () => {
@@ -178,15 +189,23 @@ test("la roue tournée : « Gagné », le lot (−10 %) sur les prix du paywall 
     await expect(page.getByRole("dialog")).toHaveCount(0);
   });
 
-  await test.step("le paywall : le bandeau du cadeau, Premium à 17,91 € ; l’onglet quitté puis retrouvé, pas d’offre ①", async () => {
+  await test.step("le paywall : le bandeau du cadeau, Premium à 17,91 € ; l’onglet quitté puis retrouvé, la question ; « C’est trop cher » avec un lot : pas d’offre ①, le rapport seul", async () => {
     const ecran = page.getByRole("main");
     await expect(ecran.getByRole("status").filter({ hasText: "Ton cadeau\u00a0: −10\u00a0% sur ta formule" })).toBeVisible();
     const premium = ecran.getByRole("radio", { name: /Premium/ });
     await expect(premium).toContainText("17,91\u00a0€");
     await expect(premium).toContainText("−1,99\u00a0€");
     await quitterPuisRevenir(page);
-    await page.waitForTimeout(1000);
+    const question = page.getByRole("dialog", { name: QUESTION });
+    await expect(question).toBeVisible({ timeout: RESEAU });
+    await question.getByRole("button", { name: "C’est trop cher" }).click();
+    const rapportSeul = page.getByRole("dialog", { name: "Prends le rapport seul." });
+    await expect(rapportSeul).toBeVisible({ timeout: RESEAU });
+    await expect(rapportSeul.getByRole("button", { name: "Passer au rapport · 8,91\u00a0€" })).toBeVisible();
     await expect(page.getByRole("dialog", { name: OFFRE_SUITE })).toHaveCount(0);
+    await rapportSeul.getByRole("button", { name: "Plus tard" }).click();
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await expect(premium).toHaveAttribute("aria-checked", "true");
   });
 
   await test.step("payé au prix du lot : 17,91 €, 25 bulles, le lot pris", async () => {
