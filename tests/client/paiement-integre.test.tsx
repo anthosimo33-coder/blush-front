@@ -199,7 +199,6 @@ describe("les Elements de Whop", () => {
     commencer.mockResolvedValueOnce({ achat: "a1", checkout: null, url: null, paiement: { id: "pay_1", statut: "open", secret: "pay_1_secret" } });
     await ouvrir();
     const bouton = within(formule()).getByRole("button", { name: DANS_LA_FEUILLE.portefeuille.apple_pay });
-    expect(within(formule()).getByText(tel(DANS_LA_FEUILLE.garder))).toBeTruthy();
     fireEvent.click(bouton);
     /* Dans le geste, avant toute attente : Apple refuse une feuille ouverte plus tard */
     expect(whop.show).toHaveBeenCalledWith("apple_pay", { email: "toi@example.com" });
@@ -234,6 +233,19 @@ describe("les Elements de Whop", () => {
     expect(commencer).toHaveBeenCalledWith("premium", true, { jeton: "ctok_carte" });
     expect(within(carte()).getByText(tel(DANS_LA_FEUILLE.carteRefusee))).toBeTruthy();
     expect(routeur.replace).not.toHaveBeenCalled();
+  });
+
+  it("la carte gardée chez Whop ne se dit plus sous les boutons (26 octobre) : ni sous Apple Pay, ni dans la feuille de la carte", async () => {
+    whop.portefeuille = { applePay: true, googlePay: false };
+    render(<OffreAvantDePartir fin={Date.now() + 300_000} chapitres={7} onRefus={() => {}} onPassee={() => {}} onClosed={() => {}} />);
+    await promesses();
+    await promesses();
+    const offre = () => screen.getByRole("dialog", { name: OFFRE_SUITE.titre });
+    expect(within(offre()).getByRole("button", { name: DANS_LA_FEUILLE.portefeuille.apple_pay })).toBeTruthy();
+    expect(within(offre()).queryByText(/garde ta carte/)).toBeNull();
+    fireEvent.click(within(offre()).getByRole("button", { name: DANS_LA_FEUILLE.avecCarte }));
+    expect(within(carte()).getByRole("button", { name: DANS_LA_FEUILLE.carte.payer(prixDe("suite")) })).toBeTruthy();
+    expect(within(carte()).queryByText(/garde ta carte/)).toBeNull();
   });
 
   it("une autre formule choisie : le portefeuille montre son prix", async () => {
