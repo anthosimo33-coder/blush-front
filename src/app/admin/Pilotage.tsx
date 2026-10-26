@@ -27,7 +27,7 @@ import type { SanteDesNavigateurs } from "@/server/navigateur";
 import type { Periode, Pilotage as Chiffres, StatsAdmin } from "@/server/stats";
 import type { OffreUnique, Population } from "@/types";
 import type { Direct } from "@/types/api";
-import { aRegarder, meilleureSource, type CarteARegarder } from "./a-regarder";
+import { aCoteDeLaMarge, aRegarder, margeProduit, meilleureSource, type CarteARegarder } from "./a-regarder";
 import { BoutonAide } from "./Aide";
 import { Beta, Journal, NOMS_OFFRES_UNIQUES } from "./AdminScreen";
 import {
@@ -378,15 +378,15 @@ function ChiffresCles({ s }: { s: StatsAdmin }) {
   const tauxAvant = rapport(p.acheteurs.avant, p.visiteurs.avant);
   const parAcheteur = rapport(p.centimesPayes.valeur, p.acheteurs.valeur);
   const parAcheteurAvant = rapport(p.centimesPayes.avant, p.acheteurs.avant);
-  /* La marge produit : les ventes des vrais clients face à l’IA du produit ; les tests à part (src/server/population.ts) */
-  const marge = margeApresIA(p.netProduit.valeur, s.couts.produit.valeur);
-  const margeAvant = margeApresIA(p.netProduit.avant, s.couts.produit.avant);
+  /* La marge produit : les ventes des vrais clients face à l’IA du produit ; les tests et le non classé à part (margeProduit) */
+  const m = margeProduit(s);
+  const marge = m.valeur;
   const sousLaCible = marge !== null && marge < CIBLE_DE_MARGE;
-  const tests = `tests\u00a0: ${dollars(s.couts.tests.valeur)} à part`;
+  const aCote = aCoteDeLaMarge(m);
   const ecartVisiteurs = suivi ? ecartRelatif(p.visiteurs.valeur, p.visiteurs.avant, nombre) : null;
   const ecartTaux = ecartEnPoints(taux === null ? null : taux * 100, tauxAvant === null ? null : tauxAvant * 100, "hausse", 2);
   const ecartPanier = ecartEnValeur(parAcheteur, parAcheteurAvant, (v) => euros(v));
-  const ecartMarge = ecartEnPoints(marge, margeAvant);
+  const ecartMarge = ecartEnPoints(marge, m.avant);
   /* Le suivi des visites a commencé pendant la période : elle n’en a qu’une partie */
   const debut = jourDeParisAvant(s.jours, new Date(s.le));
   const depuis =
@@ -436,11 +436,11 @@ function ChiffresCles({ s }: { s: StatsAdmin }) {
         />
         <ChiffreCle
           titre="Marge produit"
-          aide={{ cle: "marge", valeur: marge === null ? "—" : pourcent(marge, 0), contexte: `cible ${pourcent(CIBLE_DE_MARGE, 0)}, ${tests}` }}
+          aide={{ cle: "marge", valeur: marge === null ? "—" : pourcent(marge, 0), contexte: `cible ${pourcent(CIBLE_DE_MARGE, 0)}, ${aCote}` }}
           valeur={marge === null ? "—" : pourcent(marge, 0)}
           valeurClasse={sousLaCible ? "text-attente-ink" : undefined}
           ecart={ecartMarge}
-          sous={`cible ${pourcent(CIBLE_DE_MARGE, 0)} · ${tests}`}
+          sous={`cible ${pourcent(CIBLE_DE_MARGE, 0)} · ${aCote}`}
           courbe={pointsDeLaCourbe(cases.map((c) => margeApresIA(c.centimesProduit, c.dollarsProduit)))}
           couleur={sousLaCible ? ORANGE : VERT}
         />
@@ -1513,7 +1513,7 @@ function Couts({ s }: { s: StatsAdmin }) {
       </ul>
       <p className="m-0 mt-2 text-legende font-bold text-grey">
         En tout, {dollars(c.total)} (≈ {euros(c.total * EUROS_PAR_DOLLAR * 100, 0)}). Les invités ne sont ni un test, ni une vente. Non classé{NBSP}: une conv effacée avant la
-        note, ou une ligne d’avant la règle que rien ne rattache.
+        note, une ligne d’avant la règle que rien ne rattache, ou pas encore rangée{NBSP}; hors de la marge produit, qui dit à côté ce qu’il lui coûterait au pire.
       </p>
       <h3 className="m-0 mt-[22px] text-detail font-black">Les postes du produit</h3>
       {postes.length ? (

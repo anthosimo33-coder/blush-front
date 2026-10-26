@@ -11,8 +11,8 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
  * Une autre instance se joue en oubliant ce que garde celle-ci (oublierLesLots) : il ne reste que la base. Ce que ce
  * fichier note dans ai_usage, dans la mesure des imports, dans les lectures gardées et dans la part sans compte du
  * budget est effacé à la fin : le budget du jour des autres fichiers n’en porte rien. /admin se lit avant et après (la
- * base des tests garde tout d’un lancement à l’autre). Les invités de l’équipe (BLUSH_ACCES_LIBRE, que /admin lit) sont
- * ceux que le test pose (`etat.equipe`).
+ * base des tests garde tout d’un lancement à l’autre). Les invités de l’équipe (BLUSH_ACCES_LIBRE, que la règle « qui est
+ * qui » lit en rangeant chaque lecture : src/server/population.ts) sont ceux que le test pose (`etat.equipe`).
  */
 const etat = vi.hoisted(() => ({ cookies: new Map<string, string>(), equipe: [] as string[] }));
 vi.mock("next/headers", () => ({
@@ -453,19 +453,21 @@ describe("la mesure des imports", () => {
     expect(ecart(avant, await duType("video"))).toMatchObject({ imports: 1, lots: 2, micros: 2 * COUT_MICROS, pourRien: 0 });
   });
 
-  it("les imports d’un compte de l’équipe ou d’un invité ne comptent pas (ils ne paient jamais) ; un brouillon jamais rattaché, si", async () => {
+  it("les imports d’un compte de l’équipe ou d’un invité ne comptent pas (ils ne paient jamais) ; ceux d’un compte ordinaire, si", async () => {
     const avant = await duType("captures");
-    const id = await conv(await postCaptures(requete("/api/captures", { method: "POST", body: formulaire(ecrans(2), { app: "instagram", cle: randomUUID() }) })));
+    const lire = async () => conv(await postCaptures(requete("/api/captures", { method: "POST", body: formulaire(ecrans(2), { app: "instagram", cle: randomUUID() }) })));
+    await lire();
     expect(ecart(avant, await duType("captures"))).toMatchObject({ imports: 1, micros: COUT_MICROS });
-    const membre = await compteDeTest("lots-equipe");
-    await db().update(schema.stories).set({ userId: membre.id }).where(eq(schema.stories.id, id));
-    etat.equipe = [membre.email];
+    /* Le même compte, invité (BLUSH_ACCES_LIBRE) : sa lecture se range « offert » dès sa note (la règle « qui est qui »), son import ne compte pas */
+    etat.equipe = [compte.email];
     try {
-      expect(ecart(avant, await duType("captures"))).toMatchObject({ imports: 0, micros: 0, pourRien: 0 });
+      await lire();
+      expect(ecart(avant, await duType("captures"))).toMatchObject({ imports: 1, micros: COUT_MICROS, pourRien: 0 });
     } finally {
       etat.equipe = [];
     }
-    expect(ecart(avant, await duType("captures"))).toMatchObject({ imports: 1 });
+    /* Rangée à sa note, elle le reste : la liste des invités changée ne réécrit pas le passé */
+    expect(ecart(avant, await duType("captures"))).toMatchObject({ imports: 1, micros: COUT_MICROS });
   });
 
   it("des captures : la lecture se note sous l’empreinte de l’envoi, puis la conv ; un morceau ajouté avant « Qui es-tu ? » ajoute ses écrans, son lot et son coût à ceux de la conv", async () => {

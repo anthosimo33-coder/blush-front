@@ -40,7 +40,7 @@ import { env } from "./env";
 import { actionsRecentes, type ActionRecente } from "./equipe";
 import { metaDe, personnesDe, type Meta } from "./histoires";
 import { LOT_BLOQUE_S } from "./memoire-en-lot";
-import { duProduit, populationEnSQL } from "./population";
+import { duProduit } from "./population";
 import { PERIME_S } from "./taches";
 import { dansLaMoitieAvec, VENTE, type GroupeDeVente } from "./vente";
 
@@ -49,8 +49,10 @@ import { dansLaMoitieAvec, VENTE, type GroupeDeVente } from "./vente";
  * Les convs effacées (par l’utilisateur, ou par la purge) sortent des comptes.
  * L’IA se lit par population (ai_usage.population, la règle « qui est qui » : src/server/population.ts) : celle du
  * produit (les clients et les prospects) et celle des tests (l’équipe et le tournage) à part. La marge produit met l’IA du
- * produit face aux ventes des mêmes (l’acheteur rangé par la même règle, à l’heure de son paiement), et chaque ratio
- * (par verdict, par rapport, par acheteur) prend la même population en haut et en bas.
+ * produit face aux ventes des mêmes (achats.population : l’acheteur rangé par la même règle, à l’heure de son paiement),
+ * et chaque ratio (par verdict, par rapport, par acheteur) prend la même population en haut et en bas. Rien ici ne
+ * rejuge la règle : ces colonnes, posées à l’écriture, se lisent telles quelles (une sous-requête par ligne passerait le
+ * seuil de la compilation JIT de Postgres, comme le 15 octobre).
  */
 
 export type Periode = 1 | 7 | 30;
@@ -81,8 +83,9 @@ export type StatsAdmin = {
    * Ce qu’a coûté l’IA sur la période. `total` et `avant` : tout, comme sur la facture (la période et celle d’avant).
    * `produit` : les clients et les prospects ; `tests` : l’équipe et le tournage (la période et celle d’avant).
    * `populations` : chacune (POPULATIONS, dans l’ordre, même vide), une ligne pas encore rangée comptée « inconnu ».
-   * `parRapport`, `parVerdict` : ceux du produit, l’IA de leurs appels sur leur nombre (le même produit). `postes` : chacun
-   * en tout, et pour le produit seul.
+   * `parRapport`, `parVerdict` : ceux du produit, l’IA de leurs appels (essais rejoués, verdicts refaits et convs effacées
+   * depuis compris) sur les rapports et les verdicts gardés dont un appel est du produit. `postes` : chacun en tout, et
+   * pour le produit seul.
    */
   couts: {
     total: number;
@@ -170,7 +173,8 @@ export type Pilotage = {
   net: Chiffre;
   /**
    * Le chiffre d’affaires net du produit : celui des vrais clients, sans les achats payés par l’équipe ni par le tournage
-   * (l’acheteur rangé par la règle « qui est qui », à l’heure de son paiement ; un compte effacé depuis reste un client).
+   * (achats.population : l’acheteur rangé par la règle « qui est qui » à l’heure de son paiement, et figé ; un compte
+   * effacé ensuite garde son côté).
    * Face à l’IA du produit (couts.produit), il fait la marge produit.
    */
   netProduit: Chiffre;
@@ -256,8 +260,8 @@ export type Pilotage = {
   abDerniere: { avec: { n: number; payes: number }; sans: { n: number; payes: number } };
   /**
    * L’IA avant l’achat, par type d’import (src/server/imports.ts) : pour chaque type de TYPES_D_IMPORT, dans l’ordre, même
-   * vide, les convs importées sur la période (sans les prises du mode tournage, ni celles des comptes de l’équipe :
-   * horsEquipe), leurs écrans et leurs lots lus par le modèle, ce qu’ont coûté ces lectures (en dollars, une lecture
+   * vide, les convs importées sur la période (sans les prises du mode tournage, ni les tests et les invités :
+   * horsDesTests), leurs écrans et leurs lots lus par le modèle, ce qu’ont coûté ces lectures (en dollars, une lecture
    * notée après l’import comprise), celles arrivées au paywall (leur lecture lancée, comme le tunnel) et celles payées
    * (un achat payé pour la conv, même remboursé depuis : une conv effacée depuis n’y compte plus). `secondesAuPaywall` :
    * le temps médian de leur première lecture (le début de son appel ; l’import, pour un export) au paywall, en
@@ -276,12 +280,12 @@ export type Pilotage = {
     pourRien: number;
   }[];
   /**
-   * La lecture partielle des longues vidéos (src/server/lecture-partielle.ts), sur la période, hors de l’équipe. `bras` :
-   * chaque moitié de l’A/B (BRAS_DE_LA_LECTURE, dans l’ordre, même vide). Comptées dès leur plan, qu’elles aillent ou non
-   * jusqu’à l’import (plans_video : la moitié entière, lue plus longtemps, perd plus de monde en route) : ses longues
-   * vidéos (`videos`, une vidéo renvoyée comptée une fois), celles importées, arrivées au paywall, payées, et payées plus
-   * de 24 h après leur import (`payesTard` : l’achat venu des relances), et ce qu’ont coûté leurs lectures d’avant
-   * l’achat (importées ou non) et la suite lue après (en dollars). Par import : leurs écrans et leurs lots lus avant,
+   * La lecture partielle des longues vidéos (src/server/lecture-partielle.ts), sur la période, hors des tests et des
+   * invités (horsDesTests). `bras` : chaque moitié de l’A/B (BRAS_DE_LA_LECTURE, dans l’ordre, même vide). Comptées dès
+   * leur plan, qu’elles aillent ou non jusqu’à l’import (plans_video : la moitié entière, lue plus longtemps, perd plus de
+   * monde en route) : ses longues vidéos (`videos`, une vidéo renvoyée comptée une fois), celles importées, arrivées au
+   * paywall, payées, et payées plus de 24 h après leur import (`payesTard` : l’achat venu des relances), et ce qu’ont
+   * coûté leurs lectures d’avant l’achat (importées ou non) et la suite lue après (en dollars). Par import : leurs écrans et leurs lots lus avant,
    * leurs lots gardés et combien en ont gardé (`coupees` : la règle s’est arrêtée avant la fin, les autres ont tout lu),
    * combien ont vu le titre « Tendance » parmi celles dont le titre est noté, le temps médian de la première lecture au
    * paywall (en secondes, null sans aucune), leurs suites lues, incomplètes ou perdues, et, parmi les suites lues, combien
@@ -361,25 +365,38 @@ const n = (v: unknown) => Number(v ?? 0);
 /** L’étiquette des lectures d’avant l’import de chaque type (src/server/captures.ts) : un export n’en a pas. */
 const TACHE_DU_TYPE: Record<TypeDImport, string | null> = { export: null, captures: "captures", video: "captures_video" };
 
+/** Les populations hors de la mesure des imports : les tests (l’équipe, le tournage) et les invités, qui ne paient jamais. */
+const HORS_DE_LA_MESURE = ["equipe", "tournage", "offert"] as const satisfies readonly Population[];
+
 /**
- * Les emails de l’équipe (BLUSH_ADMINS, sinon BLUSH_ALERTES) et de ses invités (BLUSH_ACCES_LIBRE, sauf « * » : tout le
- * monde), en minuscules : leurs imports ne comptent pas parmi ceux de la mesure (tests ≠ clients). Ils ne paient jamais
- * (tout leur est ouvert), et quelques essais d’une vidéo pèseraient lourd sur une dizaine de longues vidéos par semaine.
+ * Cet import (en SQL brut, `imports` sous l’alias `alias`) n’est pas un test : aucune lecture de son envoi ni de sa conv
+ * n’est rangée équipe, tournage ou invité (ai_usage.population, la règle « qui est qui », src/server/population.ts).
+ * Tests ≠ clients : quelques essais d’une vidéo pèseraient lourd sur une dizaine de longues vidéos par semaine. Un
+ * brouillon jamais rattaché, une conv effacée (ses lectures gardent l’envoi) ou un export pas encore lu comptent : rien
+ * ne dit d’où il venait. Deux anti-jointures, par les index d’ai_usage : jamais la règle ligne par ligne.
  */
-function emailsDeLEquipe(): string[] {
-  const e = env();
-  return [...new Set([...(e.BLUSH_ADMINS ?? e.BLUSH_ALERTES), ...(e.BLUSH_ACCES_LIBRE === "*" ? [] : e.BLUSH_ACCES_LIBRE)].map((m) => m.toLowerCase()))];
+function horsDesTests(alias: string): SQL {
+  const pop = sql.join(
+    HORS_DE_LA_MESURE.map((p) => sql`${p}`),
+    sql`, `,
+  );
+  const i = sql.raw(alias);
+  return sql`not exists (select 1 from ai_usage t where t.envoi = ${i}.envoi and t.population in (${pop}))
+    and not exists (select 1 from ai_usage t where t.story_id = ${i}.story_id and t.population in (${pop}))`;
 }
 
 /**
- * La conv de cet import (`colonne` : son story_id) n’est pas celle d’un compte de l’équipe (emailsDeLEquipe). Un
- * brouillon jamais rattaché, ou une conv effacée, compte : rien ne dit d’où il venait.
+ * Cette conv (sa colonne `story_id`, en SQL brut) a un appel du produit sous cette étiquette (ai_usage.population : un
+ * client ou un prospect) : le dénominateur des ratios du produit, rangé par les mêmes lignes que leur numérateur.
  */
-function horsEquipe(colonne: SQL): SQL {
-  const equipe = emailsDeLEquipe();
-  if (!equipe.length) return sql`true`;
-  return sql`not exists (select 1 from stories s join users u on u.id = s.user_id where s.id = ${colonne} and lower(u.email) in ${equipe})`;
-}
+const appelDuProduit = (conv: string, tache: SQL) => sql`exists (select 1 from ai_usage u where u.story_id = ${sql.raw(conv)} and ${tache} and ${duProduit(sql`u.population`)})`;
+
+/**
+ * Un achat du produit (en SQL brut, `achats` sous l’alias `a0`) : payé par un client (achats.population, figée au
+ * paiement). Un achat payé pas encore rangé (le passage des 5 minutes le range) compte comme un client : il l’est presque
+ * toujours.
+ */
+const ACHAT_DU_PRODUIT = sql`(a0.population is null or ${duProduit(sql`a0.population`)})`;
 
 /**
  * Les postes de coût, d’après l’étiquette de chaque appel au modèle. La mémoire en trois : sa création après le rapport
@@ -432,8 +449,6 @@ export async function statsAdmin(jours: Periode): Promise<StatsAdmin> {
   };
   const nbJours = jours === 30 ? 30 : 14;
 
-  /* La conv d’un verdict ou d’un rapport, rangée à son heure par la règle « qui est qui » : le dénominateur des ratios du produit */
-  const convDuProduit = (conv: string, heure: string) => duProduit(populationEnSQL({ conv: sql.raw(conv), compte: sql`null`, instant: sql.raw(heure), sansRien: "inconnu" }));
   const [
     comptes,
     convs,
@@ -510,10 +525,13 @@ export async function statsAdmin(jours: Periode): Promise<StatsAdmin> {
     ),
     chiffre("waitlist", "created_at"),
     ligne<{ attente: string; comptes: string }>(sql`select (select count(*) from waitlist) as attente, (select count(*) from users where ${sql.raw(VRAI_COMPTE)}) as comptes`),
-    /* Les verdicts et les rapports écrits du produit sur la période : ceux d’une conv d’un client ou d’un prospect, à leur heure */
+    /*
+     * Les verdicts et les rapports écrits du produit sur la période : ceux d’une conv dont l’appel du verdict (ou du
+     * rapport) est rangé client ou prospect, comme les appels qui font leur coût
+     */
     ligne<{ verdicts: string; rapports: string }>(
-      sql`select (select count(*) from verdicts v where ${dans("v.created_at")} and ${convDuProduit("v.story_id", "v.created_at")}) as verdicts,
-            (select count(*) from reports r where r.data is not null and ${dans("r.updated_at")} and ${convDuProduit("r.story_id", "r.updated_at")}) as rapports`,
+      sql`select (select count(*) from verdicts v where ${dans("v.created_at")} and ${appelDuProduit("v.story_id", sql`u.task = 'verdict'`)}) as verdicts,
+            (select count(*) from reports r where r.data is not null and ${dans("r.updated_at")} and ${appelDuProduit("r.story_id", sql`u.task like 'rapport%'`)}) as rapports`,
     ),
   ]);
 
@@ -639,8 +657,6 @@ async function pilotageDe(jours: Periode): Promise<Pilotage> {
           `select (j::timestamp at time zone 'Europe/Paris') as debut from generate_series((now() at time zone 'Europe/Paris')::date - ${jours - 1}, (now() at time zone 'Europe/Paris')::date, interval '1 day') as j`,
         );
   const caseDe = (col: string) => sql.raw(pas === "heure" ? `date_trunc('hour', ${col})` : `((${col} at time zone 'Europe/Paris')::date::timestamp at time zone 'Europe/Paris')`);
-  /* Un achat du produit (en SQL brut, `achats` sous l’alias `a0`) : son acheteur rangé par la règle « qui est qui » à l’heure de son paiement, un compte effacé depuis compté client */
-  const achatDuProduit = duProduit(populationEnSQL({ conv: sql`null`, compte: sql`a0.user_id`, instant: sql`a0.paye_le`, sansRien: "prospect" }));
   const [
     parCase,
     argent,
@@ -678,7 +694,7 @@ async function pilotageDe(jours: Periode): Promise<Pilotage> {
       sql`with c as (${cases}),
             v as (select ${caseDe("arrive_le")} as b, count(*) as n from visites where arrive_le >= (select min(debut) from c) group by 1),
             a as (select ${caseDe("paye_le")} as b, count(distinct user_id) as acheteurs, sum(centimes) as centimes, sum(centimes) filter (where produit) as centimes_produit
-                  from (select a0.paye_le, a0.user_id, a0.centimes, ${achatDuProduit} as produit from achats a0 where a0.paye_le >= (select min(debut) from c)) as payes group by 1),
+                  from (select a0.paye_le, a0.user_id, a0.centimes, ${ACHAT_DU_PRODUIT} as produit from achats a0 where a0.paye_le >= (select min(debut) from c)) as payes group by 1),
             i as (select ${caseDe("created_at")} as b, sum(cost_micros) as micros, sum(cost_micros) filter (where ${duProduit(sql`population`)}) as micros_produit
                   from ai_usage where created_at >= (select min(debut) from c) group by 1)
           select c.debut, v.n as visiteurs, a.acheteurs, a.centimes, a.centimes_produit, i.micros, i.micros_produit
@@ -700,7 +716,7 @@ async function pilotageDe(jours: Periode): Promise<Pilotage> {
      */
     ligne<Record<"payes_c" | "payes_av_c" | "remb_c" | "remb_av_c" | "cont_c" | "cont_av_c" | "acheteurs" | "acheteurs_av", string | null>>(
       sql`with a as (select a0.centimes, a0.statut, a0.paye_le, a0.annule_le, a0.user_id from achats a0
-                     where a0.paye_le is not null and (${W("a0.paye_le")} or ${W("a0.paye_le", 1)} or ${W("a0.annule_le")} or ${W("a0.annule_le", 1)}) and ${achatDuProduit})
+                     where a0.paye_le is not null and (${W("a0.paye_le")} or ${W("a0.paye_le", 1)} or ${W("a0.annule_le")} or ${W("a0.annule_le", 1)}) and ${ACHAT_DU_PRODUIT})
           select sum(centimes) filter (where ${W("paye_le")}) as payes_c, sum(centimes) filter (where ${W("paye_le", 1)}) as payes_av_c,
             sum(centimes) filter (where statut = 'rembourse' and ${W("annule_le")}) as remb_c, sum(centimes) filter (where statut = 'rembourse' and ${W("annule_le", 1)}) as remb_av_c,
             sum(centimes) filter (where statut = 'conteste' and ${W("annule_le")}) as cont_c, sum(centimes) filter (where statut = 'conteste' and ${W("annule_le", 1)}) as cont_av_c,
@@ -782,12 +798,12 @@ async function pilotageDe(jours: Periode): Promise<Pilotage> {
       sql`select key, sum(count) as n from counters where key like ${`${NOTE}%`} and day > (now() at time zone 'Europe/Paris')::date - ${jours}::int group by key`,
     ),
     /*
-     * Les imports de la période (hors de l’équipe), ce qu’ont coûté leurs lectures (ai_usage, sous l’empreinte de leur
+     * Les imports de la période (hors des tests et des invités), ce qu’ont coûté leurs lectures (ai_usage, sous l’empreinte de leur
      * envoi), et le temps de leur première lecture (le début de son appel : sa fin moins sa durée ; l’import, pour un
      * export) jusqu’au paywall (la tâche du verdict posée)
      */
     lignes<{ type: TypeDImport; imports: string; ecrans: string; lots: string; micros: string; paywall: string; payes: string; secondes: string | null }>(
-      sql`with i as (select type, envoi, story_id, ecrans, lots, cree_le from imports where ${W("cree_le")} and ${horsEquipe(sql.raw("imports.story_id"))}),
+      sql`with i as (select type, envoi, story_id, ecrans, lots, cree_le from imports where ${W("cree_le")} and ${horsDesTests("imports")}),
             c as (select envoi, sum(cost_micros) as micros, min(created_at - ms * interval '1 millisecond') as debut from ai_usage where envoi in (select envoi from i) group by envoi),
             p as (select story_id, min(created_at) as le from tasks where kind = 'verdict' and story_id in (select story_id from i) group by story_id)
           select i.type, count(*) as imports, sum(i.ecrans) as ecrans, sum(i.lots) as lots, coalesce(sum(c.micros), 0) as micros,
@@ -804,14 +820,14 @@ async function pilotageDe(jours: Periode): Promise<Pilotage> {
     partSansCompteDuJour(),
     /*
      * Les deux moitiés de la lecture partielle, vidéo par vidéo : leurs longues vidéos planifiées sur la période (une par
-     * empreinte de vidéo : ses essais réunis), sans celles dont une conv est à l’équipe ; celles qui ont donné une conv,
+     * empreinte de vidéo : ses essais réunis), sans celles dont une conv est un test ; celles qui ont donné une conv,
      * arrivée au paywall (la tâche du verdict posée), payée, payée plus de 24 h après l’import ; ce qu’ont coûté les
      * lectures de leurs envois (sous leur empreinte, importés ou non) et leur suite (« captures_suite », sous la conv)
      */
     lignes<{ bras: BrasDeLaLecture; videos: string; importees: string; paywall: string; payes: string; tard: string; avant: string; suite: string }>(
       sql`with pl as (select envoi, video, bras from plans_video where ${W("cree_le")}),
-            i as (select i.story_id, i.cree_le, pl.video from imports i join pl on pl.envoi = i.envoi),
-            equipe as (select distinct video from i where not (${horsEquipe(sql.raw("i.story_id"))})),
+            i as (select i.story_id, i.envoi, i.cree_le, pl.video from imports i join pl on pl.envoi = i.envoi),
+            equipe as (select distinct video from i where not (${horsDesTests("i")})),
             v as (select video, min(bras) as bras from pl where video not in (select video from equipe) group by video),
             c as (select pl.video, sum(u.cost_micros) as micros from ai_usage u join pl on pl.envoi = u.envoi group by pl.video),
             s as (select i.video, sum(u.cost_micros) as micros from ai_usage u join i on i.story_id = u.story_id where u.task = 'captures_suite' group by i.video),
@@ -826,7 +842,7 @@ async function pilotageDe(jours: Periode): Promise<Pilotage> {
           from v left join e on e.video = v.video left join c on c.video = v.video left join s on s.video = v.video group by v.bras`,
     ),
     /*
-     * … et import par import, ceux des mêmes plans (hors de l’équipe) : ce qu’ils ont lu avant l’achat, gardé, montré au
+     * … et import par import, ceux des mêmes plans (hors des tests et des invités) : ce qu’ils ont lu avant l’achat, gardé, montré au
      * paywall, et le temps de leur première lecture (le début de son appel : sa fin moins sa durée) jusqu’au paywall
      */
     lignes<{
@@ -846,7 +862,7 @@ async function pilotageDe(jours: Periode): Promise<Pilotage> {
     }>(
       sql`with i as (select pl.bras, i.envoi, i.story_id, i.ecrans, i.lots, i.lots_gardes, i.suite, i.titre, i.titre_entier
                      from imports i join plans_video pl on pl.envoi = i.envoi
-                     where ${W("pl.cree_le")} and i.type = 'video' and ${horsEquipe(sql.raw("i.story_id"))}),
+                     where ${W("pl.cree_le")} and i.type = 'video' and ${horsDesTests("i")}),
             c as (select envoi, min(created_at - ms * interval '1 millisecond') as debut from ai_usage where envoi in (select envoi from i) group by envoi),
             p as (select story_id, min(created_at) as le from tasks where kind = 'verdict' and story_id in (select story_id from i) group by story_id)
           select i.bras, sum(i.ecrans) as ecrans, sum(i.lots) as lots, sum(i.lots_gardes) as gardes, count(*) filter (where i.lots_gardes > 0) as coupees,
@@ -861,7 +877,7 @@ async function pilotageDe(jours: Periode): Promise<Pilotage> {
       sql`select count(*) as videos, count(*) filter (where contrefactuel = 'pareil') as pareil, count(*) filter (where contrefactuel = 'tendance_perdue') as perdue,
             count(*) filter (where contrefactuel = 'date_decalee') as decalee, count(*) filter (where contrefactuel = 'autre_titre') as autre,
             coalesce(sum(lots), 0) as lots, coalesce(sum(lots_epargnables), 0) as epargnables
-          from imports where ${W("cree_le")} and type = 'video' and contrefactuel is not null and ${horsEquipe(sql.raw("imports.story_id"))}`,
+          from imports where ${W("cree_le")} and type = 'video' and contrefactuel is not null and ${horsDesTests("imports")}`,
     ),
   ]);
 

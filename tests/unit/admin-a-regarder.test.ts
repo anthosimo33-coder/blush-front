@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { aRegarder, meilleureSource, VISITEURS_D_UNE_SOURCE, type CarteARegarder } from "@/app/admin/a-regarder";
+import { aCoteDeLaMarge, aRegarder, margeProduit, meilleureSource, VISITEURS_D_UNE_SOURCE, type CarteARegarder } from "@/app/admin/a-regarder";
 import { statsDExemple } from "@/app/apercu/admin/exemple";
 import { CIBLE_DE_MARGE, margeApresIA } from "@/contenu/pilotage";
 import type { Pilotage, StatsAdmin } from "@/server/stats";
@@ -43,13 +43,17 @@ function vide(p: Partial<Pilotage> = {}): StatsAdmin {
   });
 }
 
-/** Ce qu’a coûté l’IA : `produit` pour le produit, `tests` pour les tests, sans poste à nommer. */
-const couts = (produit: number, tests = 0): StatsAdmin["couts"] => ({
-  total: produit + tests,
+/** Ce qu’a coûté l’IA : `produit` pour le produit, `tests` pour les tests, `nonClasse` sans population, sans poste à nommer. */
+const couts = (produit: number, tests = 0, nonClasse = 0): StatsAdmin["couts"] => ({
+  total: produit + tests + nonClasse,
   avant: 0,
   produit: { valeur: produit, avant: 0 },
   tests: { valeur: tests, avant: 0 },
-  populations: [],
+  populations: [
+    { population: "client", dollars: produit, appels: 1 },
+    { population: "equipe", dollars: tests, appels: 1 },
+    { population: "inconnu", dollars: nonClasse, appels: 1 },
+  ],
   parRapport: null,
   parVerdict: null,
   postes: [],
@@ -69,7 +73,9 @@ describe("« À regarder »", () => {
     const marge = margeApresIA(s.pilotage.netProduit.valeur, s.couts.produit.valeur)!;
     expect(marge).toBeLessThan(CIBLE_DE_MARGE);
     expect(cartes[1]).toMatchObject({ titre: `Marge produit${NB}: ${Math.round(marge)}${NB}%, sous ta cible de 80${NB}%`, lien: { ancre: "couts" } });
-    expect(cartes[1]?.texte).toMatch(/^Le poste «\u00a0Chat\u00a0» fait 46\u00a0% de l’IA du produit \(.+\)\. Les tests \([\d,]+\u00a0\$\) n’y comptent pas\.$/);
+    expect(cartes[1]?.texte).toMatch(
+      /^Le poste «\u00a0Chat\u00a0» fait 46\u00a0% de l’IA du produit \(.+\)\. Les tests \([\d,]+\u00a0\$\) n’y comptent pas\. L’IA non classée \([\d,]+\u00a0\$\) n’y compte pas\u00a0: comptée dans le produit, la marge serait de \d+\u00a0%\.$/,
+    );
     expect(cartes[2]).toMatchObject({ lien: { ancre: "sources" } });
     expect(cartes[2]?.titre).toMatch(/^Verdicts partagés achète le mieux\u00a0: 5,\d\u00a0%$/);
     expect(propres(cartes)).toBe(true);
@@ -180,5 +186,24 @@ describe("« À regarder »", () => {
     const haute = aRegarder(stats({ netProduit: { valeur: 12_000, avant: 0 } }, { couts: couts(10, 40) })).find((x) => x.titre.startsWith("Marge"));
     expect(haute).toMatchObject({ ton: "bon", titre: `Marge produit${NB}: 91${NB}%` });
     expect(haute?.texte).toContain(`Les tests (40,00${NB}$) n’y comptent pas.`);
+  });
+
+  it("la marge produit au-dessus de la cible que le non classé pourrait faire passer dessous : à confirmer, avec la marge au pire", () => {
+    const carte = (c: StatsAdmin["couts"]) => aRegarder(stats({ netProduit: { valeur: 12_000, avant: 0 } }, { couts: c })).find((x) => x.titre.startsWith("Marge"));
+    /* 10 $ d’IA du produit pour 100 € HT : 91 % ; avec 15 $ de non classé, au pire 79 % (78,5 %) */
+    expect(carte(couts(10, 0, 15))).toMatchObject({ ton: "neutre", titre: `Marge produit${NB}: 91${NB}%, à confirmer`, lien: { ancre: "couts" } });
+    expect(carte(couts(10, 0, 15))?.texte).toContain(`mais 15,00${NB}$ d’IA non classée`);
+    expect(carte(couts(10, 0, 15))?.texte).toContain(`la ramèneraient à 79${NB}% si elle était du produit`);
+    /* Un peu de non classé, qui ne la fait pas passer dessous : la bonne nouvelle, qui le dit */
+    expect(carte(couts(10, 0, 1))).toMatchObject({ ton: "bon", titre: `Marge produit${NB}: 91${NB}%` });
+    expect(carte(couts(10, 0, 1))?.texte).toContain(`L’IA non classée (1,00${NB}$) n’y compte pas${NB}: comptée dans le produit, la marge serait de 91${NB}%.`);
+  });
+
+  it("à côté de la marge : les tests à part, puis le non classé et la marge au pire, s’il y en a", () => {
+    const avec = (c: StatsAdmin["couts"], net = 12_000) => aCoteDeLaMarge(margeProduit(stats({ netProduit: { valeur: net, avant: 0 } }, { couts: c })));
+    expect(avec(couts(10, 40))).toBe(`tests${NB}: 40,00${NB}$ à part`);
+    expect(avec(couts(10, 40, 15))).toBe(`tests${NB}: 40,00${NB}$ à part · non classé${NB}: 15,00${NB}$ (au pire 79${NB}%)`);
+    /* Sans vente, pas de marge au pire */
+    expect(avec(couts(10, 0, 15), 0)).toBe(`tests${NB}: 0,00${NB}$ à part · non classé${NB}: 15,00${NB}$`);
   });
 });

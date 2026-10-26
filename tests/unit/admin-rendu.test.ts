@@ -35,7 +35,7 @@ describe("le pilotage, rendu", () => {
     for (const titre of ["Pilotage", "À regarder", "Chiffre d’affaires", "En direct", "Visiteurs", "Taux d’achat", "Revenu par acheteur", "Marge produit", "Le tunnel"])
       expect(t, titre).toContain(titre);
     /* La marge produit dit ce que coûtent les tests, à part ; la carte de l’IA les sépare, population par population */
-    expect(t).toMatch(/cible 80\u00a0% · tests\u00a0: [\d,]+\u00a0\$ à part/);
+    expect(t).toMatch(/cible 80\u00a0% · tests\u00a0: [\d,]+\u00a0\$ à part · non classé\u00a0: [\d,]+\u00a0\$ \(au pire \d+\u00a0%\)/);
     for (const titre of ["IA du produit", "IA des tests", "Les clients et les prospects", "L’équipe et le tournage", "Les postes du produit"]) expect(t, titre).toContain(titre);
     for (const population of ["Clients", "Prospects", "Invités (offert)", "L’équipe", "Le tournage", "Non classé"]) expect(t, population).toContain(population);
     expect(html).toContain('aria-label="L’IA par population"');

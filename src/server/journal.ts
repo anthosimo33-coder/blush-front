@@ -12,6 +12,7 @@ import { surVercel } from "./drapeaux";
  * une erreur qu’elle ne rattrape pas n’y laisse que la route, son nom et son code. Ce qui peut encore remonter jusqu’à
  * Next (qui l’écrit entière) : une erreur d’une page ou des gestionnaires hors de /api (/ouvrir/[id], /v/[id]/essayer,
  * /v/[id]/image), dont les requêtes ne prennent jamais d’email (l’empreinte d’une session, l’id d’un partage, un uuid).
+ * Les chiffres de /admin, eux, rattrapent leurs erreurs (src/app/admin/page.tsx) : seuls leur nom et leur code en sortent.
  */
 
 /** info : ce qui s’est passé ; alerte : ce qui mérite un coup d’œil (un repli, un refus du modèle) ; erreur : ce qui a échoué. */

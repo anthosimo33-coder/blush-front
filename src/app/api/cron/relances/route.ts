@@ -26,8 +26,9 @@ import { renommerLesPrises } from "@/server/tournage";
  * leur texte ne reste pas plus en base, à 5 minutes près), et les écrans gardés des longues vidéos dont l’heure est passée
  * (`ecrans`, purgerLesEcrans, src/server/ecrans-gardes.ts : une conv qui n’a rien payé les perd à son échéance, à 5
  * minutes près) ; une panne de la base n’arrête pas le reste, la purge de la nuit repasse. Et le rattrapage de la règle
- * « qui est qui » (`couts`, rangerLesCouts, src/server/population.ts : les lignes d’ai_usage pas encore rangées, puis les
- * lectures sans compte dont la conv a trouvé un compte), qui se rejoue sans risque. Elle ne répond que des nombres : les
+ * « qui est qui » (rangerLesCouts, src/server/population.ts : `couts`, les lignes d’ai_usage pas encore rangées, puis les
+ * lectures sans compte dont la conv a trouvé un compte ; `achats`, les achats payés pas encore rangés), qui se rejoue sans
+ * risque : la marge produit de /admin se lit juste une fois qu’il répond deux zéros. Elle ne répond que des nombres : les
  * logs de la veille, qui les écrivent, sont publics. Rien à faire : 200, avec des zéros.
  */
 export const GET = route("GET /api/cron/relances", async (req: Request) => {
@@ -43,9 +44,9 @@ export const GET = route("GET /api/cron/relances", async (req: Request) => {
   const gardes = auMieux(async () => {
     ecrans = await purgerLesEcrans();
   }, "purge des écrans gardés en échec");
-  let couts = 0;
+  let rangement = { couts: 0, achats: 0 };
   const rangees = auMieux(async () => {
-    couts = await rangerLesCouts();
+    rangement = await rangerLesCouts();
   }, "rattrapage des populations en échec");
   const [{ relances, sequences }, lots, chaines, prises] = await Promise.all([
     mails,
@@ -66,6 +67,6 @@ export const GET = route("GET /api/cron/relances", async (req: Request) => {
     lotsAnnules: lots.annules,
     lecturesEffacees,
     ecrans,
-    couts,
+    ...rangement,
   });
 });

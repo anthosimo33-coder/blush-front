@@ -1,5 +1,5 @@
 {
-  "id": "49e4bb2d-a1b8-493d-8780-5ecb6bb60533",
+  "id": "40504a2f-bd63-4b25-a441-ed9b0d54d2d9",
   "prevId": "d4506604-4927-4617-be3f-9dd2de9fa819",
   "version": "7",
   "dialect": "postgresql",
@@ -140,6 +140,12 @@
         },
         "vente": {
           "name": "vente",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "population": {
+          "name": "population",
           "type": "text",
           "primaryKey": false,
           "notNull": false
@@ -415,11 +421,12 @@
           "primaryKey": false,
           "notNull": false
         },
-        "user_id": {
-          "name": "user_id",
-          "type": "uuid",
+        "sans_compte": {
+          "name": "sans_compte",
+          "type": "boolean",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true,
+          "default": false
         },
         "created_at": {
           "name": "created_at",
@@ -490,21 +497,6 @@
           "method": "btree",
           "with": {}
         },
-        "ai_usage_user_idx": {
-          "name": "ai_usage_user_idx",
-          "columns": [
-            {
-              "expression": "user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
         "ai_usage_a_ranger_idx": {
           "name": "ai_usage_a_ranger_idx",
           "columns": [
@@ -529,19 +521,6 @@
           "tableTo": "stories",
           "columnsFrom": [
             "story_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        },
-        "ai_usage_user_id_users_id_fk": {
-          "name": "ai_usage_user_id_users_id_fk",
-          "tableFrom": "ai_usage",
-          "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
           ],
           "columnsTo": [
             "id"

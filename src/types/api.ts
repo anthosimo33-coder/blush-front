@@ -424,6 +424,8 @@ type Reponses = {
     ecrans: number;
     /** Les lignes d’ai_usage rangées par la règle « qui est qui » (rangerLesCouts, src/server/population.ts). */
     couts: number;
+    /** Les achats payés rangés par la même règle (leur acheteur, à l’heure de son paiement). */
+    achats: number;
   };
   "POST /api/desinscription": Ok;
   "POST /api/desinscription/un-clic": Ok;

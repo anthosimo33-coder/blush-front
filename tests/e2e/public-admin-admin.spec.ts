@@ -198,10 +198,10 @@ test("connecté avec l’email de l’équipe, le pilotage s’ouvre : ses carte
     await expect(bloc).not.toContainText(/NaN|Infinity|undefined/);
   });
 
-  await test.step("ce que coûte l’IA : le produit et les tests à part, chaque population, et la marge produit qui dit les tests", async () => {
+  await test.step("ce que coûte l’IA : le produit et les tests à part, chaque population, et la marge produit qui dit les tests et le non classé", async () => {
     /* Le modèle factice ne note rien : des appels déjà rangés par la règle « qui est qui », sous une étiquette à ce test (l’autre navigateur a la sienne) */
     const tache = `e2e-population-${testInfo.project.name}-${Date.now()}`;
-    await sql()`insert into ai_usage (task, model, cost_micros, population) values (${tache}, 'test', 5000000, 'equipe'), (${tache}, 'test', 3000000, 'client')`;
+    await sql()`insert into ai_usage (task, model, cost_micros, population) values (${tache}, 'test', 5000000, 'equipe'), (${tache}, 'test', 3000000, 'client'), (${tache}, 'test', 1000000, 'inconnu')`;
     try {
       await page.goto("/admin?p=1");
       const bloc = page.getByRole("region", { name: "Ce que coûte l’IA", exact: true });
@@ -215,7 +215,8 @@ test("connecté avec l’email de l’équipe, le pilotage s’ouvre : ses carte
       await expect(populations.filter({ hasText: /^Clients/ })).toHaveText(/^Clients\s*([3-9]|\d{2,}),\d{2}\s\$\s*\d+\s%$/);
       await expect(bloc.getByRole("heading", { level: 3, name: "Les postes du produit" })).toBeVisible();
       await expect(bloc.getByRole("list", { name: "Les ratios du produit" }).getByRole("listitem")).toHaveCount(3);
-      await expect(page.getByText(/^cible 80\s% · tests\s: ([5-9]|\d{2,}),\d{2}\s\$ à part$/)).toBeVisible();
+      /* Les tests à part, puis le non classé (notre 1 $ au moins) et la marge au pire s’il y a des ventes */
+      await expect(page.getByText(/^cible 80\s% · tests\s: ([5-9]|\d{2,}),\d{2}\s\$ à part · non classé\s: ([1-9]|\d{2,}),\d{2}\s\$( \(au pire -?\d+\s%\))?$/)).toBeVisible();
       await expect(bloc).not.toContainText(/NaN|Infinity|undefined/);
     } finally {
       await sql()`delete from ai_usage where task = ${tache}`;

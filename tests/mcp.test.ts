@@ -297,6 +297,9 @@ describe("les outils", () => {
     expect(p).toHaveProperty("chiffreDAffaires.netProduitEuros.valeur");
     expect(p).toHaveProperty("ia.produitDollars.valeur");
     expect(p).toHaveProperty("ia.testsDollars.valeur");
+    /* Le non classé, et la marge produit au pire (s’il était tout du produit) */
+    expect(p).toHaveProperty("ia.nonClasseDollars");
+    expect(p).toHaveProperty("margeProduitPct.auPire");
     expect((p.ia as { parPopulation: { population: string }[] }).parPopulation.map((x) => x.population)).toEqual([
       "Clients",
       "Prospects",

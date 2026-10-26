@@ -532,30 +532,30 @@ export const aiUsage = pgTable(
     /**
      * Qui a fait l’appel (POPULATIONS : le client, le prospect, l’invité, l’équipe, le tournage, l’inconnu), d’après la
      * règle « qui est qui » (src/server/population.ts), jugée à la fin de l’appel et figée : un compte qui achète plus tard
-     * garde ses appels d’avant en prospect, une conv ou un compte effacés laissent la leur. Seule une lecture sans compte
-     * (des captures d’avant l’email) prend celle du compte que sa conv trouve ensuite. Vide : une ligne pas encore rangée
-     * (d’avant la règle, ou écrite par la version d’avant pendant une mise en ligne), que le passage des 5 minutes range.
+     * garde ses appels d’avant en prospect, une conv ou un compte effacés laissent la leur. Seule une lecture jugée sans
+     * compte (`sans_compte`) prend celle du compte que sa conv trouve ensuite. Vide : une ligne pas encore rangée (d’avant
+     * la règle, écrite par la version d’avant pendant une mise en ligne, ou par un repli de noterCout), que le passage des
+     * 5 minutes range.
      */
     population: text("population", { enum: POPULATIONS }),
     /**
-     * Le compte de l’appel (celui de sa conv, ou le compte connecté sans conv), jamais son email : de quoi ranger une
-     * lecture sans compte dont la conv en trouve un. Effacer le compte le met à vide (set null), la population reste.
+     * La population s’est jugée sans compte (un brouillon, une lecture d’avant l’email) : le rattrapage la reprend si sa
+     * conv trouve un compte dans les deux jours. Un drapeau, jamais l’identifiant du compte : ai_usage n’en garde aucun.
      */
-    userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
+    sansCompte: boolean("sans_compte").notNull().default(false),
     createdAt: quand("created_at").notNull().defaultNow(),
   },
   /*
-   * Supprimer une histoire ou un compte met ses lignes à vide (set null) : sans index, toute la table serait parcourue. La
-   * dépense du jour (src/server/budget.ts) et le tableau de bord (src/server/stats.ts) la lisent par date ; la mesure des
-   * imports, par envoi et par lot ; le passage des 5 minutes, les lignes pas encore rangées (un index partiel, vide une
-   * fois le rattrapage fait).
+   * Supprimer une histoire met ses lignes à vide (set null) : sans index, toute la table serait parcourue. La dépense du
+   * jour (src/server/budget.ts) et le tableau de bord (src/server/stats.ts) la lisent par date ; la mesure des imports,
+   * par envoi et par lot ; le passage des 5 minutes, les lignes pas encore rangées (un index partiel, vide une fois le
+   * rattrapage fait).
    */
   (t) => [
     index("ai_usage_story_idx").on(t.storyId),
     index("ai_usage_created_idx").on(t.createdAt),
     index("ai_usage_envoi_idx").on(t.envoi),
     index("ai_usage_lot_idx").on(t.lot),
-    index("ai_usage_user_idx").on(t.userId),
     index("ai_usage_a_ranger_idx")
       .on(t.id)
       .where(sql`${t.population} is null`),
@@ -748,6 +748,14 @@ export const achats = pgTable(
     lotRoue: text("lot_roue", { enum: LOTS_DE_LA_ROUE }),
     /** La carte du chat d’où il est payé (src/server/vente.ts : une recharge, Premium), ou null : payé ailleurs. */
     vente: text("vente", { enum: GENRES_VENDUS }),
+    /**
+     * Qui l’a payé (POPULATIONS), d’après la règle « qui est qui » (src/server/population.ts), jugée à l’heure de son
+     * paiement, juste après sa livraison, et figée : un compte effacé ensuite (son achat sans compte) ou une liste de
+     * l’équipe changée ne le font pas changer de côté. La marge produit ne compte que ceux du produit. Vide : pas encore
+     * payé, ou payé et pas encore rangé (d’avant la règle, la règle en échec à la livraison), que le passage des 5 minutes
+     * range.
+     */
+    population: text("population", { enum: POPULATIONS }),
   },
   (t) => [index("achats_user_idx").on(t.userId), index("achats_story_idx").on(t.storyId), index("achats_cree_idx").on(t.creeLe)],
 );

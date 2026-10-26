@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { delivrabilite } from "@/server/delivrabilite";
 import { direct } from "@/server/direct";
 import { estAdmin } from "@/server/env";
+import { ErreurInvariant } from "@/server/erreurs";
 import { journalErreur } from "@/server/journal";
 import { santeDesNavigateurs } from "@/server/navigateur";
 import { contexte } from "@/server/requete";
@@ -11,6 +12,20 @@ import { AdminScreen } from "./AdminScreen";
 import { Pilotage } from "./Pilotage";
 
 export const metadata: Metadata = { title: "Admin" };
+
+/**
+ * Les chiffres du tableau de bord, sans rien dans les logs qu’un nom et un code s’ils échouent (un délai, la base
+ * coupée) : l’erreur d’une page remonte jusqu’à Next, qui l’écrit entière, et celle de Drizzle cite sa requête et ses
+ * paramètres. Le journal en garde le nom et le code (journalErreur) ; la page d’erreur reçoit une ErreurInvariant nue.
+ */
+async function chiffres(jours: Periode) {
+  try {
+    return await statsAdmin(jours);
+  } catch (e) {
+    journalErreur("admin:stats", e);
+    throw new ErreurInvariant("admin:stats");
+  }
+}
 
 /**
  * Le tableau de bord, réservé aux emails de BLUSH_ADMINS. Pour tous les autres, la page n’existe pas. Le pilotage
@@ -22,10 +37,10 @@ export default async function Page({ searchParams }: PageProps<"/admin">) {
   const q = await searchParams;
   const p = Number(q.p);
   const jours: Periode = p === 1 || p === 30 ? p : 7;
-  if (q.version === "actuelle") return <AdminScreen s={await statsAdmin(jours)} />;
+  if (q.version === "actuelle") return <AdminScreen s={await chiffres(jours)} />;
   /* Le direct n’empêche jamais le pilotage : lu ici pour le premier rendu, il se relit seul dans la page en cas d’échec */
   const [s, d, n, m] = await Promise.all([
-    statsAdmin(jours),
+    chiffres(jours),
     direct().catch((e: unknown) => {
       journalErreur("admin:direct", e);
       return null;
