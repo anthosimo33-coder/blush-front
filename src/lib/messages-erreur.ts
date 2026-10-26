@@ -77,6 +77,8 @@ const MESSAGES = {
     codes: "Trop de codes demandés aujourd’hui. Réessaie demain.",
     essais: ESSAIS_DU_JOUR,
     captcha: CAPTCHA,
+    /* Le domaine ne reçoit aucun mail (src/server/domaine-email.ts). TODO(produit): texte nouveau, à valider (maquette du 26 octobre) */
+    domaine: "Cette adresse ne peut recevoir aucun mail. Vérifie ce qu’il y a après le @.",
     defaut: "Le code n’est pas parti. Réessaie dans un instant.",
   },
   /* La vérification du code reçu (un mauvais code a son propre message, sur l’écran) */

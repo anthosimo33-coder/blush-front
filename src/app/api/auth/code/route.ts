@@ -2,7 +2,8 @@ import { after } from "next/server";
 import { alerter } from "@/server/alertes";
 import { inscrire } from "@/server/attente";
 import { jetonRefuse } from "@/server/captcha";
-import { codeAccorde, Email, envoyerCode, essaisEpuises, mailsDeCodeEpuises, preparerCode } from "@/server/auth";
+import { codeAccorde, codeRevenu, Email, envoyerCode, essaisEpuises, mailsDeCodeEpuises, preparerCode } from "@/server/auth";
+import { emailRecoitDuMail } from "@/server/domaine-email";
 import { lireBrouillon, lireNavigateur, poserNavigateur } from "@/server/cookies";
 import { histoireOuverte, supprimerHistoire } from "@/server/histoires";
 import { entre } from "@/server/invitations";
@@ -35,6 +36,8 @@ export const POST = route("POST /api/auth/code", async (req: Request) => {
    */
   const ip = ipDe(req);
   if (!(await sousLaLimite(`code:ip:${ip}`, LIMITES.codeParIp))) return erreur("trop");
+  /* Un domaine qui ne reçoit aucun mail (src/server/domaine-email.ts) : le code rebondirait. Il ne prend rien à l’email */
+  if (!(await emailRecoitDuMail(email))) return erreur("domaine");
   if (await essaisEpuises(email, await lireNavigateur(), ip)) return erreur("essais");
   if (await mailsDeCodeEpuises()) return erreur("codes");
   if (!(await codeAccorde(email, ip))) return erreur("codes");
@@ -70,3 +73,10 @@ export const POST = route("POST /api/auth/code", async (req: Request) => {
   });
   return repondre("POST /api/auth/code", { email });
 });
+
+/**
+ * Le dernier code demandé dans ce navigateur (son cookie) est-il revenu ? Son mail a rebondi, ou Resend bloque l’adresse
+ * (src/server/delivrabilite.ts) : l’écran du code le demande quelques secondes après l’envoi, pour dire que l’adresse
+ * n’existe pas. Sans cookie, ou pour tout autre navigateur : `{ revenu: false }`. Rien d’autre ne se lit.
+ */
+export const GET = route("GET /api/auth/code", async () => repondre("GET /api/auth/code", { revenu: await codeRevenu(await lireNavigateur()) }));

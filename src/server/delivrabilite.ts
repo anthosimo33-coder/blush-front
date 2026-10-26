@@ -4,9 +4,10 @@ import { after } from "next/server";
 import { z } from "zod";
 import { estUneRelance, SEUILS_DELIVRABILITE, VOLUME_MIN_DES_REBONDS } from "@/contenu/pilotage";
 import { alerter } from "./alertes";
+import { noterLeRetourDuCode } from "./auth";
 import { db, schema } from "./db";
 import { TYPES_EVENEMENTS_MAILS, type TypeEvenementMail } from "./db/enums";
-import { expediteurDe } from "./email";
+import { expediteurDe, type SorteSuivie } from "./email";
 import { env } from "./env";
 import { auMieux, journal } from "./journal";
 import { LIMITES, sousLaLimite } from "./limites";
@@ -21,6 +22,8 @@ import { verifierWebhookResend } from "./paiement/signature";
  * (son svix-id, le même à chaque nouvel essai de Resend). /admin en montre les 7 derniers jours, par sorte, face aux
  * seuils (SEUILS_DELIVRABILITE) ; un seuil franchi prévient l’équipe, une fois par jour au plus. Gardé
  * EVENEMENTS_MAILS_GARDES_JOURS (la purge de la nuit, src/server/purge.ts).
+ * Un mail de code revenu (un rebond, ou l’adresse bloquée) le note aussi sur le code (noterLeRetourDuCode, dans
+ * login_codes, qui a déjà l’adresse) : l’écran du code dit alors à la personne que son adresse n’existe pas.
  */
 
 /** Combien de jours la purge garde les événements des mails. */
@@ -31,6 +34,9 @@ export const CORPS_MAX_RESEND = 64 * 1024;
 
 /** La sorte d’un mail parti sans tag (avant ce suivi, ou un essai depuis le tableau de bord de Resend). */
 const SANS_SORTE = "inconnue";
+
+/** Les mails que la demande d’un code envoie : le code, ou en bêta fermée celui de la liste d’attente (la même réponse pour tous). */
+const SORTES_DU_CODE: ReadonlySet<string> = new Set<SorteSuivie>(["code", "attente"]);
 
 /**
  * Ce qu’on lit d’un webhook de Resend : son type, son heure, et du mail ses destinataires et ses tags, lus sans rien
@@ -118,17 +124,16 @@ export async function recevoirEvenementResend(corps: string, entetes: Headers, m
   }
   const type = typeDe(lu.data.type);
   if (!type) return "ok";
+  const sorte = sorteDuTag(lu.data.data?.tags);
+  const adresse = premierDestinataire(lu.data.data?.to);
   const [note] = await db()
     .insert(schema.evenementsMails)
-    .values({
-      id: v.id,
-      le: heureDe(lu.data.created_at, maintenant),
-      type,
-      sorte: sorteDuTag(lu.data.data?.tags),
-      compteId: await compteDeLAdresse(premierDestinataire(lu.data.data?.to)),
-    })
+    .values({ id: v.id, le: heureDe(lu.data.created_at, maintenant), type, sorte, compteId: await compteDeLAdresse(adresse) })
     .onConflictDoNothing()
     .returning({ id: schema.evenementsMails.id });
+  /* Avant la réponse : l’écran du code le demande toutes les quelques secondes */
+  if (note && adresse && (type === "bounced" || type === "suppressed") && SORTES_DU_CODE.has(sorte))
+    await auMieux(noterLeRetourDuCode(adresse, maintenant), "retour du code non noté");
   if (note && (type === "bounced" || type === "complained")) after(() => auMieux(verifierLesSeuils(maintenant), "seuils de la délivrabilité non relus"));
   return "ok";
 }

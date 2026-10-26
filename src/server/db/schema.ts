@@ -130,6 +130,8 @@ export const sessions = pgTable(
 /**
  * Un code de connexion par email et par navigateur : son empreinte, sa date limite, les essais. Le code ne vaut que dans
  * le navigateur qui l’a demandé : `navigateur` est l’empreinte du jeton de son cookie (src/server/auth.ts).
+ * `revenuLe` : son mail est revenu (l’adresse n’existe pas, ou Resend la bloque), d’après le webhook de Resend
+ * (src/server/delivrabilite.ts) ; l’écran du code le lit par son navigateur (codeRevenu), d’où l’index.
  */
 export const loginCodes = pgTable(
   "login_codes",
@@ -140,8 +142,9 @@ export const loginCodes = pgTable(
     expiresAt: quand("expires_at").notNull(),
     attempts: integer("attempts").notNull().default(0),
     createdAt: quand("created_at").notNull().defaultNow(),
+    revenuLe: quand("revenu_le"),
   },
-  (t) => [primaryKey({ columns: [t.email, t.navigateur] })],
+  (t) => [primaryKey({ columns: [t.email, t.navigateur] }), index("login_codes_navigateur_idx").on(t.navigateur)],
 );
 
 /**

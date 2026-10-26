@@ -348,6 +348,8 @@ type Reponses = {
   "POST /api/analyse": Ok;
   "POST /api/attente": Ok;
   "POST /api/attente/retrait": Ok;
+  /** Le dernier code demandé dans ce navigateur est-il revenu (son adresse n’existe pas) ? */
+  "GET /api/auth/code": { revenu: boolean };
   "POST /api/auth/code": { email: string };
   "POST /api/auth/deconnexion": Ok;
   /** Un mauvais code : `{ ok: false }`, en 200, la même réponse pour tous. */
@@ -481,6 +483,7 @@ export const ROUTES = {
   "POST /api/attente": { corps: z.object({ email: z.string() }) },
   /* Le lien signé de son mail */
   "POST /api/attente/retrait": { corps: z.object({ id: z.string(), cle: z.string() }) },
+  "GET /api/auth/code": {},
   "POST /api/auth/code": { corps: z.object({ email: z.string() }) },
   /* `partout` : toutes les sessions du compte ; sans, celle de cet appareil */
   "POST /api/auth/deconnexion": { corps: z.object({ partout: z.boolean().optional() }) },

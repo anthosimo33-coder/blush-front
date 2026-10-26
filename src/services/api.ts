@@ -459,6 +459,11 @@ export async function sendLoginCode(email: string): Promise<{ email: string }> {
   return appel("POST /api/auth/code", { corps: { email }, entetes: enteteCaptcha(await jetonCaptcha()) });
 }
 
+/** Le dernier code demandé dans ce navigateur est-il revenu (son mail a rebondi : l’adresse n’existe pas) ? */
+export async function codeRevenu(): Promise<boolean> {
+  return (await appel("GET /api/auth/code")).revenu;
+}
+
 /** Vérifie le code reçu : le compte est créé (sans mot de passe) à la première vérification. */
 export async function verifyLoginCode(email: string, code: string): Promise<{ ok: boolean }> {
   return appel("POST /api/auth/verifier", { corps: { email, code } });
