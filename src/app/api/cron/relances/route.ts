@@ -1,4 +1,5 @@
 import { empreinte, memeEmpreinte } from "@/server/chiffrement";
+import { purgerLesEcrans } from "@/server/ecrans-gardes";
 import { env } from "@/server/env";
 import { erreur, repondre, route } from "@/server/http";
 import { auMieux } from "@/server/journal";
@@ -21,9 +22,10 @@ import { renommerLesPrises } from "@/server/tournage";
  * lève jamais et s’arrête au bout d’une minute : relevés, puis les mises à jour calmées envoyées ; `lotsEnvoyes`,
  * `lotsLus`, `lotsAnnules`) : une mise à jour revenue de son lot en direct part par son relais. Et les lectures des lots
  * d’un enregistrement dont les dix minutes sont passées (`lecturesEffacees`, purgerLesLecturesDesLots, src/server/lots.ts :
- * leur texte ne reste pas plus en base, à 5 minutes près ; une panne de la base n’arrête pas le reste, la purge de la
- * nuit repasse). Elle ne répond que des nombres : les logs de la veille, qui les écrivent, sont publics. Rien à faire :
- * 200, avec des zéros.
+ * leur texte ne reste pas plus en base, à 5 minutes près), et les écrans gardés des longues vidéos dont l’heure est passée
+ * (`ecrans`, purgerLesEcrans, src/server/ecrans-gardes.ts : une conv qui n’a rien payé les perd à son échéance, à 5
+ * minutes près) ; une panne de la base n’arrête pas le reste, la purge de la nuit repasse. Elle ne répond que des
+ * nombres : les logs de la veille, qui les écrivent, sont publics. Rien à faire : 200, avec des zéros.
  */
 export const GET = route("GET /api/cron/relances", async (req: Request) => {
   const secret = env().CRON_SECRET;
@@ -34,7 +36,11 @@ export const GET = route("GET /api/cron/relances", async (req: Request) => {
   const lectures = auMieux(async () => {
     lecturesEffacees = await purgerLesLecturesDesLots();
   }, "purge des lectures des lots en échec");
-  const [{ relances, sequences }, lots, chaines, prises] = await Promise.all([mails, traiterLesLots(), reprendreLesChainesEnPlan(), renommerLesPrises(), lectures]);
+  let ecrans = 0;
+  const gardes = auMieux(async () => {
+    ecrans = await purgerLesEcrans();
+  }, "purge des écrans gardés en échec");
+  const [{ relances, sequences }, lots, chaines, prises] = await Promise.all([mails, traiterLesLots(), reprendreLesChainesEnPlan(), renommerLesPrises(), lectures, gardes]);
   return repondre("GET /api/cron/relances", {
     ...relances,
     chaines,
@@ -44,5 +50,6 @@ export const GET = route("GET /api/cron/relances", async (req: Request) => {
     lotsLus: lots.lus,
     lotsAnnules: lots.annules,
     lecturesEffacees,
+    ecrans,
   });
 });

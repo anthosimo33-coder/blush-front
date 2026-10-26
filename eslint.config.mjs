@@ -55,7 +55,7 @@ const PAS_D_APERCU = {
  */
 const CHIFFREMENT = "^(@/server|\\.\\.?(/\\.\\.)*(/server)?)/chiffrement$";
 const PAR_LE_COFFRE_MESSAGE =
-  "Une colonne chiffrée se lit et s’écrit par le coffre (src/server/coffre.ts : lire, ecrire, lireAudio, ecrireAudio) ; chiffrement.ts ne sert ailleurs qu’à empreinte, memeEmpreinte et jeton.";
+  "Une colonne chiffrée se lit et s’écrit par le coffre (src/server/coffre.ts : lire, ecrire, lireAudio, ecrireAudio, lireImages, ecrireImages) ; chiffrement.ts ne sert ailleurs qu’à empreinte, memeEmpreinte et jeton.";
 const PAR_LE_COFFRE = { regex: CHIFFREMENT, allowImportNames: ["empreinte", "memeEmpreinte", "jeton"], message: PAR_LE_COFFRE_MESSAGE };
 const CHIFFREMENT_DYNAMIQUE = dynamique(CHIFFREMENT, PAR_LE_COFFRE_MESSAGE);
 /*

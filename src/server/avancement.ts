@@ -40,6 +40,27 @@ export const avanceVerdict = (a: Avance) =>
     ),
   );
 
+/**
+ * La part de la jauge du verdict (0 à 100) que prend la lecture de la suite d’une longue vidéo, avant lui
+ * (src/server/suite-video.ts) : une à deux minutes de plus pour l’acheteur, qui ne doivent pas sembler bloquées au départ
+ * (jusqu’au 15 % du début du verdict, l’anneau ne bougeait plus). Le verdict avance ensuite de là jusqu’au bout.
+ */
+const PART_DE_LA_SUITE = 40;
+
+/**
+ * L’avancée du verdict (0 à PART_DE_LA_SUITE) pendant la lecture de la suite : ses lots lus sur combien, ou le temps
+ * passé sur le temps prévu (`ecouleMs`, `prevuMs` : dureeDeLaSuite, src/server/ecrans-gardes.ts), le plus avancé des
+ * deux. Une lecture plus lente que prévu n’atteint pas la part entière avant son dernier lot.
+ */
+export function avanceDeLaSuite({ faits, total, ecouleMs, prevuMs }: { faits: number; total: number; ecouleMs: number; prevuMs: number }): number {
+  const lus = faits / Math.max(1, total);
+  const temps = prevuMs > 0 ? ecouleMs / prevuMs : 0;
+  return Math.round(PART_DE_LA_SUITE * (lus >= 1 ? 1 : Math.min(0.95, Math.max(lus, temps))));
+}
+
+/** L’avancée du verdict d’une conv dont la suite vient d’être lue : la sienne (0 à PLAFOND), ramenée entre PART_DE_LA_SUITE et PLAFOND. */
+export const apresLaSuite = (p: number) => Math.round(PART_DE_LA_SUITE + ((PLAFOND - PART_DE_LA_SUITE) * Math.min(p, PLAFOND)) / PLAFOND);
+
 /* ———— Le plan du rapport ———— */
 
 /** Le plan (0 à 100) : sa réflexion jusqu’à ce seuil, puis ses chapitres. */

@@ -75,3 +75,4 @@ export * from "./partage";
 export * from "./public-admin";
 export * from "./rapport";
 export * from "./tournage";
+export * from "./video-partielle";

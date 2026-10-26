@@ -77,6 +77,19 @@ export function ConvOkScreen({ story, source, ajout }: { story: Story; source: S
         </p>
       )}
 
+      {/*
+       * Une longue vidéo lue en partie avant l’achat (src/server/lecture-partielle.ts) : ses nombres sont ceux de la partie
+       * lue, on dit pourquoi, et que le début n’est pas perdu (inutile de l’ajouter). Vrai tant que la conv peut être
+       * achetée : son début est gardé 11 jours après le paywall, le temps des relances (src/server/ecrans-gardes.ts).
+       * TODO(produit): texte nouveau (26 octobre, la lecture partielle des longues vidéos), absent de la maquette
+       */}
+      {source.suiteVideo && (
+        <p className="m-0 flex items-start gap-2 rounded-[18px] bg-plaque px-3.5 py-3 text-note font-extrabold leading-[1.45] text-soft">
+          <Icon name="clock" size={17} style={{ marginTop: 1 }} className="text-soft" />
+          <span>Ta vidéo est longue{NBSP}: BLUSH a lu d’abord la fin de votre conv, ce qui compte le plus pour savoir où vous en êtes. Le début sera lu avec ton rapport.</span>
+        </p>
+      )}
+
       {/* TODO(produit): texte nouveau, absent de la maquette (une conv gardée trop courte, qui attend son début) */}
       {courte && (
         <p className="m-0 flex items-start gap-2 rounded-[18px] bg-plaque px-3.5 py-3 text-note font-extrabold leading-[1.45] text-soft">

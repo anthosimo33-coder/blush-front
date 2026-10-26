@@ -109,6 +109,7 @@ const TESTS = [
   "CRON_SECRET",
   "BLUSH_BETA_FERMEE",
   "BLUSH_BOITE_MAILS",
+  "BLUSH_LECTURE_PARTIELLE",
   /* Les clés de test de Cloudflare (le CAPTCHA passe toujours, sans appel : src/server/captcha.ts) */
   "TURNSTILE_SECRET_KEY",
   "NEXT_PUBLIC_TURNSTILE_SITE_KEY",

@@ -9,12 +9,14 @@ import { profil } from "@prompts/lib/style";
 import { alerteSobre, enAlerteSobre, imposerTitres, titresDuVerdict } from "@prompts/lib/titres";
 import { genreDuHaut } from "@/contenu/haut-du-paywall";
 import type { ApercuDuPaywall, Message, ScoreRow } from "@/types";
-import { avanceChapitres, avanceMoitie, avancePlan, avanceVerdict, CHAPITRES_PAR_MOITIE, chapitresFinis } from "./avancement";
+import { apresLaSuite, avanceChapitres, avanceDeLaSuite, avanceMoitie, avancePlan, avanceVerdict, CHAPITRES_PAR_MOITIE, chapitresFinis } from "./avancement";
 import * as coffre from "./coffre";
 import { db, schema } from "./db";
 import type { DetailEcriture, Genre } from "./db/enums";
 import { donneesMemoire, donneesVerdict, ligneRapport, modifierMemoire } from "./depot";
 import { compterLeHaut } from "./compteurs";
+import { dureeDeLaSuite, garderJusquALAchat, garderJusquALaLecture } from "./ecrans-gardes";
+import { noterLeTitre, noterLeTitreEntier } from "./imports";
 import { contexteDe, convDe, histoireDe, metaDe, provenancesDe, type Ligne, type LigneComplete } from "./histoires";
 import { messagesAffiches } from "./ecrans/messages";
 import { apercuDuPaywall } from "./ecrans/haut-du-paywall";
@@ -36,7 +38,7 @@ import { lectureReunie } from "./morceaux";
 import { alertesNoteesDepuis, surLaRelue } from "./memoire-relue";
 import { memoireDeSecours, remplacerLeSecours } from "./secours";
 import { editionsBornees, lignesGardees, type Contexte, type DonneesMemoire, type DonneesRapport } from "./stockage/types";
-import { entreeDe, etatDesTaches, type Tache } from "./taches";
+import { attendreLePaiement, entreeDe, etatDesTaches, planifier, type Tache } from "./taches";
 import { ErreurVoix, voixBloquee, voixDisponible } from "./ia/voix";
 import { enregistrerVocal, vocalAJour } from "./vocal";
 
@@ -119,7 +121,29 @@ export async function ecrireLeContexte(storyId: string): Promise<void> {
   const { contexte } = contexteDuCode(story);
   const context = coffre.ecrire("stories.context", contexte);
   await db().update(schema.stories).set({ context, updatedAt: new Date() }).where(eq(schema.stories.id, storyId));
-  if (contexte.accroche) await compterLeHaut(contexte.accroche, "vu");
+  if (!contexte.accroche) return;
+  await compterLeHaut(contexte.accroche, "vu");
+  /* La mesure des imports le garde aussi, conv par conv (l’A/B de la lecture partielle compare les titres de ses deux moitiés) */
+  await noterLeTitre(storyId, contexte.accroche);
+}
+
+/**
+ * « Qui es-tu ? » rempli (POST /api/analyse) : le verdict de la conv posé. Son rapport ouvert en base (payé, ou un compte
+ * de l’équipe), il part (la chaîne le prend) ; sinon il attend le paiement (le paywall d’abord), et le code écrit
+ * seulement ce qu’il sait (ecrireLeContexte). La suite d’une longue vidéo lue en partie (src/server/ecrans-gardes.ts)
+ * se garde selon le cas : le temps de sa lecture, ou le temps des relances qui mènent à l’achat. Rend « paiement » (le
+ * paywall) ou « parti ».
+ */
+export async function poserLeVerdict(storyId: string): Promise<"paiement" | "parti"> {
+  if (!(await rapportOuvertEnBase(storyId))) {
+    await ecrireLeContexte(storyId);
+    await attendreLePaiement(storyId, "verdict");
+    await garderJusquALAchat(storyId);
+    return "paiement";
+  }
+  await garderJusquALaLecture(storyId);
+  await planifier(storyId, "verdict");
+  return "parti";
 }
 
 /**
@@ -134,8 +158,46 @@ export async function apercuAvantPaiement(storyId: string): Promise<ApercuDuPayw
   return apercuDuPaywall(chiffres, messages, h);
 }
 
-async function verdict(story: LigneComplete, t: Tache) {
-  const { rendu, chiffres, contexte } = contexteDuCode(story);
+/**
+ * La suite d’une longue vidéo lue en partie avant l’achat (src/server/suite-video.ts), lue avant tout le reste : la conv
+ * devient la vidéo entière, et le verdict, le rapport, la mémoire et le chat la lisent comme si elle avait été lue d’un
+ * coup. La jauge du verdict avance pendant ce temps (avanceDeLaSuite : les lots lus, ou le temps passé sur le temps
+ * prévu, toutes les deux secondes), jusqu’à la part de la suite ; l’écran de lecture dit ce qui se passe (progression,
+ * src/server/donnees.ts). Rend la ligne de la conv, relue si elle a changé (`completee`).
+ */
+async function avecSaSuite(story: LigneComplete, t: Tache): Promise<{ story: LigneComplete; completee: boolean }> {
+  const ecrire = ecrireAvance(t.id);
+  const { lireLaSuite } = await import("./suite-video");
+  const prevuMs = await dureeDeLaSuite(story.id);
+  const depuis = Date.now();
+  let lus = { faits: 0, total: 1 };
+  const avancer = () => ecrire(avanceDeLaSuite({ ...lus, ecouleMs: Date.now() - depuis, prevuMs }));
+  const minuteur = prevuMs ? setInterval(avancer, 2000) : undefined;
+  let issue: Awaited<ReturnType<typeof lireLaSuite>>;
+  try {
+    issue = await lireLaSuite(story.id, (faits, total) => {
+      lus = { faits, total };
+      avancer();
+    });
+  } finally {
+    clearInterval(minuteur);
+  }
+  if (issue !== "lue" && issue !== "incomplete") return { story, completee: false };
+  const [relue] = await db().select().from(schema.stories).where(eq(schema.stories.id, story.id));
+  return { story: relue ?? story, completee: true };
+}
+
+async function verdict(lue: LigneComplete, t: Tache) {
+  const { story, completee } = await avecSaSuite(lue, t);
+  const { rendu, chiffres, contexte: calcule } = contexteDuCode(story);
+  /*
+   * Le titre que le paywall a montré reste celui de la conv, même si la conv entière en donnerait un autre (la suite d’une
+   * longue vidéo, lue depuis) : /admin compte les achats de chaque titre vu. Celui de la conv entière se note à part (la
+   * mesure de la lecture partielle : ses titres perdus)
+   */
+  const vu = story.context ? contexteDe(story)?.accroche : undefined;
+  const contexte: Contexte = vu ? { ...calcule, accroche: vu } : calcule;
+  if (completee && calcule.accroche) await noterLeTitreEntier(story.id, calcule.accroche);
   /* Ce que le code sait déjà, gardé avant l’appel : les trouvailles s’affichent pendant que le modèle lit. Chiffré une fois, écrit deux fois : avant l’appel, puis avec le verdict */
   const context = coffre.ecrire("stories.context", contexte);
   await db().update(schema.stories).set({ context, updatedAt: new Date() }).where(eq(schema.stories.id, story.id));
@@ -144,7 +206,8 @@ async function verdict(story: LigneComplete, t: Tache) {
     lignes: rendu.lignes,
     storyId: story.id,
     etiquette: "verdict",
-    surAvance: suivreAvance(t.id, avanceVerdict),
+    /* Après une suite lue, le verdict avance de la part de la suite jusqu’au bout : la jauge ne recule ni ne s’arrête */
+    surAvance: suivreAvance(t.id, completee ? (a) => apresLaSuite(avanceVerdict(a)) : avanceVerdict),
   });
   /*
    * Le mode sobre (le rapport court et doux, offert, jamais partagé) n’existe qu’avec une alerte : danger, détresse,

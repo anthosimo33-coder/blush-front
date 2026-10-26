@@ -37,6 +37,16 @@ export const GUESS_LABELS: Record<Guess, { tile: string; quote: string }> = {
 export const READING_STEPS = ["Votre histoire, du premier au dernier message", "Qui relance, qui propose, qui s’ouvre", "Le moment où tout a basculé", "Ton verdict"];
 
 /**
+ * L’écran de lecture d’une longue vidéo payée, pendant que BLUSH lit le début de la conv (gardé pour après le paiement,
+ * src/server/suite-video.ts), avant le verdict : l’étape en cours et ce qu’elle prend.
+ * TODO(produit): textes nouveaux (26 octobre, la lecture partielle des longues vidéos), à valider.
+ */
+export const LECTURE_DU_DEBUT = {
+  etape: (faits: number, total: number) => `BLUSH lit le début de ta conv · ${faits} sur ${total}`,
+  duree: "Ça prend environ deux minutes",
+};
+
+/**
  * Les étapes de la lecture d’une conv pas encore payée (le paywall d’abord) : ce que le code compte vraiment, sans le
  * modèle (les messages, qui ouvre et qui relance, les mots qui reviennent), puis le rapport prêt à s’écrire.
  */

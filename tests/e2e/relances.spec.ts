@@ -24,6 +24,7 @@ test("la relance : le mail « Ton rapport t’attend », son lien vers la feuill
       "dues",
       "ecartees",
       "echecs",
+      "ecrans",
       "envoyees",
       "lecturesEffacees",
       "lotsAnnules",

@@ -21,6 +21,7 @@ import {
   expect,
   exportWhatsApp,
   histoiresDe,
+  importerUneVideoPartielle,
   lancerLaPrise,
   lectureComplete,
   lectureFaite,
@@ -160,6 +161,9 @@ async function preparer(etat: Etat, page: Page, testInfo: TestInfo, ecran: "m" |
     case "brouillon-court":
       /* 30 messages : gardés, mais trop courts pour la lecture (src/server/histoires.ts, tropCourte) */
       return { ...sans, histoire: await importerUnBrouillon(page, testInfo, exportWhatsApp(testInfo, { personnes: NOE_ET_ELIAS, n: 30 })) };
+    case "video-partielle":
+      /* La partie récente lue, ses lots plus anciens gardés (aide/video-partielle.ts) : le serveur des tests est en A/B */
+      return { ...sans, histoire: (await importerUneVideoPartielle(page, testInfo)).histoire };
     case "morceaux":
       return { ...sans, histoire: await brouillonEnMorceaux(page, testInfo) };
     case "code": {

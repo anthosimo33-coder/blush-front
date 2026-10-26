@@ -57,7 +57,7 @@ import { ErreurApi } from "@/types/erreurs-api";
 import { CASE_RENONCIATION } from "@/contenu/consentements";
 import { codeDe, messageErreur, problemeAjout } from "@/lib/messages-erreur";
 import { jourDeParis } from "@/lib/jours";
-import { ENVOI_IMAGES_MAX, ENVOIS_REPRIS_MAX, extensionAudio } from "@/lib/limites";
+import { ENVOI_IMAGES_MAX, ENVOIS_REPRIS_MAX, extensionAudio, LECTEURS_DE_LOTS } from "@/lib/limites";
 import { ENTETE_CAPTCHA } from "@/lib/captcha";
 import { cleDuSiteCaptcha } from "@/lib/publique";
 import { retenirSecrets } from "@/lib/secrets";
@@ -102,9 +102,10 @@ function avecConv(entetes?: HeadersInit): Headers {
 
 /**
  * Ce qu’un appel ajoute à sa requête : sa recherche (`?avant=…`), keepalive (elle part même si la page se ferme), un signal
- * pour l’arrêter, des en-têtes (le jeton du CAPTCHA).
+ * pour l’arrêter, des en-têtes (le jeton du CAPTCHA), et sa priorité (« low » : un envoi qui peut attendre, derrière les
+ * autres, là où le navigateur la connaît).
  */
-type Options = { recherche?: string; keepalive?: boolean; signal?: AbortSignal; entetes?: HeadersInit };
+type Options = { recherche?: string; keepalive?: boolean; signal?: AbortSignal; entetes?: HeadersInit; priorite?: RequestPriority };
 
 /** Ce qu’un appel à la route K prend : son corps, quand sa ligne du contrat en reçoit un (un objet JSON, ou un formulaire). */
 type ArgumentsDe<K extends CleRoute> = [Routes[K]["corps"]] extends [never] ? [options?: Options & { corps?: never }] : [options: Options & { corps: Routes[K]["corps"] }];
@@ -118,7 +119,7 @@ function requete<K extends CleFixe>(cle: K, options: Options & { corps?: Routes[
   const espace = cle.indexOf(" ");
   const method = cle.slice(0, espace);
   const chemin = cle.slice(espace + 1);
-  const { corps, recherche, keepalive, signal } = options;
+  const { corps, recherche, keepalive, signal, priorite } = options;
   const h = avecConv(entetes);
   new Headers(options.entetes).forEach((valeur, nom) => h.set(nom, valeur));
   if (corps !== undefined && !(corps instanceof FormData)) h.set("content-type", "application/json");
@@ -130,6 +131,7 @@ function requete<K extends CleFixe>(cle: K, options: Options & { corps?: Routes[
     ...(corps === undefined ? {} : { body: corps instanceof FormData ? corps : JSON.stringify(corps) }),
     ...(keepalive ? { keepalive } : {}),
     ...(signal ? { signal } : {}),
+    ...(priorite ? { priority: priorite } : {}),
   });
 }
 
@@ -240,9 +242,6 @@ async function avecFichiers(fd: FormData, files: File[]): Promise<FormData> {
   }
   return fd;
 }
-
-/* Les lots d’un enregistrement lus en même temps (chacun est un appel au modèle : lotParIp et lotsParCompte les bornent) */
-const LECTEURS = 5;
 
 /**
  * La clé d’un envoi : le serveur reconnaît un nouvel essai du même envoi (src/server/captures.ts, reprise ; le chat,
@@ -393,6 +392,10 @@ export async function uploadScreenshots(
  * premier lot à lire part d’abord (`ordre` : les autres attendent, sur le serveur, que sa réponse commence, pour ne pas
  * écrire chacun le texte système en cache), et un envoi abandonné le dit au serveur : un lot en échec pour de bon arrête
  * les lots encore en cours ; la page fermée n’arrête que ceux qui n’ont pas commencé chez le prestataire.
+ * Une longue vidéo (plus de lots qu’un tour de lecteurs) peut ne se lire qu’en partie avant l’achat
+ * (src/server/lecture-partielle.ts, le plan que donne le serveur) : ses lots les plus récents d’abord, un tour à la fois,
+ * jusqu’à ce que le serveur dise « assez » ; ses lots plus anciens partent tels quels pendant la lecture, gardés chiffrés
+ * et lus après le paiement (POST /api/captures/ecrans). S’ils ne partent pas, ils se lisent avant, comme avant.
  */
 export async function uploadRecording(
   file: File,
@@ -403,18 +406,19 @@ export async function uploadRecording(
 ): Promise<{ source: Source; messagesRead: number; story: Story }> {
   const passe = laissezPasser();
   const { imagesDeLaVideo, lotsDe, tailleDesLots, VideoIllisible, empreinteDuLot, lotDejaLu, garderLeLot } = await pVideo();
-  let images: Blob[];
+  let video: Awaited<ReturnType<typeof imagesDeLaVideo>>;
   try {
-    images = await imagesDeLaVideo(file, (p) => onAvance?.({ etape: "video", p }));
+    video = await imagesDeLaVideo(file, (p) => onAvance?.({ etape: "video", p }));
   } catch (e) {
     throw new ErreurApi(e instanceof VideoIllisible ? e.code : "video", 422);
   }
+  const { images, sensSur } = video;
   /*
    * Des lots de six à douze écrans (tailleDesLots : une courte vidéo part en un seul tour de cinq lecteurs, une longue
    * en lots de douze, moins chers et en moins de tours), et de 4 Mo au plus (des écrans sombres ou des photos pèsent
    * plus lourd). Avec Sonnet, un lot de douze se lit en 25 à 30 s, un lot de six en 15 s environ (21 octobre).
    */
-  const lots = lotsDe(images, tailleDesLots(images.length, LECTEURS), (b) => b.size, ENVOI_IMAGES_MAX);
+  const lots = lotsDe(images, tailleDesLots(images.length, LECTEURS_DE_LOTS), (b) => b.size, ENVOI_IMAGES_MAX);
   /*
    * La clé de l’envoi, la même pour ses lots et pour leur fin : le serveur y range leur coût (la mesure des imports), y
    * reconnaît le premier lot et l’abandon, et un nouvel essai de la fin après une coupure retrouve l’histoire déjà créée
@@ -427,18 +431,36 @@ export async function uploadRecording(
   const lus: unknown[] = new Array(lots.length);
   /* Les lots déjà lus dans cet onglet (un nouvel essai de la même vidéo) ne repartent pas ; leurs envois d’avant, pour la mesure */
   const repris = new Set<string>();
-  const aLire = lots.flatMap((_, k) => {
+  lots.forEach((_, k) => {
     const deja = lotDejaLu(empreintes[k] ?? null);
-    if (deja === undefined) return [k];
+    if (deja === undefined) return;
     lus[k] = deja.lot;
     if (deja.cle !== cle) repris.add(deja.cle);
-    return [];
   });
   /* Le même laissez-passer pour tous les lots, puis pour les rassembler */
   await passe;
-  let faits = lots.length - aLire.length;
-  onAvance?.({ etape: "lecture", faits, total: lots.length });
-  let suivant = 0;
+  /*
+   * Une longue vidéo d’un premier import : le serveur dit comment la lire avant l’achat (en entier, ou d’abord sa partie
+   * la plus récente), d’après l’empreinte de son lot le plus récent. Sans le jour (« ab » à sa place) : la même vidéo
+   * renvoyée le lendemain tombe dans la même moitié de l’A/B. Sans réponse (le réseau), en entier, comme avant
+   */
+  const recent = lots.at(-1);
+  const empreinteVideo = !ajout && lots.length > LECTEURS_DE_LOTS && recent ? await empreinteDuLot(recent, app, "ab") : null;
+  const longue = !!empreinteVideo;
+  const partielle =
+    longue &&
+    (await appel("POST /api/captures/video/plan", { corps: { lots: lots.length, video: empreinteVideo, sensSur, cle, consentement } }).then(
+      (r) => r.lecture === "partielle",
+      () => false,
+    ));
+
+  /*
+   * Où en est la lecture : les lots lus, sur tous ceux de la vidéo. Une longue vidéo lue en partie aussi : un total qui
+   * grandissait à chaque tour (« 5 sur 5 », puis « 5 sur 10 ») faisait croire que la lecture repartait de zéro, juste
+   * avant le paywall ; quand le serveur dit « assez », la jauge passe d’un coup à la fin
+   */
+  let faits = 0;
+  const total = lots.length;
   /*
    * Un lot qui échoue encore après un nouvel essai (ou la page fermée, plus bas) : les autres s’arrêtent (pas d’appels
    * payés pour rien), ici et chez le serveur
@@ -449,8 +471,12 @@ export async function uploadRecording(
     arret.abort();
     void appel("POST /api/captures/lot/abandon", { corps: { cle, raison }, keepalive: true }).catch(() => {});
   };
-  /* Le premier lot à lire part d’abord ; seul à lire, il n’a personne à prévenir */
-  const ordre = (k: number) => (aLire.length < 2 ? null : k === aLire[0] ? "premier" : "suite");
+  /*
+   * Le premier lot à lire part d’abord : celui du premier tour, s’il a d’autres lots avec lui (seul, il n’a personne à
+   * prévenir) ; les tours suivants partent en « suite », sans attendre (il a déjà commencé)
+   */
+  let premier: number | null | undefined;
+  const ordre = (k: number) => (premier == null ? null : k === premier ? "premier" : "suite");
   const lireLot = async (k: number) => {
     const fd = new FormData();
     (lots[k] ?? []).forEach((b, i) => fd.append("captures", b, `ecran-${k + 1}-${i + 1}.jpg`));
@@ -461,29 +487,100 @@ export async function uploadRecording(
     if (o) fd.append("ordre", o);
     return (await appel("POST /api/captures/lot", { corps: fd, signal: arret.signal })).lot;
   };
-  const lecteur = async () => {
-    while (suivant < aLire.length && !arret.signal.aborted) {
-      /* suivant < aLire.length : le lot existe */
-      const k = aLire[suivant++]!;
-      try {
-        lus[k] = await lireLot(k).catch(async (e: unknown) => {
-          /*
-           * Une erreur passagère (réseau, serveur) : un nouvel essai, le reste n’est pas à refaire. Pas le budget de l’IA du
-           * jour (« souffle ») : il tient jusqu’à minuit ; ni un refus de l’IA (« refus », malgré son repli) : il reviendrait
-           */
-          if (arret.signal.aborted || (e instanceof ErreurApi && ((e.status < 500 && e.code !== "erreur") || e.code === "souffle" || e.code === "refus"))) throw e;
-          /* Le réseau : on attend que Safari soit revenu au premier plan (en arrière-plan, l’essai échouerait encore) */
-          await (e instanceof ErreurApi ? new Promise((r) => setTimeout(r, 1500)) : quandVisible());
-          return lireLot(k);
-        });
-      } catch (e) {
-        abandonner("echec");
-        throw e;
+  /* La première lecture rendue (ses images parties, et sans doute celles des lots partis avec elle) : les lots à garder peuvent partir */
+  let direPremiereRendue = () => {};
+  const premiereRendue = new Promise<void>((ok) => (direPremiereRendue = ok));
+  /* Les lots `tour` (dans l’ordre où ils partent) qui ne sont pas encore lus, LECTEURS_DE_LOTS à la fois */
+  const lire = async (tour: number[]) => {
+    const aLire = tour.filter((k) => lus[k] === undefined);
+    faits += tour.length - aLire.length;
+    if (premier === undefined) premier = aLire.length < 2 ? null : aLire[0]!;
+    onAvance?.({ etape: "lecture", faits, total });
+    let suivant = 0;
+    const lecteur = async () => {
+      while (suivant < aLire.length && !arret.signal.aborted) {
+        /* suivant < aLire.length : le lot existe */
+        const k = aLire[suivant++]!;
+        try {
+          lus[k] = await lireLot(k).catch(async (e: unknown) => {
+            /*
+             * Une erreur passagère (réseau, serveur) : un nouvel essai, le reste n’est pas à refaire. Pas le budget de l’IA du
+             * jour (« souffle ») : il tient jusqu’à minuit ; ni un refus de l’IA (« refus », malgré son repli) : il reviendrait
+             */
+            if (arret.signal.aborted || (e instanceof ErreurApi && ((e.status < 500 && e.code !== "erreur") || e.code === "souffle" || e.code === "refus"))) throw e;
+            /* Le réseau : on attend que Safari soit revenu au premier plan (en arrière-plan, l’essai échouerait encore) */
+            await (e instanceof ErreurApi ? new Promise((r) => setTimeout(r, 1500)) : quandVisible());
+            return lireLot(k);
+          });
+        } catch (e) {
+          abandonner("echec");
+          throw e;
+        }
+        garderLeLot(empreintes[k] ?? null, { lot: lus[k], cle });
+        direPremiereRendue();
+        onAvance?.({ etape: "lecture", faits: ++faits, total });
       }
-      garderLeLot(empreintes[k] ?? null, { lot: lus[k], cle });
-      onAvance?.({ etape: "lecture", faits: ++faits, total: lots.length });
+    };
+    await Promise.all(Array.from({ length: Math.min(LECTEURS_DE_LOTS, aLire.length) }, lecteur));
+  };
+  /*
+   * La fin : les lots lus (à partir de `restants`, ceux d’avant n’étant pas lus), rassemblés par le serveur. Une longue
+   * vidéo dit ce qu’il en reste : le serveur répond alors quoi en faire (SuiteDeLaVideo), ou crée la conv
+   */
+  const fin = (restants: number, gardes = false) =>
+    avecReprise(
+      () =>
+        appel("POST /api/captures/video", {
+          corps: {
+            app,
+            lots: lus.slice(restants),
+            cle,
+            consentement,
+            ...(repris.size ? { repris: [...repris].slice(0, ENVOIS_REPRIS_MAX) } : {}),
+            ...(ajout ? { mode: "ajout" as const } : {}),
+            ...(longue && empreinteVideo ? { partiel: { restants, ecrans: images.length, video: empreinteVideo, sensSur, ...(gardes ? { gardes: true as const } : {}) } } : {}),
+          },
+        }),
+      () => onAvance?.({ etape: "reprise" }),
+    );
+  /*
+   * Les lots plus anciens d’une longue vidéo lue en partie, envoyés tels quels pour après le paiement
+   * (POST /api/captures/ecrans) pendant que BLUSH lit les plus récents : pendant ses 25 à 30 s de lecture, le réseau est
+   * libre. Seulement une fois la première lecture rendue (ou le tour fini) : sur un réseau montant faible, ils
+   * partageaient la bande avec les images du premier tour, encore en route (la priorité basse ne règle pas l’envoi du
+   * corps d’une requête). Un à la fois, en priorité basse, du plus ancien au plus récent : les plus anciens sont ceux
+   * qu’aucun tour ne lira. `borne` : les lots qu’on garde encore, ceux qu’aucun tour de lecture ne prendra (le serveur
+   * qui dit d’en lire plus la fait descendre ; les lots envoyés au-delà, il les efface à l’import). Un envoi qui échoue
+   * arrête la file : ces lots se liront avant l’achat, comme avant.
+   */
+  let borne = 0;
+  let envoyes = 0;
+  /* La lecture finie, la personne n’attend plus que ces envois : on lui dit où ils en sont */
+  let enAttente = false;
+  const envoyerUnLot = (k: number) => {
+    const fd = new FormData();
+    (lots[k] ?? []).forEach((b, i) => fd.append("captures", b, `ecran-${k + 1}-${i + 1}.jpg`));
+    fd.append("app", app);
+    fd.append("consentement", consentement);
+    fd.append("cle", cle);
+    fd.append("rang", String(k));
+    return avecReprise(() => appel("POST /api/captures/ecrans", { corps: fd, signal: arret.signal, priorite: "low" }));
+  };
+  const garderEnFond = async (): Promise<boolean> => {
+    try {
+      while (envoyes < borne && !arret.signal.aborted) {
+        await envoyerUnLot(envoyes);
+        envoyes++;
+        if (enAttente) onAvance?.({ etape: "envoi", faits: Math.min(envoyes, borne), total: borne });
+      }
+      return !arret.signal.aborted;
+    } catch (e) {
+      tracer("import:ecrans-non-gardes", e);
+      return false;
     }
   };
+  let fileDEnvoi: Promise<boolean> = Promise.resolve(true);
+
   /*
    * La page fermée pour de bon pendant la lecture (l’onglet fermé, une autre adresse, un rechargement) : ses lots qui
    * n’ont pas encore commencé chez le prestataire ne partent plus ; ceux en cours vont au bout (leur entrée est payée),
@@ -496,15 +593,69 @@ export async function uploadRecording(
   };
   window.addEventListener("pagehide", enPartant);
   try {
-    await Promise.all(Array.from({ length: Math.min(LECTEURS, aLire.length) }, lecteur));
+    if (partielle) {
+      /* lus[debut…] sont lus ; un tour de plus lit les `tour` lots juste avant, du plus récent au plus ancien */
+      let debut = lots.length;
+      let tour = LECTEURS_DE_LOTS;
+      while (debut > 0) {
+        const de = Math.max(0, debut - tour);
+        const lecture = lire(Array.from({ length: debut - de }, (_, i) => debut - 1 - i));
+        /* Le premier tour parti, ses lots à lire en route : les plus anciens partent derrière eux, pour être gardés */
+        if (debut === lots.length && de > 0) {
+          borne = de;
+          const finDuTour = lecture.then(
+            () => {},
+            () => {},
+          );
+          fileDEnvoi = Promise.race([premiereRendue, finDuTour]).then(garderEnFond);
+        }
+        await lecture;
+        debut = de;
+        if (!debut) break;
+        const r = await fin(debut);
+        if (!("suite" in r)) return r;
+        if (r.suite === "garder") {
+          /*
+           * Assez lu : la jauge de lecture va au bout. Ses lots plus anciens tous partis (on attend les derniers, en disant
+           * où ils en sont), puis la fin, qui crée la conv avec eux ; un envoi raté, ou un lot que le serveur n’a plus : on
+           * les lit, comme avant
+           */
+          const lusAvant = faits;
+          faits = total;
+          onAvance?.({ etape: "lecture", faits, total });
+          borne = Math.min(borne, debut);
+          if (envoyes < borne) {
+            enAttente = true;
+            onAvance?.({ etape: "envoi", faits: envoyes, total: borne });
+          }
+          const tousPartis = (await fileDEnvoi) || envoyes >= debut;
+          enAttente = false;
+          const creee = tousPartis ? await fin(debut, true) : null;
+          if (creee && !("suite" in creee)) return creee;
+          /* Ils se lisent finalement avant l’achat : la jauge reprend où elle en était */
+          faits = lusAvant;
+          borne = 0;
+          tour = debut;
+        } else {
+          tour = Math.max(1, r.lots);
+          /* Ceux que ce tour lira ne sont plus à garder */
+          borne = Math.min(borne, Math.max(0, debut - tour));
+        }
+      }
+    } else await lire(lots.map((_, k) => k));
+    /* Lue en entier : plus rien à garder ; l’envoi en route finit avant la fin (qui efface ceux que la conv ne prend pas) */
+    borne = 0;
+    await fileDEnvoi;
+  } catch (e) {
+    /* Une erreur en route (un lot, la question au serveur) : plus rien ne part, et le serveur oublie les écrans déjà envoyés */
+    if (partielle) abandonner("echec");
+    throw e;
   } finally {
     window.removeEventListener("pagehide", enPartant);
   }
-  const corps = { app, lots: lus, cle, consentement, ...(repris.size ? { repris: [...repris].slice(0, ENVOIS_REPRIS_MAX) } : {}), ...(ajout ? { mode: "ajout" as const } : {}) };
-  return avecReprise(
-    () => appel("POST /api/captures/video", { corps }),
-    () => onAvance?.({ etape: "reprise" }),
-  );
+  const r = await fin(0);
+  if ("suite" in r) throw new ErreurApi("erreur", 500);
+  return r;
 }
 
 /* ———— Compte et analyse ———— */

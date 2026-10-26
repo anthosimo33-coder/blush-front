@@ -86,8 +86,19 @@ const attendre = (cible: EventTarget, ok: string, ms: number) =>
     cible.addEventListener("error", fin);
   });
 
-/** Les images de la conv tirées de l’enregistrement, dans l’ordre du temps de la conv (du plus ancien au plus récent). */
-export async function imagesDeLaVideo(fichier: File, onAvance?: (p: number) => void): Promise<Blob[]> {
+/** La part du défilement qui doit aller dans le même sens pour que l’ordre des écrans soit sûr (le reste : des allers-retours). */
+const SENS_SUR = 0.8;
+
+/**
+ * Ce qu’un enregistrement donne : les images de la conv, dans l’ordre du temps de la conv (du plus ancien au plus
+ * récent), et si cet ordre est sûr (`sensSur`) : la conv a défilé presque tout le temps dans le même sens (SENS_SUR).
+ * Un aller-retour, ou un sens net trop faible, peut avoir mis des écrans dans le désordre : une longue vidéo se lit
+ * alors en entier avant l’achat (src/server/lecture-partielle.ts), aucun écran récent n’est laissé pour après.
+ */
+export type VideoLue = { images: Blob[]; sensSur: boolean };
+
+/** Les images de la conv tirées de l’enregistrement, dans l’ordre du temps de la conv (du plus ancien au plus récent), et si cet ordre est sûr. */
+export async function imagesDeLaVideo(fichier: File, onAvance?: (p: number) => void): Promise<VideoLue> {
   const url = URL.createObjectURL(fichier);
   const v = document.createElement("video");
   v.muted = true;
@@ -150,6 +161,8 @@ export async function imagesDeLaVideo(fichier: File, onAvance?: (p: number) => v
     let tAvant = debut;
     let parcouru = 0;
     let sens = 0;
+    /* Tout ce qui a défilé, dans un sens ou dans l’autre (sans les sauts) : `sens` en est la part nette */
+    let defile = 0;
     for (let t = debut; t <= duree; t += pas) {
       await aller(Math.min(t, duree - 0.05));
       const m = lire();
@@ -167,6 +180,7 @@ export async function imagesDeLaVideo(fichier: File, onAvance?: (p: number) => v
           parcouru = 0;
         } else {
           sens += d;
+          defile += Math.abs(d);
           parcouru += Math.abs(d);
           if (parcouru >= MESURE_H * PAS_GARDE) {
             images.push(await photo());
@@ -184,7 +198,7 @@ export async function imagesDeLaVideo(fichier: File, onAvance?: (p: number) => v
     if (parcouru > MESURE_H * 0.12) images.push(await photo());
     garderLesPlusRecents(images, sens > 0);
     /* On a remonté la conv (le contenu descend) : les écrans vont du plus récent au plus ancien, on les remet dans l’ordre */
-    return sens > 0 ? images.reverse() : images;
+    return { images: sens > 0 ? images.reverse() : images, sensSur: defile > 0 && Math.abs(sens) >= SENS_SUR * defile };
   } finally {
     v.removeAttribute("src");
     v.load();

@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  apresLaSuite,
   avanceChapitres,
+  avanceDeLaSuite,
   avanceMoitie,
   avancePlan,
   avanceVerdict,
@@ -72,6 +74,21 @@ describe("l’avancée du verdict", () => {
     expect(Math.max(...r)).toBeLessThanOrEqual(70);
     expect(avanceVerdict({ reflexion: 4000, texte: 350, ecrit: "" })).toBe(84);
     expect(avanceVerdict({ reflexion: 4000, texte: 5000, ecrit: "" })).toBe(98);
+  });
+});
+
+describe("la lecture du début d’une longue vidéo payée, avant le verdict", () => {
+  it("avance avec ses lots lus ou avec le temps, le plus avancé des deux, jusqu’à 40 sans l’atteindre avant le dernier lot ; le verdict repart de là sans reculer", () => {
+    const prevuMs = 120_000;
+    expect(avanceDeLaSuite({ faits: 0, total: 10, ecouleMs: 0, prevuMs })).toBe(0);
+    /* Une minute sur deux prévues, deux lots lus : le temps l’emporte (la jauge ne semble pas bloquée) */
+    expect(avanceDeLaSuite({ faits: 2, total: 10, ecouleMs: 60_000, prevuMs })).toBe(20);
+    /* Plus lente que prévu : elle attend le dernier lot sous 40 */
+    expect(avanceDeLaSuite({ faits: 9, total: 10, ecouleMs: 10 * prevuMs, prevuMs })).toBe(38);
+    expect(avanceDeLaSuite({ faits: 10, total: 10, ecouleMs: 1000, prevuMs })).toBe(40);
+    /* Le verdict qui suit : de 40 à 98, toujours au-dessus de la suite, jamais 100 avant la fin */
+    expect([apresLaSuite(0), apresLaSuite(avanceVerdict(avance("", 0))), apresLaSuite(98)]).toEqual([40, 49, 98]);
+    expect(apresLaSuite(avanceVerdict(avance("x".repeat(700))))).toBe(98);
   });
 });
 

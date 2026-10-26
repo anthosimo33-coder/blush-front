@@ -9,6 +9,8 @@
  * Le compte préparé avant la capture (galerie.spec.ts, `preparer`). Sans : aucun compte, aucune conv.
  * - brouillon : une conv importée (POST /api/import), sans email ni compte ;
  * - brouillon-court : un export de 30 messages, gardé mais trop court pour la lecture ;
+ * - video-partielle : une longue vidéo de la moitié partielle (src/server/lecture-partielle.ts), sa partie récente lue,
+ *   ses lots plus anciens gardés pour après le paiement, sans compte ;
  * - morceaux : une conv en trois morceaux (un export court, des captures, le même export en entier), sans compte ;
  * - code : un brouillon, et un code de connexion demandé pour l’email du parcours ;
  * - gratuit : un compte gratuit, sa conv lue (le verdict offert, comme avant le paywall du 16 octobre) ;
@@ -23,7 +25,7 @@
  * - tournage : un compte de BLUSH_ADMINS en mode tournage (le lien de sa conv de tournage ouvert ici), une prise commencée
  *   par l’export sans fichier ; tournage-lu : la même, sa lecture rejouée ;
  * - tournage-creatrice : le même lien, ouvert par une créatrice (un compte ordinaire), sans prise.
- * @typedef {"brouillon" | "brouillon-court" | "morceaux" | "code" | "gratuit" | "gratuit-sans-titres" | "lecture-en-cours" | "paywall" | "rapport" | "equipe" | "sobre" | "plusieurs" | "couple" | "tournage" | "tournage-lu" | "tournage-creatrice"} Compte
+ * @typedef {"brouillon" | "brouillon-court" | "video-partielle" | "morceaux" | "code" | "gratuit" | "gratuit-sans-titres" | "lecture-en-cours" | "paywall" | "rapport" | "equipe" | "sobre" | "plusieurs" | "couple" | "tournage" | "tournage-lu" | "tournage-creatrice"} Compte
  */
 
 /**
@@ -375,6 +377,16 @@ export const STATES = [
     compte: "brouillon-court",
     journey: { ...EXPORT, exportFileName: "WhatsApp Chat - Elias.zip" },
     note: "Un export de 30 messages est gardé, pour qu’on lui ajoute le début\u00a0: ajouter un morceau devient le bouton, «\u00a0Continuer\u00a0» attend. Texte de l’encart absent de la maquette, à valider.",
+  },
+  {
+    id: "04d",
+    section: "parcours",
+    title: "Ta conv est ajoutée",
+    state: "Longue vidéo lue en partie",
+    route: "/importer/ok",
+    compte: "video-partielle",
+    journey: { app: "imessage" },
+    note: "La moitié partielle de l’A/B (BLUSH_LECTURE_PARTIELLE)\u00a0: les nombres sont ceux de la partie récente lue, l’encart dit que le début se lira avec le rapport. Texte absent de la maquette, à valider (26 octobre).",
   },
   {
     id: "04c",

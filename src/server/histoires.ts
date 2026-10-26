@@ -74,6 +74,12 @@ export type Meta = {
   captures?: number;
   /** L’export était trop long pour partir en entier : seule sa partie la plus récente a été gardée (de `resume.debut` à la fin). */
   coupe?: boolean;
+  /**
+   * Une longue vidéo lue en partie avant l’achat (src/server/lecture-partielle.ts) : seule sa partie la plus récente est
+   * lue, le reste de ses écrans attend le paiement (src/server/suite-video.ts, qui l’efface une fois la conv complétée).
+   * Ce que l’écran de l’import en dit (« le début sera lu avec ton rapport »), rien de plus.
+   */
+  suiteVideo?: boolean;
   /** Rempli sur « Qui es-tu ? » : l’index de l’utilisateur dans `participants`, son pronom, sa devinette, son objectif. */
   moi?: 0 | 1;
   pronom?: Pronom;
@@ -98,7 +104,7 @@ export type Meta = {
 };
 
 /** Ce que la meta dit d’un morceau : d’où il vient (des captures : combien), et ce qu’il contenait, doublons compris. */
-export type MorceauMeta = Pick<Meta, "appli" | "fichier" | "resume"> & Pick<Meta, "captures" | "coupe">;
+export type MorceauMeta = Pick<Meta, "appli" | "fichier" | "resume"> & Pick<Meta, "captures" | "coupe" | "suiteVideo">;
 
 /** L’histoire telle qu’en base, avec la conv brute (chiffrée, jusqu’à plusieurs Mo) : pour la chaîne d’analyse (pipeline.ts, executer). */
 export type LigneComplete = typeof schema.stories.$inferSelect;
@@ -124,25 +130,42 @@ export function resumeDe(messages: Message[]): Meta["resume"] {
   };
 }
 
+/** Une transaction de la base (db().transaction), telle que la reçoit son travail. */
+export type Transaction = Parameters<Parameters<ReturnType<typeof db>["transaction"]>[0]>[0];
+
+/**
+ * Ce qui naît avec un brouillon, dans la même transaction (`avec`, la suite d’une longue vidéo, src/server/suite-video.ts) :
+ * si elle échoue, le brouillon n’existe pas non plus.
+ */
+type AvecLeBrouillon = (tx: Transaction, id: string) => Promise<void>;
+
 /**
  * L’histoire brouillon d’un import (un export ou des captures), avant l’email : sa meta et sa conv brute, chiffrées, et
  * l’accord de son import (src/server/juridique.ts). Le cookie du brouillon la retrouve par l’empreinte de `secret`.
  */
-async function creerBrouillon(meta: Meta, texte: string, secret: string, consentement: Consentement): Promise<{ id: string; meta: Meta; secret: string }> {
-  const ligne = uneLigne(
-    await db()
-      .insert(schema.stories)
-      .values({
-        draftToken: empreinte(secret),
-        messageCount: meta.resume.total,
-        meta: coffre.ecrire("stories.meta", meta),
-        conv: coffre.ecrire("stories.conv", texte),
-        consentementLe: consentement.le,
-        consentementVersion: consentement.version,
+async function creerBrouillon(meta: Meta, texte: string, secret: string, consentement: Consentement, avec?: AvecLeBrouillon): Promise<{ id: string; meta: Meta; secret: string }> {
+  const creer = async (tx: Transaction | ReturnType<typeof db>) =>
+    uneLigne(
+      await tx
+        .insert(schema.stories)
+        .values({
+          draftToken: empreinte(secret),
+          messageCount: meta.resume.total,
+          meta: coffre.ecrire("stories.meta", meta),
+          conv: coffre.ecrire("stories.conv", texte),
+          consentementLe: consentement.le,
+          consentementVersion: consentement.version,
+        })
+        .returning({ id: schema.stories.id }),
+      "stories:brouillon_cree",
+    );
+  const ligne = avec
+    ? await db().transaction(async (tx) => {
+        const l = await creer(tx);
+        await avec(tx, l.id);
+        return l;
       })
-      .returning({ id: schema.stories.id }),
-    "stories:brouillon_cree",
-  );
+    : await creer(db());
   return { id: ligne.id, meta, secret };
 }
 
@@ -203,31 +226,96 @@ export async function importerCaptures({
   t,
   secret = jeton(),
   consentement,
+  suite,
 }: {
   appli: Meta["appli"];
   t: TexteCaptures;
   secret?: string;
   consentement: Consentement;
+  /**
+   * La suite d’une longue vidéo lue en partie (src/server/ecrans-gardes.ts, rattacherLaSuite) : elle naît avec le
+   * brouillon, dans sa transaction, et sa meta le dit (`suiteVideo`).
+   */
+  suite?: AvecLeBrouillon;
 }): Promise<{ id: string; meta: Meta; secret: string }> {
-  const personne = (nom: string) => ({ prenom: nom, pronom: "il" as const, nomExport: nom });
-  const lu = lire(t.texte, { utilisateur: personne(MOI), autre: personne(t.autre), format: "captures" });
+  const lu = lectureDesCaptures(t);
   /* Courtes, elles restent un brouillon, comme un export : on peut leur ajouter un morceau (tropCourte) */
   if (erreurImport(lu, "captures") === "groupe") throw new ErreurImport("groupe");
-  const compte = (nom: string) => lu.messages.filter((m) => m.nom === nom).length;
-  const lus = pronomsLus(lu.messages);
   const meta: Meta = {
     appli,
     format: "captures",
+    ...comptesDesCaptures(t, lu.messages, [MOI, prenomDe(t.autre)]),
+    ...(suite ? { suiteVideo: true } : {}),
+    moi: 0,
+  };
+  return creerBrouillon(meta, t.texte, secret, consentement, suite);
+}
+
+/** Des captures (ou un enregistrement) au format « captures », relues : l’utilisateur en « Moi », l’autre sous le nom lu en haut. */
+function lectureDesCaptures(t: TexteCaptures) {
+  const personne = (nom: string) => ({ prenom: nom, pronom: "il" as const, nomExport: nom });
+  return lire(t.texte, { utilisateur: personne(MOI), autre: personne(t.autre), format: "captures" });
+}
+
+/** Ce que la meta d’une conv de captures dit de ses messages : son fichier, ses captures, ses deux participants (leurs prénoms donnés) et son résumé. */
+function comptesDesCaptures(t: TexteCaptures, messages: Message[], [prenomMoi, prenomAutre]: [string, string]): Pick<Meta, "fichier" | "captures" | "participants" | "resume"> {
+  const compte = (nom: string) => messages.filter((m) => m.nom === nom).length;
+  const lus = pronomsLus(messages);
+  return {
     fichier: `${t.captures} captures`,
     captures: t.captures,
     participants: [
-      { nom: MOI, prenom: MOI, messages: compte(MOI), ...(lus.toi ? { pronomLu: lus.toi } : {}) },
-      { nom: t.autre, prenom: prenomDe(t.autre), messages: compte(t.autre), ...(lus.autre ? { pronomLu: lus.autre } : {}) },
+      { nom: MOI, prenom: prenomMoi, messages: compte(MOI), ...(lus.toi ? { pronomLu: lus.toi } : {}) },
+      { nom: t.autre, prenom: prenomAutre, messages: compte(t.autre), ...(lus.autre ? { pronomLu: lus.autre } : {}) },
     ],
-    resume: resumeDe(lu.messages),
-    moi: 0,
+    resume: resumeDe(messages),
   };
-  return creerBrouillon(meta, t.texte, secret, consentement);
+}
+
+/** Une meta (ou celle d’un morceau) sans ce qui dit qu’une suite de vidéo l’attend. */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- écartée
+const sansLaSuite = <T extends { suiteVideo?: boolean }>({ suiteVideo, ...reste }: T): Omit<T, "suiteVideo"> => reste;
+
+/**
+ * La conv d’une longue vidéo lue en partie avant l’achat, complétée après le paiement (src/server/suite-video.ts) : son
+ * texte devient `t`, la vidéo lue en entier, et sa meta se recompte comme à l’import (ses captures, ses participants, son
+ * résumé), en gardant ce que « Qui es-tu ? » y a mis (qui est qui, les prénoms, le pronom, la devinette, l’objectif). Un
+ * morceau ajouté depuis (src/server/morceaux.ts) : seul le premier, la vidéo, change, et la conv réunie se recompte
+ * (metaReunie). Dans la transaction de l’appelant, sur sa ligne verrouillée. Rend la meta écrite, ou null : plus de conv
+ * (effacée, une prise du mode tournage).
+ */
+export async function completerLaConv(tx: Transaction, storyId: string, t: TexteCaptures): Promise<Meta | null> {
+  const [ligne] = await tx.select({ meta: schema.stories.meta, conv: schema.stories.conv }).from(schema.stories).where(eq(schema.stories.id, storyId)).for("update");
+  if (!ligne?.conv) return null;
+  const avant = metaDe(ligne);
+  const brute = coffre.lire("stories.conv", ligne.conv);
+  const lu = lectureDesCaptures(t);
+  /* Les prénoms de « Qui es-tu ? » restent, par la place de chaque participant (l’autre garde le nom de l’import) */
+  const comptes = comptesDesCaptures(t, lu.messages, [avant.participants[0].prenom, avant.participants[1].prenom]);
+  let conv: string | ConvEnMorceaux = t.texte;
+  /* La vidéo est entière : sa meta ne dit plus qu’une suite l’attend (suiteVideo) */
+  let meta: Meta = { ...sansLaSuite(avant), ...comptes };
+  if (typeof brute !== "string") {
+    const [premier, ...autres] = brute.morceaux;
+    if (!premier) return null;
+    conv = { morceaux: [{ ...premier, texte: t.texte, empreinte: empreinte(t.texte) }, ...autres] };
+    /* Après le paiement, « Qui es-tu ? » est rempli : qui est « Moi » est connu, comme à la lecture (relire, src/server/analyse.ts) */
+    const reunie = metaReunie(avant, conv, identiteDe(avant), { k: avant.moi ?? 0, connu: true });
+    const [m0, ...suite] = avant.morceaux ?? [];
+    const parMorceau = reunie.parMorceau[0];
+    /* Le fichier de la conv entière est celui de son premier morceau : la vidéo, maintenant lue en entier */
+    meta = {
+      ...reunie.meta,
+      fichier: comptes.fichier,
+      morceaux:
+        m0 && parMorceau?.length ? [{ ...sansLaSuite(m0), fichier: comptes.fichier, captures: comptes.captures, resume: resumeDe(parMorceau) }, ...suite] : (avant.morceaux ?? []),
+    };
+  }
+  await tx
+    .update(schema.stories)
+    .set({ conv: coffre.ecrire("stories.conv", conv), meta: coffre.ecrire("stories.meta", meta), messageCount: meta.resume.total, updatedAt: new Date() })
+    .where(eq(schema.stories.id, storyId));
+  return meta;
 }
 
 /* ———— Une conv en plusieurs morceaux ———— */
@@ -246,12 +334,13 @@ const premierMorceau = (meta: Meta, texte: string): Morceau => ({
 });
 
 /** La meta d’une conv d’un seul morceau, devenue celle de son premier morceau. */
-const morceauMetaDe = ({ appli, fichier, resume, captures, coupe }: Meta): MorceauMeta => ({
+const morceauMetaDe = ({ appli, fichier, resume, captures, coupe, suiteVideo }: Meta): MorceauMeta => ({
   appli,
   fichier,
   resume,
   ...(captures ? { captures } : {}),
   ...(coupe ? { coupe } : {}),
+  ...(suiteVideo ? { suiteVideo } : {}),
 });
 
 /** Ce que la meta sait de qui est qui : les noms des participants, celui qui importe (des captures seules), l’autre (désigné par un nom). */
@@ -284,7 +373,7 @@ function metaReunie(avant: Meta, conv: ConvEnMorceaux, id: Identite, qui: QuiLit
   };
   /* Ce qu’une conv d’un seul morceau dit d’elle-même, que ses morceaux disent désormais un à un (ou que l’identité redit) */
   // eslint-disable-next-line @typescript-eslint/no-unused-vars -- écartés, puis redits plus bas
-  const { captures, coupe, moi, contact, ...reste } = avant;
+  const { captures, coupe, suiteVideo, moi, contact, ...reste } = avant;
   const meta: Meta = {
     ...reste,
     format: conv.morceaux.some((m) => m.format === "captures") ? "captures" : conv.morceaux[0]!.format,

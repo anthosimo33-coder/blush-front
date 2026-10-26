@@ -66,7 +66,7 @@ import { SondeDuDirect } from "./SondeDuDirect";
 /*
  * Le pilotage (/admin) : ce qui se passe sur la période, d’un coup d’œil. En haut, « À regarder » (ce qui coince, puis
  * les bonnes nouvelles) ; puis l’argent (le chiffre d’affaires net, case par case) à côté du direct ; les quatre chiffres
- * clés ; le tunnel, puis le détail de l’import et du paywall (leurs jalons), et qui importe ; les mails des séquences et leur délivrabilité ; d’où viennent les visiteurs et ce qui se vend ; l’IA avant l’achat (par type d’import), ce que coûte l’IA et la santé ; enfin les outils de
+ * clés ; le tunnel, puis le détail de l’import et du paywall (leurs jalons), et qui importe ; les mails des séquences et leur délivrabilité ; d’où viennent les visiteurs et ce qui se vend ; l’IA avant l’achat (par type d’import) et la lecture partielle des longues vidéos (son A/B), ce que coûte l’IA et la santé ; enfin les outils de
  * l’équipe. Que des nombres : aucune conv, aucun message, aucun email. Chaque carte a son « ? » (src/contenu/aide-pilotage.ts).
  * Maquette validée le 13 octobre ; l’écran d’avant reste à /admin?version=actuelle.
  * TODO(produit): textes du pilotage à valider.
@@ -165,6 +165,7 @@ export function Pilotage({
           </div>
 
           <IAAvantLAchat p={p} />
+          <LecturePartielle p={p} />
           <div className="flex flex-wrap gap-4 md:gap-6">
             <Couts s={s} />
             <Sante s={s} />
@@ -1336,6 +1337,100 @@ function IAAvantLAchat({ p }: { p: Chiffres }) {
           ? `Lu pour rien (aucune conv importée ensuite)\u00a0: ${pourRien.map((x) => `${NOMS_DES_TYPES_D_IMPORT[x.type].toLowerCase()} ${dollars(x.pourRien)}`).join(", ")}, compté dans l’IA par acheteur.`
           : "Rien de lu pour rien sur la période."}{" "}
         {`«\u00a0—\u00a0»\u00a0: moins de ${PERSONNES_D_UN_TAUX}\u00a0convs, trop peu pour un taux.`}
+      </p>
+    </Bloc>
+  );
+}
+
+/* ———— La lecture partielle des longues vidéos ———— */
+
+/**
+ * Les deux moitiés de l’A/B de la lecture partielle (src/server/lecture-partielle.ts), côte à côte : la moitié qui lit
+ * tout avant l’achat, celle qui n’en lit que la partie récente (le reste lu après le paiement). Comptées dès leur plan
+ * (importées ou non) : ce qu’elles coûtent avant l’achat, ce qu’elles vendent (avec les effectifs, un taux n’étant
+ * lisible qu’à partir de PERSONNES_D_UN_TAUX vidéos), en combien de temps elles arrivent au paywall, et le titre qu’elles y
+ * montrent. Puis le contrefactuel des vidéos lues en entier : ce que la lecture partielle leur aurait changé.
+ */
+function LecturePartielle({ p }: { p: Chiffres }) {
+  const { bras, contrefactuel: c } = p.lecturePartielle;
+  const videos = bras.reduce((t, b) => t + b.videos, 0);
+  const avant = bras.reduce((t, b) => t + b.dollarsAvant, 0);
+  /* Chaque ligne : son nom, et sa valeur dans chaque moitié (dans l’ordre de BRAS_DE_LA_LECTURE : entière, partielle) */
+  const taux = (vers: number, depuis: number) => {
+    const t = tauxLisible(vers, depuis);
+    return t === null ? "—" : pourcent(t * 100, 0);
+  };
+  const lignes: [string, (b: (typeof bras)[number]) => string][] = [
+    ["Longues vidéos (au plan)", (b) => nombre(b.videos)],
+    ["Importées", (b) => `${nombre(b.importees)} · ${taux(b.importees, b.videos)}`],
+    ["Au paywall", (b) => `${nombre(b.paywall)} · ${taux(b.paywall, b.videos)}`],
+    ["Paient", (b) => `${nombre(b.payes)} · ${taux(b.payes, b.videos)}`],
+    /* L’achat venu des relances (la suite gardée 11 jours après le paywall pour lui) */
+    ["Paient plus de 24\u00a0h après", (b) => nombre(b.payesTard)],
+    ["IA avant l’achat, par vidéo", (b) => (rapport(b.dollarsAvant, b.videos) === null ? "—" : dollars(b.dollarsAvant / b.videos))],
+    ["Suite lue après, par acheteur", (b) => (rapport(b.dollarsSuite, b.payes) === null ? "—" : dollars(b.dollarsSuite / b.payes))],
+    ["IA de lecture par acheteur", (b) => (rapport(b.dollarsAvant + b.dollarsSuite, b.payes) === null ? "—" : dollars((b.dollarsAvant + b.dollarsSuite) / b.payes))],
+    ["Jusqu’au paywall (médiane)", (b) => (b.secondesAuPaywall === null ? "—" : duree(b.secondesAuPaywall))],
+    ["Lus avant l’achat, par import", (b) => (b.importees ? `${pluriel(moyenne(b.ecrans / b.importees), "écran")}, ${pluriel(moyenne(b.lots / b.importees), "lot")}` : "—")],
+    ["Coupées avant l’achat", (b) => (b.bras === "partielle" ? taux(b.coupees, b.importees) : "—")],
+    ["Lots gardés, par import", (b) => (b.importees ? nombre(moyenne(b.lotsGardes / b.importees)) : "—")],
+    ["Titre «\u00a0Tendance\u00a0»", (b) => taux(b.tendance, b.titres)],
+    ["Suites lues, incomplètes, perdues", (b) => (b.bras === "partielle" ? `${nombre(b.suites.lues)}, ${nombre(b.suites.incompletes)}, ${nombre(b.suites.perdues)}` : "—")],
+    /* La conv entière, une fois sa suite lue : un autre titre que celui que le paywall a montré (la moitié entière : le contrefactuel, plus bas) */
+    ["Titre changé par la suite", (b) => (b.bras === "partielle" && b.titresEntiers.entiers ? `${nombre(b.titresEntiers.changes)} sur ${nombre(b.titresEntiers.entiers)}` : "—")],
+  ];
+  return (
+    <Bloc
+      id="lecture-partielle"
+      titre={"Longues vidéos\u00a0: lecture partielle"}
+      sous={"L’A/B\u00a0: tout lire avant l’achat, ou seulement la partie récente"}
+      aide={{ cle: "lecturePartielle", valeur: dollars(avant), contexte: `lus avant l’achat pour ${pluriel(videos, "longue vidéo", "longues vidéos")}` }}
+    >
+      {videos ? (
+        <div role="region" aria-label="Les deux moitiés de la lecture partielle, à faire défiler" tabIndex={0} className="-mx-2 mt-[18px] overflow-x-auto px-2">
+          <table className="w-full min-w-[520px] border-collapse text-left">
+            <caption className="sr-only">
+              Pour chaque moitié de l’A/B, les longues vidéos, leur part au paywall et qui paie, ce que coûte leur lecture, et le titre de leur paywall
+            </caption>
+            <thead>
+              <tr className="text-micro font-black uppercase tracking-[0.06em] text-grey">
+                <th scope="col" className="pb-2.5 pr-3 font-black">
+                  Moitié
+                </th>
+                <th scope="col" className="pb-2.5 pr-3 text-right font-black">
+                  Entière
+                </th>
+                <th scope="col" className="pb-2.5 text-right font-black">
+                  Partielle
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {lignes.map(([nom, valeur]) => (
+                <tr key={nom} className="border-t border-sep text-detail font-extrabold">
+                  <th scope="row" className="py-2.5 pr-3 text-left font-extrabold">
+                    {nom}
+                  </th>
+                  {bras.map((b, k) => (
+                    <td key={b.bras} className={cn("py-2.5 text-right tabular-nums", k < bras.length - 1 && "pr-3")}>
+                      {valeur(b)}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <p className="m-0 mt-[18px] text-note font-bold text-grey">
+          Aucune longue vidéo en A/B sur la période (BLUSH_LECTURE_PARTIELLE à «{NBSP}ab{NBSP}»).
+        </p>
+      )}
+      <p className="m-0 mt-3 text-legende font-bold text-grey">
+        {c.videos
+          ? `Lues en entier, sur ${pluriel(c.videos, "vidéo")}\u00a0: la partie récente aurait montré le même titre ${pluriel(c.pareil, "fois", "fois")}, perdu la tendance ${pluriel(c.tendancePerdue, "fois", "fois")}, décalé sa date de plus de 7\u00a0jours ${pluriel(c.dateDecalee, "fois", "fois")}, changé de titre ${pluriel(c.autreTitre, "fois", "fois")}, et laissé ${c.lots ? pourcent((100 * c.lotsEpargnables) / c.lots, 0) : "0\u00a0%"} des lots pour après le paiement.`
+          : "Aucun contrefactuel sur la période (BLUSH_LECTURE_PARTIELLE à «\u00a0mesure\u00a0» ou «\u00a0ab\u00a0»)."}{" "}
+        {`«\u00a0—\u00a0»\u00a0: moins de ${PERSONNES_D_UN_TAUX}\u00a0vidéos, trop peu pour un taux.`}
       </p>
     </Bloc>
   );

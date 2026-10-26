@@ -34,6 +34,9 @@ import {
   OFFRES,
   OFFRES_UNIQUES,
   SOURCES_VISITE,
+  BRAS_DE_LA_LECTURE,
+  CONTREFACTUELS,
+  ISSUES_DE_LA_SUITE,
   STATUTS_ACHAT,
   TYPES_D_IMPORT,
   VOIX,
@@ -576,9 +579,98 @@ export const imports = pgTable(
     ecrans: integer("ecrans").notNull().default(0),
     /** Les appels au modèle de ces lectures : un pour des captures, un par lot pour un enregistrement. */
     lots: integer("lots").notNull().default(0),
+    /*
+     * La lecture partielle d’une longue vidéo (src/server/lecture-partielle.ts), rien de son contenu : sa moitié de l’A/B
+     * (vide hors de l’A/B), les lots gardés pour après le paiement (ses écrans chiffrés, ecrans_gardes) et ce qu’est
+     * devenue leur suite (vide sans lots gardés). `contrefactuel` : une longue vidéo lue en entier, ce qu’aurait montré
+     * le haut de son paywall sur sa seule partie récente, et les lots que la règle aurait laissés pour après
+     * (`lots_epargnables`). `titre` : le titre que son paywall a montré (GENRES_DU_HAUT), noté avec le contexte ;
+     * `titre_entier` : celui qu’aurait montré la conv entière, une fois sa suite lue après le paiement (la moitié
+     * partielle : ses titres perdus, comme le contrefactuel ceux de la moitié entière).
+     */
+    bras: text("bras", { enum: BRAS_DE_LA_LECTURE }),
+    lotsGardes: integer("lots_gardes").notNull().default(0),
+    suite: text("suite", { enum: ISSUES_DE_LA_SUITE }),
+    contrefactuel: text("contrefactuel", { enum: CONTREFACTUELS }),
+    lotsEpargnables: integer("lots_epargnables"),
+    titre: text("titre"),
+    titreEntier: text("titre_entier"),
     creeLe: quand("cree_le").notNull().defaultNow(),
   },
   (t) => [index("imports_cree_idx").on(t.creeLe)],
+);
+
+/**
+ * Les écrans gardés d’une longue vidéo lue en partie avant l’achat (src/server/suite-video.ts) : un lot par ligne, ses
+ * images à la suite, chiffrées (`data` ; leur type et leur taille en clair, qui ne disent rien de la conv), et sa lecture
+ * une fois faite après le paiement (`lu`, chiffrée : un nouvel essai du verdict ne la repaie pas). `envoi` : l’empreinte
+ * de l’envoi (envoiDe, src/server/imports.ts), jamais sa clé ; `rang` : la place du lot dans la vidéo (0, le plus ancien).
+ * Sans conv tant que l’import n’a pas eu lieu (effacés au bout d’une heure), puis rattachés à elle (effacés avec elle).
+ * `expire_le` : l’heure où la purge des 5 minutes les efface, lus ou non (48 h après l’import, 11 jours après le paywall,
+ * 7 jours après le paiement : src/server/ecrans-gardes.ts). Jamais vers le navigateur ni le journal.
+ */
+export const ecransGardes = pgTable(
+  "ecrans_gardes",
+  {
+    envoi: text("envoi").notNull(),
+    rang: smallint("rang").notNull(),
+    storyId: uuid("story_id").references(() => stories.id, { onDelete: "cascade" }),
+    medias: text("medias").array().notNull(),
+    tailles: integer("tailles").array().notNull(),
+    data: chiffre("data").notNull(),
+    lu: chiffre("lu"),
+    /** Le lot n’a pas pu se lire après le paiement (un refus, une sortie illisible) : sauté, la suite a un trou. */
+    saute: boolean("saute").notNull().default(false),
+    expireLe: quand("expire_le").notNull(),
+    creeLe: quand("cree_le").notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.envoi, t.rang] }), index("ecrans_gardes_story_idx").on(t.storyId), index("ecrans_gardes_expire_idx").on(t.expireLe)],
+);
+
+/**
+ * La suite d’une longue vidéo lue en partie avant l’achat (src/server/suite-video.ts) : ce qui permet de la lire après
+ * le paiement comme elle l’aurait été à l’import. Les lectures des lots déjà lus, chiffrées (`recents`, dans l’ordre de
+ * la vidéo), son appli, le jour de Paris de l’import (« hier » se date d’après lui), ses écrans et les lots gardés
+ * (ecrans_gardes). Effacée une fois la suite lue, ou avec ses écrans (`expire_le`), ou avec sa conv. `payee_le` : le
+ * rapport ouvert (payé, ou ouvert d’avance) l’a gardée le temps de sa lecture (7 jours au plus, le temps du verdict).
+ */
+export const suitesVideo = pgTable(
+  "suites_video",
+  {
+    storyId: uuid("story_id")
+      .primaryKey()
+      .references(() => stories.id, { onDelete: "cascade" }),
+    envoi: text("envoi").notNull(),
+    recents: chiffre("recents").notNull(),
+    appli: text("appli", { enum: CLES_DES_APPLIS }).notNull(),
+    jour: text("jour").notNull(),
+    ecrans: integer("ecrans").notNull(),
+    lots: integer("lots").notNull(),
+    payeeLe: quand("payee_le"),
+    expireLe: quand("expire_le").notNull(),
+    creeLe: quand("cree_le").notNull().defaultNow(),
+  },
+  (t) => [index("suites_video_expire_idx").on(t.expireLe)],
+);
+
+/**
+ * Les longues vidéos de l’A/B de la lecture partielle, au moment de leur plan (POST /api/captures/video/plan,
+ * src/server/lecture-partielle.ts), avant toute lecture : une ligne par envoi (`envoi`, son empreinte, envoiDe), sa moitié
+ * (`bras`), et l’empreinte de la vidéo (`video` : celle de son lot le plus récent, repassée par la clé du serveur, rien
+ * de ses images), qui réunit les essais d’une même vidéo. /admin compare les deux moitiés sur les vidéos planifiées, et
+ * non sur les seules convs nées : la moitié entière, lue plus longtemps, perd plus de monde en route, et ce qu’elle a lu
+ * pour rien compte avec elle. Ni compte, ni email, ni conv ; pas les comptes de l’équipe. Gardées IMPORTS_GARDES_JOURS
+ * (la purge de la nuit).
+ */
+export const plansVideo = pgTable(
+  "plans_video",
+  {
+    envoi: text("envoi").primaryKey(),
+    video: text("video").notNull(),
+    bras: text("bras", { enum: BRAS_DE_LA_LECTURE }).notNull(),
+    creeLe: quand("cree_le").notNull().defaultNow(),
+  },
+  (t) => [index("plans_video_cree_idx").on(t.creeLe)],
 );
 
 /**

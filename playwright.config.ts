@@ -44,6 +44,11 @@ const serveur = (port: number, betaFermee: boolean) => ({
     CRON_SECRET,
     BLUSH_BETA_FERMEE: betaFermee ? "1" : "0",
     BLUSH_BOITE_MAILS: BOITE_MAILS,
+    /*
+     * La lecture partielle des longues vidéos en A/B (src/server/lecture-partielle.ts) : import-lecture-partielle.spec.ts
+     * en suit une de bout en bout ; les vidéos filmées des autres tests sont courtes (un seul tour de lots), hors de l’A/B
+     */
+    BLUSH_LECTURE_PARTIELLE: "ab",
     /* Le CAPTCHA, avec les clés de test de Cloudflare : le serveur répond lui-même (tests/e2e/aide/captcha.ts) */
     TURNSTILE_SECRET_KEY: TURNSTILE.secrete,
     NEXT_PUBLIC_TURNSTILE_SITE_KEY: TURNSTILE.publique,

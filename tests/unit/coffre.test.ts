@@ -8,7 +8,7 @@ import * as coffre from "@/server/coffre";
 import * as schema from "@/server/db/schema";
 import type { Meta } from "@/server/histoires";
 import type { Chapter } from "@/types";
-import { lotVideo } from "../aide/fabriques";
+import { captures, lotVideo, msg } from "../aide/fabriques";
 
 /*
  * Le coffre (src/server/coffre.ts) : chaque colonne chiffrée a sa forme, s’écrit et se relit par elle. Les lignes
@@ -134,6 +134,8 @@ const EXEMPLES: { [C in coffre.Colonne]: coffre.Formes[C] } = {
   "waitlist.email": "tom@exemple.fr",
   "tournages.cle": "x".repeat(43),
   "lectures_des_lots.lu": lotVideo("Léa"),
+  "ecrans_gardes.lu": captures({ blocs: [{ repere: null, messages: [msg("autre", "Léa dit jeudi")] }] }),
+  "suites_video.recents": [captures({ autre: "Léa" })],
 };
 
 describe("le coffre", () => {
@@ -156,6 +158,14 @@ describe("le coffre", () => {
   it("compresse la conv brute avant de la chiffrer, et elle seule", () => {
     expect(coffre.ecrire("stories.conv", "Léa: coucou\n".repeat(1000))[0]).toBe(2);
     expect(coffre.ecrire("stories.meta", META)[0]).toBe(1);
+  });
+
+  it("garde les images d’un lot à la suite, sans JSON, et les redécoupe d’après leurs tailles", () => {
+    const images = [Buffer.from("ffd8ffe0", "hex"), Buffer.from("ffd8ffe1aa", "hex")];
+    const chiffre = coffre.ecrireImages(images);
+    expect(chiffre.includes(images[1]!)).toBe(false);
+    expect(coffre.lireImages(chiffre, [4, 5]).map((b) => b.toString("hex"))).toEqual(["ffd8ffe0", "ffd8ffe1aa"]);
+    expect(() => coffre.lireImages(chiffre, [4, 4])).toThrow(/tailles/);
   });
 
   it("garde l’audio tel quel, sans JSON", () => {

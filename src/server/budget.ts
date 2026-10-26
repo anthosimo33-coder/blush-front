@@ -20,7 +20,7 @@ import { aujourdhuiParis, DEBUT_DU_JOUR } from "./temps";
  *
  * Qui paie un appel : le compte de sa conv, ou le compte connecté qui envoie des captures avant l’import (`compte`,
  * src/server/captures.ts). Sans l’un ni l’autre, l’appel est « sans compte » : il a sa part à lui, prise dans le budget
- * du jour. Une lecture d’avant l’import (sans conv), et tout appel sans compte, en réserve d’abord ce qu’il peut coûter au
+ * du jour. La suite d’une longue vidéo, lue après le paiement, a la sienne aussi (PAYEUR_DE_LA_SUITE). Une lecture d’avant l’import (sans conv), et tout appel sans compte, en réserve d’abord ce qu’il peut coûter au
  * plus (reserver : n’importe qui peut en lancer, en rafale, sans compte ou d’un compte gratuit). La part sans compte
  * prévient l’équipe à 80 %, puis au premier refus : tous les visiteurs d’avant l’email s’arrêtent alors jusqu’à minuit.
  * Ce qui est dépensé pour tous se lit dans ai_usage (une conv effacée y laisse ses lignes, sans conv : elles
@@ -48,25 +48,37 @@ export const BUDGET_IA = {
    * créatrice, environ 1 $ chacune, une trentaine par jour au plus (la limite tournageApiParJour les borne avant lui).
    */
   tournage: 40,
+  /**
+   * Les suites des longues vidéos lues après le paiement (PAYEUR_DE_LA_SUITE, src/server/suite-video.ts) : environ
+   * 0,40 $ chacune, 2,80 $ pour une très longue. Avant la lecture partielle, ces écrans se lisaient avant l’email, sur la
+   * part sans compte ; sur le compte de l’acheteur (10 $), une très longue suite, avec le verdict, le rapport et le
+   * chat du même jour, pouvait reporter son verdict après minuit alors qu’il a payé. Une part à elles : une dizaine de
+   * très longues suites par jour, une soixantaine d’ordinaires.
+   */
+  suite: 30,
   /** L’équipe est prévenue à 50 % et 80 % (décidé), puis quand le budget du jour est atteint. */
   seuils: [0.5, 0.8, 1],
   /** La part sans compte prévient l’équipe à 80 % (les lectures en cours comprises), puis à son premier refus. */
   alerteSansCompte: 0.8,
 } as const;
 
-/** Qui paie un appel : un compte (sa clé, cleDuCompte), ou null (sans compte). */
+/** Qui paie un appel : un compte (sa clé, cleDuCompte), une part à elle (PAYEUR_DE_LA_SUITE), ou null (sans compte). */
 export type Payeur = string | null;
 
 /** Le payeur des appels faits pour ce compte. */
 export const payeurDuCompte = (compte: { email: string }): string => cleDuCompte(compte.email);
+
+/** Le payeur des suites des longues vidéos, lues après le paiement (BUDGET_IA.suite) : ni un compte (pas d’« @ »), ni la part sans compte. */
+export const PAYEUR_DE_LA_SUITE = "suite:video";
 
 /** Ce qui est déjà dépensé aujourd’hui, en millionièmes de dollar (comme ai_usage.cost_micros) : pour tous, et pour ce payeur. */
 export type Depenses = { jour: number; payeur: number };
 
 const micros = (dollars: number) => Math.round(dollars * 1e6);
 
-/** Le budget du jour de ce payeur, en millionièmes de dollar : le compte des convs de tournage a le sien. */
-export const plafondDe = (payeur: Payeur): number => micros(payeur === cleDuCompte(COMPTE_DU_TOURNAGE) ? BUDGET_IA.tournage : payeur ? BUDGET_IA.compte : BUDGET_IA.anonyme);
+/** Le budget du jour de ce payeur, en millionièmes de dollar : le compte des convs de tournage a le sien, les suites des longues vidéos aussi. */
+export const plafondDe = (payeur: Payeur): number =>
+  micros(payeur === cleDuCompte(COMPTE_DU_TOURNAGE) ? BUDGET_IA.tournage : payeur === PAYEUR_DE_LA_SUITE ? BUDGET_IA.suite : payeur ? BUDGET_IA.compte : BUDGET_IA.anonyme);
 
 /** Quel budget est épuisé (celui de tous d’abord), ou null : l’appel peut partir. */
 export function budgetEpuise({ jour, payeur: duPayeur }: Depenses, payeur: Payeur): "jour" | "compte" | "anonyme" | null {
@@ -205,8 +217,13 @@ export type Reserve = Depenses;
  * pour eux : les seuils suivent la dépense notée). Prévient l’équipe des seuils passés, sans attendre. Rend le payeur,
  * pour noterDepense.
  */
-export async function controlerBudget({ storyId, compte, reserve }: { storyId?: string; compte?: { email: string } | null; reserve?: Reserve } = {}): Promise<Payeur> {
-  const payeur = (await payeurDe(storyId)) ?? (compte ? payeurDuCompte(compte) : null);
+export async function controlerBudget({
+  storyId,
+  compte,
+  reserve,
+  payeur: impose,
+}: { storyId?: string; compte?: { email: string } | null; reserve?: Reserve; payeur?: Payeur } = {}): Promise<Payeur> {
+  const payeur = impose !== undefined ? impose : ((await payeurDe(storyId)) ?? (compte ? payeurDuCompte(compte) : null));
   const d = await depenses(payeur);
   for (const seuil of seuilsAtteints(d.jour)) void auMieux(prevenir(seuil, d.jour), "alerte du budget de l’IA", { seuil });
   const epuise = budgetEpuise(reserve ? { jour: d.jour + reserve.jour, payeur: d.payeur + reserve.payeur } : d, payeur);

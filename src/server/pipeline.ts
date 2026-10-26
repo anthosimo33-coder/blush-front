@@ -8,6 +8,7 @@ import { rapportOuvertEnBase } from "./droits";
 import { DUREES_MS } from "./avancement";
 import { GENRES_CHAINE, type Genre } from "./db/enums";
 import { avecEcheance, DUREE_FONCTION_S, echeancePour, tempsRestant } from "./echeance";
+import { dureeDeLaSuite, garderJusquALaLecture } from "./ecrans-gardes";
 import { ARRETS_DU_BUDGET, codeImprevu, ErreurTache, estBudget, estBudgetVoix, estRefus, type ArretDuBudget } from "./erreurs";
 import type { Ligne, LigneComplete } from "./histoires";
 import { voixDisponible } from "./ia/voix";
@@ -103,12 +104,16 @@ async function enchainer(story: Ligne, t: Tache): Promise<void> {
 /**
  * Le verdict d’une conv qui attendait son paiement (tasks.status « paiement ») part, si son rapport est maintenant ouvert
  * (payé, ou un compte de l’équipe) : l’accès lu en base, jamais d’après l’appelant. Vrai s’il vient de partir ; la chaîne
- * le prend ensuite (l’appelant la relance). `statut` : celui du verdict, déjà lu par l’appelant.
+ * le prend ensuite (l’appelant la relance). `statut` : celui du verdict, déjà lu par l’appelant. La suite d’une longue
+ * vidéo lue en partie (src/server/suite-video.ts) attend alors sa lecture, avant le verdict, au lieu de s’effacer 24 h
+ * après l’import.
  */
 export async function lancerApresPaiement(story: Pick<Ligne, "id" | "userId">, statut?: string): Promise<boolean> {
   const lu = statut ?? (await etatDesTaches(story.id, ["verdict"])).verdict?.status;
   if (lu !== "paiement" || !(await aAcces(story))) return false;
-  return (await paiementRecu(story.id)) > 0;
+  const parti = (await paiementRecu(story.id)) > 0;
+  if (parti) await garderJusquALaLecture(story.id);
+  return parti;
 }
 
 export async function reparerLaChaine(story: Pick<Ligne, "id" | "userId">, etat?: EtatChaine): Promise<boolean> {
@@ -407,8 +412,12 @@ export async function executerChaine(storyId: string, { relais = 0 }: { relais?:
     for (;;) {
       const [t] = await aRelancer(storyId);
       if (!t) return;
-      /* Plus le temps de la commencer ici (la mémoire, après le rapport) : une fonction neuve la reprend tout de suite */
-      if (tempsRestant() < tempsPourCommencer(t.kind)) {
+      /*
+       * Plus le temps de la commencer ici (la mémoire, après le rapport) : une fonction neuve la reprend tout de suite. Un
+       * verdict qui lit d’abord la suite d’une longue vidéo (src/server/suite-video.ts) demande ses vagues de lots en plus
+       */
+      const suite = t.kind === "verdict" ? await dureeDeLaSuite(storyId) : 0;
+      if (tempsRestant() < tempsPourCommencer(t.kind) + suite) {
         await passerLaMain(storyId, relais + 1);
         return;
       }

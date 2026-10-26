@@ -33,6 +33,8 @@ function sourceDe(id: string, m: MorceauMeta): Source {
         period: periode,
         messageCount: total,
         voiceCount: vocaux,
+        /* Une longue vidéo lue en partie avant l’achat : le début se lira avec le rapport */
+        ...(m.suiteVideo ? { suiteVideo: true } : {}),
       }
     : {
         id,

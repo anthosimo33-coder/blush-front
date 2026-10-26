@@ -7,7 +7,7 @@ import { useReducedMotion } from "@/lib/hooks";
 import { SOUFFLE } from "@/lib/messages-erreur";
 import { delai } from "@/lib/motion";
 import { play } from "@/lib/sound";
-import { READING_STEPS, READING_STEPS_AVANT_PAIEMENT } from "@/contenu/parcours";
+import { LECTURE_DU_DEBUT, READING_STEPS, READING_STEPS_AVANT_PAIEMENT } from "@/contenu/parcours";
 import { BubbleLogo, CheckBurst } from "@/components/brand/objects3d";
 import { Button, ButtonLink } from "@/components/ui/Button";
 import { DoneCheck, TypingDots } from "@/components/ui/feedback";
@@ -67,6 +67,8 @@ export function LectureScreen({
   const raison = p.failReason;
   const etapes = paiement ? READING_STEPS_AVANT_PAIEMENT : READING_STEPS;
   const step = p.done ? etapes.length - 1 : Math.min(p.stepsDone, etapes.length - 1);
+  /* Une longue vidéo payée : BLUSH lit d’abord le début de la conv, avant le verdict (une à deux minutes de plus) */
+  const debut = !p.done && p.debut && p.debut.faits < p.debut.total ? p.debut : null;
   const shown = reduced && p.done ? { ...p, messagesRead: total } : p;
 
   if (paywall && apercu) return <Paywall story={apercu.story} apercu={apercu.haut} offreDirecte={offreDirecte} />;
@@ -126,12 +128,14 @@ export function LectureScreen({
                 <span className="flex size-5 shrink-0 items-center justify-center" aria-hidden="true">
                   {p.done ? <DoneCheck size={20} data-popin="" /> : <TypingDots size={5} />}
                 </span>
-                <span key={step} data-rise="">
-                  {etapes[step]}
+                <span key={debut ? "debut" : step} data-rise="">
+                  {debut ? LECTURE_DU_DEBUT.etape(debut.faits, debut.total) : etapes[step]}
                   <span className="sr-only">{p.done ? "\u00a0: fait" : "\u00a0: en cours"}</span>
                 </span>
               </div>
-              <p className={cn("m-0 text-legende font-extrabold text-grey", p.done && "invisible")}>{paiement ? "Quelques secondes" : "Ça prend environ 40 secondes"}</p>
+              <p className={cn("m-0 text-legende font-extrabold text-grey", p.done && "invisible")}>
+                {paiement ? "Quelques secondes" : debut ? LECTURE_DU_DEBUT.duree : "Ça prend environ 40 secondes"}
+              </p>
             </div>
           )}
         </div>

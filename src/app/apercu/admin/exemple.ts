@@ -189,6 +189,49 @@ function pilotageDe(jours: Periode, { calme = false, suivi = true }: Variante): 
       pourRien: n * dollars * 0.08,
     };
   });
+  /*
+   * La lecture partielle des longues vidéos, en A/B : la moitié des longues vidéos de la période dans chaque moitié, la
+   * partielle lisant un tiers des lots avant l’achat (le reste gardé, lu après le paiement), un peu plus vite au paywall,
+   * et perdant moins de monde en route ; le contrefactuel des vidéos lues en entier, presque toujours le même titre
+   */
+  const longues = Math.round(importsParType.find((t) => t.type === "video")!.imports * 0.6);
+  const moitie = (bras: "entiere" | "partielle") => {
+    const partielle = bras === "partielle";
+    const planifiees = Math.round(longues / 2);
+    const videos = Math.round(planifiees * (partielle ? 0.9 : 0.8));
+    const payes = Math.round(videos * (partielle ? 0.06 : 0.07));
+    return {
+      bras,
+      videos: planifiees,
+      importees: videos,
+      paywall: Math.round(videos * 0.82),
+      payes,
+      payesTard: Math.round(payes / 3),
+      dollarsAvant: videos * (partielle ? 0.45 : 1.2),
+      dollarsSuite: partielle ? payes * 0.8 : 0,
+      ecrans: videos * (partielle ? 56 : 150),
+      lots: videos * (partielle ? 5 : 14),
+      lotsGardes: partielle ? videos * 9 : 0,
+      coupees: partielle ? Math.round(videos * 0.85) : 0,
+      tendance: Math.round(videos * 0.18),
+      titres: Math.round(videos * 0.82),
+      secondesAuPaywall: partielle ? 95 : 140,
+      suites: partielle ? { lues: Math.max(0, payes - 1), incompletes: payes ? 1 : 0, perdues: 0 } : { lues: 0, incompletes: 0, perdues: 0 },
+      titresEntiers: partielle ? { entiers: payes, changes: 0 } : { entiers: 0, changes: 0 },
+    };
+  };
+  const lecturePartielle: Pilotage["lecturePartielle"] = {
+    bras: [moitie("entiere"), moitie("partielle")],
+    contrefactuel: {
+      videos: Math.round(longues / 2),
+      pareil: Math.round(longues / 2) - 1,
+      tendancePerdue: 0,
+      dateDecalee: 1,
+      autreTitre: 0,
+      lots: Math.round(longues / 2) * 14,
+      lotsEpargnables: Math.round(longues / 2) * 9,
+    },
+  };
   const jalonsParAppli = applis
     .map(([appli, part, passe]) => {
       const choisie = Math.round(jalons.appli * part);
@@ -276,6 +319,7 @@ function pilotageDe(jours: Periode, { calme = false, suivi = true }: Variante): 
     ],
     abDerniere: { avec: { n: 38, payes: 6 }, sans: { n: 41, payes: 3 } },
     importsParType,
+    lecturePartielle,
     iaDuJour: { dollars: 12.4, budget: 30, sansCompte: { dollars: 3.1, budget: 50 } },
     sante: calme
       ? { echecs: 0, bloquees: 0, paiementsEchoues: 0, alertes: 0, pannes: 0, pannesDuJour: 0 }

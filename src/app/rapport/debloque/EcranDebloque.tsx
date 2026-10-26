@@ -223,6 +223,7 @@ export function EcranDebloque({
   restants,
   total,
   reprise,
+  avecLeDebut = false,
 }: {
   /** L’achat payé (`?achat=`), son offre, et les bulles reçues avec lui (celles de l’offre ③ prise juste après comprises). */
   achat: string;
@@ -234,6 +235,8 @@ export function EcranDebloque({
   /** Les chapitres du rapport, offerts compris : ceux qu’il a vraiment (un rapport écrit peut en avoir moins de huit). */
   total: number;
   reprise: number;
+  /** Une longue vidéo : BLUSH lit d’abord le début de la conv, gardé pour après le paiement (le verdict arrive plus tard). */
+  avecLeDebut?: boolean;
 }) {
   const titre = useId();
   /* Le seul son qui suit un achat : la serrure, puis la signature sur un accord ouvert */
@@ -424,7 +427,7 @@ export function EcranDebloque({
         {montree === null && (
           <div data-rise="" style={delai(0.45)} className="mt-6 w-full text-left">
             <InsetGroup>
-              <InsetRow leading={<RowIcon icon="check" tone="vrai" />} title={DEBLOQUE.restants(restants, restants === total)} sub={DEBLOQUE.reprise(reprise)} />
+              <InsetRow leading={<RowIcon icon="check" tone="vrai" />} title={DEBLOQUE.restants(restants, restants === total)} sub={DEBLOQUE.reprise(reprise, avecLeDebut)} />
               <InsetRow
                 leading={
                   <RowIcon tone="elle">

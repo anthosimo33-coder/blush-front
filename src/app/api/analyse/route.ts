@@ -1,5 +1,4 @@
-import { ecrireLeContexte } from "@/server/analyse";
-import { rapportOuvertEnBase } from "@/server/droits";
+import { poserLeVerdict } from "@/server/analyse";
 import { lancerApresPaiement, relancerApres } from "@/server/pipeline";
 import { effacerBrouillon, lireBrouillon, poserChoisie } from "@/server/cookies";
 import { progression, relancer } from "@/server/donnees";
@@ -7,7 +6,7 @@ import { erreur, lireCorps, repondre, route } from "@/server/http";
 import { definirQui, metaDe, quiRempli, rattacherBrouillon, tropCourte } from "@/server/histoires";
 import { LIMITES } from "@/server/limites";
 import { garde, lecture, rendreAuCompte, sousLaLimiteDeLIp, sousLaLimiteDuCompte } from "@/server/requete";
-import { attendreLePaiement, etatDesTaches, planifier } from "@/server/taches";
+import { etatDesTaches } from "@/server/taches";
 import { lecturePayeeRefusee, rejouer, tournageDe, tournageDuNavigateur } from "@/server/tournage";
 import { ROUTES } from "@/types/api";
 
@@ -89,13 +88,8 @@ export const POST = route("POST /api/analyse", async (req: Request) => {
       await rejouer(story.id, tournage, utilisateur);
       return repondre("POST /api/analyse", { ok: true });
     }
-    /* Le rapport ouvert se lit en base, après le rattachement : un brouillon n’avait pas encore de compte */
-    if (!(await rapportOuvertEnBase(story.id))) {
-      await ecrireLeContexte(story.id);
-      await attendreLePaiement(story.id, "verdict");
-      return repondre("POST /api/analyse", { ok: true });
-    }
-    await planifier(story.id, "verdict");
+    /* Le rapport ouvert se lit en base, après le rattachement : un brouillon n’avait pas encore de compte. Sans lui, le paywall */
+    if ((await poserLeVerdict(story.id)) === "paiement") return repondre("POST /api/analyse", { ok: true });
   } else if (verdict.status === "paiement") await lancerApresPaiement(story, verdict.status);
   relancerApres(story.id);
   return repondre("POST /api/analyse", { ok: true });

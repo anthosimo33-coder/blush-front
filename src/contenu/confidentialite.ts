@@ -39,7 +39,13 @@ export const NOTE_CODE = `Pas de mot de passe\u00a0: ce code suffit. Il expire a
 /** Sous le champ de la liste d’attente. */
 export const NOTE_ATTENTE = `Un mail pour confirmer, puis un autre le jour où ta place est prête. ${PROMESSE_EMAIL}`;
 
-/** L’enregistrement de l’écran (iMessage) : la vidéo ne part pas, seuls ses écrans. */
+/**
+ * L’enregistrement de l’écran (iMessage) : la vidéo ne part pas, seuls ses écrans. Courte et rassurante, la même pour
+ * tous, à l’étape où l’on perd le plus de monde : la garde des écrans les plus anciens d’une longue vidéo lue en partie
+ * (src/server/ecrans-gardes.ts) est sur la page de confidentialité, et l’écran « C’est bon » de la moitié partielle la
+ * dit. Avec la phrase sous chaque enregistrement, les deux moitiés de l’A/B la voyaient, et l’interrupteur à 0 aussi.
+ * TODO(produit): avant « ab », demander au juriste si la page de confidentialité et « C’est bon » suffisent ; sinon une phrase de plus ici, en « ab » seulement (un drapeau du serveur).
+ */
 export const NOTE_ENREGISTREMENT = "La vidéo reste sur ton téléphone\u00a0: seuls les écrans de la conv partent, lus une fois puis oubliés.";
 
 /**

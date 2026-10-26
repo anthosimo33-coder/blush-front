@@ -22,11 +22,12 @@ vi.mock("@/services/preparer-video", async (importOriginal) => {
        * L’écran n° k pèse k octets : le simulateur reconnaît un lot à son premier écran (happy-dom oublie le nom des fichiers
        * d’un formulaire). Ses octets valent `sel` : une autre vidéo à chaque test
        */
-      return Array.from({ length: ecrans }, (_, k) => {
+      const images = Array.from({ length: ecrans }, (_, k) => {
         const b = new Blob([new Uint8Array(k + 1).fill(sel)], { type: "image/jpeg" });
         signatures.set(b, `${sel}:${k}`);
         return b;
       });
+      return { images, sensSur };
     },
     /*
      * L’empreinte d’un lot, d’après ce que la vidéo simulée a mis dans ses écrans : la vraie passe par crypto.subtle, qui
@@ -42,28 +43,42 @@ const signatures = new WeakMap<Blob, string>();
 let ecrans = 11;
 /** Les octets des écrans de la vidéo simulée : un autre à chaque test, pour que les lots lus d’un test ne servent pas au suivant. */
 let sel = 0;
+/** La vidéo simulée a-t-elle défilé dans un seul sens (ses écrans sûrement dans l’ordre) ? */
+let sensSur = true;
 
 const json = (corps: unknown, status = 200) => new Response(JSON.stringify(corps), { status, headers: { "content-type": "application/json" } });
 const SOURCE = { kind: "captures", app: "imessage" };
 const VIDEO = new File([new Uint8Array(8)], "enregistrement.mp4", { type: "video/mp4" });
 
+/** La conv importée, telle que le serveur simulé la rend. */
+const IMPORTEE = { source: SOURCE, story: { id: "s1" }, messagesRead: 42 };
+
 /**
- * Le serveur simulé : `lot(n, essai)` répond à l’essai n° `essai` (1, 2…) du lot n° `n` (une Response, tout de suite ou
- * plus tard, ou « pend » : pas de réponse avant l’arrêt de l’envoi) ; `video` répond à l’assemblage. Rend la liste des
- * appels, les signaux, ce que portait chaque essai d’un lot (sa clé, son ordre) et les abandons reçus.
+ * Le serveur simulé : `lot(n, essai, indice)` répond à l’essai n° `essai` (1, 2…) du lot n° `n` (dans l’ordre d’arrivée ;
+ * `indice` : sa place dans la vidéo, d’après son premier écran, pour des lots de douze), par une Response, tout de suite
+ * ou plus tard, ou « pend » : pas de réponse avant l’arrêt de l’envoi ; `video(corps, k)` répond à la k-ième fin (une
+ * question sur une longue vidéo, ou l’assemblage), `plan` au plan d’une longue vidéo (en entier, par défaut), `ecrans`
+ * à l’envoi d’un lot gardé. Rend la liste des appels, les signaux, ce que portait chaque essai d’un lot (sa clé, son
+ * ordre, sa place), les abandons reçus, les plans demandés et les lots gardés (leur rang).
  */
 function serveur({
   lot,
-  video = () => json({ source: SOURCE, story: { id: "s1" }, messagesRead: 42 }),
+  video = () => json(IMPORTEE),
+  plan = () => json({ lecture: "entiere" }),
+  ecrans: garder = () => json({ ok: true }),
 }: {
-  lot: (n: number, essai: number) => Response | Promise<Response> | "pend";
-  video?: () => Response;
+  lot: (n: number, essai: number, indice: number) => Response | Promise<Response> | "pend";
+  video?: (corps: unknown, k: number) => Response;
+  plan?: (corps: unknown) => Response;
+  ecrans?: (rang: number) => Response | Promise<Response>;
 }) {
   const appels: string[] = [];
   const corpsVideo: unknown[] = [];
-  /* Ce que chaque essai d’un lot porte (sa clé d’envoi, son ordre), et les abandons reçus */
-  const champs: { n: number; cle: unknown; ordre: unknown }[] = [];
+  /* Ce que chaque essai d’un lot porte (sa clé d’envoi, son ordre, sa place), et les abandons reçus */
+  const champs: { n: number; cle: unknown; ordre: unknown; indice: number }[] = [];
   const abandons: { corps: unknown; keepalive: boolean | undefined }[] = [];
+  const plans: unknown[] = [];
+  const gardes: { rang: number; cle: unknown; images: number; priorite: RequestPriority | undefined }[] = [];
   const essais = new Map<number, number>();
   /* Le n° d’un lot, d’après son premier écran : les lots partent dans l’ordre, un nouvel essai reprend le même premier écran */
   const lots = new Map<number, number>();
@@ -76,8 +91,22 @@ function serveur({
   vi.spyOn(globalThis, "fetch").mockImplementation(async (url, init) => {
     if (url === "/api/captures/video") {
       appels.push("video");
-      corpsVideo.push(JSON.parse(String(init?.body)));
-      return video();
+      const corps: unknown = JSON.parse(String(init?.body));
+      corpsVideo.push(corps);
+      return video(corps, corpsVideo.length);
+    }
+    if (url === "/api/captures/video/plan") {
+      appels.push("plan");
+      const corps: unknown = JSON.parse(String(init?.body));
+      plans.push(corps);
+      return plan(corps);
+    }
+    if (url === "/api/captures/ecrans") {
+      const fd = init?.body as FormData;
+      const rang = Number(fd.get("rang"));
+      appels.push(`ecrans ${rang}`);
+      gardes.push({ rang, cle: fd.get("cle"), images: fd.getAll("captures").length, priorite: init?.priority });
+      return garder(rang);
     }
     if (url === "/api/captures/lot/abandon") {
       abandons.push({ corps: JSON.parse(String(init?.body)), keepalive: init?.keepalive });
@@ -86,16 +115,18 @@ function serveur({
     if (url !== "/api/captures/lot") throw new Error(`appel inattendu : ${String(url)}`);
     const n = lotDe(init);
     const fd = init?.body as FormData;
-    champs.push({ n, cle: fd.get("cle"), ordre: fd.get("ordre") });
+    /* Des lots de douze écrans, chacun reprenant le dernier du précédent : le premier écran du lot j est le n° 11 j (de taille 11 j + 1) */
+    const indice = ((fd.getAll("captures")[0] as Blob).size - 1) / 11;
+    champs.push({ n, cle: fd.get("cle"), ordre: fd.get("ordre"), indice });
     const essai = (essais.get(n) ?? 0) + 1;
     essais.set(n, essai);
     appels.push(`lot ${n} · essai ${essai}`);
     if (init?.signal) signaux.set(n, init.signal);
-    const r = lot(n, essai);
+    const r = lot(n, essai, indice);
     if (r !== "pend") return r;
     return new Promise<Response>((_, rejeter) => init?.signal?.addEventListener("abort", () => rejeter(new DOMException("arrêté", "AbortError"))));
   });
-  return { appels, corpsVideo, signaux, champs, abandons };
+  return { appels, corpsVideo, signaux, champs, abandons, plans, gardes };
 }
 
 /* L’extraction est chargée à la demande (pVideo) : chargée d’avance, son import ne dépend plus du temps simulé */
@@ -106,6 +137,7 @@ beforeEach(() => {
   vi.useFakeTimers();
   ecrans = 11;
   sel++;
+  sensSur = true;
 });
 afterEach(() => {
   vi.useRealTimers();
@@ -141,11 +173,12 @@ describe("uploadRecording sur une 5xx", () => {
     const e = await resultat;
     expect(e).toBeInstanceOf(ErreurApi);
     expect(e).toMatchObject({ code: "erreur", status: 502 });
-    expect(appels).toEqual(["lot 1 · essai 1", "lot 2 · essai 1", "lot 3 · essai 1", "lot 4 · essai 1", "lot 5 · essai 1", "lot 1 · essai 2"]);
+    /* Une longue vidéo : son plan d’abord (en entier, par défaut) */
+    expect(appels).toEqual(["plan", "lot 1 · essai 1", "lot 2 · essai 1", "lot 3 · essai 1", "lot 4 · essai 1", "lot 5 · essai 1", "lot 1 · essai 2"]);
     expect([2, 3, 4, 5].map((n) => signaux.get(n)?.aborted)).toEqual([true, true, true, true]);
     /* Rien ne repart ensuite */
     await vi.advanceTimersByTimeAsync(10_000);
-    expect(appels).toHaveLength(6);
+    expect(appels).toHaveLength(7);
   });
 
   it("le budget du jour atteint (« souffle »), même en 503 : pas de nouvel essai, il tient jusqu’à minuit", async () => {
@@ -241,5 +274,200 @@ describe("uploadRecording : un lot n’est jamais payé deux fois", () => {
     vi.setSystemTime(Date.now() + 86400e3);
     await uploadRecording(VIDEO, "imessage", CASE_IMPORT.version);
     expect(appels.filter((a) => a.startsWith("lot"))).toHaveLength(6);
+  });
+});
+
+describe("uploadRecording : une longue vidéo lue en partie avant l’achat", () => {
+  /** Une lecture de lot simulée, d’après sa place dans la vidéo. */
+  const lu = (_n: number, _essai: number, indice: number) => json({ lot: `lecture ${indice}` });
+  const lectures = (...indices: number[]) => indices.map((i) => `lecture ${i}`);
+  /* Huit lots de douze écrans (de 0 à 7), le dernier n’en ayant que trois : une longue vidéo */
+  beforeEach(() => {
+    ecrans = 80;
+  });
+
+  it("dans la moitié partielle : ses cinq lots les plus récents d’abord, puis la question ; « garder » : ses trois plus anciens partent tels quels, puis la fin avec eux", async () => {
+    const { appels, champs, corpsVideo, plans, gardes } = serveur({
+      lot: lu,
+      plan: () => json({ lecture: "partielle" }),
+      video: (_corps, k) => (k === 1 ? json({ suite: "garder", lots: 3 }) : json(IMPORTEE)),
+    });
+    const avance: AvanceVideo[] = [];
+    await expect(uploadRecording(VIDEO, "imessage", CASE_IMPORT.version, (a) => avance.push(a))).resolves.toEqual(IMPORTEE);
+    const cle = champs[0]!.cle;
+    /* Le plan : la longue vidéo, l’empreinte de son lot le plus récent, son sens, et la clé de l’envoi (sa moitié s’y note) */
+    expect(plans).toEqual([{ lots: 8, video: expect.stringContaining(`:${sel}:77`), sensSur: true, cle, consentement: CASE_IMPORT.version }]);
+    /* Du plus récent au plus ancien, le plus récent d’abord (« premier ») */
+    expect(champs.map((c) => [c.indice, c.ordre])).toEqual([
+      [7, "premier"],
+      [6, "suite"],
+      [5, "suite"],
+      [4, "suite"],
+      [3, "suite"],
+    ]);
+    const partiel = { restants: 3, ecrans: 80, video: (plans[0] as { video: string }).video, sensSur: true };
+    expect(corpsVideo).toEqual([
+      expect.objectContaining({ cle, lots: lectures(3, 4, 5, 6, 7), partiel }),
+      expect.objectContaining({ cle, lots: lectures(3, 4, 5, 6, 7), partiel: { ...partiel, gardes: true } }),
+    ]);
+    /* Ses trois lots plus anciens, gardés tels quels (jamais lus avant l’achat), sous la même clé, un à la fois, du plus ancien au plus récent */
+    expect(gardes.map((g) => g.rang)).toEqual([0, 1, 2]);
+    expect(gardes.every((g) => g.cle === cle && g.images === 12 && g.priorite === "low")).toBe(true);
+    /* Partis pendant la lecture, une fois la première lecture rendue (les images à lire d’abord), avant la question */
+    expect(appels.slice(0, 7)).toEqual(["plan", ...[1, 2, 3, 4, 5].map((n) => `lot ${n} · essai 1`), "ecrans 0"]);
+    expect(appels.filter((a) => a.startsWith("lot"))).toHaveLength(5);
+    /* La jauge compte toute la vidéo dès le départ (« 5 sur 8 », jamais « 5 sur 5 »), puis passe au bout à « assez » */
+    const lecture = avance.filter((a) => a.etape === "lecture");
+    expect(lecture.every((a) => a.total === 8)).toBe(true);
+    expect(lecture.map((a) => a.faits)).toEqual([0, 1, 2, 3, 4, 5, 8]);
+  });
+
+  it("les lots à garder attendent la première lecture rendue : ils ne partagent pas le réseau avec les images du premier tour", async () => {
+    let rendre = () => {};
+    const rendues = new Promise<void>((ok) => (rendre = ok));
+    const { appels } = serveur({
+      lot: async (n, essai, indice) => {
+        await rendues;
+        return lu(n, essai, indice);
+      },
+      plan: () => json({ lecture: "partielle" }),
+      video: (_corps, k) => (k === 1 ? json({ suite: "garder", lots: 3 }) : json(IMPORTEE)),
+    });
+    const envoi = uploadRecording(VIDEO, "imessage", CASE_IMPORT.version);
+    await vi.waitFor(() => expect(appels.filter((a) => a.startsWith("lot"))).toHaveLength(5));
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(appels.some((a) => a.startsWith("ecrans"))).toBe(false);
+    rendre();
+    await expect(envoi).resolves.toEqual(IMPORTEE);
+    expect(appels.filter((a) => a.startsWith("ecrans"))).toEqual(["ecrans 0", "ecrans 1", "ecrans 2"]);
+  });
+
+  it("les lots à garder encore en route quand la lecture finit : la personne voit leur envoi, puis la fin avec eux", async () => {
+    /* Le réseau lent : les écrans à garder n’arrivent qu’une fois la question posée */
+    let questionPosee = () => {};
+    const posee = new Promise<void>((ok) => (questionPosee = ok));
+    const { corpsVideo, gardes } = serveur({
+      lot: lu,
+      plan: () => json({ lecture: "partielle" }),
+      video: (_corps, k) => {
+        if (k > 1) return json(IMPORTEE);
+        questionPosee();
+        return json({ suite: "garder", lots: 3 });
+      },
+      ecrans: async () => {
+        await posee;
+        return json({ ok: true });
+      },
+    });
+    const avance: AvanceVideo[] = [];
+    await expect(uploadRecording(VIDEO, "imessage", CASE_IMPORT.version, (a) => avance.push(a))).resolves.toEqual(IMPORTEE);
+    expect(avance.filter((a) => a.etape === "envoi")).toEqual([0, 1, 2, 3].map((faits) => ({ etape: "envoi", faits, total: 3 })));
+    expect(gardes.map((g) => g.rang)).toEqual([0, 1, 2]);
+    expect(corpsVideo[1]).toMatchObject({ partiel: { restants: 3, gardes: true } });
+  });
+
+  it("le serveur dit d’en lire encore : les lots que ce tour lira ne partent plus être gardés, la suite garde les autres", async () => {
+    let questionPosee = () => {};
+    const posee = new Promise<void>((ok) => (questionPosee = ok));
+    const { champs, corpsVideo, gardes } = serveur({
+      lot: lu,
+      plan: () => json({ lecture: "partielle" }),
+      video: (_corps, k) => {
+        questionPosee();
+        return json(k === 1 ? { suite: "lire", lots: 2 } : k === 2 ? { suite: "garder", lots: 1 } : IMPORTEE);
+      },
+      ecrans: async () => {
+        await posee;
+        return json({ ok: true });
+      },
+    });
+    await expect(uploadRecording(VIDEO, "imessage", CASE_IMPORT.version)).resolves.toEqual(IMPORTEE);
+    /* Le lot 0 en route quand la question répond ; les lots 1 et 2, lus au tour suivant, ne partent pas */
+    expect(gardes.map((g) => g.rang)).toEqual([0]);
+    expect(champs.map((c) => c.indice)).toEqual([7, 6, 5, 4, 3, 2, 1]);
+    expect(corpsVideo.map((c) => (c as { partiel: { restants: number; gardes?: true } }).partiel)).toEqual([
+      expect.objectContaining({ restants: 3 }),
+      expect.objectContaining({ restants: 1 }),
+      expect.objectContaining({ restants: 1, gardes: true }),
+    ]);
+  });
+
+  it("la question dit d’en lire encore : un tour de plus, du plus récent au plus ancien, puis la fin de toute la vidéo", async () => {
+    const { champs, corpsVideo } = serveur({
+      lot: lu,
+      plan: () => json({ lecture: "partielle" }),
+      video: (_corps, k) => (k === 1 ? json({ suite: "lire", lots: 3 }) : json(IMPORTEE)),
+    });
+    await expect(uploadRecording(VIDEO, "imessage", CASE_IMPORT.version)).resolves.toEqual(IMPORTEE);
+    expect(champs.map((c) => c.indice)).toEqual([7, 6, 5, 4, 3, 2, 1, 0]);
+    expect(corpsVideo.map((c) => (c as { partiel: { restants: number } }).partiel.restants)).toEqual([3, 0]);
+    expect(corpsVideo[1]).toMatchObject({ lots: lectures(0, 1, 2, 3, 4, 5, 6, 7) });
+  });
+
+  it("la question au serveur échoue : rien ne part plus, et l’envoi est abandonné (le serveur oublie les écrans déjà envoyés)", async () => {
+    let questionPosee = () => {};
+    const posee = new Promise<void>((ok) => (questionPosee = ok));
+    const { abandons, gardes } = serveur({
+      lot: lu,
+      plan: () => json({ lecture: "partielle" }),
+      video: () => {
+        questionPosee();
+        return json({ erreur: "trop" }, 429);
+      },
+      ecrans: async () => {
+        await posee;
+        return json({ ok: true });
+      },
+    });
+    await expect(uploadRecording(VIDEO, "imessage", CASE_IMPORT.version)).rejects.toMatchObject({ code: "trop" });
+    expect(abandons).toEqual([expect.objectContaining({ keepalive: true })]);
+    /* Le lot en route au moment de l’erreur, et aucun après lui */
+    expect(gardes.map((g) => g.rang)).toEqual([0]);
+  });
+
+  it("l’envoi des lots gardés échoue : ils se lisent avant l’achat, comme avant, et la fin rassemble toute la vidéo", async () => {
+    const { appels, champs, corpsVideo } = serveur({
+      lot: lu,
+      plan: () => json({ lecture: "partielle" }),
+      video: (_corps, k) => (k === 1 ? json({ suite: "garder", lots: 3 }) : json(IMPORTEE)),
+      ecrans: () => json({ erreur: "trop_jour" }, 429),
+    });
+    await expect(uploadRecording(VIDEO, "imessage", CASE_IMPORT.version)).resolves.toEqual(IMPORTEE);
+    expect(champs.map((c) => c.indice).slice(5)).toEqual([2, 1, 0]);
+    expect(corpsVideo).toHaveLength(2);
+    expect(corpsVideo[1]).toMatchObject({ lots: lectures(0, 1, 2, 3, 4, 5, 6, 7), partiel: { restants: 0 } });
+    expect(appels.filter((a) => a.startsWith("ecrans")).length).toBeGreaterThan(0);
+  });
+
+  it("dans la moitié entière, ou sans réponse au plan : lue en entier dans l’ordre, comme avant ; la fin dit la longue vidéo", async () => {
+    const { champs, corpsVideo, gardes } = serveur({ lot: lu });
+    await uploadRecording(VIDEO, "imessage", CASE_IMPORT.version);
+    expect(champs.map((c) => c.indice)).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
+    expect(corpsVideo).toEqual([expect.objectContaining({ lots: lectures(0, 1, 2, 3, 4, 5, 6, 7), partiel: expect.objectContaining({ restants: 0, ecrans: 80, sensSur: true }) })]);
+    expect(gardes).toEqual([]);
+    /* Le plan sans réponse (le réseau) : en entier aussi */
+    sel++;
+    const secondes = serveur({ lot: lu, plan: () => json({ erreur: "erreur" }, 500) });
+    await expect(uploadRecording(VIDEO, "imessage", CASE_IMPORT.version)).resolves.toEqual(IMPORTEE);
+    expect(secondes.champs.map((c) => c.indice)).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
+  });
+
+  it("un morceau ajouté, ou une courte vidéo : aucun plan demandé, rien de la longue vidéo dans la fin ; un sens douteux se dit au plan", async () => {
+    const ajout = serveur({ lot: lu });
+    await uploadRecording(VIDEO, "imessage", CASE_IMPORT.version, undefined, { ajout: true });
+    expect(ajout.plans).toEqual([]);
+    expect(ajout.corpsVideo).toEqual([expect.not.objectContaining({ partiel: expect.anything() })]);
+    sel++;
+    ecrans = 11;
+    const courte = serveur({ lot: lu });
+    await uploadRecording(VIDEO, "imessage", CASE_IMPORT.version);
+    expect(courte.plans).toEqual([]);
+    expect(courte.corpsVideo).toEqual([expect.not.objectContaining({ partiel: expect.anything() })]);
+    sel++;
+    ecrans = 80;
+    sensSur = false;
+    const douteuse = serveur({ lot: lu });
+    await uploadRecording(VIDEO, "imessage", CASE_IMPORT.version);
+    expect(douteuse.plans).toEqual([expect.objectContaining({ sensSur: false })]);
   });
 });
