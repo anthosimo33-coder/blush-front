@@ -8,6 +8,7 @@ import { compterImportVenuDuPartage } from "@/server/compteurs";
 import { lireBrouillon, poserBrouillon } from "@/server/cookies";
 import { ErreurPublique } from "@/server/erreurs";
 import { erreur, lireCorps, repondre, route } from "@/server/http";
+import { envoiDe, noterAjout, noterImport } from "@/server/imports";
 import { storyEtSource } from "@/server/conv-affichee";
 import { ajouterDesCaptures, importerCaptures, morceauDejaAjoute } from "@/server/histoires";
 import { consentementImport } from "@/server/juridique";
@@ -93,6 +94,11 @@ export const POST = route("POST /api/captures/video", async (req: Request) => {
     if (!place) throw new ErreurPublique("trop_jour");
     return place;
   };
+  /*
+   * La mesure des imports (src/server/imports.ts) : l’empreinte de l’envoi, celle sous laquelle ses lots ont rangé leur
+   * coût, et ce qu’ils ont lu (les écrans, sans l’image partagée par deux lots voisins, et les lots)
+   */
+  const mesure = (f: ReturnType<typeof fusionnerLots>) => ({ ecrans: f.captures.length, lots: lots.length, envoi: envoiDe(cleEnvoi(cle)) });
   /* Un morceau de plus (pas en mode tournage : sa conv n’est pas lue) */
   if (envoi.mode === "ajout") {
     const brouillon = await lireBrouillon();
@@ -102,12 +108,14 @@ export const POST = route("POST /api/captures/video", async (req: Request) => {
       c,
       brouillon,
       async () => {
-        const t = enTexte(fusionnerLots(lots, app));
+        const f = fusionnerLots(lots, app);
+        const t = enTexte(f);
         const place = await dansLeBudget(t);
         const { id, meta } = await ajouterDesCaptures(brouillon, { appli: app, t, cle: c }).catch(async (e: unknown) => {
           await place.rendre();
           throw e;
         });
+        await noterAjout(id, mesure(f));
         return { id, meta, secret: brouillon, messages: t.messages };
       },
       () => (c ? morceauDejaAjoute(brouillon, c) : Promise.resolve(null)),
@@ -117,14 +125,16 @@ export const POST = route("POST /api/captures/video", async (req: Request) => {
   }
   const lu = await uneSeuleLecture(cleEnvoi(cle), async (secret) => {
     if (tournage) return brouillonDeTournage(tournage, { appli: app, captures: lots.length, secret, consentement });
-    const t = enTexte(fusionnerLots(lots, app));
+    const f = fusionnerLots(lots, app);
+    const t = enTexte(f);
     const place = await dansLeBudget(t);
     /* Rien n’entre en base : sa place revient à tous, l’adresse garde son compte */
     const { id, meta } = await importerCaptures({ appli: app, t, secret, consentement }).catch(async (e: unknown) => {
       await place.rendre();
       throw e;
     });
-    /* Une fois par histoire créée : un nouvel essai qui la retrouve ne compte pas l’import deux fois */
+    /* Une fois par histoire créée : un nouvel essai qui la retrouve ne compte pas l’import deux fois (ni sa mesure) */
+    await noterImport({ storyId: id, type: "video", appli: app, ...mesure(f) });
     await compterImportVenuDuPartage();
     await noterAuFil(req, { genre: "import" });
     return { id, meta, secret, messages: t.messages };

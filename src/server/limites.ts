@@ -153,23 +153,26 @@ export const LIMITES = {
   /** Les images « Partager en image » (une réponse du chat, la chute d’un chapitre) et le rapport en PDF, dessinés à la demande. */
   imageParCompte: { max: 60, fenetreS: 86400 },
   /**
-   * Les lots d’images d’un enregistrement d’écran, chacun lu par le modèle : des lots de six à douze écrans selon la
-   * longueur (depuis le 21 octobre ; six le 20, douze avant), jusqu’à quinze pour un long enregistrement (trente-deux le
-   * 20 octobre, seize avant). Les plafonds des lots ont doublé à
-   * chaque fois : autant d’enregistrements qu’avant (un Wi-Fi partagé ou le NAT d’un opérateur en font passer
-   * plusieurs), pour à peu près la même dépense (un lot lu par Sonnet coûte moitié moins qu’avec Opus).
+   * Les lots d’images d’un enregistrement d’écran (et leurs abandons), chacun lu par le modèle : des lots de six à douze
+   * écrans selon la longueur (depuis le 21 octobre ; six le 20, douze avant), jusqu’à quinze pour un long enregistrement
+   * (trente-deux le 20 octobre, seize avant). Ramené de 1 200 à 600 par heure le 26 octobre (l’audit des coûts, 1.25) :
+   * quarante longs enregistrements par heure et par adresse, leurs nouveaux essais compris, bien assez pour un Wi-Fi
+   * partagé ou le NAT d’un opérateur ; une rafale de 1 200 lots coûtait jusqu’à 470 $. Jamais sous 150 : les Wi-Fi
+   * partagés et les clients seraient touchés. Un lot déjà lu (src/server/lots.ts) passe aussi par elle.
    */
-  lotParIp: { max: 1200, fenetreS: 3600 },
+  lotParIp: { max: 600, fenetreS: 3600 },
   /** Des captures ou un export envoyés après l’import (dans le chat ou pour sa fiche) : les lire coûte plus qu’un message. */
   ajoutParCompte: { max: 40, fenetreS: 86400 },
   /**
    * Bêta ouverte : les lectures de captures et de lots par des visiteurs sans compte, pour tous et par jour. Chacune fait
    * travailler le modèle payant avant l’email : changer d’adresse IP ne doit pas faire grimper la facture sans fin.
    * Relevés pour l’ouverture (13 octobre) : le CAPTCHA arrête les robots, et la part sans compte du budget de l’IA
-   * (BUDGET_IA.anonyme) tient la facture.
+   * (BUDGET_IA.anonyme), réservée avant chaque lecture (reserverSansCompte), tient la facture. Les lots, ramenés de
+   * 16 000 à 3 000 le 26 octobre (l’audit des coûts, 1.25) : deux cents longs enregistrements par jour, plus que le
+   * budget sans compte n’en paie ; un lot déjà lu (src/server/lots.ts) n’y compte pas.
    */
   capturesAnonymesParJour: { max: 1000, fenetreS: 86400 },
-  lotsAnonymesParJour: { max: 16000, fenetreS: 86400 },
+  lotsAnonymesParJour: { max: 3000, fenetreS: 86400 },
   /** Les mêmes lectures pour un compte connecté, par jour (un compte gratuit suffirait sinon à passer outre le plafond). */
   capturesParCompte: { max: 30, fenetreS: 86400 },
   lotsParCompte: { max: 600, fenetreS: 86400 },
@@ -196,10 +199,11 @@ export const LIMITES = {
   /*
    * Ce qu’un laissez-passer du CAPTCHA permet (src/server/captcha.ts), pendant ses 20 minutes : un import, un envoi de
    * captures ou la fin d’un enregistrement (et un nouvel essai après une coupure du réseau), et les lots d’un
-   * enregistrement (trente-deux au plus pour un long, quarante pour le serveur, chacun avec son nouvel essai).
+   * enregistrement (quinze pour un long depuis les lots de douze, quarante au plus pour le serveur, chacun avec son
+   * nouvel essai : ramené de 160 à 80 le 26 octobre, l’audit des coûts, 1.25). Un lot déjà lu dans l’onglet ne repart pas.
    */
   laissezPasserBrouillons: { max: 2, fenetreS: 20 * 60 },
-  laissezPasserLots: { max: 160, fenetreS: 20 * 60 },
+  laissezPasserLots: { max: 80, fenetreS: 20 * 60 },
   /** Les erreurs qu’un navigateur remonte (POST /api/navigateur/erreur), par adresse IP : une page qui boucle sur une erreur n’inonde pas la base. */
   erreurNavigateurParIp: { max: 30, fenetreS: 3600 },
   /** Les envois de mesures de vitesse (POST /api/navigateur/mesures, un par page quittée), par adresse IP. */

@@ -6,6 +6,7 @@ import { purgerLaListe } from "./attente";
 import { db, schema } from "./db";
 import { EVENEMENTS_MAILS_GARDES_JOURS } from "./delivrabilite";
 import { PREDICATS } from "./depot";
+import { IMPORTS_GARDES_JOURS } from "./imports";
 import { journalErreur } from "./journal";
 import { purgerLOAuth } from "./mcp/acces";
 import { NAVIGATEUR_GARDE_JOURS } from "./navigateur";
@@ -30,7 +31,8 @@ import { PRESENCES_GARDEES_JOURS, VISITES_GARDEES_JOURS } from "./visites";
  * - les erreurs et les mesures de vitesse des navigateurs de plus de 30 jours (NAVIGATEUR_GARDE_JOURS, src/server/navigateur.ts) ;
  * - les accès de Claude à /admin (src/server/mcp/acces.ts) : les codes expirés, les accès dont le rafraîchissement a
  *   expiré, et les clients restés sans accès ;
- * - le registre des effacements de plus de 90 jours (EFFACEMENTS_GARDES_JOURS) : plus long que la fenêtre de restauration de la base.
+ * - le registre des effacements de plus de 90 jours (EFFACEMENTS_GARDES_JOURS) : plus long que la fenêtre de restauration de la base ;
+ * - la mesure des imports (src/server/imports.ts) de plus de 90 jours (IMPORTS_GARDES_JOURS) : /admin n’en lit que les 30 derniers.
  */
 
 /** Combien de jours on garde le registre des effacements : plus que la fenêtre de restauration de Neon (BACKEND.md, « Les sauvegardes »). */
@@ -120,6 +122,11 @@ export async function purger(maintenant = new Date()) {
     await db()
       .delete(schema.jalonsParAppli)
       .where(lt(schema.jalonsParAppli.le, il_y_a(VISITES_GARDEES_JOURS)));
+  });
+  await etape("mesure des imports", async () => {
+    await db()
+      .delete(schema.imports)
+      .where(lt(schema.imports.creeLe, il_y_a(IMPORTS_GARDES_JOURS)));
   });
   await etape("registre des effacements", async () => {
     await db()

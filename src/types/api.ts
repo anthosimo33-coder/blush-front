@@ -362,6 +362,8 @@ type Reponses = {
   "POST /api/captures": ConvImportee & { messagesRead: number };
   /** La lecture brute d’un lot : le navigateur ne la lit pas, il la rend à /api/captures/video. */
   "POST /api/captures/lot": { lot: unknown };
+  /** Toujours `{ ok: true }` : le navigateur l’envoie en partant (src/server/lots.ts). */
+  "POST /api/captures/lot/abandon": Ok;
   "POST /api/captures/video": ConvImportee & { messagesRead: number };
   "GET /api/achats": { achats: AchatDuCompte[] };
   "GET /api/chat": HistoriqueChat;
@@ -498,12 +500,16 @@ export const ROUTES = {
   /* Le jeton du widget voyage dans l’en-tête x-blush-captcha (ENTETE_CAPTCHA, src/lib/captcha.ts), comme à la demande de code */
   "POST /api/captcha": {},
   "POST /api/captures": { formulaire: true },
+  /* Les images d’un lot, son appli, l’accord de l’import, la clé de l’envoi (`cle`) et son ordre (« premier », « suite ») */
   "POST /api/captures/lot": { formulaire: true },
+  /* La clé de l’envoi abandonné, celle de ses lots */
+  "POST /api/captures/lot/abandon": { corps: z.object({ cle: z.string().max(64) }) },
   /*
    * Les lots lus (/api/captures/lot), rendus tels quels : le serveur les revérifie, appli comprise. `cle` : celle de
-   * l’envoi, pour qu’un nouvel essai après une coupure retrouve l’histoire déjà créée. `consentement` : la version de la
-   * case de l’import cochée (src/server/juridique.ts) ; sans elle, 422 `consentement`. `mode: "ajout"` : un morceau de
-   * plus pour la conv qu’on importe (src/server/morceaux.ts)
+   * l’envoi (la même que ses lots : la mesure des imports y retrouve leur coût), pour qu’un nouvel essai après une
+   * coupure retrouve l’histoire déjà créée. `consentement` : la version de la case de l’import cochée
+   * (src/server/juridique.ts) ; sans elle, 422 `consentement`. `mode: "ajout"` : un morceau de plus pour la conv qu’on
+   * importe (src/server/morceaux.ts)
    */
   "POST /api/captures/video": {
     corps: z.object({

@@ -70,6 +70,7 @@ const SANS_COMPTE = new Set<CleRoute>([
   "POST /api/navigateur/mesures",
   "POST /api/captures",
   "POST /api/captures/lot",
+  "POST /api/captures/lot/abandon",
   "POST /api/captures/video",
   "POST /api/import",
   "GET /api/histoire",

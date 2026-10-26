@@ -47,6 +47,11 @@ export const ERREURS_API = {
   tournage: 409,
   /** Rien à payer : le rapport de cette conv est déjà débloqué, ou le compte est de l’équipe. */
   deja: 409,
+  /**
+   * Un lot d’enregistrement d’écran dont l’envoi a été abandonné par le navigateur (un autre lot a échoué pour de bon,
+   * src/server/lots.ts) : il n’est pas lu, ou plus. Le navigateur, parti, ne lit pas cette réponse.
+   */
+  abandon: 409,
   /** Pas encore payé : sa fiche (un client), la chute d’un chapitre (le rapport débloqué). */
   acces: 402,
   /** Le paiement n’est pas encore branché (ni Whop, ni le faux Whop) : rien ne s’achète. */

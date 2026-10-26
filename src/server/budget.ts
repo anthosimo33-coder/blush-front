@@ -7,7 +7,7 @@ import { db, schema } from "./db";
 import { cleDuCompte } from "./email-canonique";
 import { ErreurTache } from "./erreurs";
 import { auMieux, journal } from "./journal";
-import { compteDe, compter, sousLaLimite } from "./limites";
+import { compteDe, compter, rendre, sousLaLimite } from "./limites";
 import { aujourdhuiParis, DEBUT_DU_JOUR } from "./temps";
 
 /*
@@ -20,7 +20,8 @@ import { aujourdhuiParis, DEBUT_DU_JOUR } from "./temps";
  *
  * Qui paie un appel : le compte de sa conv, ou le compte connecté qui envoie des captures avant l’import (`compte`,
  * src/server/captures.ts). Sans l’un ni l’autre, l’appel est « sans compte » : il a sa part à lui, prise dans le budget
- * du jour. Ce qui est dépensé pour tous se lit dans ai_usage (une conv effacée y laisse ses lignes, sans conv : elles
+ * du jour, et il en réserve d’abord ce qu’il peut coûter au plus (reserverSansCompte : n’importe qui peut en lancer, en
+ * rafale). Ce qui est dépensé pour tous se lit dans ai_usage (une conv effacée y laisse ses lignes, sans conv : elles
  * comptent encore pour le jour). Ce qu’a dépensé un compte, ou la part sans compte, se compte à part au moment de
  * l’appel (noterDepense, dans rate_limits) : effacer une conv ne rend pas au compte ce qu’elle a coûté, et ne le fait
  * pas passer dans la part sans compte. Un compte se range sur son email canonique (cleDuCompte), comme ses limites : un
@@ -205,6 +206,29 @@ export async function controlerBudget({ storyId, compte, reserve }: { storyId?: 
     throw new ErreurTache("budget");
   }
   return payeur;
+}
+
+/** Une part du budget sans compte réservée pour un appel (reserverSansCompte), à rendre une fois l’appel fini. */
+export type Reservation = { rendre: () => Promise<void> };
+
+/**
+ * Avant un appel sans compte (des captures, un lot d’enregistrement, lus avant l’email) : réserve d’un coup ce qu’il
+ * peut coûter au plus (`micros`, src/server/ia/claude.ts), dans la dépense du jour de la part sans compte, en base
+ * (comme la voix réserve ses caractères, src/server/ia/voix.ts). Deux appels lancés ensemble ne passent pas ensemble
+ * au-delà du budget : sans elle, la dépense n’était notée qu’après l’appel, sur une valeur gardée 30 secondes, et une
+ * rafale de lots pouvait le dépasser de beaucoup. Au-delà : rendue aussitôt, et l’erreur d’étape « budget » (« souffle »
+ * pour le navigateur), sans rien appeler. La réservation se rend une fois l’appel fini, réussi ou non, après que sa vraie
+ * dépense s’est ajoutée (noterDepense) : il ne reste que ce qu’il a coûté.
+ */
+export async function reserverSansCompte(micros: number): Promise<Reservation> {
+  const cle = cleDeDepense(null, gardeDuJour());
+  const reserve = Math.max(0, Math.round(micros));
+  if ((await compter(cle, FENETRE_DEPENSE, reserve)) > plafondDe(null)) {
+    await rendre(cle, reserve);
+    journal("budget de l’IA atteint", { budget: "anonyme" }, "alerte");
+    throw new ErreurTache("budget");
+  }
+  return { rendre: () => rendre(cle, reserve) };
 }
 
 /**

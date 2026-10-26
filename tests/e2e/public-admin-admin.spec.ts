@@ -1,4 +1,6 @@
-import { ADMIN, compteDe, emailLibre, expect, INVITES, lectureFaite, origine, seConnecter, seConnecterAdmin, sql, test } from "./aide";
+import { readFileSync } from "node:fs";
+import { CASE_IMPORT } from "../../src/contenu/consentements";
+import { ADMIN, compteDe, emailLibre, expect, exportWhatsApp, INVITES, lectureFaite, origine, RESEAU, seConnecter, seConnecterAdmin, sql, test } from "./aide";
 
 /*
  * Le tableau de bord (/admin, le pilotage ; /admin/direct ; l’écran d’avant à ?version=actuelle) : réservé aux emails de
@@ -42,7 +44,18 @@ test("connecté avec l’email de l’équipe, le pilotage s’ouvre : ses carte
     await expect(page).toHaveTitle("Admin · BLUSH");
     await expect(page.getByRole("heading", { level: 1, name: "Pilotage" })).toBeVisible();
     await expect(page.getByText(sousTitre("7\\s+jours"))).toBeVisible();
-    for (const titre of ["À regarder", "Chiffre d’affaires", "En direct", "Le tunnel", "D’où ils viennent", "Ce qui se vend", "Ce que coûte l’IA", "Santé", "Outils"]) {
+    for (const titre of [
+      "À regarder",
+      "Chiffre d’affaires",
+      "En direct",
+      "Le tunnel",
+      "D’où ils viennent",
+      "Ce qui se vend",
+      "L’IA avant l’achat",
+      "Ce que coûte l’IA",
+      "Santé",
+      "Outils",
+    ]) {
       await expect(page.getByRole("heading", { level: 2, name: titre, exact: true })).toBeVisible();
     }
     for (const titre of ["Visiteurs", "Taux d’achat", "Revenu par acheteur", "Marge après IA", "Les coups de pouce", "Bêta", "Les derniers gestes"]) {
@@ -95,6 +108,7 @@ test("connecté avec l’email de l’équipe, le pilotage s’ouvre : ses carte
       "les sources",
       "ce qui se vend",
       "les coups de pouce",
+      "l’IA avant l’achat",
       "les coûts de l’IA",
       "la santé",
     ])
@@ -162,6 +176,26 @@ test("connecté avec l’email de l’équipe, le pilotage s’ouvre : ses carte
     await page.reload();
     const applis = page.getByRole("list", { name: "De l’appli au fichier, appli par appli" });
     await expect(applis.getByRole("listitem").filter({ hasText: /^Hinge/ })).toHaveText(/^Hinge\s*\d+ → \d+\s*(—|\d+\s%)$/);
+  });
+
+  await test.step("l’IA avant l’achat : un export importé se compte sous « Export », sans IA avant l’achat", async () => {
+    const conv = exportWhatsApp(testInfo);
+    const envoi = await page.request.post("/api/import", {
+      headers: origine(testInfo),
+      multipart: { fichier: { name: conv.nom, mimeType: "application/zip", buffer: readFileSync(conv.chemin) }, consentement: CASE_IMPORT.version },
+      timeout: RESEAU,
+    });
+    expect(envoi.status()).toBe(200);
+    await page.goto("/admin?p=1");
+    const bloc = page.getByRole("region", { name: "L’IA avant l’achat", exact: true });
+    /* Ses imports, puis l’IA par import : rien (le modèle factice ne coûte rien, et rien n’est lu avant l’achat d’un export) */
+    const cellules = bloc
+      .getByRole("row")
+      .filter({ has: page.getByRole("rowheader", { name: /^Export/ }) })
+      .getByRole("cell");
+    await expect(cellules.first()).toHaveText(/^[1-9]\d*$/);
+    await expect(cellules.nth(1)).toHaveText("0,00\u00a0$");
+    await expect(bloc).not.toContainText(/NaN|Infinity|undefined/);
   });
 
   await test.step("l’écran d’avant reste à ?version=actuelle, tel quel", async () => {

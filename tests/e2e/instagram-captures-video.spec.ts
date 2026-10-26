@@ -50,7 +50,12 @@ test("iMessage : l’enregistrement d’écran est lu dans le navigateur, seules
     }
     const lectures = await envoisVers("/api/captures/video");
     expect(lectures).toHaveLength(1);
-    expect(JSON.parse(lectures[0]!.texte!)).toMatchObject({ app: "imessage", lots: expect.any(Array) });
+    const fin = JSON.parse(lectures[0]!.texte!) as { cle: string };
+    expect(fin).toMatchObject({ app: "imessage", lots: expect.any(Array), cle: expect.any(String) });
+    /* Tous les lots portent la clé de leur fin (le serveur y range leur coût) ; à plusieurs, le premier part « premier », les autres « suite » */
+    expect(lots.map((l) => l.champs.find((c) => c.nom === "cle")?.texte)).toEqual(lots.map(() => fin.cle));
+    const ordres = lots.map((l) => l.champs.find((c) => c.nom === "ordre")?.texte ?? null).sort();
+    expect(ordres).toEqual(lots.length > 1 ? ["premier", ...lots.slice(1).map(() => "suite")] : [null]);
     /* Aucun envoi, vers aucune route, ne contient un fichier vidéo */
     const tous = await envoisVers();
     expect(tous.flatMap((e) => e.champs).filter((c) => c.type?.startsWith("video/") || c.fichier?.endsWith(".webm"))).toEqual([]);

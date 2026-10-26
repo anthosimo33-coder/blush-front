@@ -191,6 +191,17 @@ export const AIDES_DU_PILOTAGE = {
     repere: `Par acheteur, sous 3\u00a0$ pour tenir ${CIBLE_DE_MARGE}\u00a0% de marge.`,
     siCaBouge: "Si le chat grimpe\u00a0: vérifie la mémoire et la longueur des réponses de BLUSH.",
   },
+  avantLAchat: {
+    titre: "L’IA avant l’achat",
+    de: "l’IA avant l’achat",
+    quoi: "Ce que coûte la lecture d’une conv avant que la personne paie, selon comment elle est arrivée\u00a0: un export (rien n’est lu avant l’achat), des captures (une lecture) ou un enregistrement d’écran (lu par lots).",
+    calcul:
+      "Chaque conv importée sur la période (sans les prises du mode tournage) garde son type, son appli, ses écrans et ses lots lus, sans rien de son contenu. Ses lectures (des captures, les lots d’une vidéo, ceux d’un morceau ajouté avant «\u00a0Qui es-tu\u00a0?\u00a0» compris) sont notées sous l’empreinte de son envoi, en dollars comme sur la facture. Paywall\u00a0: sa lecture lancée, comme le tunnel. Paient\u00a0: un achat payé pour cette conv, même remboursé depuis (une conv effacée depuis n’y compte plus). IA par acheteur\u00a0: tout ce que le type a coûté avant l’achat, lu pour rien compris, divisé par les convs payées. Lu pour rien\u00a0: des lectures d’avant l’import qui n’ont mené à aucune conv (un enregistrement abandonné, des captures refusées, une lecture ratée).",
+    repere:
+      "Un taux se lit à partir de 30\u00a0convs. Une vidéo de 160\u00a0écrans coûte environ 1,25\u00a0$ à lire. Le poste «\u00a0Captures\u00a0» de «\u00a0Ce que coûte l’IA\u00a0» réunit les captures et les vidéos, celles envoyées au chat comprises\u00a0: ici, seulement ce qui est lu avant l’achat.",
+    siCaBouge:
+      "Si la vidéo coûte bien plus par acheteur que les captures sans payer plus souvent, lis-en moins avant l’achat (la partie la plus récente). Si «\u00a0lu pour rien\u00a0» grimpe\u00a0: regarde les envois ratés de «\u00a0L’import, écran par écran\u00a0» et la santé.",
+  },
   sante: {
     titre: "Santé",
     de: "la santé",

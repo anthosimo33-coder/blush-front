@@ -6,7 +6,18 @@ import { NOM_DU_GENRE } from "@/contenu/haut-du-paywall";
 import { NOMS_DES_MAILS } from "@/contenu/mails";
 import { NOTE_DU_RAPPORT, QUI_COINCE } from "@/contenu/mesures";
 import { CATALOGUE } from "@/contenu/offres";
-import { CIBLE_DE_MARGE, NOMS_DES_ETAPES, NOMS_DES_GENRES, NOMS_DES_GROUPES, NOMS_DES_PAIRES, NOMS_DES_SOURCES, PAIRES, SOURCE_INCONNUE, margeApresIA } from "@/contenu/pilotage";
+import {
+  CIBLE_DE_MARGE,
+  NOMS_DES_ETAPES,
+  NOMS_DES_GENRES,
+  NOMS_DES_GROUPES,
+  NOMS_DES_PAIRES,
+  NOMS_DES_SOURCES,
+  NOMS_DES_TYPES_D_IMPORT,
+  PAIRES,
+  SOURCE_INCONNUE,
+  margeApresIA,
+} from "@/contenu/pilotage";
 import type { SourceVisite } from "@/types";
 import { delivrabilite } from "../delivrabilite";
 import { direct } from "../direct";
@@ -74,7 +85,7 @@ export const OUTILS: readonly OutilMcp[] = [
     name: "couts_ia",
     title: "Coûts de l’IA",
     description:
-      "Ce qu’a coûté l’IA sur la période et celle d’avant, en dollars : le total, par rapport, par verdict, par poste (avec le nombre d’appels), et la dépense d’aujourd’hui face au budget du jour.",
+      "Ce qu’a coûté l’IA sur la période et celle d’avant, en dollars : le total, par rapport, par verdict, par poste (avec le nombre d’appels), la dépense d’aujourd’hui face au budget du jour, et l’IA avant l’achat par type d’import (export, captures, vidéo : les convs importées, leurs écrans et leurs lots par import, l’IA par import, la part au paywall et la part qui paie, à partir de 30 convs, l’IA par acheteur, et ce qui a été lu pour rien).",
     inputSchema: AVEC_JOURS,
   },
   {
@@ -272,6 +283,26 @@ function coutsIA(s: StatsAdmin) {
     parVerdictDollars: arrondi(c.parVerdict, 3),
     postes: c.postes.map((x) => ({ poste: x.nom, dollars: arrondi(x.dollars, 2), appels: x.appels })),
     aujourdhui: { dollars: arrondi(s.pilotage.iaDuJour.dollars, 2), budgetDollars: s.pilotage.iaDuJour.budget },
+    /* Les taux : null sous les 30 convs importées du type (comme dans /admin) ; l’IA par acheteur compte le lu pour rien */
+    avantLAchat: s.pilotage.importsParType.map((t) => {
+      const taux = (n: number) => {
+        const v = tauxLisible(n, t.imports);
+        return v === null ? null : arrondi(v * 100);
+      };
+      return {
+        type: NOMS_DES_TYPES_D_IMPORT[t.type],
+        imports: t.imports,
+        ecransParImport: arrondi(rapport(t.ecrans, t.imports)),
+        lotsParImport: arrondi(rapport(t.lots, t.imports)),
+        dollars: arrondi(t.dollars, 2),
+        dollarsParImport: arrondi(rapport(t.dollars, t.imports), 3),
+        arriventAuPaywallPct: taux(t.paywall),
+        payes: t.payes,
+        paientPct: taux(t.payes),
+        dollarsParAcheteur: arrondi(rapport(t.dollars + t.pourRien, t.payes), 2),
+        luPourRienDollars: arrondi(t.pourRien, 2),
+      };
+    }),
   };
 }
 

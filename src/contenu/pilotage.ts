@@ -1,4 +1,4 @@
-import type { EtapeVisite, GenreVendu, OffreId, SourceVisite } from "@/types";
+import type { EtapeVisite, GenreVendu, OffreId, SourceVisite, TypeDImport } from "@/types";
 import { CATALOGUE, prixDe } from "./offres";
 
 /*
@@ -62,6 +62,9 @@ export const NOMS_DES_GROUPES: Record<GroupeDOffres, string> = { premium: "Premi
  * centimes, eux, sont ceux payés.
  */
 export const NOM_DU_PASSAGE_EN_PREMIUM = `Premium pour ${prixDe("passe_premium")} de plus (${CATALOGUE.premium_ajout.bulles} bulles pour ${CATALOGUE.premium_ajout.centimes / 100}\u00a0€ avant le 23 octobre)`;
+
+/** Le nom de chaque type d’import (src/server/imports.ts), dans /admin « L’IA avant l’achat » et le serveur MCP. */
+export const NOMS_DES_TYPES_D_IMPORT: Record<TypeDImport, string> = { export: "Export", captures: "Captures", video: "Vidéo" };
 
 /** Le nom de chaque carte d’achat du chat (src/server/vente.ts), dans /admin. */
 export const NOMS_DES_VENTES: Record<GenreVendu, string> = {

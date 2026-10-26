@@ -170,6 +170,14 @@ export type NoteDuRapport = (typeof NOTES_DU_RAPPORT)[number];
 export const RAISONS_DE_LA_NOTE = ["precis", "a_cote", "dur", "long", "autre"] as const;
 export type RaisonDeLaNote = (typeof RAISONS_DE_LA_NOTE)[number];
 
+/**
+ * Comment une conv est arrivée (la mesure des imports, src/server/imports.ts, et /admin « L’IA avant l’achat ») : un
+ * export (rien n’est lu avant l’achat), des captures (une lecture du prompt 01), un enregistrement d’écran (ses lots).
+ * Une vidéo devient des captures une fois lue (meta.format) : seule la mesure garde la différence.
+ */
+export const TYPES_D_IMPORT = ["export", "captures", "video"] as const;
+export type TypeDImport = (typeof TYPES_D_IMPORT)[number];
+
 /** Les mesures de vitesse que les navigateurs envoient (les Web Vitals : src/lib/sentinelle.tsx), en millisecondes sauf CLS. */
 export const METRIQUES_WEB = ["LCP", "INP", "CLS", "FCP", "TTFB"] as const;
 export type MetriqueWeb = (typeof METRIQUES_WEB)[number];

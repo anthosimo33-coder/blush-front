@@ -4,6 +4,7 @@ import { cleEnvoi, imagesDe, LectureRefusee, lecturePermise, lireCaptures, uneSe
 import { compterImportVenuDuPartage } from "@/server/compteurs";
 import { lireBrouillon, poserBrouillon } from "@/server/cookies";
 import { erreur, repondre, route } from "@/server/http";
+import { envoiOuNouveau, noterAjout, noterImport } from "@/server/imports";
 import { storyEtSource } from "@/server/conv-affichee";
 import { ajouterDesCaptures, importerCaptures, morceauDejaAjoute } from "@/server/histoires";
 import { consentementImport } from "@/server/juridique";
@@ -60,6 +61,8 @@ async function traiter(req: Request) {
   /* Son lien arrêté (ou une créatrice sans son lien) : le modèle ne lit rien, qu’elle rouvre le nouveau */
   if (!tournage && (await lecturePayeeRefusee(await utilisateurDeSession(await lireSession())))) return erreur("tournage");
   const cle = cleEnvoi(fd?.get("cle"));
+  /* La mesure des imports (src/server/imports.ts) : l’empreinte de l’envoi range le coût de sa lecture, puis la conv qui en naît */
+  const envoi = envoiOuNouveau(cle);
   if (brouillon) {
     /* Pas de morceau en mode tournage : sa conv n’est pas lue, rien à réunir */
     if (tournage) return erreur("aucune");
@@ -69,8 +72,10 @@ async function traiter(req: Request) {
       async () => {
         const permis = await lecturePermise("captures");
         if (permis !== "ok") throw new LectureRefusee(permis);
-        const t = await lireCaptures(images, app);
-        return { ...(await ajouterDesCaptures(brouillon, { appli: app, t, cle })), secret: brouillon, messages: t.messages };
+        const t = await lireCaptures(images, app, envoi);
+        const ajoute = await ajouterDesCaptures(brouillon, { appli: app, t, cle });
+        await noterAjout(ajoute.id, { ecrans: images.length, lots: 1, envoi });
+        return { ...ajoute, secret: brouillon, messages: t.messages };
       },
       () => (cle ? morceauDejaAjoute(brouillon, cle) : Promise.resolve(null)),
     );
@@ -82,9 +87,10 @@ async function traiter(req: Request) {
     /* Le modèle va lire : la bêta et les plafonds d’abord (après la vérification de l’envoi, qu’un envoi invalide ne compte pas) */
     const permis = await lecturePermise("captures");
     if (permis !== "ok") throw new LectureRefusee(permis);
-    const t = await lireCaptures(images, app);
+    const t = await lireCaptures(images, app, envoi);
     const { id, meta } = await importerCaptures({ appli: app, t, secret, consentement });
-    /* Ici, une fois par lecture : un nouvel essai qui la reprend ne compte pas l’import deux fois */
+    /* Ici, une fois par lecture : un nouvel essai qui la reprend ne compte pas l’import deux fois (ni sa mesure) */
+    await noterImport({ storyId: id, type: "captures", appli: app, ecrans: images.length, lots: 1, envoi });
     await compterImportVenuDuPartage();
     await noterAuFil(req, { genre: "import" });
     return { id, meta, secret, messages: t.messages };

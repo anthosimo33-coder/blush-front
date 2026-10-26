@@ -299,6 +299,9 @@ describe("les outils", () => {
     expect(p).toHaveProperty("quiImporte.lAutre.devines");
     /* Le tunnel détaillé : l’import appli par appli aussi */
     expect(contenu((await mcp("tools/call", { name: "tunnel", arguments: { jours: 30 } }, acces)).json!)).toHaveProperty("importParAppli");
+    /* Les coûts : l’IA avant l’achat, un type d’import par ligne, même vide */
+    const couts = contenu((await mcp("tools/call", { name: "couts_ia", arguments: { jours: 7 } }, acces)).json!) as { avantLAchat: { type: string }[] };
+    expect(couts.avantLAchat.map((t) => t.type)).toEqual(["Export", "Captures", "Vidéo"]);
     const faux = (await mcp("tools/call", { name: "pilotage", arguments: { jours: 5 } }, acces)).json?.result as { isError: boolean; content: { text: string }[] };
     expect(faux.isError).toBe(true);
     expect(faux.content[0]!.text).toContain("1, 7, 30");
