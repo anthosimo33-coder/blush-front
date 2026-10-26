@@ -22,10 +22,12 @@ import type {
   Guess,
   IssueDuFauxWhop,
   Jalon,
+  NoteDuRapport,
   OffreId,
   OffreProposee,
   Pronom,
   QuestionAnswer,
+  RaisonDeLaNote,
   Source,
   Story,
 } from "@/types";
@@ -643,6 +645,18 @@ export async function etatDuPaiement(achat: string, paiement: string | null): Pr
  */
 export async function jouerLaRoue(geste: GesteDeLaRoue): Promise<RoueDuCompte> {
   return appel("POST /api/roue", { corps: { geste } });
+}
+
+/**
+ * La note du rapport de la conv ouverte (POST /api/rapport/note) : la note, la raison d’un « Bof », ou un avis. Au mieux :
+ * une note perdue (le réseau, un rapport pas débloqué) ne se dit pas à l’écran.
+ */
+export async function noterLeRapport(corps: { note: NoteDuRapport } | { raison: RaisonDeLaNote } | { avis: { prenom: string; phrase: string } }): Promise<void> {
+  try {
+    await appel("POST /api/rapport/note", { corps });
+  } catch {
+    /* Rien à dire : la note est un plus */
+  }
 }
 
 /**

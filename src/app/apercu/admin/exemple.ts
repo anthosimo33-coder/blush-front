@@ -148,6 +148,11 @@ function pilotageDe(jours: Periode, { calme = false, suivi = true }: Variante): 
     refuse: pw(0.02),
     ferme: pw(0.07),
     page_whop: 0,
+    coince: pw(0.42),
+    coince_cher: pw(0.12),
+    coince_confiance: pw(0.06),
+    coince_plus_tard: pw(0.09),
+    coince_bug: pw(0.01),
   };
   /*
    * L’import appli par appli : la part de chaque appli parmi ceux qui en choisissent une, et son passage au fichier.
@@ -198,6 +203,18 @@ function pilotageDe(jours: Periode, { calme = false, suivi = true }: Variante): 
       { genre: "egalite", vus: 57, payes: 6 },
       { genre: "aucun", vus: 12, payes: 1 },
     ],
+    note: {
+      oui: Math.round(acheteurs * 0.62),
+      bof: Math.round(acheteurs * 0.14),
+      avis: Math.round(acheteurs * 0.09),
+      raisons: [
+        { raison: "precis", n: Math.round(acheteurs * 0.05) },
+        { raison: "a_cote", n: Math.round(acheteurs * 0.04) },
+        { raison: "dur", n: Math.round(acheteurs * 0.02) },
+        { raison: "long", n: Math.round(acheteurs * 0.01) },
+        { raison: "autre", n: Math.round(acheteurs * 0.01) },
+      ],
+    },
     ventesDuChat: [
       { genre: "bulles", vues: 214, touchees: 61, refusees: 38, payees: 27, centimes: 32_830 },
       { genre: "premium", vues: 46, touchees: 19, refusees: 9, payees: 11, centimes: 7_590 },

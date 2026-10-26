@@ -4,6 +4,7 @@ import { ETAPES_DU_TUNNEL, JALONS_DE_L_IMPORT, JALONS_DU_PAYWALL, fuiteDuTunnel,
 import { AIDES_DU_PILOTAGE } from "@/contenu/aide-pilotage";
 import { NOM_DU_GENRE } from "@/contenu/haut-du-paywall";
 import { NOMS_DES_MAILS } from "@/contenu/mails";
+import { NOTE_DU_RAPPORT, QUI_COINCE } from "@/contenu/mesures";
 import { CATALOGUE } from "@/contenu/offres";
 import { CIBLE_DE_MARGE, NOMS_DES_ETAPES, NOMS_DES_GENRES, NOMS_DES_GROUPES, NOMS_DES_PAIRES, NOMS_DES_SOURCES, PAIRES, SOURCE_INCONNUE, margeApresIA } from "@/contenu/pilotage";
 import type { SourceVisite } from "@/types";
@@ -38,7 +39,7 @@ export const OUTILS: readonly OutilMcp[] = [
     name: "pilotage",
     title: "Pilotage",
     description:
-      "L’écran principal de /admin sur la période : « À regarder » (ce qui coince, les bonnes nouvelles), le chiffre d’affaires net (payé − remboursé − contesté), les visiteurs, les acheteurs, le taux d’achat, le revenu par acheteur, la dépense de l’IA et la marge après l’IA (cible comprise), le tunnel visiteurs → imports → paywall → acheteurs → racheteurs et sa plus grosse fuite, qui importe (des filles ou des garçons, sur un garçon ou une fille, et le taux d’achat de chacun), les sources, ce qui se vend, et la santé. Chaque chiffre avec celui de la période d’avant. À appeler en premier.",
+      "L’écran principal de /admin sur la période : « À regarder » (ce qui coince, les bonnes nouvelles), le chiffre d’affaires net (payé − remboursé − contesté), les visiteurs, les acheteurs, le taux d’achat, le revenu par acheteur, la dépense de l’IA et la marge après l’IA (cible comprise), la note des rapports écrits (« Oui, grave », « Bof » et ses raisons, les avis laissés), le tunnel visiteurs → imports → paywall → acheteurs → racheteurs et sa plus grosse fuite, qui importe (des filles ou des garçons, sur un garçon ou une fille, et le taux d’achat de chacun), les sources, ce qui se vend, et la santé. Chaque chiffre avec celui de la période d’avant. À appeler en premier.",
     inputSchema: AVEC_JOURS,
   },
   {
@@ -52,7 +53,7 @@ export const OUTILS: readonly OutilMcp[] = [
     name: "tunnel",
     title: "Tunnel détaillé",
     description:
-      "Le tunnel écran par écran sur la période : les jalons de l’import (du choix de l’appli au lancement de la lecture), l’import appli par appli (WhatsApp, Instagram, iMessage, Captures ou vidéo : ceux qui ouvrent son écran, qui y choisissent un fichier, et le taux de passage à partir de 30 personnes, puis les convs bien reçues et les envois ratés), les jalons du paywall (de l’arrivée au paiement), les titres du haut du paywall (vus, payés), les offres uniques (montrées, prises), les commandes (payées, échouées, en attente) et jusqu’où vont les convs importées.",
+      "Le tunnel écran par écran sur la période : les jalons de l’import (du choix de l’appli au lancement de la lecture), l’import appli par appli (WhatsApp, Instagram, iMessage, Captures ou vidéo : ceux qui ouvrent son écran, qui y choisissent un fichier, et le taux de passage à partir de 30 personnes, puis les convs bien reçues et les envois ratés), les jalons du paywall (de l’arrivée au paiement), « Qu’est-ce qui coince ? » (la question posée, et chaque réponse : trop cher, pas confiance, pas maintenant, ça a bugué), les titres du haut du paywall (vus, payés), les offres uniques (montrées, prises), les commandes (payées, échouées, en attente) et jusqu’où vont les convs importées.",
     inputSchema: AVEC_JOURS,
   },
   {
@@ -175,6 +176,12 @@ function pilotage(s: StatsAdmin) {
     quiImporte: quiImporte(p.quiImporte),
     sources: p.sources.map((x) => ({ source: nomDeLaSource(x.source), visiteurs: x.visiteurs, acheteurs: x.acheteurs, payeEuros: euros(x.centimes) })),
     ceQuiSeVend: p.mix.map((m) => ({ groupe: NOMS_DES_GROUPES[m.groupe], achats: m.n, payeEuros: euros(m.centimes) })),
+    noteDuRapport: {
+      ouiGrave: p.note.oui,
+      bof: p.note.bof,
+      avisLaisses: p.note.avis,
+      raisonsDuBof: p.note.raisons.map((r) => ({ raison: NOTE_DU_RAPPORT.raisons[r.raison], n: r.n })),
+    },
     sante: p.sante,
   };
 }
@@ -226,6 +233,10 @@ function tunnel(s: StatsAdmin) {
       };
     }),
     paywall: JALONS_DU_PAYWALL.map(([j, nom]) => ({ etape: nom, personnes: p.jalons[j] })),
+    quiCoince: {
+      questionPosee: p.jalons.coince,
+      reponses: QUI_COINCE.raisons.map((r) => ({ reponse: r.texte, personnes: p.jalons[`coince_${r.id}`] })),
+    },
     hautsDuPaywall: p.hauts.map((h) => ({ titre: NOM_DU_GENRE[h.genre], vus: h.vus, payes: h.payes })),
     offresUniques: s.offresUniques,
     commandes: s.achats,

@@ -2,6 +2,7 @@ import "server-only";
 import { sql } from "drizzle-orm";
 import { cookies } from "next/headers";
 import type { GenreDuHaut } from "@/contenu/haut-du-paywall";
+import type { NoteDuRapport, RaisonDeLaNote } from "@/types";
 import { cookieSecurise } from "./cookies";
 import { db, schema } from "./db";
 import { auMieux, journalErreur } from "./journal";
@@ -31,7 +32,24 @@ export const CLES = {
   /** Une réponse du chat sortie en alerte (danger, détresse, mineur) : la santé de /admin les compte (src/server/stats.ts). */
   alerteChat: "chat_alerte",
 } as const;
-export type Cle = (typeof CLES)[keyof typeof CLES];
+/**
+ * La note d’un rapport écrit (src/server/note-du-rapport.ts) : « Oui, grave », « Bof », ce qui n’allait pas après
+ * « Bof », et un avis parti à l’équipe. Une fois par conv chacun, sans rien de la conv ni du compte.
+ */
+export const CLES_DE_LA_NOTE = {
+  oui: "note_oui",
+  bof: "note_bof",
+  avis: "note_avis",
+  precis: "note_raison_precis",
+  a_cote: "note_raison_a_cote",
+  dur: "note_raison_dur",
+  long: "note_raison_long",
+  autre: "note_raison_autre",
+} as const satisfies Record<NoteDuRapport | RaisonDeLaNote | "avis", string>;
+/** Le début des clés de la note : /admin les lit d’une requête (src/server/stats.ts). */
+export const NOTE = "note_";
+
+export type Cle = (typeof CLES)[keyof typeof CLES] | (typeof CLES_DE_LA_NOTE)[keyof typeof CLES_DE_LA_NOTE];
 
 /** Compte un passage ; un échec laisse une ligne au journal (le nom de l’erreur, jamais son message), sans rien faire échouer. */
 export async function compter(cle: Cle): Promise<void> {

@@ -1,13 +1,13 @@
 import { NB_CHAPITRES } from "./chapitres";
 import { NOTE_DES_AVIS } from "./paiement";
-import type { Pronom } from "@/types";
+import type { Pronom, RaisonDeCoincer, RaisonDeLaNote } from "@/types";
 
 /*
  * Proposition du 26 octobre (une maquette dans l’appli, branche locale proto/mesures-paywall-note) : deux questions en
  * un toucher. La première sur le paywall (src/app/lecture/FeuilleQuiCoince.tsx), la carte refermée sans payer ou au
  * moment où l’offre ① venait d’elle-même ; chaque réponse a sa suite, et l’offre ① ne vient plus qu’après « C’est trop
- * cher ». La seconde au bas d’un rapport écrit (src/app/rapport/NoteDuRapport.tsx). Rien n’est encore envoyé au serveur.
- * TODO(produit): valider les textes, puis ce qui se compte pour /admin (une réponse par raison, sans cookie ni conv).
+ * cher ». La seconde au bas d’un rapport écrit (src/app/rapport/NoteDuRapport.tsx). Les deux se comptent pour /admin,
+ * sans cookie ni rien de la conv (les jalons `coince…`, les compteurs `note_…`).
  */
 
 /** « Qu’est-ce qui coince ? » : la feuille qui suit la carte refermée sans payer, et la page de Whop après « Ça a bugué ». */
@@ -19,7 +19,7 @@ export const QUI_COINCE = {
     { id: "confiance", texte: "J’ai pas confiance" },
     { id: "plus_tard", texte: "Pas maintenant" },
     { id: "bug", texte: "Ça a bugué" },
-  ],
+  ] satisfies readonly { id: RaisonDeCoincer; texte: string }[],
   passer: "Passer",
   merci: "Merci, c’est noté.",
   /** « C’est trop cher » sans offre ① possible (déjà montrée, un lot de la roue), Premium choisie : le rapport seul. */
@@ -66,7 +66,7 @@ export const NOTE_DU_RAPPORT = {
   oui: "Oui, grave",
   bof: "Bof",
   bofTitre: "Aïe. Qu’est-ce qui allait pas\u00a0?",
-  raisons: ["Pas assez précis", "À côté de notre histoire", "Trop dur", "Trop long", "Autre chose"],
+  raisons: { precis: "Pas assez précis", a_cote: "À côté de notre histoire", dur: "Trop dur", long: "Trop long", autre: "Autre chose" } satisfies Record<RaisonDeLaNote, string>,
   envoyer: "Envoyer",
   avisTitre: "Trop bien. Tu nous laisses un avis\u00a0?",
   avisSous: "Ton prénom et une phrase. Jamais rien de ta conv.",

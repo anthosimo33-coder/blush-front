@@ -11,19 +11,21 @@ import {
   JALONS_PAR_APPLI,
   OFFRES,
   OFFRES_UNIQUES,
+  RAISONS_DE_LA_NOTE,
   type AppKind,
   type GenreVendu,
   type Jalon,
   type JalonParAppli,
   type OffreId,
   type OffreUnique,
+  type RaisonDeLaNote,
   type SourceVisite,
 } from "@/types";
 import { pronomDeLAutreLu } from "./accords";
 import { etatDeLaListe } from "./attente";
 import { BUDGET_IA } from "./budget";
 import { COMPTE_DU_TOURNAGE } from "./compte-du-tournage";
-import { CLES, HAUT, MAIL, PANNE } from "./compteurs";
+import { CLES, CLES_DE_LA_NOTE, HAUT, MAIL, NOTE, PANNE } from "./compteurs";
 import { CLES_DES_MAILS, type CleDeMail } from "./sequences";
 import { db, uneLigne } from "./db";
 import { env } from "./env";
@@ -190,6 +192,12 @@ export type Pilotage = {
    * (achats.vente, payés sur la période, même remboursés depuis) et leur montant.
    */
   ventesDuChat: { genre: GenreVendu; vues: number; touchees: number; refusees: number; payees: number; centimes: number }[];
+  /**
+   * La note des rapports écrits (src/server/note-du-rapport.ts) : « Oui, grave », « Bof », ce qui n’allait pas après
+   * « Bof » (dans l’ordre de RAISONS_DE_LA_NOTE, même vide), et les avis partis à l’équipe, comptés par jour de Paris
+   * (counters, CLES_DE_LA_NOTE : sur la période en jours entiers), une fois par conv chacun.
+   */
+  note: { oui: number; bof: number; avis: number; raisons: { raison: RaisonDeLaNote; n: number }[] };
   /**
    * L’A/B de la vente dans le chat (groupeDeVente) : pour chaque moitié, les comptes qui ont écrit au chat sur la période,
    * ceux d’entre eux qui ont payé quelque chose sur la période (n’importe quelle offre, d’où qu’elle se paie), et ce montant.
@@ -478,6 +486,7 @@ async function pilotageDe(jours: Periode): Promise<Pilotage> {
     ventesPayees,
     abChat,
     convsDeLaPeriode,
+    notes,
   ] = await Promise.all([
     lignes<{ debut: string; visiteurs: string; acheteurs: string; centimes: string; micros: string }>(
       sql`with c as (${cases}),
@@ -569,6 +578,9 @@ async function pilotageDe(jours: Periode): Promise<Pilotage> {
           from c left join p on p.user_id = c.user_id group by 1`,
     ),
     lignes<{ meta: Buffer; payee: boolean }>(sql`select s.meta, ${PAYEE_S} as payee from stories s where ${W("s.created_at")} and ${sql.raw(VRAIE_CONV_S)}`),
+    lignes<{ key: string; n: string }>(
+      sql`select key, sum(count) as n from counters where key like ${`${NOTE}%`} and day > (now() at time zone 'Europe/Paris')::date - ${jours}::int group by key`,
+    ),
   ]);
 
   const m = (c: unknown) => n(c);
@@ -618,6 +630,12 @@ async function pilotageDe(jours: Periode): Promise<Pilotage> {
       const p = ventesPayees.find((v) => v.vente === genre);
       return { genre, vues: compte("vue"), touchees: compte("touchee"), refusees: compte("refusee"), payees: n(p?.n), centimes: n(p?.centimes) };
     }),
+    note: {
+      oui: n(notes.find((l) => l.key === CLES_DE_LA_NOTE.oui)?.n),
+      bof: n(notes.find((l) => l.key === CLES_DE_LA_NOTE.bof)?.n),
+      avis: n(notes.find((l) => l.key === CLES_DE_LA_NOTE.avis)?.n),
+      raisons: RAISONS_DE_LA_NOTE.map((raison) => ({ raison, n: n(notes.find((l) => l.key === CLES_DE_LA_NOTE[raison])?.n) })),
+    },
     abDuChat: (["avec", "sans"] as const).map((groupe) => {
       const l = abChat.find((x) => x.avec === (groupe === "avec"));
       return { groupe, comptes: n(l?.comptes), acheteurs: n(l?.acheteurs), centimes: n(l?.centimes) };

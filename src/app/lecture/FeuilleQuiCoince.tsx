@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { QUI_COINCE, type EtatQuiCoince } from "@/contenu/mesures";
+import { marquerJalon } from "@/lib/jalons";
 import { enEuros } from "@/contenu/offres";
 import { MentionRenonciation } from "@/components/juridique/cases";
 import { usePaiement } from "@/components/paiement/usePaiement";
@@ -9,7 +10,7 @@ import { Button } from "@/components/ui/Button";
 import { InsetGroup, InsetRow, RowIcon } from "@/components/ui/inset";
 import { NotePrivee } from "@/components/ui/NotePrivee";
 import { Sheet } from "@/components/ui/surfaces";
-import type { OffreId } from "@/types";
+import type { OffreId, RaisonDeCoincer } from "@/types";
 
 /*
  * Proposition du 26 octobre (src/contenu/mesures.ts) : « Qu’est-ce qui coince ? » en un toucher, dans une feuille comme
@@ -20,7 +21,8 @@ import type { OffreId } from "@/types";
  *   au paiement ;
  * - « Pas maintenant » : rien à vendre, la conv attend ;
  * - « Ça a bugué » : la page de Whop, le chemin de secours du paiement (SurLaPageDeWhop), au même prix.
- * Rien n’est encore envoyé au serveur.
+ * Chaque réponse touchée se compte pour /admin (son jalon, `coince_<réponse>`, sans cookie), comme la question posée
+ * (`coince`, par le paywall).
  */
 
 /** Ce que le paywall fait de « C’est trop cher » : l’offre ① montrée, le rapport seul à proposer, ou juste merci. */
@@ -62,7 +64,8 @@ export function FeuilleQuiCoince({
   const [etat, setEtat] = useState<EtatQuiCoince>(etatDAbord);
   const [attente, setAttente] = useState(false);
   const paiement = usePaiement({ suite: "/lecture", quand: { deja: relire } });
-  const choisir = async (id: (typeof QUI_COINCE.raisons)[number]["id"]) => {
+  const choisir = async (id: RaisonDeCoincer) => {
+    marquerJalon(`coince_${id}`);
     if (id === "bug") return setEtat("bug");
     if (id === "confiance") return setEtat("confiance");
     if (id === "plus_tard") return setEtat("plusTard");
