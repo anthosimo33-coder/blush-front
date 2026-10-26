@@ -14,7 +14,8 @@ import { voixDisponible } from "./ia/voix";
 import { auMieux, journal, journalErreur } from "./journal";
 import { sousLaLimite } from "./limites";
 import { passerLaMain } from "./relais";
-import { aRelancer, battre, clore, echouer, ESSAIS_MAX, etatDesTaches, finir, occupee, paiementRecu, PERIME_S, planifier, prendre, type Tache } from "./taches";
+import { aRelancer, battre, clore, echouer, ESSAIS_MAX, etatDesTaches, finir, occupee, paiementRecu, PERIME_S, planifier, prendre, sansLotEnVol, type Tache } from "./taches";
+import { memoireEnLot } from "./env";
 import { donneesMemoire } from "./depot";
 import type { DonneesMemoire, DonneesVerdict } from "./stockage/types";
 import { suite, type EtatChaine } from "./chaine";
@@ -486,9 +487,10 @@ async function reprendreLesEchecsPassagers(): Promise<string[]> {
 /**
  * Les chaînes restées en plan : une étape en attente depuis plus de 5 minutes qu’un essai peut encore faire ; une mise
  * à jour de la mémoire dont le chat s’est calmé (son heure venue : src/server/memoire-groupee.ts ; c’est ce passage qui
- * la lance, 10 à 15 minutes après le dernier échange) ; une étape abandonnée (son battement de cœur perdu), même à son
- * dernier essai : la chaîne relancée la clôt et prévient l’équipe (cloreLesAbandons), sans attendre qu’un écran
- * revienne ; et, pour un rapport payé, une étape arrêtée par le budget d’un jour passé (la chaîne relancée la remet en
+ * la lance, 10 à 15 minutes après le dernier échange, sauf avec la mémoire en lot : elle part alors en lot, au même
+ * passage, src/server/memoire-en-lot.ts), jamais une qui attend la réponse du lot d’une autre (sansLotEnVol) ; une étape
+ * abandonnée (son battement de cœur perdu), même à son dernier essai : la chaîne relancée la clôt et prévient l’équipe
+ * (cloreLesAbandons), sans attendre qu’un écran revienne ; et, pour un rapport payé, une étape arrêtée par le budget d’un jour passé (la chaîne relancée la remet en
  * attente, reprendreApresMinuit) : le rapport s’écrit et son mail part sans que la personne revienne. Le passage des 5
  * minutes (GET /api/cron/relances) les reprend, chacune dans sa propre fonction (passerLaMain) : le filet du relais,
  * qu’un réseau coupé ou un déploiement peut rater. Les plus récemment arrêtées d’abord (celles qu’on attend sans doute
@@ -506,7 +508,8 @@ export async function reprendreLesChainesEnPlan(): Promise<number> {
         and(
           lt(t.attempts, ESSAIS_MAX),
           eq(t.status, "attente"),
-          or(and(isNull(t.pasAvant), lt(t.updatedAt, sql`now() - make_interval(secs => ${EN_PLAN_APRES_S})`)), lte(t.pasAvant, sql`now()`)),
+          or(and(isNull(t.pasAvant), lt(t.updatedAt, sql`now() - make_interval(secs => ${EN_PLAN_APRES_S})`)), memoireEnLot() ? sql`false` : lte(t.pasAvant, sql`now()`)),
+          sansLotEnVol,
         ),
         and(eq(t.status, "en_cours"), lt(t.heartbeatAt, sql`now() - make_interval(secs => ${PERIME_S})`)),
         and(

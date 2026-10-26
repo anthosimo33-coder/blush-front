@@ -182,6 +182,15 @@ export const Env = z.object({
    * socle seul.
    */
   BLUSH_MONTAGE: z.enum(["separe", "partage"]).default("separe"),
+  /**
+   * La mise à jour de la mémoire qui part au calme, envoyée en lot (src/server/memoire-en-lot.ts : l’API des lots du
+   * prestataire, deux fois moins chère, la même requête qu’en direct) : « 1 » l’envoie en lot, « 0 » (le défaut) la garde
+   * en direct, comme avant le 26 octobre 2026. Les lots déjà partis sont relevés dans les deux cas.
+   */
+  BLUSH_MEMOIRE_EN_LOT: z
+    .enum(["0", "1"])
+    .default("0")
+    .transform((v) => v === "1"),
   /** Tests et dev sans coût : le modèle rejoue des sorties enregistrées au lieu d’appeler l’API. Ignoré sur Vercel. */
   BLUSH_IA_FACTICE: z
     .enum(["0", "1"])
@@ -316,6 +325,12 @@ export const boiteAMails = () => boiteDe(env());
  * non dans factice.ts : la voix et la transcription le demandent sans charger les sorties factices.
  */
 export const iaFactice = (): boolean => env().BLUSH_IA_FACTICE;
+
+/**
+ * La mise à jour de la mémoire au calme part-elle en lot (BLUSH_MEMOIRE_EN_LOT) ? En mode factice aussi : le lot est
+ * alors celui du modèle factice (src/server/ia/claude.ts), qui ne part chez aucun prestataire.
+ */
+export const memoireEnLot = (): boolean => env().BLUSH_MEMOIRE_EN_LOT;
 
 /**
  * Le serveur des tests de bout en bout : `next start` sur http://localhost, avec le modèle factice et la boîte à mails.

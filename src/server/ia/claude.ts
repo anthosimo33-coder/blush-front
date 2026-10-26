@@ -1,11 +1,12 @@
 import "server-only";
+import { randomUUID } from "node:crypto";
 import Anthropic from "@anthropic-ai/sdk";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import type { z } from "zod";
 import { REGLAGES, systeme, type Requete, type Tache } from "@prompts/lib/contextes";
 import { env, iaFactice } from "../env";
 import { alerter } from "../alertes";
-import { controlerBudget, type Payeur } from "../budget";
+import { controlerBudget, payeurDe, type Payeur } from "../budget";
 import { delaiAppel, tempsRestant } from "../echeance";
 import { ErreurTache } from "../erreurs";
 import { journal, journalErreur } from "../journal";
@@ -19,7 +20,9 @@ import { TEXTES } from "./textes.generated";
  * Un appel se fait en trois temps : ses paramètres (parametres), l’envoi au prestataire (un Fournisseur : le SDK en vrai,
  * le modèle factice en mode factice, un faux dans les tests du vrai chemin), suivi au fil de l’eau s’il passe en flux
  * (suivreFlux), puis la lecture de la réponse (lireMessage). Les deux prestataires passent par le même chemin : le
- * budget, l’échéance, la lecture et le refus. Le coût de chaque vrai appel est noté par src/server/ia/usage.ts.
+ * budget, l’échéance, la lecture et le refus. Le coût de chaque vrai appel est noté par src/server/ia/usage.ts. Une
+ * requête qui peut attendre part aussi en lot (l’API Message Batches : envoyerEnLot, plus bas), avec les mêmes paramètres,
+ * et sa réponse se lit par le même chemin (lireLeResultat).
  */
 const MODELE = "claude-opus-5-5";
 /**
@@ -80,8 +83,11 @@ export function definirFactice(f: Factice | null) {
 
 /* ———— Le prestataire ———— */
 
-/** Les paramètres d’un appel (parametres), avec le repli du prestataire quand le SDK le demande. */
-type Parametres = Anthropic.Beta.Messages.MessageCreateParamsNonStreaming;
+/**
+ * Les paramètres d’un appel (parametres) : ceux de l’API des messages (la bêta, où le SDK ajoute le repli du
+ * prestataire) et ceux de l’API des lots (sans bêta) à la fois. La même requête part par l’une ou l’autre.
+ */
+type Parametres = Anthropic.Beta.Messages.MessageCreateParamsNonStreaming & Anthropic.Messages.MessageCreateParamsNonStreaming;
 /** Ce que l’envoi passe au SDK : son délai, ses nouvelles tentatives, et de quoi l’arrêter. */
 type OptionsEnvoi = { timeout: number; maxRetries: number; signal?: AbortSignal };
 /** Ce qu’on suit d’un appel en flux : un bloc qui commence (son type : « fallback » pour un repli), la réflexion, le texte. */
@@ -288,8 +294,8 @@ type Repli = { categorie: string | null; de: string; vers: string };
  * Ce que dit une réponse : la sortie vérifiée par son schéma, ou le refus (et sa catégorie), son coût, et le repli s’il
  * y en a eu un. Après un repli (bloc « fallback »), seul ce que le second modèle a écrit compte.
  */
-function lireMessage<S extends z.ZodType>(message: MessageRecu, schema: S): { appel: Appel<z.infer<S>>; repli: Repli | null } {
-  const c = cout(message.usage, message.model);
+function lireMessage<S extends z.ZodType>(message: MessageRecu, schema: S, { lot = false }: { lot?: boolean } = {}): { appel: Appel<z.infer<S>>; repli: Repli | null } {
+  const c = cout(message.usage, message.model, { lot });
   const bloc = message.content.find((b): b is Extract<BlocRecu, { type: "fallback" }> => b.type === "fallback");
   const repli = bloc ? { categorie: bloc.trigger.category ?? null, de: bloc.from.model, vers: bloc.to.model } : null;
   if (message.stop_reason === "refusal")
@@ -326,14 +332,22 @@ const coutDe = (t: Tokens, prix: Prix) =>
   1e6;
 
 /**
- * Ce qu’un appel a coûté, en dollars : chaque passage du modèle à son tarif (`iterations` : le nôtre, puis celui du
- * repli ; sans modèle dit, celui qui a répondu), sinon tout au tarif du modèle qui a répondu (`modele`).
+ * La remise d’un lot (l’API Message Batches) : le prestataire y facture chaque jeton à moitié prix, l’entrée, la sortie,
+ * l’écriture et la lecture du cache comprises.
  */
-export function cout(u: Usage, modele: string): number {
+const REMISE_DU_LOT = 0.5;
+
+/**
+ * Ce qu’un appel a coûté, en dollars : chaque passage du modèle à son tarif (`iterations` : le nôtre, puis celui du
+ * repli ; sans modèle dit, celui qui a répondu), sinon tout au tarif du modèle qui a répondu (`modele`). `lot` : la
+ * requête est passée en lot, à moitié prix (REMISE_DU_LOT).
+ */
+export function cout(u: Usage, modele: string, { lot = false }: { lot?: boolean } = {}): number {
   /* Rien d’écrit (le modèle factice) : rien à compter, ni de prix à chercher */
   if (!u.input_tokens && !u.output_tokens && !u.cache_creation_input_tokens && !u.cache_read_input_tokens && !u.iterations?.length) return 0;
-  if (u.iterations?.length) return u.iterations.reduce((n, i) => n + coutDe(i, prixDe(i.model ?? modele)), 0);
-  return coutDe(u, prixDe(modele));
+  const remise = lot ? REMISE_DU_LOT : 1;
+  if (u.iterations?.length) return remise * u.iterations.reduce((n, i) => n + coutDe(i, prixDe(i.model ?? modele)), 0);
+  return remise * coutDe(u, prixDe(modele));
 }
 
 /** Les options d’un appel (appeler). */
@@ -437,4 +451,165 @@ async function noterUsage(u: Usage, micros: number, { storyId, payeur, tache, ms
     ms,
     payeur,
   });
+}
+
+/* ———— Les lots (l’API Message Batches) ———— */
+
+/*
+ * Une requête qui peut attendre (une mise à jour de la mémoire au calme : src/server/memoire-en-lot.ts) part en lot chez
+ * le prestataire : il la traite quand il veut (d’habitude en quelques minutes, au plus 24 h), à moitié prix. C’est la même
+ * requête qu’en direct, à l’octet près (parametres : le modèle, la réflexion, l’effort, le format de sortie, le système et
+ * son cache, les messages), sans le flux, qu’un lot n’a pas, et sans le repli du prestataire (`fallbacks` et son en-tête
+ * bêta) : l’API des lots le refuse. Un refus en lot n’est donc pas repris par un autre modèle : la mise à jour repart en
+ * direct, avec lui (le repli ne change que le modèle qui répond à un refus, jamais la requête). Une requête par lot : une
+ * mise à jour qu’il faut faire tout de suite annule le sien sans toucher aux autres. Son identifiant (custom_id) est celui
+ * de sa tâche.
+ */
+
+/** Où en est un lot chez le prestataire : il tourne (ou s’annule), il est fini (ses résultats se lisent), ou il n’existe plus. */
+export type EtatDuLot = "en_cours" | "fini" | "introuvable";
+
+/** Ce qu’est devenue une requête d’un lot : sa réponse, une erreur (son type, jamais son message), annulée, ou expirée (24 h). */
+export type IssueDuLot = { type: "succeeded"; message: MessageRecu } | { type: "errored"; code: string } | { type: "canceled" } | { type: "expired" };
+
+/**
+ * Ce qui envoie un lot au prestataire et le suit : le SDK (lotsSDK), le modèle factice (ses réponses tout de suite, sans
+ * rien envoyer), ou un faux dans les tests (definirFournisseurDeLots). `envoyer` rend l’identifiant du lot ; `resultats`,
+ * l’issue de chaque requête (son `id`, le custom_id), une fois le lot fini ; `effacer` le retire de chez le prestataire,
+ * ses réponses avec.
+ */
+export type FournisseurDeLots = {
+  envoyer: (requetes: { id: string; demande: Demande }[]) => Promise<string>;
+  etat: (lot: string) => Promise<EtatDuLot>;
+  resultats: (lot: string) => Promise<{ id: string; issue: IssueDuLot }[]>;
+  annuler: (lot: string) => Promise<void>;
+  effacer: (lot: string) => Promise<void>;
+  /** Un prestataire qui ne coûte rien (le modèle factice) : ses réponses ne sont pas notées au suivi des coûts. */
+  gratuit?: boolean;
+};
+
+/** Le délai et les nouvelles tentatives de chaque appel à l’API des lots : des requêtes courtes, au passage des 5 minutes. */
+const OPTIONS_LOTS = { timeout: 30_000, maxRetries: 2 };
+
+/** L’issue d’une requête d’un lot, telle que le SDK la rend. */
+function issueDe(r: Anthropic.Messages.MessageBatchResult): IssueDuLot {
+  if (r.type === "succeeded") return { type: "succeeded", message: r.message };
+  if (r.type === "errored") return { type: "errored", code: r.error.error.type };
+  return { type: r.type };
+}
+
+/**
+ * Le vrai prestataire des lots, par le client de son SDK (`client` : un client au faux `fetch` dans tests/unit/lots.test.ts),
+ * sur l’API des lots sans bêta (`messages.batches`) : les paramètres de chaque requête sont ceux du direct, tels quels.
+ */
+export function lotsSDK(client: () => Anthropic): FournisseurDeLots {
+  return {
+    async envoyer(requetes) {
+      const lot = await client().messages.batches.create({ requests: requetes.map(({ id, demande }) => ({ custom_id: id, params: demande.params })) }, OPTIONS_LOTS);
+      return lot.id;
+    },
+    async etat(lot) {
+      try {
+        return (await client().messages.batches.retrieve(lot, {}, OPTIONS_LOTS)).processing_status === "ended" ? "fini" : "en_cours";
+      } catch (e) {
+        if (e instanceof Anthropic.NotFoundError) return "introuvable";
+        throw e;
+      }
+    },
+    async resultats(lot) {
+      const lus: { id: string; issue: IssueDuLot }[] = [];
+      for await (const r of await client().messages.batches.results(lot, {}, OPTIONS_LOTS)) lus.push({ id: r.custom_id, issue: issueDe(r.result) });
+      return lus;
+    },
+    async annuler(lot) {
+      await client().messages.batches.cancel(lot, {}, OPTIONS_LOTS);
+    },
+    async effacer(lot) {
+      try {
+        await client().messages.batches.delete(lot, {}, OPTIONS_LOTS);
+      } catch (e) {
+        /* Déjà effacé (un passage coupé après l’effacement) : il n’y est plus, c’est ce qu’on voulait */
+        if (!(e instanceof Anthropic.NotFoundError)) throw e;
+      }
+    },
+  };
+}
+
+/**
+ * Les lots du modèle factice (le dev et les tests, sans prestataire) : chaque requête a sa réponse factice dès l’envoi,
+ * gardée par l’instance, et le lot est fini tout de suite.
+ */
+function lotsFactices(prestataire: Fournisseur): FournisseurDeLots {
+  const lots = new Map<string, { id: string; issue: IssueDuLot }[]>();
+  return {
+    gratuit: true,
+    async envoyer(requetes) {
+      const id = `lot_factice_${randomUUID()}`;
+      const issues = await Promise.all(
+        requetes.map(async ({ id: r, demande }) => ({
+          id: r,
+          issue: { type: "succeeded" as const, message: await prestataire.envoyer(demande, { timeout: 0, maxRetries: 0 }, { flux: false, ecoute: null }) },
+        })),
+      );
+      lots.set(id, issues);
+      return id;
+    },
+    etat: async (lot) => (lots.has(lot) ? "fini" : "introuvable"),
+    resultats: async (lot) => lots.get(lot) ?? [],
+    annuler: async () => {},
+    effacer: async (lot) => void lots.delete(lot),
+  };
+}
+
+const LOTS_SDK = lotsSDK(anthropic);
+const LOTS_FACTICES = lotsFactices(MODELE_FACTICE);
+
+let lotsDuTest: FournisseurDeLots | null = null;
+/**
+ * Pour les tests : un faux prestataire des lots, puis de nouveau celui de l’appli (`null`). Il passe avant le modèle
+ * factice (à l’inverse de definirFournisseur) : les tests de la base, en mode factice, y décident de chaque issue.
+ */
+export function definirFournisseurDeLots(f: FournisseurDeLots | null) {
+  lotsDuTest = f;
+}
+/** Le prestataire des lots : le faux d’un test, ou le modèle factice en mode factice (jamais le SDK), ou le SDK. */
+const lots = () => lotsDuTest ?? (iaFactice() ? LOTS_FACTICES : LOTS_SDK);
+
+/**
+ * Envoie une requête en lot (son identifiant : `id`, celui de sa tâche) et rend l’identifiant du lot. Le budget du jour
+ * est contrôlé avant, comme pour un appel direct (ErreurTache « budget ») ; son coût sera noté à la lecture de sa
+ * réponse (lireLeResultat).
+ */
+export async function envoyerEnLot<S extends z.ZodType>(id: string, req: Requete, schema: S, { storyId, partie }: Pick<OptionsAppel, "storyId" | "partie">): Promise<string> {
+  await controlerBudget({ storyId });
+  return lots().envoyer([{ id, demande: { requete: req, partie: partie ?? null, params: parametres(req, schema) } }]);
+}
+
+/** Où en est ce lot chez le prestataire. */
+export const etatDuLot = (lot: string): Promise<EtatDuLot> => lots().etat(lot);
+/** L’issue de chaque requête d’un lot fini. */
+export const resultatsDuLot = (lot: string) => lots().resultats(lot);
+/** Annule un lot qui tourne : ce qui n’a pas commencé ne sera ni fait ni facturé ; ce qui est en cours peut encore finir. */
+export const annulerLeLot = (lot: string): Promise<void> => lots().annuler(lot);
+/** Efface un lot fini de chez le prestataire, ses réponses avec : elles n’y restent pas 29 jours. */
+export const effacerLeLot = (lot: string): Promise<void> => lots().effacer(lot);
+
+/**
+ * La réponse d’une requête passée en lot, lue comme celle d’un appel direct (lireMessage) : sa sortie vérifiée par son
+ * schéma, ou son refus. Son coût, à moitié prix, est noté au suivi (ai_usage, sous `etiquette`) et dans la dépense du
+ * jour de qui paie, même quand la réponse ne servira plus (sa tâche partie en direct entre-temps) : elle a été facturée.
+ * `ms` : le temps du lot, de l’envoi à la lecture.
+ */
+export async function lireLeResultat<S extends z.ZodType>(
+  message: MessageRecu,
+  schema: S,
+  { storyId, etiquette, ms }: { storyId?: string; etiquette: string; ms: number },
+): Promise<Appel<z.infer<S>>> {
+  if (!lots().gratuit) {
+    const payeur = await payeurDe(storyId);
+    await noterUsage(message.usage, Math.round(cout(message.usage, message.model, { lot: true }) * 1e6), { storyId, payeur, tache: etiquette, ms, modele: message.model });
+  }
+  const { appel } = lireMessage(message, schema, { lot: true });
+  if (appel.refus) journal("refus du modèle", { tache: etiquette, categorie: appel.categorie ?? null, requete: message._request_id ?? null }, "alerte");
+  return appel;
 }

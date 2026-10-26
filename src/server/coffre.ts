@@ -61,6 +61,8 @@ export type Formes = {
   "chat_messages.data:blush": MessageBlush;
   /** L’entrée d’une tâche : les échanges qui mettent la mémoire à jour (memoire_maj, la seule qui en a une), dans l’ordre. */
   "tasks.input": Echange[];
+  /** La mémoire sur laquelle une mise à jour envoyée en lot a été faite (src/server/memoire-en-lot.ts), le temps du lot. */
+  "tasks.lot_avant": DonneesMemoire;
   "shares.data": VerdictPartage;
   "vocals.data": DonneesVocal;
   /** L’email de la liste d’attente, en minuscules (src/server/attente.ts). */
@@ -177,6 +179,8 @@ const REGISTRE: { [C in Colonne]: Regle<Formes[C]> } = {
   "chat_messages.data:toi": {},
   "chat_messages.data:blush": {},
   "tasks.input": { relecture: EntreeGardee },
+  /* Relue comme la mémoire elle-même : comparée à elle (alertesNoteesDepuis), elle doit en avoir la même forme */
+  "tasks.lot_avant": { relecture: MemoireGardee },
   "shares.data": {},
   "vocals.data": { relecture: VocalGarde },
   "waitlist.email": {},

@@ -219,11 +219,17 @@ const lignes = async <T>(q: SQL) => (await db().execute(q)).rows as T[];
 const ligne = async <T>(q: SQL) => uneLigne(await lignes<T>(q), "stats");
 const n = (v: unknown) => Number(v ?? 0);
 
-/** Les postes de coût, d’après l’étiquette de chaque appel au modèle. */
+/**
+ * Les postes de coût, d’après l’étiquette de chaque appel au modèle. La mémoire en trois : sa création après le rapport
+ * (une par rapport), ses mises à jour en direct, et celles parties en lot (src/server/memoire-en-lot.ts, à moitié prix) :
+ * leurs appels se comparent aux messages du chat sans en retirer les créations à l’estime.
+ */
 const POSTES: [string, (tache: string) => boolean][] = [
   ["Verdict", (t) => t === "verdict"],
   ["Rapport", (t) => t.startsWith("rapport")],
-  ["Mémoire", (t) => t.startsWith("memoire")],
+  ["Mémoire (création)", (t) => t === "memoire"],
+  ["Mémoire (mise à jour)", (t) => t === "memoire_maj"],
+  ["Mémoire (en lot)", (t) => t === "memoire_maj_lot"],
   ["Chat", (t) => t === "chat"],
   ["Captures", (t) => t.startsWith("captures") || t === "01"],
 ];

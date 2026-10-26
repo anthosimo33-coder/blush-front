@@ -248,7 +248,9 @@ export function statsDExemple(jours: Periode, variante: Variante = {}): StatsAdm
         { nom: "Chat", dollars: Math.round(total * 46) / 100, appels: 412 },
         { nom: "Rapport", dollars: Math.round(total * 38) / 100, appels: rapports * 2 },
         { nom: "Verdict", dollars: Math.round(total * 11) / 100, appels: verdicts },
-        { nom: "Mémoire", dollars: Math.round(total * 5) / 100, appels: 31 },
+        { nom: "Mémoire (mise à jour)", dollars: Math.round(total * 2) / 100, appels: 14 },
+        { nom: "Mémoire (création)", dollars: Math.round(total * 2) / 100, appels: rapports },
+        { nom: "Mémoire (en lot)", dollars: Math.round(total * 1) / 100, appels: 11 },
       ],
     },
     sante: variante.calme

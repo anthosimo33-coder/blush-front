@@ -138,7 +138,8 @@ export async function ajouterALaFiche(story: Ligne, ajout: Ajout): Promise<Fiche
 
 /**
  * La mémoire s’écrit-elle : la première (après le rapport), ou une mise à jour (un ajout à sa fiche, des échanges du
- * chat), en attente ou en cours ? Pas une mise à jour qui attend que le chat se calme : elle ne s’écrit pas encore.
+ * chat), en attente, en cours, ou partie en lot (src/server/memoire-en-lot.ts) ? Pas une mise à jour qui attend que le
+ * chat se calme : elle ne s’écrit pas encore.
  */
 export async function majEnCours(storyId: string): Promise<boolean> {
   const [t] = await db()
@@ -148,7 +149,7 @@ export async function majEnCours(storyId: string): Promise<boolean> {
       and(
         eq(schema.tasks.storyId, storyId),
         inArray(schema.tasks.kind, ["memoire", "memoire_maj"]),
-        or(and(eq(schema.tasks.status, "attente"), aPrendre), eq(schema.tasks.status, "en_cours")),
+        or(and(eq(schema.tasks.status, "attente"), aPrendre()), inArray(schema.tasks.status, ["en_cours", "lot"])),
       ),
     )
     .limit(1);
