@@ -50,14 +50,14 @@ export const OUTILS: readonly OutilMcp[] = [
     name: "pilotage",
     title: "Pilotage",
     description:
-      "L’écran principal de /admin sur la période : « À regarder » (ce qui coince, les bonnes nouvelles), le chiffre d’affaires net (payé − remboursé − contesté), celui des vrais clients (sans les achats de l’équipe ni du tournage), les visiteurs, les acheteurs, le taux d’achat, le revenu par acheteur, la dépense de l’IA en deux (celle du produit, les clients et les prospects ; celle des tests, l’équipe et le tournage ; puis l’offert aux invités et le non classé) et la marge produit (les ventes des vrais clients face à l’IA du produit, cible comprise, et au pire : le non classé compté dans le produit), la note des rapports écrits (« Oui, grave », « Bof » et ses raisons, les avis laissés), le tunnel visiteurs → imports → paywall → acheteurs → racheteurs et sa plus grosse fuite, qui importe (des filles ou des garçons, sur un garçon ou une fille, et le taux d’achat de chacun), les sources, ce qui se vend, et la santé. Chaque chiffre avec celui de la période d’avant. À appeler en premier.",
+      "L’écran principal de /admin sur la période : « À regarder » (ce qui coince, les bonnes nouvelles), le chiffre d’affaires net (payé − remboursé − contesté), les visiteurs, les acheteurs, le taux d’achat, le revenu par acheteur (toutes les ventes sont celles des vrais clients : les achats de l’équipe, du tournage et des invités sont retirés, et dits à côté), la dépense de l’IA en deux (celle du produit, les clients et les prospects ; celle des tests, l’équipe et le tournage ; puis l’offert aux invités et le non classé) et la marge produit (les ventes des vrais clients face à l’IA du produit, cible comprise, et au pire : le non classé compté dans le produit), la note des rapports écrits (« Oui, grave », « Bof » et ses raisons, les avis laissés), le tunnel visiteurs → imports → paywall → acheteurs → racheteurs et sa plus grosse fuite, qui importe (des filles ou des garçons, sur un garçon ou une fille, et le taux d’achat de chacun), les sources, ce qui se vend, et la santé. Chaque chiffre avec celui de la période d’avant. À appeler en premier.",
     inputSchema: AVEC_JOURS,
   },
   {
     name: "evolution",
     title: "Évolution",
     description:
-      "Les courbes du pilotage : heure par heure (sur 1 jour) ou jour par jour (7 ou 30), les visiteurs, les acheteurs, le payé en euros et l’IA en dollars de chaque case, en tout et pour le produit seul (les vrais clients, l’IA des clients et des prospects). La dernière case est en cours.",
+      "Les courbes du pilotage : heure par heure (sur 1 jour) ou jour par jour (7 ou 30), les visiteurs, les acheteurs et le payé en euros des vrais clients, et l’IA en dollars de chaque case, en tout et pour le produit seul (les clients et les prospects). La dernière case est en cours.",
     inputSchema: AVEC_JOURS,
   },
   {
@@ -163,16 +163,15 @@ function pilotage(s: StatsAdmin) {
     suiviDesVisitesDepuis: p.suiviDepuis,
     aRegarder: aRegarder(s).map(({ ton, titre, texte }) => ({ ton, titre, texte })),
     chiffreDAffaires: {
+      /* Celui des vrais clients : sans les achats payés par l’équipe, le tournage ni un invité (retirés, dits à côté) */
       netEuros: { valeur: euros(p.net.valeur), avant: euros(p.net.avant) },
-      /* Celui des vrais clients : sans les achats payés par l’équipe ni par le tournage */
-      netProduitEuros: { valeur: euros(p.netProduit.valeur), avant: euros(p.netProduit.avant) },
       payes: montant(p.payes),
       rembourses: montant(p.rembourses),
       contestes: montant(p.contestes),
+      achatsRetires: montant(p.achatsRetires),
     },
     visiteurs: chiffre(p.visiteurs),
     acheteurs: chiffre(p.acheteurs),
-    acheteursDuProduit: chiffre(p.acheteursProduit),
     tauxDAchatPct: { valeur: pourcent(p.acheteurs.valeur, p.visiteurs.valeur), avant: pourcent(p.acheteurs.avant, p.visiteurs.avant) },
     revenuParAcheteurEuros: {
       valeur: arrondi(rapport(euros(p.centimesPayes.valeur), p.acheteurs.valeur), 2),
@@ -240,7 +239,6 @@ function evolution(s: StatsAdmin) {
       acheteurs: c.acheteurs,
       payeEuros: euros(c.centimes),
       iaDollars: arrondi(c.dollars, 2),
-      payeProduitEuros: euros(c.centimesProduit),
       iaProduitDollars: arrondi(c.dollarsProduit, 2),
     })),
   };
@@ -306,7 +304,7 @@ function coutsIA(s: StatsAdmin) {
     testsDollars: { valeur: arrondi(c.tests.valeur, 2), avant: arrondi(c.tests.avant, 2) },
     parPopulation: c.populations.map((x) => ({ population: NOMS_DES_POPULATIONS[x.population], dollars: arrondi(x.dollars, 2), appels: x.appels })),
     /* Les ratios du produit : la même population en haut et en bas */
-    parAcheteurDollars: arrondi(rapport(c.produit.valeur, s.pilotage.acheteursProduit.valeur), 2),
+    parAcheteurDollars: arrondi(rapport(c.produit.valeur, s.pilotage.acheteurs.valeur), 2),
     parRapportDollars: arrondi(c.parRapport, 3),
     parVerdictDollars: arrondi(c.parVerdict, 3),
     postes: c.postes.map((x) => ({

@@ -25,11 +25,10 @@ function vide(p: Partial<Pilotage> = {}): StatsAdmin {
   return stats({
     cases: [],
     net: zero,
-    netProduit: zero,
-    acheteursProduit: zero,
     payes: rien,
     rembourses: rien,
     contestes: rien,
+    achatsRetires: rien,
     visiteurs: zero,
     acheteurs: zero,
     centimesPayes: zero,
@@ -70,7 +69,7 @@ describe("« À regarder »", () => {
     expect(cartes.map((c) => c.ton)).toEqual(["mal", "mal", "bon"]);
     expect(cartes[0]).toMatchObject({ titre: `85${NB}% des visiteurs repartent sans importer`, lien: { ancre: "tunnel" } });
     /* La marge produit : les ventes des vrais clients face à l’IA du produit, les tests nommés à part */
-    const marge = margeApresIA(s.pilotage.netProduit.valeur, s.couts.produit.valeur)!;
+    const marge = margeApresIA(s.pilotage.net.valeur, s.couts.produit.valeur)!;
     expect(marge).toBeLessThan(CIBLE_DE_MARGE);
     expect(cartes[1]).toMatchObject({ titre: `Marge produit${NB}: ${Math.round(marge)}${NB}%, sous ta cible de 80${NB}%`, lien: { ancre: "couts" } });
     expect(cartes[1]?.texte).toMatch(
@@ -114,7 +113,7 @@ describe("« À regarder »", () => {
   });
 
   it("la marge au-dessus de la cible est une bonne nouvelle", () => {
-    const cartes = aRegarder(stats({ netProduit: { valeur: 120000, avant: 100000 } }, { couts: couts(10) }));
+    const cartes = aRegarder(stats({ net: { valeur: 120000, avant: 100000 } }, { couts: couts(10) }));
     const marge = cartes.find((c) => c.titre.startsWith("Marge"));
     expect(marge).toMatchObject({ ton: "bon", lien: { ancre: "couts" } });
     expect(marge?.texte).toContain(`Au-dessus de ta cible de 80${NB}%`);
@@ -141,7 +140,7 @@ describe("« À regarder »", () => {
   });
 
   it("au plus trois cartes, dans l’ordre : ce qui coince, la remarque, les bonnes nouvelles", () => {
-    const sansSuivi = vide({ suiviDepuis: null, net: { valeur: 120000, avant: 0 }, netProduit: { valeur: 120000, avant: 0 }, payes: { n: 10, centimes: 120000 } });
+    const sansSuivi = vide({ suiviDepuis: null, net: { valeur: 120000, avant: 0 }, payes: { n: 10, centimes: 120000 } });
     const cartes = aRegarder({ ...sansSuivi, couts: couts(10) });
     expect(cartes.map((c) => c.ton)).toEqual(["neutre", "bon"]);
     const pleines = aRegarder(
@@ -175,7 +174,7 @@ describe("« À regarder »", () => {
   });
 
   it("la marge produit sous la cible, sans poste de coût à nommer : l’IA du produit et le chiffre d’affaires des vrais clients, les tests à part", () => {
-    const marge = (c: StatsAdmin["couts"]) => aRegarder(stats({ netProduit: { valeur: 1200, avant: 0 } }, { couts: c })).find((x) => x.titre.startsWith("Marge"));
+    const marge = (c: StatsAdmin["couts"]) => aRegarder(stats({ net: { valeur: 1200, avant: 0 } }, { couts: c })).find((x) => x.titre.startsWith("Marge"));
     expect(marge(couts(10))?.texte).toBe(`L’IA du produit a coûté 10,00${NB}$ pour 12,00${NB}€ de chiffre d’affaires net des vrais clients.`);
     /* Les tests ne touchent pas la marge : 10 $ de produit sous la cible, que les tests coûtent 0 ou 40 $ */
     expect(marge(couts(10, 40))?.titre).toBe(marge(couts(10))?.titre);
@@ -183,13 +182,13 @@ describe("« À regarder »", () => {
       `L’IA du produit a coûté 10,00${NB}$ pour 12,00${NB}€ de chiffre d’affaires net des vrais clients. Les tests (40,00${NB}$) n’y comptent pas.`,
     );
     /* Au-dessus de la cible : la bonne nouvelle, avec les tests nommés aussi */
-    const haute = aRegarder(stats({ netProduit: { valeur: 12_000, avant: 0 } }, { couts: couts(10, 40) })).find((x) => x.titre.startsWith("Marge"));
+    const haute = aRegarder(stats({ net: { valeur: 12_000, avant: 0 } }, { couts: couts(10, 40) })).find((x) => x.titre.startsWith("Marge"));
     expect(haute).toMatchObject({ ton: "bon", titre: `Marge produit${NB}: 91${NB}%` });
     expect(haute?.texte).toContain(`Les tests (40,00${NB}$) n’y comptent pas.`);
   });
 
   it("la marge produit au-dessus de la cible que le non classé pourrait faire passer dessous : à confirmer, avec la marge au pire", () => {
-    const carte = (c: StatsAdmin["couts"]) => aRegarder(stats({ netProduit: { valeur: 12_000, avant: 0 } }, { couts: c })).find((x) => x.titre.startsWith("Marge"));
+    const carte = (c: StatsAdmin["couts"]) => aRegarder(stats({ net: { valeur: 12_000, avant: 0 } }, { couts: c })).find((x) => x.titre.startsWith("Marge"));
     /* 10 $ d’IA du produit pour 100 € HT : 91 % ; avec 15 $ de non classé, au pire 79 % (78,5 %) */
     expect(carte(couts(10, 0, 15))).toMatchObject({ ton: "neutre", titre: `Marge produit${NB}: 91${NB}%, à confirmer`, lien: { ancre: "couts" } });
     expect(carte(couts(10, 0, 15))?.texte).toContain(`mais 15,00${NB}$ d’IA non classée`);
@@ -200,7 +199,7 @@ describe("« À regarder »", () => {
   });
 
   it("à côté de la marge : les tests à part, puis le non classé et la marge au pire, s’il y en a", () => {
-    const avec = (c: StatsAdmin["couts"], net = 12_000) => aCoteDeLaMarge(margeProduit(stats({ netProduit: { valeur: net, avant: 0 } }, { couts: c })));
+    const avec = (c: StatsAdmin["couts"], net = 12_000) => aCoteDeLaMarge(margeProduit(stats({ net: { valeur: net, avant: 0 } }, { couts: c })));
     expect(avec(couts(10, 40))).toBe(`tests${NB}: 40,00${NB}$ à part`);
     expect(avec(couts(10, 40, 15))).toBe(`tests${NB}: 40,00${NB}$ à part · non classé${NB}: 15,00${NB}$ (au pire 79${NB}%)`);
     /* Sans vente, pas de marge au pire */

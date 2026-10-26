@@ -44,14 +44,13 @@ function casesDe(jours: Periode, suivi: boolean): CaseDuPilotage[] {
     /* Un panier qui varie d’un jour à l’autre, autour de 16,50 € */
     const centimes = acheteurs * (1650 + (((k * 5) % 7) - 3) * 40);
     const dollars = Math.round(centimes * 0.234) / 100;
-    /* Le produit : 96 % du payé (le reste, des achats d’essai de l’équipe), 85 % de l’IA (le reste, les tests, l’offert, le non classé) */
+    /* Le payé est celui des vrais clients (les achats d’essai de l’équipe à part) ; l’IA du produit, 85 % de l’IA (le reste, les tests, l’offert, le non classé) */
     return {
       le: iso(debut),
       visiteurs: suivi ? visiteurs : 0,
       acheteurs,
       centimes,
       dollars,
-      centimesProduit: Math.round(centimes * 0.96),
       dollarsProduit: Math.round(dollars * 85) / 100,
     };
   });
@@ -255,11 +254,10 @@ function pilotageDe(jours: Periode, { calme = false, suivi = true }: Variante): 
     pas: jours === 1 ? "heure" : "jour",
     cases,
     net: { valeur: net, avant: Math.round(net * 0.77) },
-    netProduit: { valeur: Math.round(net * 0.96), avant: Math.round(net * 0.77 * 0.96) },
-    acheteursProduit: { valeur: Math.max(0, acheteurs - 1), avant: Math.max(0, Math.round(acheteurs * 0.8) - 1) },
     payes: { n: premium + rapport + suite + Math.round(bulles / 990), centimes: paye },
     rembourses,
     contestes,
+    achatsRetires: { n: 1, centimes: 1490 },
     visiteurs: { valeur: visiteurs, avant: Math.round(visiteurs * 0.77) },
     acheteurs: { valeur: acheteurs, avant: Math.round(acheteurs * 0.8) },
     centimesPayes: { valeur: paye, avant: Math.round(paye * 0.76) },

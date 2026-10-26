@@ -294,7 +294,7 @@ describe("les outils", () => {
     expect(p).toMatchObject({ jours: 30, margeProduitPct: { cible: 80 } });
     expect(p).toHaveProperty("chiffreDAffaires.netEuros.valeur");
     /* La marge produit : les ventes des vrais clients face à l’IA du produit, les tests à part, chaque population nommée */
-    expect(p).toHaveProperty("chiffreDAffaires.netProduitEuros.valeur");
+    expect(p).toHaveProperty("chiffreDAffaires.achatsRetires.euros");
     expect(p).toHaveProperty("ia.produitDollars.valeur");
     expect(p).toHaveProperty("ia.testsDollars.valeur");
     /* Le non classé, et la marge produit au pire (s’il était tout du produit) */

@@ -122,13 +122,12 @@ describe("le pilotage, rendu", () => {
     };
     s.pilotage = {
       ...s.pilotage,
-      cases: s.pilotage.cases.map((c) => ({ ...c, visiteurs: 0, acheteurs: 0, centimes: 0, dollars: 0, centimesProduit: 0, dollarsProduit: 0 })),
+      cases: s.pilotage.cases.map((c) => ({ ...c, visiteurs: 0, acheteurs: 0, centimes: 0, dollars: 0, dollarsProduit: 0 })),
       net: zero,
-      netProduit: zero,
-      acheteursProduit: zero,
       payes: rien,
       rembourses: rien,
       contestes: rien,
+      achatsRetires: rien,
       visiteurs: zero,
       acheteurs: zero,
       centimesPayes: zero,

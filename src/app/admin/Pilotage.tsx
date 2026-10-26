@@ -268,7 +268,7 @@ function ChiffreDAffaires({ p, jours }: { p: Chiffres; jours: Periode }) {
     <Bloc
       id="chiffre-d-affaires"
       titre="Chiffre d’affaires"
-      sous="Net, TTC, remboursements retirés"
+      sous="Net, TTC, des vrais clients"
       aide={{ cle: "ca", valeur: euros(p.net.valeur), contexte: `${PERIODES[jours].sur}, ${texteDeLEcart(ecart)} ${PERIODES[jours].contre}` }}
       className="grow-[999] basis-[560px]"
     >
@@ -282,6 +282,12 @@ function ChiffreDAffaires({ p, jours }: { p: Chiffres; jours: Periode }) {
         <span>Payé {euros(p.payes.centimes)}</span>
         <span>Remboursé {p.rembourses.centimes ? `−${euros(p.rembourses.centimes)} (${nombre(p.rembourses.n)})` : euros(0)}</span>
         <span>Contesté {p.contestes.centimes ? `−${euros(p.contestes.centimes)} (${nombre(p.contestes.n)})` : euros(0)}</span>
+        {/* Les achats de l’équipe, du tournage et des invités : hors de toutes les ventes, dits ici */}
+        {p.achatsRetires.n > 0 && (
+          <span className="text-grey">
+            Achats d’essai retirés {euros(p.achatsRetires.centimes)} ({nombre(p.achatsRetires.n)})
+          </span>
+        )}
         <span className="inline-flex items-center gap-1.5 text-grey md:ml-auto">
           <span aria-hidden="true" className="size-2.5 rounded-[3px]" style={{ background: ROSE }} />
           {p.pas === "heure" ? "cette heure, en cours" : "aujourd’hui, en cours"}
@@ -441,7 +447,7 @@ function ChiffresCles({ s }: { s: StatsAdmin }) {
           valeurClasse={sousLaCible ? "text-attente-ink" : undefined}
           ecart={ecartMarge}
           sous={`cible ${pourcent(CIBLE_DE_MARGE, 0)} · ${aCote}`}
-          courbe={pointsDeLaCourbe(cases.map((c) => margeApresIA(c.centimesProduit, c.dollarsProduit)))}
+          courbe={pointsDeLaCourbe(cases.map((c) => margeApresIA(c.centimes, c.dollarsProduit)))}
           couleur={sousLaCible ? ORANGE : VERT}
         />
       </div>
@@ -1459,7 +1465,7 @@ const COULEURS_DES_POPULATIONS: Record<Population, string> = {
 function Couts({ s }: { s: StatsAdmin }) {
   const c = s.couts;
   const p = s.pilotage;
-  const parAcheteur = rapport(c.produit.valeur, p.acheteursProduit.valeur);
+  const parAcheteur = rapport(c.produit.valeur, p.acheteurs.valeur);
   const postes = c.postes.filter((x) => x.produit.appels > 0).sort((a, b) => b.produit.dollars - a.produit.dollars);
   const max = Math.max(0.0001, ...postes.map((x) => x.produit.dollars));
   const maxDesPopulations = Math.max(0.0001, ...c.populations.map((x) => x.dollars));

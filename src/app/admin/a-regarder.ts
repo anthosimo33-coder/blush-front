@@ -51,9 +51,9 @@ export function margeProduit(s: StatsAdmin): { valeur: number | null; avant: num
   const c = s.couts;
   const nonClasse = c.populations.find((x) => x.population === "inconnu")?.dollars ?? 0;
   return {
-    valeur: margeApresIA(p.netProduit.valeur, c.produit.valeur),
-    avant: margeApresIA(p.netProduit.avant, c.produit.avant),
-    plancher: margeApresIA(p.netProduit.valeur, c.produit.valeur + nonClasse),
+    valeur: margeApresIA(p.net.valeur, c.produit.valeur),
+    avant: margeApresIA(p.net.avant, c.produit.avant),
+    plancher: margeApresIA(p.net.valeur, c.produit.valeur + nonClasse),
     tests: c.tests.valeur,
     nonClasse,
   };
@@ -111,7 +111,7 @@ export function aRegarder(s: StatsAdmin): CarteARegarder[] {
       texte:
         poste && part !== null
           ? `Le poste «\u00a0${poste.nom}\u00a0» fait ${pourcent(part * 100, 0)} de l’IA du produit (${dollars(poste.produit.dollars)} sur ${dollars(produit)}).${tests}${nonClasse}`
-          : `L’IA du produit a coûté ${dollars(produit)} pour ${euros(p.netProduit.valeur)} de chiffre d’affaires net des vrais clients.${tests}${nonClasse}`,
+          : `L’IA du produit a coûté ${dollars(produit)} pour ${euros(p.net.valeur)} de chiffre d’affaires net des vrais clients.${tests}${nonClasse}`,
       lien: { texte: "Voir les coûts", ancre: "couts" },
     });
   }

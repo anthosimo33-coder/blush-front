@@ -375,17 +375,24 @@ describe("le tableau de bord : l’IA du produit et celle des tests à part, la 
     /* Les postes : en tout, et pour le produit seul */
     const poste = (s: typeof avant, nom: string) => s.couts.postes.find((p) => p.nom === nom) ?? { dollars: 0, produit: { dollars: 0 } };
     expect([d((s) => poste(s, "Verdict").dollars), d((s) => poste(s, "Verdict").produit.dollars), d((s) => poste(s, "Chat").produit.dollars)]).toEqual([3.5, 1.5, 0.5]);
-    /* Les ventes : le net de tous, celui des vrais clients (sans l’essai de l’équipe), leurs acheteurs */
-    expect([d((s) => s.pilotage.net.valeur), d((s) => s.pilotage.netProduit.valeur), d((s) => s.pilotage.acheteursProduit.valeur)]).toEqual([2480, 990, 1]);
-    /* Case par case aussi (la dernière, aujourd’hui) : le payé et l’IA du produit, la marge produit en sort */
+    /*
+     * Les ventes, toutes celles des vrais clients (sans l’essai de l’équipe, dit à côté) : le net, le payé, les acheteurs,
+     * ce qui se vend, les ventes de la semaine
+     */
+    const mix = (s: typeof avant) => s.pilotage.mix.reduce((t, g) => t + g.centimes, 0);
+    expect([d((s) => s.pilotage.net.valeur), d((s) => s.pilotage.centimesPayes.valeur), d((s) => s.pilotage.acheteurs.valeur), d(mix)]).toEqual([990, 990, 1, 990]);
+    expect([d((s) => s.pilotage.achatsRetires.n), d((s) => s.pilotage.achatsRetires.centimes), d((s) => s.ventes.semaine.payes.centimes)]).toEqual([1, 1490, 990]);
+    /* Case par case aussi (la dernière, aujourd’hui) : le payé des vrais clients et l’IA du produit, la marge produit en sort */
     const derniereCase = (s: typeof avant) => s.pilotage.cases.at(-1)!;
-    expect([d((s) => derniereCase(s).centimesProduit), d((s) => derniereCase(s).dollarsProduit), d((s) => derniereCase(s).dollars)]).toEqual([990, 2, 7]);
+    expect([d((s) => derniereCase(s).centimes), d((s) => derniereCase(s).acheteurs), d((s) => derniereCase(s).dollarsProduit), d((s) => derniereCase(s).dollars)]).toEqual([
+      990, 1, 2, 7,
+    ]);
     /* Un verdict du client et son coût : le coût par verdict du produit le compte, en haut et en bas */
     expect(apres.couts.parVerdict).not.toBeNull();
     if (avant.couts.parVerdict === null) expect(apres.couts.parVerdict).toBeCloseTo(1.5, 6);
   });
 
-  it("la somme des populations fait le total, sur la période et celle d’avant ; le produit d’une case ne dépasse jamais la case", async () => {
+  it("la somme des populations fait le total, sur la période et celle d’avant ; l’IA du produit d’une case ne dépasse jamais la case", async () => {
     await noter({}, { dollars: 0.25 });
     for (const jours of [1, 7, 30] as const) {
       const s = await statsAdmin(jours);
@@ -396,12 +403,11 @@ describe("le tableau de bord : l’IA du produit et celle des tests à part, la 
       expect(s.couts.produit.valeur).toBeCloseTo(de("client") + de("prospect"), 6);
       for (const c of s.pilotage.cases) {
         expect(c.dollarsProduit).toBeLessThanOrEqual(c.dollars + 1e-9);
-        expect(c.centimesProduit).toBeLessThanOrEqual(c.centimes);
       }
     }
   });
 
-  it("l’achat d’essai d’un alias de l’équipe, son compte effacé ensuite, reste hors du chiffre d’affaires du produit", async () => {
+  it("l’achat d’essai d’un alias de l’équipe, son compte effacé ensuite, reste hors du chiffre d’affaires des vrais clients", async () => {
     const avant = await statsAdmin(7);
     const equipe = await compteA(`equipe+efface-${unique()}@blush.test`);
     const achat = await achatPaye(equipe.id, { centimes: 1490 });
@@ -409,9 +415,9 @@ describe("le tableau de bord : l’IA du produit et celle des tests à part, la 
     achatsOrphelins.push(achat);
     const apres = await statsAdmin(7);
     expect(await populationDeLAchat(achat)).toBe("equipe");
-    expect(apres.pilotage.netProduit.valeur - avant.pilotage.netProduit.valeur).toBe(0);
-    expect(apres.pilotage.acheteursProduit.valeur - avant.pilotage.acheteursProduit.valeur).toBe(0);
-    expect(apres.pilotage.net.valeur - avant.pilotage.net.valeur).toBe(1490);
+    expect(apres.pilotage.net.valeur - avant.pilotage.net.valeur).toBe(0);
+    expect(apres.pilotage.acheteurs.valeur - avant.pilotage.acheteurs.valeur).toBe(0);
+    expect(apres.pilotage.achatsRetires.centimes - avant.pilotage.achatsRetires.centimes).toBe(1490);
   });
 
   it("un rapport de l’équipe et ses appels ne bougent pas le coût par rapport ; les lignes pas encore rangées comptent « inconnu »", async () => {

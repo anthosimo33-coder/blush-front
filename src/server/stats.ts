@@ -138,14 +138,13 @@ export type CaseDuPilotage = {
   le: string;
   /** Les visiteurs arrivés dans la case (une personne par jour : visites). */
   visiteurs: number;
-  /** Les comptes qui ont payé un achat dans la case. */
+  /** Les vrais clients qui ont payé un achat dans la case (sans l’équipe, le tournage ni les invités : ACHAT_DU_PRODUIT). */
   acheteurs: number;
-  /** Les achats payés dans la case, TTC, en centimes (même remboursés depuis). */
+  /** Les achats des vrais clients payés dans la case, TTC, en centimes (même remboursés depuis). */
   centimes: number;
   /** Ce qu’a coûté l’IA dans la case, en dollars. */
   dollars: number;
-  /** Le payé des vrais clients dans la case (sans les achats de l’équipe ni du tournage), et l’IA du produit : la marge produit, case par case. */
-  centimesProduit: number;
+  /** L’IA du produit dans la case : face au payé (`centimes`), la marge produit, case par case. */
   dollarsProduit: number;
 };
 
@@ -169,25 +168,23 @@ export type Pilotage = {
   /** Les cases des graphiques : des heures (24 h) ou des jours de Paris. */
   pas: "heure" | "jour";
   cases: CaseDuPilotage[];
-  /** Le chiffre d’affaires net : payé − remboursé − contesté, sur la période (comme ventesDepuis). */
-  net: Chiffre;
   /**
-   * Le chiffre d’affaires net du produit : celui des vrais clients, sans les achats payés par l’équipe ni par le tournage
+   * Le chiffre d’affaires net des vrais clients : payé − remboursé − contesté, sur la période (comme ventesDepuis). Toutes
+   * les ventes du pilotage sont celles des vrais clients : sans les achats payés par l’équipe, le tournage ni un invité
    * (achats.population : l’acheteur rangé par la règle « qui est qui » à l’heure de son paiement, et figé ; un compte
-   * effacé ensuite garde son côté).
-   * Face à l’IA du produit (couts.produit), il fait la marge produit.
+   * effacé ensuite garde son côté). Face à l’IA du produit (couts.produit), il fait la marge produit.
    */
-  netProduit: Chiffre;
-  /** Les comptes du produit qui ont payé au moins un achat : le dénominateur de l’IA par acheteur. */
-  acheteursProduit: Chiffre;
+  net: Chiffre;
   payes: Montant;
   rembourses: Montant;
   contestes: Montant;
+  /** Les achats payés sur la période par l’équipe, le tournage ou un invité : retirés de toutes les ventes, dits à côté. */
+  achatsRetires: Montant;
   /** Les visiteurs : une personne par jour (une personne revenue deux jours compte deux fois). */
   visiteurs: Chiffre;
-  /** Les comptes qui ont payé au moins un achat. */
+  /** Les vrais clients qui ont payé au moins un achat : le dénominateur du revenu et de l’IA par acheteur. */
   acheteurs: Chiffre;
-  /** Le payé TTC, en centimes : le revenu par acheteur en sort. */
+  /** Le payé des vrais clients TTC, en centimes : le revenu par acheteur en sort. */
   centimesPayes: Chiffre;
   /** Ce qu’a coûté l’IA, en dollars, sur la période et celle d’avant (comme couts.total et couts.avant). */
   dollars: Chiffre;
@@ -211,8 +208,8 @@ export type Pilotage = {
    */
   jalonsParAppli: { appli: AppKind; jalons: Record<JalonParAppli, number> }[];
   /**
-   * Les sources : leurs visiteurs, et les acheteurs (et leur payé) d’après la source de leur compte (users.source).
-   * `source` null : les acheteurs dont le compte date d’avant le suivi des visites. Classées par payé.
+   * Les sources : leurs visiteurs, et les vrais clients qui ont acheté (et leur payé) d’après la source de leur compte
+   * (users.source). `source` null : les acheteurs dont le compte date d’avant le suivi des visites. Classées par payé.
    */
   sources: { source: SourceVisite | null; visiteurs: number; acheteurs: number; centimes: number }[];
   /**
@@ -221,7 +218,7 @@ export type Pilotage = {
    * période, et il n’en sort que des totaux.
    */
   quiImporte: { importees: Genres; payees: Genres };
-  /** Le payé par groupe d’offres (GROUPES_D_OFFRES), dans l’ordre des groupes, même vides. */
+  /** Le payé des vrais clients par groupe d’offres (GROUPES_D_OFFRES), dans l’ordre des groupes, même vides. */
   mix: { groupe: GroupeDOffres; n: number; centimes: number }[];
   /**
    * Le haut du paywall (src/contenu/haut-du-paywall.ts) : pour chaque titre, dans l’ordre de GENRES_DU_HAUT, même vide,
@@ -660,7 +657,7 @@ async function pilotageDe(jours: Periode): Promise<Pilotage> {
   const [
     parCase,
     argent,
-    argentDuProduit,
+    achatsRetires,
     visiteurs,
     dollars,
     tunnel,
@@ -690,39 +687,34 @@ async function pilotageDe(jours: Periode): Promise<Pilotage> {
     parBrasImports,
     contrefactuels,
   ] = await Promise.all([
-    lignes<{ debut: string; visiteurs: string; acheteurs: string; centimes: string; centimes_produit: string; micros: string; micros_produit: string }>(
+    lignes<{ debut: string; visiteurs: string; acheteurs: string; centimes: string; micros: string; micros_produit: string }>(
       sql`with c as (${cases}),
             v as (select ${caseDe("arrive_le")} as b, count(*) as n from visites where arrive_le >= (select min(debut) from c) group by 1),
-            a as (select ${caseDe("paye_le")} as b, count(distinct user_id) as acheteurs, sum(centimes) as centimes, sum(centimes) filter (where produit) as centimes_produit
-                  from (select a0.paye_le, a0.user_id, a0.centimes, ${ACHAT_DU_PRODUIT} as produit from achats a0 where a0.paye_le >= (select min(debut) from c)) as payes group by 1),
+            a as (select ${caseDe("a0.paye_le")} as b, count(distinct a0.user_id) as acheteurs, sum(a0.centimes) as centimes
+                  from achats a0 where a0.paye_le >= (select min(debut) from c) and ${ACHAT_DU_PRODUIT} group by 1),
             i as (select ${caseDe("created_at")} as b, sum(cost_micros) as micros, sum(cost_micros) filter (where ${duProduit(sql`population`)}) as micros_produit
                   from ai_usage where created_at >= (select min(debut) from c) group by 1)
-          select c.debut, v.n as visiteurs, a.acheteurs, a.centimes, a.centimes_produit, i.micros, i.micros_produit
+          select c.debut, v.n as visiteurs, a.acheteurs, a.centimes, i.micros, i.micros_produit
           from c left join v on v.b = c.debut left join a on a.b = c.debut left join i on i.b = c.debut order by c.debut`,
     ),
+    /*
+     * L’argent des vrais clients : sans les achats de l’équipe, du tournage ni des invités. Seulement ceux des deux
+     * périodes : la règle se lit achat par achat
+     */
     ligne<Record<"payes" | "payes_c" | "payes_av_c" | "remb" | "remb_c" | "remb_av_c" | "cont" | "cont_c" | "cont_av_c" | "acheteurs" | "acheteurs_av", string | null>>(
-      sql`select count(*) filter (where ${W("paye_le")}) as payes, sum(centimes) filter (where ${W("paye_le")}) as payes_c,
+      sql`with a as (select a0.centimes, a0.statut, a0.paye_le, a0.annule_le, a0.user_id from achats a0
+                     where a0.paye_le is not null and (${W("a0.paye_le")} or ${W("a0.paye_le", 1)} or ${W("a0.annule_le")} or ${W("a0.annule_le", 1)}) and ${ACHAT_DU_PRODUIT})
+          select count(*) filter (where ${W("paye_le")}) as payes, sum(centimes) filter (where ${W("paye_le")}) as payes_c,
             sum(centimes) filter (where ${W("paye_le", 1)}) as payes_av_c,
             count(*) filter (where statut = 'rembourse' and ${W("annule_le")}) as remb, sum(centimes) filter (where statut = 'rembourse' and ${W("annule_le")}) as remb_c,
             sum(centimes) filter (where statut = 'rembourse' and ${W("annule_le", 1)}) as remb_av_c,
             count(*) filter (where statut = 'conteste' and ${W("annule_le")}) as cont, sum(centimes) filter (where statut = 'conteste' and ${W("annule_le")}) as cont_c,
             sum(centimes) filter (where statut = 'conteste' and ${W("annule_le", 1)}) as cont_av_c,
             count(distinct user_id) filter (where ${W("paye_le")}) as acheteurs, count(distinct user_id) filter (where ${W("paye_le", 1)}) as acheteurs_av
-          from achats where paye_le is not null`,
-    ),
-    /*
-     * … et celui du produit : les mêmes achats, sans ceux de l’équipe ni du tournage. Seulement ceux des deux périodes : la
-     * règle se juge achat par achat
-     */
-    ligne<Record<"payes_c" | "payes_av_c" | "remb_c" | "remb_av_c" | "cont_c" | "cont_av_c" | "acheteurs" | "acheteurs_av", string | null>>(
-      sql`with a as (select a0.centimes, a0.statut, a0.paye_le, a0.annule_le, a0.user_id from achats a0
-                     where a0.paye_le is not null and (${W("a0.paye_le")} or ${W("a0.paye_le", 1)} or ${W("a0.annule_le")} or ${W("a0.annule_le", 1)}) and ${ACHAT_DU_PRODUIT})
-          select sum(centimes) filter (where ${W("paye_le")}) as payes_c, sum(centimes) filter (where ${W("paye_le", 1)}) as payes_av_c,
-            sum(centimes) filter (where statut = 'rembourse' and ${W("annule_le")}) as remb_c, sum(centimes) filter (where statut = 'rembourse' and ${W("annule_le", 1)}) as remb_av_c,
-            sum(centimes) filter (where statut = 'conteste' and ${W("annule_le")}) as cont_c, sum(centimes) filter (where statut = 'conteste' and ${W("annule_le", 1)}) as cont_av_c,
-            count(distinct user_id) filter (where ${W("paye_le")}) as acheteurs, count(distinct user_id) filter (where ${W("paye_le", 1)}) as acheteurs_av
           from a`,
     ),
+    /* … et ce qui en est retiré : les achats payés sur la période par l’équipe, le tournage ou un invité */
+    ligne<{ n: string; centimes: string | null }>(sql`select count(*) as n, sum(a0.centimes) as centimes from achats a0 where ${W("a0.paye_le")} and not ${ACHAT_DU_PRODUIT}`),
     ligne<{ a: string; b: string }>(sql`select count(*) filter (where ${W("arrive_le")}) as a, count(*) filter (where ${W("arrive_le", 1)}) as b from visites`),
     ligne<{ a: string | null; b: string | null }>(
       sql`select sum(cost_micros) filter (where ${W("created_at")}) as a, sum(cost_micros) filter (where ${W("created_at", 1)}) as b from ai_usage`,
@@ -736,18 +728,21 @@ async function pilotageDe(jours: Periode): Promise<Pilotage> {
       sql`select (select count(*) from stories s where ${W("s.created_at")} and ${sql.raw(VRAIE_CONV_S)}) as imports,
             (select count(*) from stories s where ${W("s.created_at")} and ${sql.raw(VRAIE_CONV_S)}
               and exists (select 1 from tasks t where t.story_id = s.id and t.kind = 'verdict')) as paywall,
-            (select count(*) from (select user_id from achats where paye_le is not null and user_id in (select user_id from achats where ${W("paye_le")})
-              group by user_id having count(*) >= 2) as r) as racheteurs`,
+            (select count(*) from (select a0.user_id from achats a0 where a0.paye_le is not null and ${ACHAT_DU_PRODUIT}
+              and a0.user_id in (select a0.user_id from achats a0 where ${W("a0.paye_le")} and ${ACHAT_DU_PRODUIT})
+              group by a0.user_id having count(*) >= 2) as r) as racheteurs`,
     ),
     lignes<{ jalon: Jalon; n: string }>(sql`select jalon, count(*) as n from jalons where ${W("le")} group by jalon`),
     ligne<{ depuis: string | null }>(sql`select to_char(min(jour), 'YYYY-MM-DD') as depuis from jalons`),
     lignes<{ appli: AppKind; jalon: JalonParAppli; n: string }>(sql`select appli, jalon, count(*) as n from jalons_par_appli where ${W("le")} group by appli, jalon`),
     lignes<{ source: SourceVisite; n: string }>(sql`select source, count(*) as n from visites where ${W("arrive_le")} group by source`),
     lignes<{ source: SourceVisite | null; acheteurs: string; centimes: string }>(
-      sql`select u.source, count(distinct a.user_id) as acheteurs, sum(a.centimes) as centimes
-          from achats a left join users u on u.id = a.user_id where ${W("a.paye_le")} group by u.source`,
+      sql`select u.source, count(distinct a0.user_id) as acheteurs, sum(a0.centimes) as centimes
+          from achats a0 left join users u on u.id = a0.user_id where ${W("a0.paye_le")} and ${ACHAT_DU_PRODUIT} group by u.source`,
     ),
-    lignes<{ offre: OffreId; n: string; centimes: string }>(sql`select offre, count(*) as n, sum(centimes) as centimes from achats where ${W("paye_le")} group by offre`),
+    lignes<{ offre: OffreId; n: string; centimes: string }>(
+      sql`select a0.offre, count(*) as n, sum(a0.centimes) as centimes from achats a0 where ${W("a0.paye_le")} and ${ACHAT_DU_PRODUIT} group by a0.offre`,
+    ),
     ligne<{ micros: string | null }>(sql`select sum(cost_micros) as micros from ai_usage where created_at >= ${DEBUT_DU_JOUR}`),
     ligne<{ echecs: string; bloquees: string; echoues: string; alertes: string }>(
       sql`select (select count(*) from tasks where status = 'echec' and ${sql.raw(VRAI_ECHEC)} and ${W("updated_at")}) as echecs,
@@ -883,8 +878,6 @@ async function pilotageDe(jours: Periode): Promise<Pilotage> {
 
   const m = (c: unknown) => n(c);
   const net = { valeur: m(argent.payes_c) - m(argent.remb_c) - m(argent.cont_c), avant: m(argent.payes_av_c) - m(argent.remb_av_c) - m(argent.cont_av_c) };
-  const ap = argentDuProduit;
-  const netProduit = { valeur: m(ap.payes_c) - m(ap.remb_c) - m(ap.cont_c), avant: m(ap.payes_av_c) - m(ap.remb_av_c) - m(ap.cont_av_c) };
   const parSource = new Map<SourceVisite | null, { visiteurs: number; acheteurs: number; centimes: number }>();
   const ligneDe = (source: SourceVisite | null) => parSource.get(source) ?? parSource.set(source, { visiteurs: 0, acheteurs: 0, centimes: 0 }).get(source)!;
   for (const v of visiteursParSource) ligneDe(v.source).visiteurs = n(v.n);
@@ -905,15 +898,13 @@ async function pilotageDe(jours: Periode): Promise<Pilotage> {
       acheteurs: n(c.acheteurs),
       centimes: n(c.centimes),
       dollars: n(c.micros) / 1e6,
-      centimesProduit: n(c.centimes_produit),
       dollarsProduit: n(c.micros_produit) / 1e6,
     })),
     net,
-    netProduit,
-    acheteursProduit: { valeur: n(ap.acheteurs), avant: n(ap.acheteurs_av) },
     payes: { n: n(argent.payes), centimes: m(argent.payes_c) },
     rembourses: { n: n(argent.remb), centimes: m(argent.remb_c) },
     contestes: { n: n(argent.cont), centimes: m(argent.cont_c) },
+    achatsRetires: { n: n(achatsRetires.n), centimes: m(achatsRetires.centimes) },
     visiteurs: { valeur: n(visiteurs.a), avant: n(visiteurs.b) },
     acheteurs: { valeur: n(argent.acheteurs), avant: n(argent.acheteurs_av) },
     centimesPayes: { valeur: m(argent.payes_c), avant: m(argent.payes_av_c) },
@@ -1046,9 +1037,10 @@ function genresDe(metas: Meta[]): Genres {
 }
 
 /**
- * Les ventes depuis `debut` : les achats payés depuis (même remboursés ou contestés ensuite), ceux remboursés ou contestés
- * depuis (s’ils avaient été payés : une commande jamais payée puis annulée ne compte pas), et les payés par offre, dans
- * l’ordre du catalogue. Les montants sont TTC (le prix payé, figé à la commande).
+ * Les ventes des vrais clients depuis `debut` (ACHAT_DU_PRODUIT : sans l’équipe, le tournage ni les invités) : les achats
+ * payés depuis (même remboursés ou contestés ensuite), ceux remboursés ou contestés depuis (s’ils avaient été payés : une
+ * commande jamais payée puis annulée ne compte pas), et les payés par offre, dans l’ordre du catalogue. Les montants sont
+ * TTC (le prix payé, figé à la commande).
  */
 async function ventesDepuis(debut: SQL): Promise<Ventes> {
   const r = await ligne<Record<"payes" | "payes_c" | "rembourses" | "rembourses_c" | "contestes" | "contestes_c", string | null>>(
@@ -1057,10 +1049,10 @@ async function ventesDepuis(debut: SQL): Promise<Ventes> {
           sum(centimes) filter (where statut = 'rembourse' and annule_le >= ${debut}) as rembourses_c,
           count(*) filter (where statut = 'conteste' and annule_le >= ${debut}) as contestes,
           sum(centimes) filter (where statut = 'conteste' and annule_le >= ${debut}) as contestes_c
-        from achats where paye_le is not null`,
+        from achats a0 where paye_le is not null and ${ACHAT_DU_PRODUIT}`,
   );
   const parOffre = await lignes<{ offre: OffreId; n: string; centimes: string }>(
-    sql`select offre, count(*) as n, sum(centimes) as centimes from achats where paye_le >= ${debut} group by offre`,
+    sql`select offre, count(*) as n, sum(centimes) as centimes from achats a0 where paye_le >= ${debut} and ${ACHAT_DU_PRODUIT} group by offre`,
   );
   const po = new Map(parOffre.map((l) => [l.offre, l]));
   return {

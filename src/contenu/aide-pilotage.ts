@@ -24,9 +24,9 @@ export const AIDES_DU_PILOTAGE = {
   ca: {
     titre: "Chiffre d’affaires",
     de: "le chiffre d’affaires",
-    quoi: "Ce que les gens ont vraiment payé sur la période, une fois les remboursements et les contestations retirés.",
+    quoi: "Ce que les vrais clients ont payé sur la période, une fois les remboursements et les contestations retirés.",
     calcul:
-      "Les achats payés sur la période (même remboursés depuis), moins ceux remboursés et ceux contestés sur la période. En TTC\u00a0: le prix payé, figé à la commande. Whop reverse ensuite la TVA et garde ses frais. Les colonnes montrent le payé de chaque heure (sur 24\u00a0h) ou de chaque jour de Paris, remboursements non retirés.",
+      "Les achats payés sur la période (même remboursés depuis), moins ceux remboursés et ceux contestés sur la période. En TTC\u00a0: le prix payé, figé à la commande. Whop reverse ensuite la TVA et garde ses frais. Les vrais clients seulement\u00a0: les achats de l’équipe, du tournage et des invités, rangés une fois pour toutes à l’heure de leur paiement, sont retirés de toutes les ventes de /admin (le taux d’achat, le revenu par acheteur, les courbes, les sources, ce qui se vend)\u00a0; «\u00a0Achats d’essai retirés\u00a0» dit combien. Whop, lui, les compte\u00a0: son total peut être plus haut. Les colonnes montrent le payé de chaque heure (sur 24\u00a0h) ou de chaque jour de Paris, remboursements non retirés.",
     repere: "La flèche compare à la période d’avant, de même durée. La colonne rose est celle en cours\u00a0: elle n’est pas finie.",
     siCaBouge: "S’il baisse alors que les visiteurs montent, le problème est après l’arrivée\u00a0: regarde le tunnel. S’il baisse avec les visiteurs, c’est la distribution.",
   },
@@ -53,7 +53,7 @@ export const AIDES_DU_PILOTAGE = {
     de: "le taux d’achat",
     quoi: "La part des visiteurs qui achètent au moins une fois sur la période.",
     calcul:
-      "Les comptes qui ont payé au moins un achat sur la période, divisés par les visiteurs de la même période. Un compte qui achète deux fois compte une fois\u00a0; un visiteur revenu deux jours compte deux fois\u00a0: le taux est plutôt prudent.",
+      "Les vrais clients qui ont payé au moins un achat sur la période (sans l’équipe, le tournage ni les invités), divisés par les visiteurs de la même période. Un compte qui achète deux fois compte une fois\u00a0; un visiteur revenu deux jours compte deux fois\u00a0: le taux est plutôt prudent.",
     repere: "Entre 2 et 4\u00a0% est bon pour un achat sous 20\u00a0€ venu des réseaux.",
     siCaBouge: "S’il baisse, regarde quelle étape du tunnel a lâché, puis quelle source a changé.",
   },
@@ -61,7 +61,8 @@ export const AIDES_DU_PILOTAGE = {
     titre: "Revenu par acheteur",
     de: "le revenu par acheteur",
     quoi: "Ce qu’un acheteur dépense en moyenne sur la période, recharges de bulles comprises.",
-    calcul: "Le payé TTC de la période (remboursements non retirés), divisé par les comptes qui ont payé au moins un achat.",
+    calcul:
+      "Le payé TTC des vrais clients sur la période (remboursements non retirés, achats d’essai de l’équipe retirés), divisé par les vrais clients qui ont payé au moins un achat.",
     repere: "Au-dessus de 9,90\u00a0€, Premium et les recharges font leur travail. Le plafond naturel est autour de 20\u00a0€.",
     siCaBouge: "S’il baisse\u00a0: Premium est moins choisi sur la feuille du paiement, ou les coups de pouce ne se montrent plus.",
   },
@@ -70,7 +71,7 @@ export const AIDES_DU_PILOTAGE = {
     de: "la marge produit",
     quoi: "Ce qu’il reste de ce que paient les vrais clients, hors taxes, une fois payée l’IA du produit. Les tests (l’équipe et le tournage) n’y comptent ni dans les ventes ni dans l’IA\u00a0: ils se lisent à côté.",
     calcul:
-      "(Chiffre d’affaires net des vrais clients hors taxes − l’IA du produit, en euros) ÷ ce chiffre d’affaires. Les vrais clients\u00a0: les acheteurs qui ne sont ni de l’équipe ni du tournage, rangés une fois pour toutes à l’heure de leur paiement (les achats d’essai de l’équipe sont retirés, même si son compte d’essai est effacé ensuite). L’IA du produit\u00a0: celle des clients et des prospects (ceux qui importent sans acheter\u00a0: ce qu’il en coûte pour faire des clients), chaque appel rangé par la même règle («\u00a0Ce que coûte l’IA\u00a0» la détaille). La TVA retirée est celle de la France (20\u00a0%), le dollar compté à son cours du 11 octobre. Hors frais Whop et hors créatrices\u00a0: c’est une estimation. La courbe\u00a0: le payé et l’IA du produit de chaque case.",
+      "(Chiffre d’affaires net des vrais clients hors taxes − l’IA du produit, en euros) ÷ ce chiffre d’affaires. Les vrais clients\u00a0: les acheteurs qui ne sont ni de l’équipe, ni du tournage, ni des invités, rangés une fois pour toutes à l’heure de leur paiement (les achats d’essai de l’équipe sont retirés, même si son compte d’essai est effacé ensuite). L’IA du produit\u00a0: celle des clients et des prospects (ceux qui importent sans acheter\u00a0: ce qu’il en coûte pour faire des clients), chaque appel rangé par la même règle («\u00a0Ce que coûte l’IA\u00a0» la détaille). La TVA retirée est celle de la France (20\u00a0%), le dollar compté à son cours du 11 octobre. Hors frais Whop et hors créatrices\u00a0: c’est une estimation. La courbe\u00a0: le payé et l’IA du produit de chaque case.",
     repere: `La cible\u00a0: ${CIBLE_DE_MARGE}\u00a0% ou plus. En dessous, la carte passe en orange. Ce que coûtent les tests s’écrit dessous, à part, et le non classé avec la marge au pire (s’il était tout du produit).`,
     siCaBouge:
       "Si elle baisse\u00a0: le chat coûte trop par réponse, ou des bulles offertes partent en réponses. Regarde l’IA du produit, poste par poste. Des tests qui grimpent ne la touchent pas. Un appel «\u00a0non classé\u00a0» (une conv effacée avant sa note, une ligne d’avant la règle que rien ne rattache, une ligne pas encore rangée) n’y est pas non plus\u00a0: beaucoup de non classé, et la marge se lit trop belle, d’où la marge au pire écrite dessous. Juste après une mise en ligne, l’historique se range en quelques passages de 5\u00a0minutes\u00a0: lis la marge une fois le non classé retombé. Les lectures de captures d’avant le 26 octobre (sans conv ni envoi notés) sont rangées en prospect\u00a0: un essai de l’équipe sans compte peut s’y glisser.",
@@ -161,7 +162,7 @@ export const AIDES_DU_PILOTAGE = {
   sources: {
     titre: "D’où ils viennent",
     de: "les sources",
-    quoi: "Le canal par lequel les visiteurs arrivent, et ce que ses acheteurs ont payé.",
+    quoi: "Le canal par lequel les visiteurs arrivent, et ce que ses vrais clients ont payé.",
     calcul:
       "Le lien d’une créatrice (utm_source), sinon un verdict partagé, sinon le site d’avant, sinon l’appli qui a ouvert le lien, sinon «\u00a0Direct\u00a0». Les acheteurs se rangent d’après le canal de leur compte\u00a0; «\u00a0Avant le suivi\u00a0»\u00a0: des comptes venus avant qu’on compte les visites.",
     repere: "Juge un canal sur son taux d’achat et ce qu’il rapporte, jamais sur ses visiteurs seuls. Le «\u00a0meilleur taux\u00a0» ne se donne qu’à partir de 30\u00a0visiteurs.",
@@ -170,8 +171,9 @@ export const AIDES_DU_PILOTAGE = {
   mix: {
     titre: "Ce qui se vend",
     de: "ce qui se vend",
-    quoi: "Le payé de la période, par offre.",
-    calcul: "Les achats payés sur la période, TTC, remboursements non retirés. «\u00a0Bulles\u00a0» réunit les packs et le passage en Premium après le rapport.",
+    quoi: "Le payé des vrais clients sur la période, par offre.",
+    calcul:
+      "Les achats payés sur la période, TTC, remboursements non retirés, achats d’essai de l’équipe retirés. «\u00a0Bulles\u00a0» réunit les packs et le passage en Premium après le rapport.",
     repere: "Premium au-dessus de la moitié\u00a0: la feuille du paiement fait son travail.",
     siCaBouge: "Si le rapport seul passe devant Premium, regarde ce que montre la feuille du paiement.",
   },
