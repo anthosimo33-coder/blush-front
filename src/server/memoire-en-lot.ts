@@ -16,7 +16,8 @@ import { aRelancer, autreEnCours, entreeDe, ESSAIS_MAX, finir, sansLotEnVol, typ
  * La mise à jour de la mémoire, en différé. Celle qui part au calme (src/server/memoire-groupee.ts : 10 minutes sans
  * échange), personne ne l’attend : la personne est partie, le chat relit ses derniers échanges, et sa fiche la rapatrie
  * quand elle s’ouvre. Avec BLUSH_MEMOIRE_EN_LOT, le passage des 5 minutes (GET /api/cron/relances) l’envoie donc en lot au
- * prestataire (l’API Message Batches, src/server/ia/claude.ts : la même requête qu’en direct, deux fois moins chère), puis
+ * prestataire (l’API Message Batches, src/server/ia/claude.ts : la même requête qu’en direct, deux fois moins chère),
+ * sauf celle d’une conv en alerte, qui part en direct (ALERTE : une alerte qu’elle lèverait n’attend pas le lot), puis
  * relève les lots à chaque passage :
  *   - fini : la réponse s’applique à la mémoire gardée à l’envoi (tasks.lot_avant), ou à elle et aux alertes que le chat
  *     a notées depuis (majDuLot, src/server/analyse.ts) ; la tâche finit ;
@@ -66,6 +67,16 @@ const RESERVE_PAR_LOT = 100_000;
 const ETIQUETTE = "memoire_maj_lot";
 /** Le code d’un envoi raté pour une raison passagère, une première fois : la seconde, la mise à jour part en direct. */
 const REPORTE = "lot:reporte";
+/**
+ * Le code (tasks.error) d’une mise à jour au calme gardée en direct, sans lot, parce que la conv est en alerte : sa
+ * mémoire en a une (la règle de l’âge, « danger » ou « detresse » : de la lecture, d’une mise à jour, ou vue dans le chat
+ * et pas encore tranchée), ou l’un de ses échanges en a levé une que le chat n’a pas pu y noter (noterLAlerte,
+ * src/server/chat.ts). En lot, une alerte que la mise à jour lèverait (« mineur » sous une « detresse » : la règle de
+ * l’âge, que le chat lit sur la ligne de sa mémoire) ne s’écrirait qu’à sa réponse, jusqu’à environ 1 h 26 après le
+ * dernier échange (le calme, le passage, LOT_AU_PLUS_S, puis le direct) ; et un refus s’y paie deux fois (le lot, puis le
+ * direct : `lot:refus`).
+ */
+const ALERTE = "lot:alerte";
 /** Sur le chemin d’une requête (sa fiche, le chat) : des appels courts au prestataire, le direct sans sa réponse. */
 const COURT: Presse = { court: true };
 
@@ -344,7 +355,8 @@ async function reserveDesLots(userId: string | null): Promise<Reserve> {
  * tâche en lot avec la mémoire de l’envoi, seulement si elle est encore à cet envoi (son battement est le sien) : prise
  * entre-temps par une autre exécution, le lot est annulé, et effacé quand il aura fini. Le budget du jour atteint (les
  * lots en vol comptés d’avance) : elle attend (ErreurTache « budget »). Une erreur passagère du prestataire, une première
- * fois : elle attend le passage suivant (REPORTE). Sans mémoire, ou un envoi impossible : elle part en direct (`direct`).
+ * fois : elle attend le passage suivant (REPORTE). Sans mémoire, la conv en alerte (ALERTE), ou un envoi impossible : elle
+ * part en direct (`direct`).
  */
 async function envoyer(id: string): Promise<{ envoyee: boolean; direct: string | null }> {
   const prise = new Date();
@@ -361,6 +373,11 @@ async function envoyer(id: string): Promise<{ envoyee: boolean; direct: string |
     const echanges = entreeDe(tache);
     /* Sans mémoire (la vraie en échec, celle de secours pas encore écrite) : le direct sait l’écrire d’abord */
     if (!story || !lue || !echanges?.length) return { envoyee: false, direct: await versLeDirect(tache.id, "en_cours", "lot:sans_memoire", battement) };
+    /*
+     * La conv en alerte (ALERTE) : en direct, avant toute requête au prestataire. Sans heure, ni le passage suivant ni un
+     * échange qui la rejoint (`due`, retenir) ne la renvoient en lot ; la suivante de la conv repasse ici
+     */
+    if (lue.etat.alerte || echanges.some((e) => e.levee)) return { envoyee: false, direct: await versLeDirect(tache.id, "en_cours", ALERTE, battement) };
     const { req } = (await analyse()).preparerLaMaj(story, lue, echanges);
     const ia = await claude();
     const reserve = await reserveDesLots(story.userId);
