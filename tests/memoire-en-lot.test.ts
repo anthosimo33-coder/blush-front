@@ -698,6 +698,100 @@ describe("le garde-fou des alertes : la mise à jour au calme d’une conv en al
     expect(await comptees()).toBe(avant + 2);
   });
 
+  it("une alerte levée par le chat pendant un lot en vol : la mise à jour qui relit l’échange n’attend pas le lot (jusqu’à LOT_AU_PLUS_S) ; il est annulé, et tout part en direct, réuni", async () => {
+    const { id } = await convLue();
+    const { tache: tid, lot } = await envoyee(id);
+    const levee = { alerte: "detresse" as const, reponse: 4242 };
+    /* Comme le chat : l’alerte notée dans la mémoire (noterLAlerte), puis l’échange qui l’a levée retenu */
+    await modifierMemoire(id, (m) => ({ ...m, etat: noterAlerteDuChat(m.etat, levee.alerte, levee.reponse) }), { essais: 3 });
+    const r = await auChat(id, 3, { levee });
+    expect(r.part).toBe(true);
+    expect(faux.lots.get(lot)!.annule).toBe(true);
+    expect(await tache(tid)).toMatchObject({ status: "attente", dans: null, dits: ["échange numéro 1", "échange numéro 2", "échange numéro 3"] });
+    /* En direct tout de suite, un seul appel, qui relit l’échange qui l’a levée ; l’alerte reste */
+    await executerChaine(id);
+    expect(await tache(tid)).toMatchObject({ status: "fini" });
+    expect(majsLues()).toHaveLength(1);
+    expect(majsLues()[0]!.includes("ta réponse a levé l’alerte : detresse")).toBe(true);
+    expect((await donneesMemoire(id))!.etat.alerte).toBe("detresse");
+  });
+
+  it("une alerte levée pendant un lot dont la réponse est déjà revenue : elle s’applique d’abord, puis la mise à jour de l’alerte part en direct à son calme par le garde-fou, jamais en lot", async () => {
+    const { id } = await convLue();
+    const { tache: tid, lot } = await envoyee(id);
+    faux.finir(lot);
+    const r = await auChat(id, 3, { levee: { alerte: "danger", reponse: 4242 } });
+    expect(r.part).toBe(false);
+    expect(faux.appels).not.toContain("annuler");
+    expect((await tache(tid)).status).toBe("fini");
+    expect(await faits(id)).toContain("Adore les soirées improvisées");
+    expect(await tache(r.id!)).toMatchObject({ status: "attente", dits: ["échange numéro 3"] });
+    expect((await tache(r.id!)).dans).toBeGreaterThan(CALME_S - 60);
+    /* À son calme : en direct (lot:alerte), sans rien envoyer de plus au prestataire */
+    await db()
+      .update(t)
+      .set({ pasAvant: sql`now() - interval '1 second'` })
+      .where(eq(t.id, r.id!));
+    await traiterLesLots();
+    expect(envois()).toBe(1);
+    expect(await tache(r.id!)).toMatchObject({ status: "attente", dans: null, error: "lot:alerte" });
+    expect(relais).toContain(id);
+  });
+
+  it.each([
+    ["notée dans sa mémoire par le chat", true],
+    ["levée par un échange que le chat n’a pas pu noter dans sa mémoire", false],
+  ])(
+    "une alerte %s pendant l’envoi du lot (sa tâche pas encore en lot) : relevée juste après, le lot à peine parti est annulé, et la mise à jour part en direct, réunie (lot:alerte)",
+    async (_, notee) => {
+      const comptees = async () => (await statsAdmin(1)).pilotage.compteurs.majEnDirectParAlerte;
+      const avant = await comptees();
+      const { id } = await convLue();
+      const tid = await calmee(id);
+      const levee = { alerte: "danger" as const, reponse: 4242 };
+      /* Pendant l’envoi : le chat note l’alerte (ou n’y arrive pas), puis retient l’échange qui l’a levée, sans voir de lot */
+      let pendant: Awaited<ReturnType<typeof auChat>> | null = null;
+      definirFournisseurDeLots({
+        ...faux.f,
+        envoyer: async (requetes) => {
+          if (notee) await modifierMemoire(id, (m) => ({ ...m, etat: noterAlerteDuChat(m.etat, levee.alerte, levee.reponse) }), { essais: 3 });
+          pendant = await auChat(id, 3, { levee });
+          return faux.f.envoyer(requetes);
+        },
+      });
+      await traiterLesLots();
+      expect(pendant).toMatchObject({ part: false });
+      expect(envois()).toBe(1);
+      expect(faux.dernier().annule).toBe(true);
+      expect(await tache(tid)).toMatchObject({
+        status: "attente",
+        dans: null,
+        error: "lot:alerte",
+        gardee: false,
+        dits: ["échange numéro 1", "échange numéro 2", "échange numéro 3"],
+      });
+      expect(relais).toContain(id);
+      expect(await comptees()).toBe(avant + 1);
+      await executerChaine(id);
+      expect(await tache(tid)).toMatchObject({ status: "fini" });
+      expect(majsLues()).toHaveLength(1);
+      /* Le lot annulé finit sans réponse : effacé, rien de noté */
+      faux.finir(faux.dernier().id);
+      await traiterLesLots();
+      expect(faux.dernier().efface).toBe(true);
+      expect(await coutsDuLot(id)).toEqual([]);
+    },
+  );
+
+  it("éteint (BLUSH_MEMOIRE_EN_LOT=0), une alerte levée sans lot en vol : rien ne change, sa mise à jour attend son calme, rien ne part chez le prestataire", async () => {
+    LOT.on = false;
+    const { id } = await convLue();
+    const r = await auChat(id, 1, { levee: { alerte: "danger", reponse: 4242 } });
+    expect(r.part).toBe(false);
+    expect((await tache(r.id!)).dans).toBeGreaterThan(CALME_S - 60);
+    expect(faux.appels).toEqual([]);
+  });
+
   it("éteint (BLUSH_MEMOIRE_EN_LOT=0) : rien ne change, la conv en alerte part au calme en direct comme toutes, par la chaîne, sans code", async () => {
     LOT.on = false;
     const { id } = await convLue();
