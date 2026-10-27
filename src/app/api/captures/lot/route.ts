@@ -26,8 +26,9 @@ const LOT_DU_TOURNAGE = { appli: null, autre: null, captures: [], blocs: [], pro
  * Jamais payé deux fois (src/server/lots.ts) : un lot déjà lu (ses images, son appli, le jour), ici ou sur une autre
  * instance, revient sans rappeler le modèle ni compter les plafonds de lecture. `cle` : celle de l’envoi (la même pour
  * tous ses lots, et pour leur fin), dont l’empreinte range le coût de chaque lot (src/server/imports.ts) ; `ordre` :
- * « premier » pour le lot qui part d’abord, « suite » pour ceux qui attendent que sa réponse commence ; `mode` : « ajout »
- * pour le lot d’un morceau ajouté à la conv qu’on importe (seulement pour la mesure des refus). Un envoi
+ * « premier » pour le lot qui part d’abord, « suite » pour ceux qui attendent que sa réponse commence ; `mode` : « import »
+ * pour le lot d’un premier import, « ajout » pour celui d’un morceau ajouté à la conv qu’on importe (seulement pour la
+ * mesure des refus). Un envoi
  * abandonné par le navigateur (pour de bon, ou sa page fermée avant que le lot appelle le modèle) : 409 `abandon`.
  */
 async function traiter(req: Request) {
@@ -57,8 +58,12 @@ async function traiter(req: Request) {
   const app = appli.success ? appli.data : "autre";
   const envoi = envoiDe(cleEnvoi(fd?.get("cle")));
   const ordre = fd?.get("ordre");
-  /* Un lot d’un morceau ajouté (`mode=ajout`) : son refus n’arrête pas un premier import, il ne se compte pas (/admin) */
-  const ajout = fd?.get("mode") === "ajout";
+  /*
+   * Le lot d’un premier import (`mode=import`) : son refus arrête l’import, il se compte (/admin). Pas celui d’un morceau
+   * ajouté (`mode=ajout`, la conv est déjà là), ni d’un onglet resté sur le JS d’avant, qui ne dit pas son mode (pendant
+   * une mise en ligne : on ne sait pas s’il ajoutait un morceau)
+   */
+  const premierImport = fd?.get("mode") === "import";
   /* Le premier lot de l’envoi dit aux autres quand sa réponse commence, ou qu’il a fini (lu, retrouvé, refusé, en échec) */
   const commence = ordre === "premier" && envoi ? premierLot(envoi) : null;
   try {
@@ -80,7 +85,7 @@ async function traiter(req: Request) {
      * Un refus de lecture arrête tout l’import (le navigateur ne le relance pas) : compté pour /admin, une fois par envoi
      * d’un premier import (face aux premiers imports de vidéo)
      */
-    if (envoi && !ajout && e instanceof ErreurTache && estRefus(e)) await noterLeRefusDUneVideo(envoi, compte);
+    if (envoi && premierImport && e instanceof ErreurTache && estRefus(e)) await noterLeRefusDUneVideo(envoi, compte);
     throw e;
   } finally {
     commence?.();

@@ -494,8 +494,11 @@ export async function uploadRecording(
     fd.append("cle", cle);
     const o = ordre(k);
     if (o) fd.append("ordre", o);
-    /* Un morceau ajouté : son refus de lecture n’arrête pas un premier import (la mesure des refus, /admin) */
-    if (ajout) fd.append("mode", "ajout");
+    /*
+     * Un premier import ou un morceau ajouté : seul le refus de lecture d’un premier import se compte (la mesure des
+     * refus, /admin). Le JS d’avant ne disait rien : le serveur ne compte pas son refus
+     */
+    fd.append("mode", ajout ? "ajout" : "import");
     return (await appel("POST /api/captures/lot", { corps: fd, signal: arret.signal })).lot;
   };
   /* La première lecture rendue (ses images parties, et sans doute celles des lots partis avec elle) : les lots à garder peuvent partir */
@@ -537,7 +540,8 @@ export async function uploadRecording(
   /*
    * La fin : les lots lus (à partir de `restants`, ceux d’avant n’étant pas lus), rassemblés par le serveur. Une vidéo de
    * deux lots ou plus dit ce qu’il en reste (rien, lue en entier) : pour une longue lue en partie, le serveur répond
-   * alors quoi en faire (SuiteDeLaVideo), ou crée la conv
+   * alors quoi en faire (SuiteDeLaVideo), ou crée la conv. Elle dit aussi ses lots découpés en partant de la fin
+   * (`decoupe`), sans quoi le serveur ne mesure pas la règle visée (le JS d’avant découpait depuis le début)
    */
   const fin = (restants: number, gardes = false) =>
     avecReprise(
@@ -550,7 +554,9 @@ export async function uploadRecording(
             consentement,
             ...(repris.size ? { repris: [...repris].slice(0, ENVOIS_REPRIS_MAX) } : {}),
             ...(ajout ? { mode: "ajout" as const } : {}),
-            ...(empreinteVideo ? { partiel: { restants, ecrans: images.length, video: empreinteVideo, sensSur, ...(gardes ? { gardes: true as const } : {}) } } : {}),
+            ...(empreinteVideo
+              ? { partiel: { restants, ecrans: images.length, video: empreinteVideo, sensSur, decoupe: "fin" as const, ...(gardes ? { gardes: true as const } : {}) } }
+              : {}),
           },
         }),
       () => onAvance?.({ etape: "reprise" }),

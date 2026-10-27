@@ -81,8 +81,8 @@ function serveur({
 }) {
   const appels: string[] = [];
   const corpsVideo: unknown[] = [];
-  /* Ce que chaque essai d’un lot porte (sa clé d’envoi, son ordre, sa place), et les abandons reçus */
-  const champs: { n: number; cle: unknown; ordre: unknown; indice: number }[] = [];
+  /* Ce que chaque essai d’un lot porte (sa clé d’envoi, son ordre, son mode, sa place), et les abandons reçus */
+  const champs: { n: number; cle: unknown; ordre: unknown; mode: unknown; indice: number }[] = [];
   const abandons: { corps: unknown; keepalive: boolean | undefined }[] = [];
   const plans: unknown[] = [];
   const gardes: { rang: number; cle: unknown; images: number; priorite: RequestPriority | undefined }[] = [];
@@ -127,7 +127,7 @@ function serveur({
     const n = lotDe(init);
     const fd = init?.body as FormData;
     const indice = indiceDuLot((fd.getAll("captures")[0] as Blob).size - 1);
-    champs.push({ n, cle: fd.get("cle"), ordre: fd.get("ordre"), indice });
+    champs.push({ n, cle: fd.get("cle"), ordre: fd.get("ordre"), mode: fd.get("mode"), indice });
     const essai = (essais.get(n) ?? 0) + 1;
     essais.set(n, essai);
     appels.push(`lot ${n} · essai ${essai}`);
@@ -227,12 +227,12 @@ describe("uploadRecording sur une 5xx", () => {
 });
 
 describe("uploadRecording : un lot n’est jamais payé deux fois", () => {
-  it("tous les lots portent la même clé que leur fin ; le premier part « premier », les autres « suite »", async () => {
+  it("tous les lots portent la même clé que leur fin ; le premier part « premier », les autres « suite » ; tous disent un premier import", async () => {
     const { champs, corpsVideo } = serveur({ lot: (n) => json({ lot: `lecture ${n}` }) });
     await expect(uploadRecording(VIDEO, "imessage", CASE_IMPORT.version)).resolves.toMatchObject({ messagesRead: 42 });
-    expect(champs.map((c) => [c.n, c.ordre])).toEqual([
-      [1, "premier"],
-      [2, "suite"],
+    expect(champs.map((c) => [c.n, c.ordre, c.mode])).toEqual([
+      [1, "premier", "import"],
+      [2, "suite", "import"],
     ]);
     const cle = champs[0]!.cle;
     expect(cle).toEqual(expect.stringMatching(/^[0-9a-f-]{16,64}$/i));
@@ -326,7 +326,7 @@ describe("uploadRecording : une longue vidéo lue en partie avant l’achat", ()
       [4, "suite"],
       [3, "suite"],
     ]);
-    const partiel = { restants: 3, ecrans: 80, video: (plans[0] as { video: string }).video, sensSur: true };
+    const partiel = { restants: 3, ecrans: 80, video: (plans[0] as { video: string }).video, sensSur: true, decoupe: "fin" };
     expect(corpsVideo).toEqual([
       expect.objectContaining({ cle, lots: lectures(3, 4, 5, 6, 7), partiel }),
       expect.objectContaining({ cle, lots: lectures(3, 4, 5, 6, 7), partiel: { ...partiel, gardes: true } }),
@@ -468,7 +468,9 @@ describe("uploadRecording : une longue vidéo lue en partie avant l’achat", ()
     const { champs, corpsVideo, gardes } = serveur({ lot: lu });
     await uploadRecording(VIDEO, "imessage", CASE_IMPORT.version);
     expect(champs.map((c) => c.indice)).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
-    expect(corpsVideo).toEqual([expect.objectContaining({ lots: lectures(0, 1, 2, 3, 4, 5, 6, 7), partiel: expect.objectContaining({ restants: 0, ecrans: 80, sensSur: true }) })]);
+    expect(corpsVideo).toEqual([
+      expect.objectContaining({ lots: lectures(0, 1, 2, 3, 4, 5, 6, 7), partiel: expect.objectContaining({ restants: 0, ecrans: 80, sensSur: true, decoupe: "fin" }) }),
+    ]);
     expect(gardes).toEqual([]);
     /* Le plan sans réponse (le réseau) : en entier aussi */
     sel++;
@@ -482,6 +484,8 @@ describe("uploadRecording : une longue vidéo lue en partie avant l’achat", ()
     await uploadRecording(VIDEO, "imessage", CASE_IMPORT.version, undefined, { ajout: true });
     expect(ajout.plans).toEqual([]);
     expect(ajout.corpsVideo).toEqual([expect.not.objectContaining({ partiel: expect.anything() })]);
+    /* Ses lots disent le morceau ajouté : leur refus ne compte pas comme un premier import arrêté */
+    expect([...new Set(ajout.champs.map((c) => c.mode))]).toEqual(["ajout"]);
     sel++;
     /* La plus longue des courtes : cinq lots de douze, un seul tour, lus sans attendre de plan ; sa fin dit l’empreinte de son lot le plus récent */
     ecrans = 56;
@@ -490,7 +494,9 @@ describe("uploadRecording : une longue vidéo lue en partie avant l’achat", ()
     expect(courte.plans).toEqual([]);
     expect(courte.appels[0]).toBe("lot 1 · essai 1");
     const recente = `imessage:ab:${Array.from({ length: 12 }, (_, k) => `${sel}:${44 + k}`).join(",")}`;
-    expect(courte.corpsVideo).toEqual([expect.objectContaining({ lots: lectures(0, 1, 2, 3, 4), partiel: { restants: 0, ecrans: 56, video: recente, sensSur: true } })]);
+    expect(courte.corpsVideo).toEqual([
+      expect.objectContaining({ lots: lectures(0, 1, 2, 3, 4), partiel: { restants: 0, ecrans: 56, video: recente, sensSur: true, decoupe: "fin" } }),
+    ]);
     sel++;
     /* Deux lots : pareil */
     ecrans = 23;

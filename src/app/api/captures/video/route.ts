@@ -73,7 +73,8 @@ const Envoi = ROUTES["POST /api/captures/video"].corps.extend({ app: AppliCaptur
  * Une longue vidéo lue en partie (`partiel`, src/server/lecture-partielle.ts) : tant que ses lots plus anciens ne sont
  * ni lus ni envoyés, la route dit seulement quoi en faire (SuiteDeLaVideo : en lire encore, ou les garder), sans rien
  * créer ; renvoyée avec `gardes`, la conv naît avec sa suite (src/server/ecrans-gardes.ts), lue après le paiement. Toute
- * vidéo de deux lots ou plus envoie `partiel` (lue en entier : `restants` à 0), pour la mesure de la règle visée.
+ * vidéo de deux lots ou plus envoie `partiel` (lue en entier : `restants` à 0), pour la mesure de la règle visée (avec
+ * `decoupe`, sans quoi elle ne se mesure pas).
  */
 export const POST = route("POST /api/captures/video", async (req: Request) => {
   const g = await garde(req, { session: "aucune" });
@@ -179,10 +180,13 @@ export const POST = route("POST /api/captures/video", async (req: Request) => {
   /*
    * Une vidéo lue en entier, quand la lecture partielle se mesure (seMesure : en « mesure », toute vidéo de deux lots ou
    * plus ; en « ab », une longue vidéo de la moitié entière) : ce que la règle visée en aurait lu, épargné et changé au
-   * haut du paywall (le contrefactuel, sans modèle). Rien de plus n’est lu ni gardé. Une erreur n’arrête jamais l’import
+   * haut du paywall (le contrefactuel, sans modèle). Rien de plus n’est lu ni gardé. Une erreur n’arrête jamais l’import.
+   * Seulement des lots découpés en partant de la fin (`decoupe`) : la règle lit d’abord le lot le plus récent, qu’elle
+   * suppose plein. Un onglet resté sur le JS d’avant (pendant une mise en ligne) découpait depuis le début (son lot le
+   * plus récent, le reste : trois écrans sur 80) ; sa vidéo s’importe comme avant, sans être mesurée
    */
   const contrefactuel = () => {
-    if (!partiel || !video || tournage || aGarder || bras === "partielle" || modeDeLaLecture() === "0" || !seMesure(video.lots)) return null;
+    if (!partiel || partiel.decoupe !== "fin" || !video || tournage || aGarder || bras === "partielle" || modeDeLaLecture() === "0" || !seMesure(video.lots)) return null;
     try {
       return leContrefactuel(lots, { ecrans: partiel.ecrans, appli: app, jour, sensSur: partiel.sensSur });
     } catch (err) {

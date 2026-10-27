@@ -204,7 +204,7 @@ async function importEntier(serie: string, video = videoDe("entiere")): Promise<
   expect(await plan(video, { cle })).toBe("entiere");
   const lots: Captures[] = [];
   for (let j = 0; j < LOTS; j++) lots.push(await lireLeLot(serie, cle, j));
-  return { id: nee(await fin({ lots, cle, partiel: { restants: 0, ecrans: ECRANS, video, sensSur: true } })), cle };
+  return { id: nee(await fin({ lots, cle, partiel: { restants: 0, ecrans: ECRANS, video, sensSur: true, decoupe: "fin" } })), cle };
 }
 
 /**
@@ -229,14 +229,15 @@ async function importPartiel(serie: string): Promise<{ id: string; cle: string; 
 
 /**
  * Une courte vidéo de deux lots (23 écrans), lue en entier comme le navigateur : sans plan, ses deux lots, puis sa fin,
- * qui dit l’empreinte de son lot le plus récent (`partiel`, rien de restant) pour la mesure de la règle visée. `avant` :
- * ce qui se passe entre la lecture des lots et leur fin (leur coût noté, comme par le vrai modèle).
+ * qui dit l’empreinte de son lot le plus récent (`partiel`, rien de restant) et sa découpe (en partant de la fin) pour la
+ * mesure de la règle visée. `avant` : ce qui se passe entre la lecture des lots et leur fin (leur coût noté, comme par le
+ * vrai modèle). `decoupe: null` : la fin d’un onglet resté sur le JS d’avant, qui ne dit pas sa découpe.
  */
-async function importCourt(serie: string, avant?: (cle: string) => Promise<void>): Promise<{ id: string; cle: string }> {
+async function importCourt(serie: string, avant?: (cle: string) => Promise<void>, { decoupe = "fin" }: { decoupe?: "fin" | null } = {}): Promise<{ id: string; cle: string }> {
   const cle = randomUUID();
   const lots = [await lireLeLot(serie, cle, 0), await lireLeLot(serie, cle, 1)];
   await avant?.(cle);
-  return { id: nee(await fin({ lots, cle, partiel: { restants: 0, ecrans: 2 * 11 + 1, video: randomUUID(), sensSur: true } })), cle };
+  return { id: nee(await fin({ lots, cle, partiel: { restants: 0, ecrans: 2 * 11 + 1, video: randomUUID(), sensSur: true, ...(decoupe ? { decoupe } : {}) } })), cle };
 }
 
 /** La conv brute d’une histoire, déchiffrée (une conv d’un seul morceau : son texte). */
@@ -743,6 +744,25 @@ describe("l’A/B et son interrupteur", () => {
     } finally {
       if (envois.length) await db().delete(schema.aiUsage).where(inArray(schema.aiUsage.envoi, envois));
     }
+  });
+
+  it("en mesure, la fin d’un onglet resté sur le JS d’avant (sans `decoupe` : son lot le plus récent n’était que le reste) : importée comme avant, pas mesurée ; une longue vidéo de la moitié entière non plus", async () => {
+    etat.mode = "mesure";
+    const avant = (await statsAdmin(1)).pilotage.lecturePartielle.contrefactuel;
+    const { id } = await importCourt(randomUUID(), undefined, { decoupe: null });
+    expect(await mesureDe(id)).toMatchObject({ type: "video", lots: 2, ecrans: 23, contrefactuel: null, arret: null, lotsEpargnables: null, ecransEpargnables: null });
+    /* La même vidéo, de la moitié entière d’une longue vidéo en « ab » : lue en entier, rien de noté */
+    etat.mode = "ab";
+    const cle = randomUUID();
+    const video = videoDe("entiere");
+    expect(await plan(video, { cle })).toBe("entiere");
+    const serie = randomUUID();
+    const lots: Captures[] = [];
+    for (let j = 0; j < LOTS; j++) lots.push(await lireLeLot(serie, cle, j));
+    const longue = nee(await fin({ lots, cle, partiel: { restants: 0, ecrans: ECRANS, video, sensSur: true } }));
+    expect(await mesureDe(longue)).toMatchObject({ bras: "entiere", lots: LOTS, contrefactuel: null, arret: null, lotsEpargnables: null });
+    const apres = (await statsAdmin(1)).pilotage.lecturePartielle.contrefactuel;
+    expect([apres.videos - avant.videos, apres.mesurees - avant.mesurees]).toEqual([0, 0]);
   });
 
   it("une courte vidéo de deux lots, éteinte (« 0 ») ou en A/B (« ab », hors de l’A/B) : lue en entier, rien de noté, comme avant", async () => {

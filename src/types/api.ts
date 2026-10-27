@@ -288,8 +288,11 @@ export type SuiteDeLaVideo = { suite: "lire" | "garder"; lots: number };
 /*
  * Ce que le navigateur dit d’une vidéo de deux lots ou plus (POST /api/captures/video ; une longue, ou une plus courte
  * pour la mesure de la règle visée) : ses lots plus anciens pas encore lus (`restants`, 0 lue en entier), tous ses
- * écrans, l’empreinte de son lot le plus récent (`video`, la moitié de l’A/B), si son sens de défilement est sûr, et si
- * ses lots plus anciens sont déjà envoyés (`gardes`)
+ * écrans, l’empreinte de son lot le plus récent (`video`, la moitié de l’A/B), si son sens de défilement est sûr, si
+ * ses lots plus anciens sont déjà envoyés (`gardes`), et comment il a découpé ses lots (`decoupe`) : « fin », en partant
+ * de la fin (le lot le plus récent plein, depuis le 27 octobre 2026), ce que la mesure de la règle visée suppose. Un
+ * onglet resté sur le JS d’avant (pendant une mise en ligne) ne le dit pas : il découpait depuis le début, son lot le
+ * plus récent n’était que le reste. Sa vidéo se lit comme avant, sans être mesurée
  */
 const LongueVideo = z.object({
   restants: z.number().int().min(0).max(LOTS_MAX),
@@ -301,6 +304,7 @@ const LongueVideo = z.object({
   video: z.string().min(16).max(128),
   sensSur: z.boolean(),
   gardes: z.literal(true).optional(),
+  decoupe: z.literal("fin").optional(),
 });
 
 /* ———— Ce que les routes reçoivent ———— */
@@ -559,7 +563,7 @@ export const ROUTES = {
   "POST /api/captures": { formulaire: true },
   /*
    * Les images d’un lot, son appli, l’accord de l’import, la clé de l’envoi (`cle`), son ordre (« premier », « suite »)
-   * et, pour un morceau ajouté, `mode` (« ajout »)
+   * et son `mode` (« import » pour un premier import, « ajout » pour un morceau ajouté ; le JS d’avant n’en disait rien)
    */
   "POST /api/captures/lot": { formulaire: true },
   /* La clé de l’envoi abandonné, celle de ses lots, et pourquoi (RAISONS_D_ABANDON) */
