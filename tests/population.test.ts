@@ -557,10 +557,18 @@ describe("le tableau de bord : l’IA du produit et celle des tests à part, la 
           sql`insert into achats (user_id, story_id, offre, centimes, bulles, fournisseur, statut, paye_le, cree_le, population) select ${u.id}, id, 'premium', 1990, 25, 'factice', 'paye', ${pres}, ${pres}, 'client' from stories where id in ${recentes}`,
         );
         await tx.execute(sql`insert into tasks (story_id, kind, status, created_at) select id, 'verdict', 'paiement', ${pres} from stories where id in ${recentes}`);
+        /*
+         * Et les imports des convs d’il y a 100 jours, la table pleine et ses statistiques prises : « Par longueur » les
+         * cherche achat par achat. Sans eux, le plan dépendait de ce que l’autovacuum avait déjà vu d’imports (une base
+         * neuve, celle de la CI, n’en a aucune statistique)
+         */
+        await tx.execute(
+          sql`insert into imports (story_id, envoi, type, appli, cree_le) select id, 'jit-' || id::text, 'video', 'whatsapp', ${loin} from stories where id in ${ids} and created_at < now() - interval '2 days'`,
+        );
         await tx.execute(
           sql`insert into mouvements_bulles (user_id, delta, raison, ref, cree_le) select ${u.id}, 3, 'achat', id::text, ${pres} from achats where user_id = ${u.id} and paye_le > now() - interval '2 days'`,
         );
-        await tx.execute(sql`analyze users, stories, ai_usage, achats, tasks, mouvements_bulles`);
+        await tx.execute(sql`analyze users, stories, ai_usage, achats, tasks, mouvements_bulles, imports`);
         for (const q of prises) await estimer(q, (x) => tx.execute(x), true);
         tx.rollback();
       })

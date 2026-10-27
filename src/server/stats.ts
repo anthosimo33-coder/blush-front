@@ -1088,9 +1088,10 @@ async function pilotageDe(jours: Periode): Promise<Pilotage> {
     ),
     /*
      * … et conv par conv (une conv payée deux fois compte une fois) : ce qu’ont coûté sa lecture, son verdict et ce qui a
-     * été lu avant l’achat (les appels du produit seuls), si son import est mesuré (une ligne d’imports, par son index
-     * unique), ses lignes de verdict et leurs modèles, et les jetons lus par ses verdicts du montage partagé, le socle
-     * retiré (VERDICT_MESURE)
+     * été lu avant l’achat (les appels du produit seuls), si son import est mesuré (sa ligne d’imports, jointe par son
+     * index unique : une au plus, et pas une sous-requête rejouée conv par conv, qui passait le seuil du JIT sur une table
+     * d’imports encore sans statistiques), ses lignes de verdict et leurs modèles, et les jetons lus par ses verdicts du
+     * montage partagé, le socle retiré (VERDICT_MESURE)
      */
     lignes<{
       messages: number;
@@ -1114,9 +1115,9 @@ async function pilotageDe(jours: Periode): Promise<Pilotage> {
                     array_agg(distinct u.model order by u.model) filter (where u.task = 'verdict') as modeles
                   from ai_usage u where u.story_id in (select story_id from a) and ${duProduit(sql`u.population`)} group by u.story_id)
           select s.message_count as messages, coalesce(u.micros, 0) as micros, coalesce(u.micros_avant, 0) as micros_avant,
-            exists (select 1 from imports i where i.story_id = a.story_id) as mesuree, coalesce(u.micros_verdict, 0) as micros_verdict, coalesce(u.verdicts, 0) as verdicts,
+            im.story_id is not null as mesuree, coalesce(u.micros_verdict, 0) as micros_verdict, coalesce(u.verdicts, 0) as verdicts,
             coalesce(u.jetons, 0) as jetons, coalesce(u.mesures, 0) as mesures, coalesce(u.modeles, '{}') as modeles
-          from a join stories s on s.id = a.story_id left join u on u.story_id = a.story_id`,
+          from a join stories s on s.id = a.story_id left join u on u.story_id = a.story_id left join imports im on im.story_id = a.story_id`,
     ),
     /* … et leurs lignes de verdict par modèle : un modèle de repli, plus cher, s’y voit */
     lignes<{ modele: string; lignes: string; convs: string; micros: string }>(
