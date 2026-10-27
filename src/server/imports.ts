@@ -1,5 +1,5 @@
 import "server-only";
-import { and, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, type SQL, sql } from "drizzle-orm";
 import type { GenreDuHaut } from "@/contenu/haut-du-paywall";
 import type { AppKind, BrasDeLaLecture, IssueDeLaSuite, TypeDImport } from "@/types";
 import { empreinte, jeton } from "./chiffrement";
@@ -77,6 +77,7 @@ export async function noterImport({ storyId, type, appli, ecrans, lots, envoi, r
   await auMieux(
     async () => {
       const e = envoi ?? envoiOuNouveau(null);
+      const de = [...(envoi ? [envoi] : []), ...repris];
       await db()
         .insert(schema.imports)
         .values({
@@ -93,27 +94,35 @@ export async function noterImport({ storyId, type, appli, ecrans, lots, envoi, r
           arret: contrefactuel?.arret ?? null,
           lotsEpargnables: contrefactuel?.epargnables ?? null,
           ecransEpargnables: contrefactuel?.ecransEpargnables ?? null,
-          /* Ce qu’était la vidéo mesurée : ses écrans et ses lots, que les morceaux ajoutés ensuite ne changent pas (noterAjout) */
+          /*
+           * Ce qu’était la vidéo mesurée : ses écrans, ses lots et ce qu’ils ont coûté, que les morceaux ajoutés ensuite ne
+           * changent pas (noterAjout : un morceau vidéo range ses lots sous la même empreinte, ceux qu’il reprend d’un envoi
+           * lu avant l’import compris, et une date ne les distinguerait pas). Le coût, dans la même écriture que l’arrêt :
+           * une panne en route (relier, juste après) ne laisse jamais une vidéo mesurée sans lui
+           */
           ecransMesures: contrefactuel ? ecrans : null,
           lotsMesures: contrefactuel ? lots : null,
+          microsMesures: contrefactuel ? coutDesLots(de) : null,
         })
         .onConflictDoNothing();
-      await relier([...(envoi ? [envoi] : []), ...repris], { storyId, envoi: e });
-      /*
-       * … et ce qu’ont coûté ses lots, maintenant qu’ils sont tous sous son empreinte (les siens, ceux repris par le serveur
-       * ou par l’onglet) : un morceau vidéo ajouté ensuite range les siens sous la même empreinte, ceux qu’il reprend d’un
-       * envoi lu avant l’import compris (noterAjout), et une date ne les distinguerait pas. Une seule fois (un nouvel essai
-       * ne la refait pas)
-       */
-      if (contrefactuel)
-        await db()
-          .update(schema.imports)
-          .set({ microsMesures: sql`(select coalesce(sum(u.cost_micros), 0) from ai_usage u where u.envoi = ${e} and u.task = 'captures_video')` })
-          .where(and(eq(schema.imports.storyId, storyId), isNull(schema.imports.microsMesures)));
+      await relier(de, { storyId, envoi: e });
     },
     "import non mesuré",
     { type },
   );
+}
+
+/**
+ * Ce qu’ont coûté les lots d’enregistrement des envois `de` qu’aucune conv n’a encore pris (les lignes « captures_video »
+ * que relier range sous l’import : les siens, ceux que le serveur a repris sous son empreinte, ceux des envois que
+ * l’onglet a repris), en micro-dollars : une sous-requête, lue dans l’écriture qui l’emploie. 0 sans envoi.
+ */
+function coutDesLots(de: string[]): SQL {
+  if (!de.length) return sql`0`;
+  return sql`(select coalesce(sum(u.cost_micros), 0) from ai_usage u where u.envoi in (${sql.join(
+    de.map((d) => sql`${d}`),
+    sql`, `,
+  )}) and u.story_id is null and u.task = 'captures_video')`;
 }
 
 /**

@@ -782,6 +782,41 @@ describe("l’A/B et son interrupteur", () => {
     }
   });
 
+  it("en mesure, une panne de la base juste après la mesure (ses lectures pas rangées sous la conv) : la vidéo mesurée garde le coût de ses lots, pas 0 $", async () => {
+    etat.mode = "mesure";
+    const avant = (await statsAdmin(1)).pilotage.lecturePartielle.contrefactuel;
+    /* La panne, pendant sa fin : ranger ses lectures sous la conv échoue (une erreur passagère de la base) */
+    const base = db();
+    const update = base.update.bind(base);
+    let enPanne = false;
+    const espion = vi.spyOn(base, "update").mockImplementation(((t: Parameters<typeof base.update>[0]) => {
+      if (enPanne && t === schema.aiUsage) throw new Error("panne passagère de la base");
+      return update(t);
+    }) as typeof base.update);
+    let envoi: string | null = null;
+    try {
+      const { id } = await importCourt(randomUUID(), async (cle) => {
+        /* Ce que ses deux lots ont coûté, sous l’empreinte de son envoi (le modèle factice n’en note pas) : 0,10 $ chacun */
+        const e = envoiDe(cle)!;
+        envoi = e;
+        await db()
+          .insert(schema.aiUsage)
+          .values([0, 1].map(() => ({ task: "captures_video", model: "factice", costMicros: 100_000, envoi: e, population: "prospect" as const })));
+        enPanne = true;
+      });
+      enPanne = false;
+      /* La panne a bien eu lieu (rien sous la conv), et la mesure tient : son arrêt et le coût de ses lots, écrits ensemble */
+      expect(await db().select().from(schema.aiUsage).where(eq(schema.aiUsage.storyId, id))).toEqual([]);
+      expect(await mesureDe(id)).toMatchObject({ arret: "premier_tour", lotsMesures: 2, microsMesures: 200_000 });
+      const apres = (await statsAdmin(1)).pilotage.lecturePartielle.contrefactuel;
+      expect(apres.mesurees - avant.mesurees).toBe(1);
+      expect(apres.dollars - avant.dollars).toBeCloseTo(0.2, 6);
+    } finally {
+      espion.mockRestore();
+      if (envoi) await db().delete(schema.aiUsage).where(eq(schema.aiUsage.envoi, envoi));
+    }
+  });
+
   it("en mesure, la fin d’un onglet resté sur le JS d’avant (sans `decoupe` : son lot le plus récent n’était que le reste) : importée comme avant, pas mesurée ; une longue vidéo de la moitié entière non plus", async () => {
     etat.mode = "mesure";
     const avant = (await statsAdmin(1)).pilotage.lecturePartielle.contrefactuel;
