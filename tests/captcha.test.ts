@@ -5,8 +5,8 @@ import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vites
  * Le CAPTCHA aux portes sans compte (src/server/captcha.ts), les routes appelées comme le ferait le navigateur : la
  * demande de code (le jeton du widget, un par demande), le laissez-passer des imports (/api/captcha, puis un import et
  * son nouvel essai, ou les lots d’un enregistrement), toujours vérifiés AVANT toute limite comptée. Cloudflare est un
- * faux fetch ; les cookies et la clé secrète sont simulés (`etat`). Chaque import porte la case de l’import cochée
- * (src/server/juridique.ts), vérifiée avant le CAPTCHA.
+ * faux fetch ; les cookies, la clé secrète et le mode de la lecture partielle sont simulés (`etat`). Chaque import porte
+ * la case de l’import cochée (src/server/juridique.ts), vérifiée avant le CAPTCHA.
  */
 type Attributs = { expires?: Date; httpOnly?: boolean };
 const etat = vi.hoisted(() => ({
@@ -14,6 +14,7 @@ const etat = vi.hoisted(() => ({
   cookies: new Map<string, string>(),
   attributs: new Map<string, Attributs>(),
   apres: [] as (() => unknown)[],
+  mode: "0" as "0" | "mesure" | "ab",
 }));
 vi.mock("next/headers", () => ({
   cookies: async () => ({
@@ -29,7 +30,10 @@ vi.mock("next/headers", () => ({
 }));
 vi.mock("@/server/env", async (original) => {
   const m = await original<typeof import("@/server/env")>();
-  return { ...m, env: () => ({ ...m.env(), TURNSTILE_SECRET_KEY: etat.secret, NEXT_PUBLIC_TURNSTILE_SITE_KEY: etat.secret && "0x4AAAAAAAcle-publique" }) };
+  return {
+    ...m,
+    env: () => ({ ...m.env(), TURNSTILE_SECRET_KEY: etat.secret, NEXT_PUBLIC_TURNSTILE_SITE_KEY: etat.secret && "0x4AAAAAAAcle-publique", BLUSH_LECTURE_PARTIELLE: etat.mode }),
+  };
 });
 vi.mock("next/server", async (original) => ({ ...(await original<typeof import("next/server")>()), after: (f: () => unknown) => etat.apres.push(f) }));
 vi.mock("@/server/alertes", async (original) => ({ ...(await original<typeof import("@/server/alertes")>()), alerter: async () => {} }));
@@ -98,6 +102,7 @@ const laissezPasser = (jeton: string | null = "jeton-du-widget", ipDeLaRequete?:
 
 beforeEach(() => {
   etat.secret = "0x4AAAAAAAsecret-fictif";
+  etat.mode = "0";
   etat.cookies.clear();
   etat.attributs.clear();
   etat.apres.length = 0;
@@ -186,7 +191,7 @@ describe("le laissez-passer des imports sans compte", () => {
     vi.restoreAllMocks();
     cloudflare(true);
     const ici = adresse();
-    expect(await corpsDe(await laissezPasser("jeton", ici))).toEqual([200, { ok: true }]);
+    expect(await corpsDe(await laissezPasser("jeton", ici))).toEqual([200, { ok: true, planDesVideos: false }]);
     expect(recus.at(-1)).toMatchObject({ response: "jeton", remoteip: ici });
     expect(etat.attributs.get(HUMAIN)?.httpOnly).toBe(true);
     const fin = etat.attributs.get(HUMAIN)!.expires!.getTime() - Date.now();
@@ -226,11 +231,25 @@ describe("le laissez-passer des imports sans compte", () => {
     expect((await humainRefuse("brouillon"))?.status).toBe(403);
   });
 
+  it("il dit au navigateur si une longue vidéo demande son plan : seulement dans l’A/B de la lecture partielle (« ab »)", async () => {
+    cloudflare(true);
+    const plans: unknown[] = [];
+    for (const mode of ["0", "mesure", "ab"] as const) {
+      etat.mode = mode;
+      plans.push((await corpsDe(await laissezPasser("jeton")))[1]);
+    }
+    expect(plans).toEqual([
+      { ok: true, planDesVideos: false },
+      { ok: true, planDesVideos: false },
+      { ok: true, planDesVideos: true },
+    ]);
+  });
+
   it("un compte connecté n’en a pas besoin : ni jeton vérifié, ni cookie posé", async () => {
     const f = vi.spyOn(globalThis, "fetch");
     const u = await compteDeTest("captcha");
     etat.cookies.set(SESSION, (await ouvrirSession(u.id)).secret);
-    expect(await corpsDe(await laissezPasser(null))).toEqual([200, { ok: true }]);
+    expect(await corpsDe(await laissezPasser(null))).toEqual([200, { ok: true, planDesVideos: false }]);
     expect(etat.cookies.has(HUMAIN)).toBe(false);
     expect(await humainRefuse("brouillon")).toBeNull();
     expect(f).not.toHaveBeenCalled();

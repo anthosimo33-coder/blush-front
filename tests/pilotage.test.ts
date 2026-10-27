@@ -591,4 +591,28 @@ describe("les convs payées par longueur (/admin)", () => {
       await db().delete(schema.aiUsage).where(inArray(schema.aiUsage.id, ids));
     }
   });
+
+  it("les compteurs du suivi se comparent à ce qui se compte les mêmes jours de Paris : juste avant minuit, une mise à jour en lot ou un import de vidéo sort du jour, comme le compteur", async () => {
+    const suivi = async () => (await statsAdmin(1)).pilotage.compteurs;
+    /* Une seconde avant minuit à Paris (dans les 24 dernières heures, sauf dans la dernière seconde du jour), puis maintenant */
+    const veille = sql`(date_trunc('day', now() at time zone 'Europe/Paris') at time zone 'Europe/Paris') - interval '1 second'`;
+    const avant = await suivi();
+    const envois = [randomUUID(), randomUUID()];
+    const ids = (
+      await db()
+        .insert(schema.aiUsage)
+        .values([veille, sql`now()`].map((quand) => ({ task: "memoire_maj_lot", model: "claude-opus-5-5", costMicros: 1_000, population: "client" as const, createdAt: quand })))
+        .returning({ id: schema.aiUsage.id })
+    ).map((l) => l.id);
+    await db()
+      .insert(schema.imports)
+      .values(envois.map((envoi, k) => ({ envoi, type: "video" as const, appli: "imessage" as const, ecrans: 12, lots: 1, creeLe: k ? sql`now()` : veille })));
+    try {
+      const apres = await suivi();
+      expect([apres.majEnLot - avant.majEnLot, apres.videosImportees - avant.videosImportees]).toEqual([1, 1]);
+    } finally {
+      await db().delete(schema.aiUsage).where(inArray(schema.aiUsage.id, ids));
+      await db().delete(schema.imports).where(inArray(schema.imports.envoi, envois));
+    }
+  });
 });

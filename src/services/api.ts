@@ -291,14 +291,13 @@ const enteteCaptcha = (jeton: string | null): HeadersInit => (jeton ? { [ENTETE_
 /**
  * Le laissez-passer du CAPTCHA, avant un import (src/server/captcha.ts) : le jeton du widget de l’écran, échangé contre un
  * cookie. Lancé pendant que le navigateur prépare ses fichiers, attendu juste avant de les envoyer : il ne retarde rien.
- * Un compte connecté le reçoit sans rien prouver. Sans clé publique, il n’y a rien à faire. Rejette avec l’ErreurApi du
- * serveur (« captcha », « trop »).
+ * Un compte connecté le reçoit sans rien prouver. Sans clé publique, il n’y a rien à faire : null, rien de demandé (ni
+ * ce que la réponse dit en plus, `planDesVideos`, pour un enregistrement). Rejette avec l’ErreurApi du serveur
+ * (« captcha », « trop »).
  */
-function laissezPasser(): Promise<void> {
-  if (!cleDuSiteCaptcha()) return Promise.resolve();
-  const demande = (async () => {
-    await appel("POST /api/captcha", { entetes: enteteCaptcha(await jetonCaptcha()) });
-  })();
+function laissezPasser(): Promise<Routes["POST /api/captcha"]["reponse"] | null> {
+  if (!cleDuSiteCaptcha()) return Promise.resolve(null);
+  const demande = (async () => appel("POST /api/captcha", { entetes: enteteCaptcha(await jetonCaptcha()) }))();
   /* Attendu plus tard : un échec avant (le fichier illisible) ne doit pas devenir une promesse rejetée sans personne */
   demande.catch(() => {});
   return demande;
@@ -441,22 +440,24 @@ export async function uploadRecording(
     lus[k] = deja.lot;
     if (deja.cle !== cle) repris.add(deja.cle);
   });
-  /* Le même laissez-passer pour tous les lots, puis pour les rassembler */
-  await passe;
+  /* Le même laissez-passer pour tous les lots, puis pour les rassembler ; il dit aussi si une longue vidéo demande son plan */
+  const passeur = await passe;
   /*
    * Une vidéo de deux lots ou plus d’un premier import : l’empreinte de son lot le plus récent, sans le jour (« ab » à sa
    * place : la même vidéo renvoyée le lendemain tombe dans la même moitié de l’A/B), que sa fin envoie au serveur
    * (`partiel`) avec ce qu’il faut pour rejouer la règle d’arrêt sur ses lots (en « mesure », le contrefactuel de toute
    * vidéo de deux lots ou plus : src/server/lecture-partielle.ts). Seule une longue vidéo demande d’abord comment la lire
    * avant l’achat (en entier, ou d’abord sa partie la plus récente : l’A/B), et sa lecture attend la réponse ; une plus
-   * courte n’est jamais dans l’A/B, elle se lit en entier sans rien demander. Sans réponse (le réseau), en entier, comme
-   * avant
+   * courte n’est jamais dans l’A/B, elle se lit en entier sans rien demander. Hors de l’A/B (le laissez-passer le dit :
+   * `planDesVideos` faux), la réponse serait toujours « en entier » : rien n’est demandé, la lecture n’attend pas. Sans
+   * laissez-passer (pas de CAPTCHA, ou un serveur d’avant qui ne le dit pas), on demande, comme avant. Sans réponse (le
+   * réseau), en entier, comme avant
    */
   const recent = lots.at(-1);
   const empreinteVideo = !ajout && lots.length >= LOTS_MIN_PARTIELLE && recent ? await empreinteDuLot(recent, app, "ab") : null;
-  const longue = !!empreinteVideo && lots.length > LECTEURS_DE_LOTS;
+  const planADemander = !!empreinteVideo && lots.length > LECTEURS_DE_LOTS && passeur?.planDesVideos !== false;
   const partielle =
-    longue &&
+    planADemander &&
     (await appel("POST /api/captures/video/plan", { corps: { lots: lots.length, video: empreinteVideo, sensSur, cle, consentement } }).then(
       (r) => r.lecture === "partielle",
       () => false,
@@ -493,6 +494,8 @@ export async function uploadRecording(
     fd.append("cle", cle);
     const o = ordre(k);
     if (o) fd.append("ordre", o);
+    /* Un morceau ajouté : son refus de lecture n’arrête pas un premier import (la mesure des refus, /admin) */
+    if (ajout) fd.append("mode", "ajout");
     return (await appel("POST /api/captures/lot", { corps: fd, signal: arret.signal })).lot;
   };
   /* La première lecture rendue (ses images parties, et sans doute celles des lots partis avec elle) : les lots à garder peuvent partir */

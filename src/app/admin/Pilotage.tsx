@@ -1280,9 +1280,12 @@ function IAAvantLAchat({ p }: { p: Chiffres }) {
   const total = types.reduce((t, x) => t + x.dollars + x.pourRien, 0);
   const pourRien = types.filter((x) => x.pourRien > 0);
   const lignes = types.filter((x) => x.imports || x.pourRien);
-  /* Les vidéos arrêtées par un refus de lecture, face à toutes celles envoyées (importées, ou arrêtées ainsi) */
+  /*
+   * Les vidéos arrêtées par un refus de lecture, face à toutes celles envoyées (importées, ou arrêtées ainsi), comptées sur
+   * les mêmes jours de Paris que le compteur (pas les imports du tableau, sur la fenêtre glissante)
+   */
   const refusees = p.compteurs.videosRefusees;
-  const envoyees = (types.find((x) => x.type === "video")?.imports ?? 0) + refusees;
+  const envoyees = p.compteurs.videosImportees + refusees;
   const partRefusee = tauxLisible(refusees, envoyees);
   return (
     <Bloc
@@ -1665,10 +1668,13 @@ function Couts({ s }: { s: StatsAdmin }) {
   const sansCompte = rapport(p.iaDuJour.sansCompte.dollars, p.iaDuJour.sansCompte.budget);
   const ecart = ecartRelatif(c.produit.valeur, c.produit.avant, dollars, null);
   const ecartDesTests = ecartRelatif(c.tests.valeur, c.tests.avant, dollars, null);
-  /* Le garde-fou de la mémoire en lot (src/server/memoire-en-lot.ts) : les mises à jour au calme qu’il garde en direct, face à celles parties en lot */
-  const enAlerte = p.compteurs.majEnDirectParAlerte;
-  const enLot = c.postes.find((x) => x.nom === "Mémoire (en lot)")?.produit.appels ?? 0;
-  const partEnAlerte = rapport(enAlerte, enAlerte + enLot);
+  /*
+   * Le garde-fou de la mémoire en lot (src/server/memoire-en-lot.ts) : les mises à jour au calme qu’il garde en direct,
+   * face à celles parties en lot sur les mêmes jours de Paris (pas le poste, sur la fenêtre glissante) ; leur part
+   * seulement à partir de PERSONNES_D_UN_TAUX, comme le MCP
+   */
+  const { majEnDirectParAlerte: enAlerte, majEnLot: enLot } = p.compteurs;
+  const partEnAlerte = tauxLisible(enAlerte, enAlerte + enLot);
   return (
     <Bloc
       id="couts"
@@ -1738,7 +1744,7 @@ function Couts({ s }: { s: StatsAdmin }) {
         </p>
       )}
       <p className="m-0 mt-3 text-legende font-bold text-grey">
-        {`Mémoire gardée en direct par une alerte\u00a0: ${pluriel(enAlerte, "mise à jour", "mises à jour")} au calme, face à ${pluriel(enLot, "partie", "parties")} en lot (${partEnAlerte === null ? "—" : pourcent(partEnAlerte * 100, 0)} gardées en direct).`}
+        {`Mémoire gardée en direct par une alerte\u00a0: ${pluriel(enAlerte, "mise à jour", "mises à jour")} au calme, face à ${pluriel(enLot, "partie", "parties")} en lot (${partEnAlerte === null ? `«\u00a0—\u00a0»\u00a0: moins de ${PERSONNES_D_UN_TAUX}\u00a0mises à jour, trop peu pour un taux` : `${pourcent(partEnAlerte * 100, 0)} gardées en direct`}).`}
       </p>
       <ul aria-label="Les ratios du produit" className="m-0 mt-[18px] flex list-none flex-wrap gap-2 p-0">
         <Pastille valeur={parAcheteur === null ? "—" : dollars(parAcheteur)} nom="par acheteur" />

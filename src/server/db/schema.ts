@@ -619,7 +619,9 @@ export const imports = pgTable(
      * haut de son paywall sur la seule partie que la règle visée aurait lue, où elle se serait arrêtée (`arret`,
      * ARRETS_DE_LA_REGLE : vide avant le 27 octobre 2026, quand elle rejouait la règle de l’A/B), les lots qu’elle aurait
      * laissés pour après (`lots_epargnables`) et leurs écrans (`ecrans_epargnables`, comptés comme `ecrans` : les dollars
-     * épargnables au prorata ; vides avant le 27 octobre). `titre` : le titre que son paywall a montré (GENRES_DU_HAUT),
+     * épargnables au prorata ; vides avant le 27 octobre), face aux écrans et aux lots de la vidéo mesurée, figés à sa
+     * mesure (`ecrans_mesures`, `lots_mesures`, vides sans elle : `ecrans` et `lots` grossissent des morceaux ajoutés
+     * ensuite, que la règle ne lirait pas). `titre` : le titre que son paywall a montré (GENRES_DU_HAUT),
      * noté avec le contexte ; `titre_entier` : celui qu’aurait montré la conv entière, une fois sa suite lue après le
      * paiement (la moitié partielle : ses titres perdus, comme le contrefactuel ceux de la moitié entière).
      */
@@ -630,6 +632,8 @@ export const imports = pgTable(
     arret: text("arret", { enum: ARRETS_DE_LA_REGLE }),
     lotsEpargnables: integer("lots_epargnables"),
     ecransEpargnables: integer("ecrans_epargnables"),
+    ecransMesures: integer("ecrans_mesures"),
+    lotsMesures: integer("lots_mesures"),
     titre: text("titre"),
     titreEntier: text("titre_entier"),
     creeLe: quand("cree_le").notNull().defaultNow(),

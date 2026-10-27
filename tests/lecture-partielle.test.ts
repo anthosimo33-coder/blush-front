@@ -713,6 +713,38 @@ describe("l’A/B et son interrupteur", () => {
     }
   });
 
+  it("en mesure, une vidéo mesurée puis un morceau vidéo ajouté : ses lots, ses écrans et ses dollars restent ceux de la vidéo mesurée (la règle ne lit pas les morceaux)", async () => {
+    etat.mode = "mesure";
+    const avant = (await statsAdmin(1)).pilotage.lecturePartielle.contrefactuel;
+    const serie = randomUUID();
+    const envois: string[] = [];
+    /* Ce que deux lots ont coûté, sous l’empreinte de leur envoi (le modèle factice n’en note pas) : 0,10 $ chacun */
+    const payer = async (cle: string) => {
+      const envoi = envoiDe(cle)!;
+      envois.push(envoi);
+      await db()
+        .insert(schema.aiUsage)
+        .values([0, 1].map(() => ({ task: "captures_video", model: "factice", costMicros: 100_000, envoi, population: "prospect" as const })));
+    };
+    try {
+      const { id } = await importCourt(serie, payer);
+      /* Le morceau : deux autres lots de la même conv (les écrans 33 à 55), lus après l’import, sous une autre clé */
+      const cle = randomUUID();
+      const lots = [await lireLeLot(serie, cle, 3), await lireLeLot(serie, cle, 4)];
+      await payer(cle);
+      expect((await fin({ lots, cle, mode: "ajout" })).story?.id).toBe(id);
+      /* L’import a grossi du morceau (ses lectures passent sous son empreinte), pas la vidéo mesurée */
+      expect(await mesureDe(id)).toMatchObject({ ecrans: 46, lots: 4, ecransMesures: 23, lotsMesures: 2, lotsEpargnables: 1, ecransEpargnables: 12 });
+      const apres = (await statsAdmin(1)).pilotage.lecturePartielle.contrefactuel;
+      expect([apres.videos - avant.videos, apres.lots - avant.lots, apres.lotsEpargnables - avant.lotsEpargnables]).toEqual([1, 2, 1]);
+      /* Les deux lots de la vidéo seule (0,20 $), et ses douze écrans épargnables sur ses 23 : comme sans le morceau */
+      expect(apres.dollars - avant.dollars).toBeCloseTo(0.2, 6);
+      expect(apres.dollarsEpargnables - avant.dollarsEpargnables).toBeCloseTo((0.2 * 12) / 23, 6);
+    } finally {
+      if (envois.length) await db().delete(schema.aiUsage).where(inArray(schema.aiUsage.envoi, envois));
+    }
+  });
+
   it("une courte vidéo de deux lots, éteinte (« 0 ») ou en A/B (« ab », hors de l’A/B) : lue en entier, rien de noté, comme avant", async () => {
     for (const mode of ["0", "ab"] as const) {
       etat.mode = mode;

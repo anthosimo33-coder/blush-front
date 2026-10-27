@@ -386,7 +386,8 @@ type Reponses = {
   /** Un mauvais code : `{ ok: false }`, en 200, la même réponse pour tous. */
   "POST /api/auth/verifier": { ok: false } | { ok: true; email: string };
   /** Le laissez-passer du CAPTCHA, posé en cookie (src/server/captcha.ts). */
-  "POST /api/captcha": Ok;
+  /** Le laissez-passer posé ; `planDesVideos` : une longue vidéo demande-t-elle son plan (seulement dans l’A/B de la lecture partielle) ? */
+  "POST /api/captcha": Ok & { planDesVideos: boolean };
   "POST /api/captures": ConvImportee & { messagesRead: number };
   /** La lecture brute d’un lot : le navigateur ne la lit pas, il la rend à /api/captures/video. */
   "POST /api/captures/lot": { lot: unknown };
@@ -556,7 +557,10 @@ export const ROUTES = {
   /* Le jeton du widget voyage dans l’en-tête x-blush-captcha (ENTETE_CAPTCHA, src/lib/captcha.ts), comme à la demande de code */
   "POST /api/captcha": {},
   "POST /api/captures": { formulaire: true },
-  /* Les images d’un lot, son appli, l’accord de l’import, la clé de l’envoi (`cle`) et son ordre (« premier », « suite ») */
+  /*
+   * Les images d’un lot, son appli, l’accord de l’import, la clé de l’envoi (`cle`), son ordre (« premier », « suite »)
+   * et, pour un morceau ajouté, `mode` (« ajout »)
+   */
   "POST /api/captures/lot": { formulaire: true },
   /* La clé de l’envoi abandonné, celle de ses lots, et pourquoi (RAISONS_D_ABANDON) */
   "POST /api/captures/lot/abandon": { corps: z.object({ cle: z.string().max(64), raison: z.enum(RAISONS_D_ABANDON) }) },

@@ -380,15 +380,17 @@ function coutsIA(s: StatsAdmin) {
       }),
       contrefactuel: contrefactuelDuMcp(s.pilotage.lecturePartielle.contrefactuel),
     },
-    /* Les compteurs du suivi (le produit seul, par jour de Paris), avec ce à quoi ils se comparent ; les taux, null sous les 30 */
+    /*
+     * Les compteurs du suivi (le produit seul, par jour de Paris), avec ce à quoi ils se comparent, compté sur les mêmes
+     * jours de Paris (pas la fenêtre glissante des imports et des postes, plus haut) ; les taux, null sous les 30
+     */
     videosArreteesParUnRefus: (() => {
-      const n = s.pilotage.compteurs.videosRefusees;
-      const envoyees = (s.pilotage.importsParType.find((t) => t.type === "video")?.imports ?? 0) + n;
+      const { videosRefusees: n, videosImportees } = s.pilotage.compteurs;
+      const envoyees = videosImportees + n;
       return { arretees: n, videosEnvoyees: envoyees, arreteesPct: tauxPct(n, envoyees) };
     })(),
     memoireEnDirectParAlerte: (() => {
-      const n = s.pilotage.compteurs.majEnDirectParAlerte;
-      const enLot = c.postes.find((x) => x.nom === "Mémoire (en lot)")?.produit.appels ?? 0;
+      const { majEnDirectParAlerte: n, majEnLot: enLot } = s.pilotage.compteurs;
       return { majsGardeesEnDirect: n, majsEnLot: enLot, gardeesPct: tauxPct(n, n + enLot) };
     })(),
     parLongueur: parLongueurDuMcp(s.pilotage.parLongueur),

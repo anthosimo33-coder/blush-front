@@ -40,6 +40,13 @@ import { fusionnerLots } from "./video";
 export type ModeDeLaLecture = "0" | "mesure" | "ab";
 export const modeDeLaLecture = (): ModeDeLaLecture => env().BLUSH_LECTURE_PARTIELLE;
 
+/**
+ * Une longue vidéo doit-elle demander son plan (POST /api/captures/video/plan) avant d’être lue ? Seulement en « ab » :
+ * ailleurs, la réponse est toujours « en entier » (brasDeLaVideo), et la lecture l’attendait pour rien (un aller-retour,
+ * une place de la limite des lots). Le laissez-passer du CAPTCHA le dit au navigateur (POST /api/captcha).
+ */
+export const planDemande = () => modeDeLaLecture() === "ab";
+
 /** Une longue vidéo : plus de lots qu’un seul tour de lecteurs (LECTEURS_DE_LOTS). En dessous, tout part d’un coup, pour 0,40 $ au plus. */
 export const estLongue = (lots: number) => lots > LECTEURS_DE_LOTS;
 

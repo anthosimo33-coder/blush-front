@@ -313,7 +313,8 @@ export type Pilotage = {
    * épargnés ; et, pour celles mesurées depuis le 27 octobre 2026 (`mesurees`), où elle se serait arrêtée (`arrets`,
    * ARRETS_DE_LA_REGLE, dans l’ordre, même à 0), ce qu’ont coûté leurs lots avant l’achat (`dollars`, sous l’empreinte
    * de leur envoi) et ce qu’elle en aurait épargné (`dollarsEpargnables`, estimé : le coût de chaque vidéo au prorata
-   * de ses écrans épargnables, sans modèle).
+   * de ses écrans épargnables, sans modèle). Chaque fois la vidéo seule, telle que mesurée à son import : un morceau
+   * ajouté ensuite, que la règle ne lirait pas, ne change ni ses lots, ni ses écrans, ni ses dollars.
    */
   lecturePartielle: {
     bras: {
@@ -385,11 +386,14 @@ export type Pilotage = {
   };
   /**
    * Deux compteurs du suivi, par jour de Paris (counters : sur la période en jours entiers, comme les pannes), du produit
-   * seul (la règle « qui est qui » jugée à l’écriture) : les imports de vidéo arrêtés par un refus de lecture
-   * (`videosRefusees`, une fois par envoi), et les mises à jour de la mémoire au calme gardées en direct parce que leur
-   * conv est en alerte (`majEnDirectParAlerte`, le garde-fou de la mémoire en lot : seulement quand elle est allumée).
+   * seul (la règle « qui est qui » jugée à l’écriture) : les premiers imports de vidéo arrêtés par un refus de lecture
+   * (`videosRefusees`, une fois par envoi ; pas un morceau ajouté), et les mises à jour de la mémoire au calme gardées en
+   * direct parce que leur conv est en alerte (`majEnDirectParAlerte`, le garde-fou de la mémoire en lot : seulement quand
+   * elle est allumée). Chacun avec ce à quoi il se compare, sur les mêmes jours de Paris (pas la fenêtre glissante des
+   * autres chiffres) : les premiers imports de vidéo (`videosImportees`, hors des tests et des invités) et les mises à
+   * jour parties en lot (`majEnLot`, les appels du produit de « Mémoire (en lot) »).
    */
-  compteurs: { videosRefusees: number; majEnDirectParAlerte: number };
+  compteurs: { videosRefusees: number; videosImportees: number; majEnDirectParAlerte: number; majEnLot: number };
   /**
    * La dépense de l’IA aujourd’hui (jour de Paris) et le budget du jour (BUDGET_IA.jour), en dollars ; `sansCompte` : la
    * part sans compte (les lectures d’avant l’email, celles en cours comprises par leur réservation) et son budget
@@ -517,11 +521,17 @@ const JETONS_DU_SOCLE = 15_300;
 /**
  * La mise en ligne du montage partagé (BLUSH_MONTAGE=partage, le 22 octobre 2026 à 22 h 10 à Paris) : ai_usage ne note
  * pas le montage de chaque appel, et le système du verdict n’est pas le même dans les deux (son prompt en « separe », le
- * socle en « partage ») ; les jetons par message ne lisent donc que les verdicts d’après. Ils comptent tout ce que le
- * verdict a lu (`input_tokens`, `cache_write_tokens` et `cache_read_tokens` : le socle peut venir du cache d’un autre
- * verdict, la conv s’écrit en cache), moins le socle, divisé par les messages de sa conv.
+ * socle en « partage ») ; les jetons par message ne lisent donc que les verdicts d’après cette heure (VERDICT_MESURE).
  */
 const MONTAGE_PARTAGE_DEPUIS = "2026-10-22T20:10:00Z";
+
+/**
+ * Un verdict dont les jetons par message se mesurent (en SQL brut, `ai_usage` sous l’alias `u`) : un appel du verdict
+ * d’après MONTAGE_PARTAGE_DEPUIS, qui a lu plus que le socle (JETONS_DU_SOCLE). Ce qu’il a lu compte tout : l’entrée,
+ * le cache écrit et le cache lu (`input_tokens`, `cache_write_tokens`, `cache_read_tokens` : le socle peut venir du
+ * cache d’un autre verdict, la conv s’écrit en cache). « Par longueur » en retire le socle, et divise ce qui reste par
+ * les messages de sa conv.
+ */
 const VERDICT_MESURE = sql.raw(
   `(u.task = 'verdict' and u.created_at >= '${MONTAGE_PARTAGE_DEPUIS}' and u.input_tokens + u.cache_write_tokens + u.cache_read_tokens > ${JETONS_DU_SOCLE})`,
 );
@@ -959,10 +969,18 @@ async function pilotageDe(jours: Periode): Promise<Pilotage> {
             percentile_cont(0.5) within group (order by extract(epoch from p.le - coalesce(c.debut, i.cree_le))) filter (where p.le is not null) as secondes
           from i left join c on c.envoi = i.envoi left join p on p.story_id = i.story_id group by i.type`,
     ),
-    /* Les lectures d’avant l’import de la période dont aucun import n’est né : des captures (« captures »), des lots (« captures_video ») */
+    /*
+     * Les lectures d’avant l’import de la période dont aucun import n’est né : des captures (« captures »), des lots
+     * (« captures_video »). Hors des tests et des invités, comme les imports (HORS_DE_LA_MESURE) : une vidéo que l’équipe
+     * abandonne n’est pas de l’IA par acheteur ; une ligne pas encore rangée compte
+     */
     lignes<{ task: string; micros: string }>(
       sql`select task, sum(cost_micros) as micros from ai_usage u
-          where ${W("u.created_at")} and u.envoi is not null and not exists (select 1 from imports i where i.envoi = u.envoi) group by task`,
+          where ${W("u.created_at")} and u.envoi is not null and not exists (select 1 from imports i where i.envoi = u.envoi)
+            and (u.population is null or u.population not in (${sql.join(
+              HORS_DE_LA_MESURE.map((p) => sql`${p}`),
+              sql`, `,
+            )})) group by task`,
     ),
     partSansCompteDuJour(),
     /*
@@ -1021,13 +1039,17 @@ async function pilotageDe(jours: Periode): Promise<Pilotage> {
     ),
     /*
      * Le contrefactuel des vidéos lues en entier de la période (« mesure », la moitié entière), par arrêt de la règle et
-     * par titre : leurs lots, ceux épargnables, ce qu’ont coûté leurs lots (« captures_video », sous l’empreinte de leur
-     * envoi, ceux repris d’un envoi d’avant compris) et la part de ce coût que leurs écrans épargnables représentent
+     * par titre : les lots de la vidéo mesurée, ceux épargnables, ce qu’ont coûté ses lots (« captures_video », sous
+     * l’empreinte de son envoi, ceux repris d’un envoi d’avant compris) et la part de ce coût que ses écrans épargnables
+     * représentent. La vidéo seule, telle que mesurée : ses écrans et ses lots figés à sa mesure (ecrans_mesures,
+     * lots_mesures ; à défaut, ceux de l’import), et les lots lus avant son import, pas ceux d’un morceau vidéo ajouté
+     * ensuite (rangés sous la même empreinte, lus après), que la règle ne lirait pas
      */
     lignes<{ arret: ArretDeLaRegle | null; contrefactuel: Contrefactuel; videos: string; lots: string; epargnables: string; micros: string; micros_epargnables: string }>(
-      sql`with i as (select envoi, ecrans, lots, contrefactuel, arret, lots_epargnables, ecrans_epargnables from imports
-                     where ${W("cree_le")} and type = 'video' and contrefactuel is not null and ${horsDesTests("imports")}),
-            c as (select envoi, sum(cost_micros) as micros from ai_usage where task = 'captures_video' and envoi in (select envoi from i) group by envoi)
+      sql`with i as (select envoi, cree_le, coalesce(ecrans_mesures, ecrans) as ecrans, coalesce(lots_mesures, lots) as lots, contrefactuel, arret, lots_epargnables, ecrans_epargnables
+                     from imports where ${W("cree_le")} and type = 'video' and contrefactuel is not null and ${horsDesTests("imports")}),
+            c as (select u.envoi, sum(u.cost_micros) as micros from ai_usage u join i on i.envoi = u.envoi
+                  where u.task = 'captures_video' and u.created_at <= i.cree_le group by u.envoi)
           select i.arret, i.contrefactuel, count(*) as videos, coalesce(sum(i.lots), 0) as lots, coalesce(sum(i.lots_epargnables), 0) as epargnables,
             coalesce(sum(c.micros), 0) as micros, coalesce(sum(c.micros::float8 * i.ecrans_epargnables / nullif(i.ecrans, 0)), 0) as micros_epargnables
           from i left join c on c.envoi = i.envoi group by i.arret, i.contrefactuel`,
@@ -1071,10 +1093,19 @@ async function pilotageDe(jours: Periode): Promise<Pilotage> {
             and u.story_id in (select a0.story_id from achats a0 where a0.story_id is not null and ${achatDUneConv(W)})
           group by u.model order by 4 desc, 1`,
     ),
-    /* Les compteurs du suivi : par jour de Paris, sur la période en jours entiers (comme les pannes) */
-    lignes<{ key: string; n: string }>(
-      sql`select key, sum(count) as n from counters where key in (${CLES.videoRefusee}, ${CLES.majEnDirectParAlerte})
-            and day > (now() at time zone 'Europe/Paris')::date - ${jours}::int group by key`,
+    /*
+     * Les compteurs du suivi : par jour de Paris, sur la période en jours entiers (comme les pannes). Et ce à quoi chacun
+     * se compare, sur les mêmes jours (depuis minuit à Paris, `jours` − 1 jours avant aujourd’hui), pas sur la fenêtre
+     * glissante : à 0 h 30, la période d’un jour n’a que 30 minutes de compteurs, face aux 24 h d’un import. Les premiers
+     * imports de vidéo, hors des tests et des invités (comme « L’IA avant l’achat ») ; les mises à jour de la mémoire
+     * parties en lot, du produit (le poste « Mémoire (en lot) »)
+     */
+    ligne<{ refusees: string; en_direct: string; importees: string; en_lot: string }>(
+      sql`with c as (select key, sum(count) as n from counters where key in (${CLES.videoRefusee}, ${CLES.majEnDirectParAlerte})
+                     and day > (now() at time zone 'Europe/Paris')::date - ${jours}::int group by key)
+          select (select n from c where key = ${CLES.videoRefusee}) as refusees, (select n from c where key = ${CLES.majEnDirectParAlerte}) as en_direct,
+            (select count(*) from imports where type = 'video' and cree_le >= ${minuitDeParis(jours - 1)} and ${horsDesTests("imports")}) as importees,
+            (select count(*) from ai_usage u where u.task = 'memoire_maj_lot' and u.created_at >= ${minuitDeParis(jours - 1)} and ${duProduit(sql`u.population`)}) as en_lot`,
     ),
   ]);
 
@@ -1250,8 +1281,10 @@ async function pilotageDe(jours: Periode): Promise<Pilotage> {
     },
     parLongueur,
     compteurs: {
-      videosRefusees: n(duSuivi.find((l) => l.key === CLES.videoRefusee)?.n),
-      majEnDirectParAlerte: n(duSuivi.find((l) => l.key === CLES.majEnDirectParAlerte)?.n),
+      videosRefusees: n(duSuivi.refusees),
+      videosImportees: n(duSuivi.importees),
+      majEnDirectParAlerte: n(duSuivi.en_direct),
+      majEnLot: n(duSuivi.en_lot),
     },
     iaDuJour: { dollars: n(iaDuJour.micros) / 1e6, budget: BUDGET_IA.jour, sansCompte: { dollars: sansCompte / 1e6, budget: BUDGET_IA.anonyme } },
     sante: {

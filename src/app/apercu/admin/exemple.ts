@@ -301,10 +301,13 @@ function pilotageDe(jours: Periode, { calme = false, suivi = true }: Variante): 
     ].slice(0, payesDesConvs ? 3 : 0),
   };
   /*
-   * Les compteurs du suivi : une vidéo sur trente-cinq arrêtée par un refus, et les mises à jour gardées en direct par le
-   * garde-fou de la mémoire en lot, environ une sur six de celles parties au calme (le poste « Mémoire (en lot) » : 10)
+   * Les compteurs du suivi et ce à quoi ils se comparent, sur les mêmes jours de Paris : une vidéo sur trente-cinq arrêtée
+   * par un refus (face aux vidéos importées, celles du tableau), et les mises à jour gardées en direct par le garde-fou de
+   * la mémoire en lot, environ une sur six de celles parties au calme (les appels du poste « Mémoire (en lot) » : 11, trop
+   * peu pour un taux)
    */
-  const compteurs: Pilotage["compteurs"] = { videosRefusees: Math.round(importsParType.find((t) => t.type === "video")!.imports / 35), majEnDirectParAlerte: 2 };
+  const videosImportees = importsParType.find((t) => t.type === "video")!.imports;
+  const compteurs: Pilotage["compteurs"] = { videosRefusees: Math.round(videosImportees / 35), videosImportees, majEnDirectParAlerte: 2, majEnLot: 11 };
   const jalonsParAppli = applis
     .map(([appli, part, passe]) => {
       const choisie = Math.round(jalons.appli * part);

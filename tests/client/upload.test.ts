@@ -36,6 +36,11 @@ vi.mock("@/services/preparer-video", async (importOriginal) => {
     empreinteDuLot: async (images: Blob[], appli: string, jour: string) => `${appli}:${jour}:${images.map((b) => signatures.get(b)).join(",")}`,
   };
 });
+/*
+ * Le jeton du widget du CAPTCHA, tout de suite : seulement quand un test pose la clé publique (sinon, ni jeton ni
+ * laissez-passer, comme en local)
+ */
+vi.mock("@/services/captcha", async (importOriginal) => ({ ...(await importOriginal<typeof import("@/services/captcha")>()), jetonCaptcha: async () => "jeton" }));
 /** Ce que chaque écran de la vidéo simulée contient (son `sel` et son rang), que lit l’empreinte simulée. */
 const signatures = new WeakMap<Blob, string>();
 
@@ -58,7 +63,7 @@ const IMPORTEE = { source: SOURCE, story: { id: "s1" }, messagesRead: 42 };
  * `indice` : sa place dans la vidéo, d’après son premier écran, pour des lots de douze), par une Response, tout de suite
  * ou plus tard, ou « pend » : pas de réponse avant l’arrêt de l’envoi ; `video(corps, k)` répond à la k-ième fin (une
  * question sur une longue vidéo, ou l’assemblage), `plan` au plan d’une longue vidéo (en entier, par défaut), `ecrans`
- * à l’envoi d’un lot gardé. Rend la liste des appels, les signaux, ce que portait chaque essai d’un lot (sa clé, son
+ * à l’envoi d’un lot gardé, `captcha` au laissez-passer (seulement avec la clé publique du CAPTCHA : l’A/B allumé, par défaut). Rend la liste des appels, les signaux, ce que portait chaque essai d’un lot (sa clé, son
  * ordre, sa place), les abandons reçus, les plans demandés et les lots gardés (leur rang).
  */
 function serveur({
@@ -66,11 +71,13 @@ function serveur({
   video = () => json(IMPORTEE),
   plan = () => json({ lecture: "entiere" }),
   ecrans: garder = () => json({ ok: true }),
+  captcha = () => json({ ok: true, planDesVideos: true }),
 }: {
   lot: (n: number, essai: number, indice: number) => Response | Promise<Response> | "pend";
   video?: (corps: unknown, k: number) => Response;
   plan?: (corps: unknown) => Response;
   ecrans?: (rang: number) => Response | Promise<Response>;
+  captcha?: () => Response;
 }) {
   const appels: string[] = [];
   const corpsVideo: unknown[] = [];
@@ -94,6 +101,10 @@ function serveur({
       const corps: unknown = JSON.parse(String(init?.body));
       corpsVideo.push(corps);
       return video(corps, corpsVideo.length);
+    }
+    if (url === "/api/captcha") {
+      appels.push("captcha");
+      return captcha();
     }
     if (url === "/api/captures/video/plan") {
       appels.push("plan");
@@ -500,5 +511,28 @@ describe("uploadRecording : une longue vidéo lue en partie avant l’achat", ()
     const douteuse = serveur({ lot: lu });
     await uploadRecording(VIDEO, "imessage", CASE_IMPORT.version);
     expect(douteuse.plans).toEqual([expect.objectContaining({ sensSur: false })]);
+  });
+
+  it("le laissez-passer dit si l’A/B est allumé : éteint (« 0 », « mesure »), aucun plan demandé, les lots partent sans l’attendre ; allumé, le plan d’abord ; un serveur qui ne le dit pas, le plan aussi", async () => {
+    vi.stubEnv("NEXT_PUBLIC_TURNSTILE_SITE_KEY", "1x00000000000000000000AA");
+    try {
+      const eteint = serveur({ lot: lu, captcha: () => json({ ok: true, planDesVideos: false }) });
+      await expect(uploadRecording(VIDEO, "imessage", CASE_IMPORT.version)).resolves.toEqual(IMPORTEE);
+      expect(eteint.appels.slice(0, 2)).toEqual(["captcha", "lot 1 · essai 1"]);
+      expect(eteint.plans).toEqual([]);
+      /* Lue en entier, dans l’ordre ; sa fin dit quand même de quoi mesurer la règle visée */
+      expect(eteint.champs.map((c) => c.indice)).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
+      expect(eteint.corpsVideo).toEqual([expect.objectContaining({ partiel: expect.objectContaining({ restants: 0, ecrans: 80 }) })]);
+      sel++;
+      const allume = serveur({ lot: lu });
+      await uploadRecording(VIDEO, "imessage", CASE_IMPORT.version);
+      expect(allume.appels.slice(0, 3)).toEqual(["captcha", "plan", "lot 1 · essai 1"]);
+      sel++;
+      const ancien = serveur({ lot: lu, captcha: () => json({ ok: true }) });
+      await uploadRecording(VIDEO, "imessage", CASE_IMPORT.version);
+      expect(ancien.appels.slice(0, 3)).toEqual(["captcha", "plan", "lot 1 · essai 1"]);
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 });

@@ -76,7 +76,9 @@ describe("le pilotage, rendu", () => {
     expect(t).toMatch(/claude-opus-5-5 [\d\u202f]+\u00a0lignes sur [\d\u202f]+\u00a0convs, [\d,\u202f]+\u00a0\$ \([\d,]+\u00a0\$ la ligne\)/);
     /* Les deux compteurs du suivi : les vidéos arrêtées par un refus, la mémoire gardée en direct par une alerte */
     expect(t).toMatch(/Vidéos arrêtées par un refus de lecture\u00a0: \d+ sur [\d\u202f]+\u00a0vidéos envoyées/);
-    expect(t).toMatch(/Mémoire gardée en direct par une alerte\u00a0: \d+\u00a0mises? à jour au calme, face à \d+\u00a0parties? en lot \(\d+\u00a0% gardées en direct\)/);
+    expect(t).toMatch(
+      /Mémoire gardée en direct par une alerte\u00a0: \d+\u00a0mises? à jour au calme, face à \d+\u00a0parties? en lot \((\d+\u00a0% gardées en direct|«\u00a0—\u00a0»\u00a0: moins de 30\u00a0mises à jour, trop peu pour un taux)\)/,
+    );
     /* Les images en deux postes */
     for (const poste of ["Captures", "Vidéo"]) expect(html, poste).toMatch(new RegExp(`<span class="truncate">${poste}</span>`));
     /* Un « ? » par carte et par chiffre clé, chacun nommé */
@@ -133,6 +135,21 @@ describe("le pilotage, rendu", () => {
     expect(t).toContain("Tout tourne");
   });
 
+  it("les deux compteurs du suivi : leurs taux sur ce qui se compte les mêmes jours (pas les imports du tableau ni le poste), « — » sous 30 comme dans le MCP", () => {
+    const rendu = (compteurs: ReturnType<typeof statsDExemple>["pilotage"]["compteurs"]) => {
+      const s = statsDExemple(7);
+      s.pilotage.compteurs = compteurs;
+      return texte(renderToStaticMarkup(createElement(Pilotage, { s, direct: null, base: "/apercu/admin", sonder: false })));
+    };
+    /* Une seule mise à jour gardée en direct, aucune en lot : pas de « 100 % », trop peu pour un taux */
+    expect(rendu({ videosRefusees: 1, videosImportees: 2, majEnDirectParAlerte: 1, majEnLot: 0 })).toContain(
+      "Mémoire gardée en direct par une alerte\u00a0: 1\u00a0mise à jour au calme, face à 0\u00a0partie en lot («\u00a0—\u00a0»\u00a0: moins de 30\u00a0mises à jour, trop peu pour un taux).",
+    );
+    const t = rendu({ videosRefusees: 4, videosImportees: 36, majEnDirectParAlerte: 6, majEnLot: 34 });
+    expect(t).toContain("Vidéos arrêtées par un refus de lecture\u00a0: 4 sur 40\u00a0vidéos envoyées (10,0\u00a0%).");
+    expect(t).toContain("Mémoire gardée en direct par une alerte\u00a0: 6\u00a0mises à jour au calme, face à 34\u00a0parties en lot (15\u00a0% gardées en direct).");
+  });
+
   it("rien du tout (une base neuve) : des zéros et des « — », jamais une division par zéro", () => {
     const s = statsDExemple(1, { calme: true });
     const zero = { valeur: 0, avant: 0 };
@@ -178,7 +195,7 @@ describe("le pilotage, rendu", () => {
         modeles: [],
         chers: [],
       },
-      compteurs: { videosRefusees: 0, majEnDirectParAlerte: 0 },
+      compteurs: { videosRefusees: 0, videosImportees: 0, majEnDirectParAlerte: 0, majEnLot: 0 },
       suiviDepuis: null,
     };
     s.couts = {
@@ -200,7 +217,9 @@ describe("le pilotage, rendu", () => {
     expect(t).toContain("Aucun appel au modèle sur la période.");
     expect(t).toContain("Aucune conv payée sur la période.");
     expect(t).toContain("Payés plus de 48\u00a0h après l’arrivée de leur conv au paywall\u00a0: 0 sur 0\u00a0achat (—).");
-    expect(t).toContain("Mémoire gardée en direct par une alerte\u00a0: 0\u00a0mise à jour au calme, face à 0\u00a0partie en lot (— gardées en direct).");
+    expect(t).toContain(
+      "Mémoire gardée en direct par une alerte\u00a0: 0\u00a0mise à jour au calme, face à 0\u00a0partie en lot («\u00a0—\u00a0»\u00a0: moins de 30\u00a0mises à jour, trop peu pour un taux).",
+    );
     expect(t).toContain("Pas encore de fuite à comparer");
     expect(t).toContain("Personne sur le site en ce moment.");
     expect(t).toContain("0 personne en ligne");
