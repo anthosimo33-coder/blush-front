@@ -244,7 +244,7 @@ describe("le laissez-passer des imports sans compte", () => {
 });
 
 describe("les captures et l’enregistrement d’écran sans compte : le laissez-passer, avant toute limite", () => {
-  /* Une capture (la signature d’un PNG suffit au serveur), un lot de six images, les lots lus rassemblés */
+  /* Une capture (la signature d’un PNG suffit au serveur), un lot d’images d’un enregistrement, les lots lus rassemblés */
   const png = () => new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47])], "c.png", { type: "image/png" });
   const formulaire = () => {
     const fd = new FormData();

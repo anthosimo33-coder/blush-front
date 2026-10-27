@@ -414,11 +414,13 @@ export async function uploadRecording(
   }
   const { images, sensSur } = video;
   /*
-   * Des lots de six à douze écrans (tailleDesLots : une courte vidéo part en un seul tour de cinq lecteurs, une longue
-   * en lots de douze, moins chers et en moins de tours), et de 4 Mo au plus (des écrans sombres ou des photos pèsent
-   * plus lourd). Avec Sonnet, un lot de douze se lit en 25 à 30 s, un lot de six en 15 s environ (21 octobre).
+   * Des lots de douze écrans (tailleDesLots : toutes les vidéos, les moins chers), découpés en partant de la fin (lotsDe :
+   * le plus récent plein, celui que la lecture partielle lit d’abord ; le reste dans le plus ancien), et de 4 Mo au plus
+   * (des écrans sombres ou des photos pèsent plus lourd). Avec Sonnet, un lot de douze se lit en 25 à 30 s, un lot de six
+   * en 15 s environ (21 octobre) : une courte vidéo, en lots de six à douze jusqu’au 27 octobre, se lit jusqu’à 15 s plus
+   * lentement, pour moins cher.
    */
-  const lots = lotsDe(images, tailleDesLots(images.length, LECTEURS_DE_LOTS), (b) => b.size, ENVOI_IMAGES_MAX);
+  const lots = lotsDe(images, tailleDesLots(images.length), (b) => b.size, ENVOI_IMAGES_MAX);
   /*
    * La clé de l’envoi, la même pour ses lots et pour leur fin : le serveur y range leur coût (la mesure des imports), y
    * reconnaît le premier lot et l’abandon, et un nouvel essai de la fin après une coupure retrouve l’histoire déjà créée

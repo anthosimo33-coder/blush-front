@@ -8,9 +8,9 @@ import { ErreurApi } from "@/types/erreurs-api";
  * L’envoi d’un enregistrement d’écran (uploadRecording, src/services/api.ts) quand le serveur répond une 5xx : ses lots
  * partent cinq à la fois vers /api/captures/lot, puis leurs lectures vers /api/captures/video. Le réseau est un `fetch`
  * simulé, et l’extraction des écrans de la vidéo (qui demande un vrai navigateur) rend des images toutes faites, que
- * lotsDe découpe pour de vrai, à la taille de tailleDesLots (six à douze écrans), chaque lot reprenant le dernier écran du
- * précédent. Les lots déjà lus restent dans l’onglet (preparer-video.ts) : chaque test a ses images à lui (`sel`), sauf
- * ceux qui renvoient exprès la même vidéo.
+ * lotsDe découpe pour de vrai, en lots de douze écrans (tailleDesLots) en partant de la fin : le plus récent plein, chaque
+ * lot reprenant le dernier écran du précédent, le reste dans le plus ancien. Les lots déjà lus restent dans l’onglet
+ * (preparer-video.ts) : chaque test a ses images à lui (`sel`), sauf ceux qui renvoient exprès la même vidéo.
  */
 vi.mock("@/services/preparer-video", async (importOriginal) => {
   const vrai = await importOriginal<typeof import("@/services/preparer-video")>();
@@ -39,8 +39,8 @@ vi.mock("@/services/preparer-video", async (importOriginal) => {
 /** Ce que chaque écran de la vidéo simulée contient (son `sel` et son rang), que lit l’empreinte simulée. */
 const signatures = new WeakMap<Blob, string>();
 
-/** Combien d’écrans la vidéo simulée donne : 11 font deux lots de six (1 à 6, 6 à 11), 80 en font huit de douze. */
-let ecrans = 11;
+/** Combien d’écrans la vidéo simulée donne : 23 font deux lots de douze (0 à 11, 11 à 22), 80 en font huit (indiceDuLot). */
+let ecrans = 23;
 /** Les octets des écrans de la vidéo simulée : un autre à chaque test, pour que les lots lus d’un test ne servent pas au suivant. */
 let sel = 0;
 /** La vidéo simulée a-t-elle défilé dans un seul sens (ses écrans sûrement dans l’ordre) ? */
@@ -115,8 +115,7 @@ function serveur({
     if (url !== "/api/captures/lot") throw new Error(`appel inattendu : ${String(url)}`);
     const n = lotDe(init);
     const fd = init?.body as FormData;
-    /* Des lots de douze écrans, chacun reprenant le dernier du précédent : le premier écran du lot j est le n° 11 j (de taille 11 j + 1) */
-    const indice = ((fd.getAll("captures")[0] as Blob).size - 1) / 11;
+    const indice = indiceDuLot((fd.getAll("captures")[0] as Blob).size - 1);
     champs.push({ n, cle: fd.get("cle"), ordre: fd.get("ordre"), indice });
     const essai = (essais.get(n) ?? 0) + 1;
     essais.set(n, essai);
@@ -129,13 +128,23 @@ function serveur({
   return { appels, corpsVideo, signaux, champs, abandons, plans, gardes };
 }
 
+/**
+ * La place d’un lot dans la vidéo simulée (0 : le plus ancien), d’après son premier écran (`premier`, de taille premier + 1).
+ * Des lots de douze écrans découpés en partant de la fin, chacun reprenant le dernier du précédent : le plus récent
+ * commence à l’écran ecrans − 12, chacun onze écrans avant le suivant, et le plus ancien, le reste, à l’écran 0.
+ */
+function indiceDuLot(premier: number): number {
+  const lots = ecrans <= 12 ? 1 : 1 + Math.ceil((ecrans - 12) / 11);
+  return premier === 0 ? 0 : lots - 1 - (ecrans - 12 - premier) / 11;
+}
+
 /* L’extraction est chargée à la demande (pVideo) : chargée d’avance, son import ne dépend plus du temps simulé */
 beforeAll(async () => {
   await import("@/services/preparer-video");
 });
 beforeEach(() => {
   vi.useFakeTimers();
-  ecrans = 11;
+  ecrans = 23;
   sel++;
   sensSur = true;
 });
@@ -281,7 +290,7 @@ describe("uploadRecording : une longue vidéo lue en partie avant l’achat", ()
   /** Une lecture de lot simulée, d’après sa place dans la vidéo. */
   const lu = (_n: number, _essai: number, indice: number) => json({ lot: `lecture ${indice}` });
   const lectures = (...indices: number[]) => indices.map((i) => `lecture ${i}`);
-  /* Huit lots de douze écrans (de 0 à 7), le dernier n’en ayant que trois : une longue vidéo */
+  /* Huit lots (de 0 à 7) : le plus récent, et les six d’avant, de douze écrans ; le plus ancien n’en a que trois. Une longue vidéo */
   beforeEach(() => {
     ecrans = 80;
   });
@@ -295,8 +304,9 @@ describe("uploadRecording : une longue vidéo lue en partie avant l’achat", ()
     const avance: AvanceVideo[] = [];
     await expect(uploadRecording(VIDEO, "imessage", CASE_IMPORT.version, (a) => avance.push(a))).resolves.toEqual(IMPORTEE);
     const cle = champs[0]!.cle;
-    /* Le plan : la longue vidéo, l’empreinte de son lot le plus récent, son sens, et la clé de l’envoi (sa moitié s’y note) */
-    expect(plans).toEqual([{ lots: 8, video: expect.stringContaining(`:${sel}:77`), sensSur: true, cle, consentement: CASE_IMPORT.version }]);
+    /* Le plan : la longue vidéo, l’empreinte de son lot le plus récent (ses douze derniers écrans), son sens, et la clé de l’envoi (sa moitié s’y note) */
+    const recent = `imessage:ab:${Array.from({ length: 12 }, (_, k) => `${sel}:${68 + k}`).join(",")}`;
+    expect(plans).toEqual([{ lots: 8, video: recent, sensSur: true, cle, consentement: CASE_IMPORT.version }]);
     /* Du plus récent au plus ancien, le plus récent d’abord (« premier ») */
     expect(champs.map((c) => [c.indice, c.ordre])).toEqual([
       [7, "premier"],
@@ -311,8 +321,12 @@ describe("uploadRecording : une longue vidéo lue en partie avant l’achat", ()
       expect.objectContaining({ cle, lots: lectures(3, 4, 5, 6, 7), partiel: { ...partiel, gardes: true } }),
     ]);
     /* Ses trois lots plus anciens, gardés tels quels (jamais lus avant l’achat), sous la même clé, un à la fois, du plus ancien au plus récent */
-    expect(gardes.map((g) => g.rang)).toEqual([0, 1, 2]);
-    expect(gardes.every((g) => g.cle === cle && g.images === 12 && g.priorite === "low")).toBe(true);
+    expect(gardes.map((g) => [g.rang, g.images])).toEqual([
+      [0, 3],
+      [1, 12],
+      [2, 12],
+    ]);
+    expect(gardes.every((g) => g.cle === cle && g.priorite === "low")).toBe(true);
     /* Partis pendant la lecture, une fois la première lecture rendue (les images à lire d’abord), avant la question */
     expect(appels.slice(0, 7)).toEqual(["plan", ...[1, 2, 3, 4, 5].map((n) => `lot ${n} · essai 1`), "ecrans 0"]);
     expect(appels.filter((a) => a.startsWith("lot"))).toHaveLength(5);
@@ -458,7 +472,8 @@ describe("uploadRecording : une longue vidéo lue en partie avant l’achat", ()
     expect(ajout.plans).toEqual([]);
     expect(ajout.corpsVideo).toEqual([expect.not.objectContaining({ partiel: expect.anything() })]);
     sel++;
-    ecrans = 11;
+    /* La plus longue des courtes : cinq lots de douze, un seul tour */
+    ecrans = 56;
     const courte = serveur({ lot: lu });
     await uploadRecording(VIDEO, "imessage", CASE_IMPORT.version);
     expect(courte.plans).toEqual([]);

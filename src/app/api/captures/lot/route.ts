@@ -13,7 +13,7 @@ import { lireSession } from "@/server/cookies";
 import { avecEcheance, echeancePour } from "@/server/echeance";
 import { aujourdhuiParis } from "@/server/temps";
 
-/* Un lot de six à douze images (ECRANS_PAR_LOT) : une demi-minute de lecture, une minute et demie au pire */
+/* Un lot de douze images au plus (ECRANS_PAR_LOT) : une demi-minute de lecture, une minute et demie au pire */
 export const maxDuration = 180;
 
 /** Le lot d’un enregistrement en mode tournage : vide, sans appel au modèle (POST /api/captures/video n’en lit rien). */

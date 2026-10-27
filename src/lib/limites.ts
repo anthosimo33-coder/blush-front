@@ -12,11 +12,12 @@ const MO = 1024 * 1024;
 export const CAPTURES_MAX = 20;
 
 /**
- * Les écrans d’un lot d’enregistrement d’écran (tailleDesLots, src/services/preparer-video.ts) : six pour une courte
- * vidéo, lue en un seul tour, jusqu’à douze pour une longue. /api/captures/video borne les messages d’un lot en
- * conséquence, et /api/captures/lot les images d’un envoi (CAPTURES_MAX).
+ * Les écrans d’un lot d’enregistrement d’écran, au plus (tailleDesLots et lotsDe, src/services/preparer-video.ts) : douze
+ * pour toutes les vidéos depuis le 27 octobre (de six pour une courte à douze pour une longue avant), découpés en partant
+ * de la fin : le lot le plus récent plein, le reste dans le plus ancien. /api/captures/video borne les messages d’un lot
+ * en conséquence, et /api/captures/lot les images d’un envoi (CAPTURES_MAX).
  */
-export const ECRANS_PAR_LOT = { min: 6, max: 12 } as const;
+export const ECRANS_PAR_LOT = 12;
 
 /**
  * Les envois d’avant dont un enregistrement reprend des lots déjà lus dans l’onglet (src/services/preparer-video.ts), au
@@ -26,8 +27,9 @@ export const ENVOIS_REPRIS_MAX = 10;
 
 /**
  * Les lots d’un enregistrement lus en même temps par le navigateur (chacun est un appel au modèle : lotParIp et
- * lotsParCompte les bornent). Une vidéo de plus de lots que ça ne se lit pas en un seul tour : c’est une longue vidéo,
- * que la lecture partielle peut ne lire qu’en partie avant l’achat (src/server/lecture-partielle.ts).
+ * lotsParCompte les bornent). Une vidéo de plus de lots que ça ne se lit pas en un seul tour : c’est une longue vidéo
+ * (plus de 56 écrans en lots de douze, moins quand des écrans lourds font couper un lot), que la lecture partielle peut
+ * ne lire qu’en partie avant l’achat (src/server/lecture-partielle.ts).
  */
 export const LECTEURS_DE_LOTS = 5;
 
