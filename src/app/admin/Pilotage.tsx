@@ -10,13 +10,17 @@ import {
   EUROS_PAR_DOLLAR,
   NOMS_DES_GENRES,
   NOMS_DES_GROUPES,
+  NOMS_DES_OFFRES_D_UNE_CONV,
   NOMS_DES_PAIRES,
   NOMS_DES_POPULATIONS,
   NOMS_DES_SOURCES,
+  NOMS_DES_TRANCHES,
   NOMS_DES_TYPES_D_IMPORT,
   NOMS_DES_VENTES,
+  OFFRES_D_UNE_CONV,
   PAIRES,
   SOURCE_INCONNUE,
+  TRANCHES_TRES_LONGUES,
   margeApresIA,
 } from "@/contenu/pilotage";
 import { cn } from "@/lib/cn";
@@ -67,7 +71,7 @@ import { SondeDuDirect } from "./SondeDuDirect";
 /*
  * Le pilotage (/admin) : ce qui se passe sur la période, d’un coup d’œil. En haut, « À regarder » (ce qui coince, puis
  * les bonnes nouvelles) ; puis l’argent (le chiffre d’affaires net, case par case) à côté du direct ; les quatre chiffres
- * clés ; le tunnel, puis le détail de l’import et du paywall (leurs jalons), et qui importe ; les mails des séquences et leur délivrabilité ; d’où viennent les visiteurs et ce qui se vend ; l’IA avant l’achat (par type d’import) et la lecture partielle des longues vidéos (son A/B), ce que coûte l’IA et la santé ; enfin les outils de
+ * clés ; le tunnel, puis le détail de l’import et du paywall (leurs jalons), et qui importe ; les mails des séquences et leur délivrabilité ; d’où viennent les visiteurs et ce qui se vend ; l’IA avant l’achat (par type d’import), la lecture partielle des vidéos (la règle visée, puis son A/B) et les convs payées par longueur, ce que coûte l’IA et la santé ; enfin les outils de
  * l’équipe. Que des nombres : aucune conv, aucun message, aucun email. Chaque carte a son « ? » (src/contenu/aide-pilotage.ts).
  * Maquette validée le 13 octobre ; l’écran d’avant reste à /admin?version=actuelle.
  * TODO(produit): textes du pilotage à valider.
@@ -167,6 +171,7 @@ export function Pilotage({
 
           <IAAvantLAchat p={p} />
           <LecturePartielle p={p} />
+          <ParLongueur p={p} />
           <div className="flex flex-wrap gap-4 md:gap-6">
             <Couts s={s} />
             <Sante s={s} />
@@ -1275,6 +1280,10 @@ function IAAvantLAchat({ p }: { p: Chiffres }) {
   const total = types.reduce((t, x) => t + x.dollars + x.pourRien, 0);
   const pourRien = types.filter((x) => x.pourRien > 0);
   const lignes = types.filter((x) => x.imports || x.pourRien);
+  /* Les vidéos arrêtées par un refus de lecture, face à toutes celles envoyées (importées, ou arrêtées ainsi) */
+  const refusees = p.compteurs.videosRefusees;
+  const envoyees = (types.find((x) => x.type === "video")?.imports ?? 0) + refusees;
+  const partRefusee = tauxLisible(refusees, envoyees);
   return (
     <Bloc
       id="ia-avant-achat"
@@ -1351,6 +1360,7 @@ function IAAvantLAchat({ p }: { p: Chiffres }) {
         {pourRien.length
           ? `Lu pour rien (aucune conv importée ensuite)\u00a0: ${pourRien.map((x) => `${NOMS_DES_TYPES_D_IMPORT[x.type].toLowerCase()} ${dollars(x.pourRien)}`).join(", ")}, compté dans l’IA par acheteur.`
           : "Rien de lu pour rien sur la période."}{" "}
+        {`Vidéos arrêtées par un refus de lecture\u00a0: ${nombre(refusees)} sur ${pluriel(envoyees, "vidéo envoyée", "vidéos envoyées")} (${partRefusee === null ? "—" : pourcent(partRefusee * 100)}).`}{" "}
         {`«\u00a0—\u00a0»\u00a0: moins de ${PERSONNES_D_UN_TAUX}\u00a0convs, trop peu pour un taux.`}
       </p>
     </Bloc>
@@ -1504,6 +1514,129 @@ function LecturePartielle({ p }: { p: Chiffres }) {
   );
 }
 
+/* ———— Les convs payées, par longueur ———— */
+
+/**
+ * Les convs payées par les vrais clients sur la période, par longueur (src/server/stats.ts, parLongueur) : ce qui manque
+ * pour décider d’une conv très longue. Par tranche, les ventes et l’offre prise, l’IA médiane d’une lecture, les jetons
+ * par message des verdicts et leurs nouveaux essais ; puis les achats faits plus de 48 h après le paywall, ceux dont la
+ * conv est effacée, et les verdicts les plus chers (leur modèle, leurs lignes).
+ */
+function ParLongueur({ p }: { p: Chiffres }) {
+  const { tranches, effacees, tard, modeles, chers } = p.parLongueur;
+  const ventes = tranches.reduce((t, x) => t + x.ventes, 0);
+  const tresLongues = tranches.filter((x) => TRANCHES_TRES_LONGUES.includes(x.tranche)).reduce((t, x) => t + x.ventes, 0);
+  const partTard = tauxLisible(tard.plusDe48h, tard.payes);
+  /* Les offres prises dans une tranche, les plus vendues d’abord : « Premium 3 · Le rapport 2 » */
+  const offres = (x: (typeof tranches)[number]) =>
+    OFFRES_D_UNE_CONV.filter((o) => x.offres[o] > 0)
+      .sort((a, b) => x.offres[b] - x.offres[a])
+      .map((o) => `${NOMS_DES_OFFRES_D_UNE_CONV[o]} ${nombre(x.offres[o])}`)
+      .join(" · ");
+  return (
+    <Bloc
+      id="par-longueur"
+      titre="Par longueur"
+      sous="Les convs payées sur la période, par leur nombre de messages"
+      aide={{ cle: "parLongueur", valeur: `${nombre(tresLongues)} sur ${nombre(ventes)}`, contexte: "ventes d’une conv de 3\u202f000 messages ou plus" }}
+    >
+      {ventes ? (
+        <div role="region" aria-label="Les convs payées par longueur, à faire défiler" tabIndex={0} className="-mx-2 mt-[18px] overflow-x-auto px-2">
+          <table className="w-full min-w-[760px] border-collapse text-left">
+            <caption className="sr-only">
+              Par longueur de conv, les ventes, l’offre prise, l’IA médiane d’une lecture, les jetons par message des verdicts et les verdicts par conv
+            </caption>
+            <thead>
+              <tr className="text-micro font-black uppercase tracking-[0.06em] text-grey">
+                <th scope="col" className="pb-2.5 pr-3 font-black">
+                  Longueur
+                </th>
+                <th scope="col" className="pb-2.5 pr-3 text-right font-black">
+                  Ventes
+                </th>
+                <th scope="col" className="pb-2.5 pr-3 font-black">
+                  Offres
+                </th>
+                <th scope="col" className="pb-2.5 pr-3 text-right font-black">
+                  IA d’une lecture
+                </th>
+                <th scope="col" className="pb-2.5 pr-3 text-right font-black">
+                  Jetons par message
+                </th>
+                <th scope="col" className="pb-2.5 text-right font-black">
+                  Verdicts par conv
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {tranches.map((x) => {
+                const parConv = rapport(x.verdicts, x.convs);
+                return (
+                  <tr key={x.tranche} className="border-t border-sep text-detail font-extrabold">
+                    <th scope="row" className="py-3 pr-3 text-left font-extrabold">
+                      {NOMS_DES_TRANCHES[x.tranche]}
+                    </th>
+                    <td className="py-3 pr-3 text-right tabular-nums">{nombre(x.ventes)}</td>
+                    <td className="py-3 pr-3 text-legende font-bold text-soft">{offres(x) || "—"}</td>
+                    <td className="py-3 pr-3 text-right tabular-nums">
+                      {x.dollarsMedian === null ? "—" : dollars(x.dollarsMedian)}
+                      {x.lues > 0 && <span className="ml-1.5 text-micro text-grey">{`médiane de ${nombre(x.lues)}`}</span>}
+                    </td>
+                    <td className="py-3 pr-3 text-right tabular-nums">
+                      {x.jetonsParMessage === null ? "—" : nombre(Math.round(x.jetonsParMessage))}
+                      {x.verdictsMesures > 0 && <span className="ml-1.5 text-micro text-grey">{`sur ${pluriel(x.verdictsMesures, "verdict")}`}</span>}
+                    </td>
+                    <td className="py-3 text-right tabular-nums">
+                      {parConv === null ? "—" : nombre(Math.round(parConv * 10) / 10)}
+                      {x.plusieursVerdicts > 0 && <span className="ml-1.5 text-micro text-grey">{`${nombre(x.plusieursVerdicts)} à plusieurs`}</span>}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <p className="m-0 mt-[18px] text-note font-bold text-grey">Aucune conv payée sur la période.</p>
+      )}
+      <p className="m-0 mt-3 text-legende font-bold text-grey">
+        {`Payés plus de 48\u00a0h après l’arrivée de leur conv au paywall\u00a0: ${nombre(tard.plusDe48h)} sur ${pluriel(tard.payes, "achat")} (${partTard === null ? "—" : pourcent(partTard * 100)})`}
+        {tard.sansPaywall > 0 ? `, dont ${nombre(tard.sansPaywall)} jugés depuis l’import (sans paywall noté).` : "."}{" "}
+        {effacees > 0 ? `${pluriel(effacees, "achat", "achats")} de la période dont la conv a été effacée depuis, hors du tableau. ` : ""}
+        {`«\u00a0—\u00a0»\u00a0: moins de ${PERSONNES_D_UN_TAUX}\u00a0achats, trop peu pour un taux.`}
+      </p>
+      {modeles.length > 0 && (
+        <>
+          <h3 className="m-0 mt-[22px] text-detail font-black">Les verdicts de ces convs, par modèle</h3>
+          <ul aria-label="Les verdicts par modèle" className="m-0 mt-3 flex list-none flex-col gap-2 p-0">
+            {modeles.map((m) => (
+              <li key={m.modele} className="flex flex-wrap items-baseline justify-between gap-x-3 text-detail font-extrabold">
+                <span className="min-w-0 font-mono text-note">{m.modele}</span>
+                <span className="text-note font-bold text-soft tabular-nums">
+                  {`${pluriel(m.lignes, "ligne")} sur ${pluriel(m.convs, "conv")}, ${dollars(m.dollars)} (${dollars(m.dollars / m.lignes)} la ligne)`}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+      {chers.length > 0 && (
+        <>
+          <h3 className="m-0 mt-[22px] text-detail font-black">Les verdicts les plus chers</h3>
+          <ol aria-label="Les verdicts les plus chers" className="m-0 mt-3 flex list-none flex-col gap-2 p-0">
+            {chers.map((v, k) => (
+              <li key={k} className="flex flex-wrap items-baseline justify-between gap-x-3 text-detail font-extrabold">
+                <span className="tabular-nums">{`${dollars(v.dollars)} · ${pluriel(v.lignes, "ligne")} · ${pluriel(v.messages, "message")}`}</span>
+                <span className="min-w-0 font-mono text-micro font-bold text-soft">{v.modeles.join(", ")}</span>
+              </li>
+            ))}
+          </ol>
+        </>
+      )}
+    </Bloc>
+  );
+}
+
 /* ———— Ce que coûte l’IA ———— */
 
 /** La couleur de la barre d’une population : le produit en encre, les tests en orange, le reste en gris. */
@@ -1532,6 +1665,10 @@ function Couts({ s }: { s: StatsAdmin }) {
   const sansCompte = rapport(p.iaDuJour.sansCompte.dollars, p.iaDuJour.sansCompte.budget);
   const ecart = ecartRelatif(c.produit.valeur, c.produit.avant, dollars, null);
   const ecartDesTests = ecartRelatif(c.tests.valeur, c.tests.avant, dollars, null);
+  /* Le garde-fou de la mémoire en lot (src/server/memoire-en-lot.ts) : les mises à jour au calme qu’il garde en direct, face à celles parties en lot */
+  const enAlerte = p.compteurs.majEnDirectParAlerte;
+  const enLot = c.postes.find((x) => x.nom === "Mémoire (en lot)")?.produit.appels ?? 0;
+  const partEnAlerte = rapport(enAlerte, enAlerte + enLot);
   return (
     <Bloc
       id="couts"
@@ -1600,6 +1737,9 @@ function Couts({ s }: { s: StatsAdmin }) {
           {c.postes.length ? "Aucun appel du produit sur la période\u00a0: seulement des tests." : "Aucun appel au modèle sur la période."}
         </p>
       )}
+      <p className="m-0 mt-3 text-legende font-bold text-grey">
+        {`Mémoire gardée en direct par une alerte\u00a0: ${pluriel(enAlerte, "mise à jour", "mises à jour")} au calme, face à ${pluriel(enLot, "partie", "parties")} en lot (${partEnAlerte === null ? "—" : pourcent(partEnAlerte * 100, 0)} gardées en direct).`}
+      </p>
       <ul aria-label="Les ratios du produit" className="m-0 mt-[18px] flex list-none flex-wrap gap-2 p-0">
         <Pastille valeur={parAcheteur === null ? "—" : dollars(parAcheteur)} nom="par acheteur" />
         <Pastille valeur={c.parVerdict === null ? "—" : dollars(c.parVerdict)} nom="par verdict" />

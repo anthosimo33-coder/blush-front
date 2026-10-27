@@ -68,6 +68,17 @@ describe("le pilotage, rendu", () => {
     ])
       expect(t, titre).toContain(titre);
     expect(t).toMatch(/Sur [\d\u202f]+\u00a0vidéos? mesurées? depuis le 27\u00a0octobre, [\d,\u202f]+\u00a0\$ d’IA épargnables sur [\d,\u202f]+\u00a0\$ lus avant l’achat/);
+    /* Les convs payées par longueur : chaque tranche, l’offre prise, l’IA d’une lecture, les verdicts ; puis les achats tardifs et les verdicts chers */
+    for (const titre of ["Par longueur", "Moins de 1\u202f000 messages", "1\u202f000 à 3\u202f000", "3\u202f000 à 7\u202f000", "7\u202f000 et plus", "Les verdicts les plus chers"])
+      expect(t, titre).toContain(titre);
+    expect(t).toMatch(/Premium \d+ · Le rapport \d+ · ①\u00a0offre unique \d+/);
+    expect(t).toMatch(/Payés plus de 48\u00a0h après l’arrivée de leur conv au paywall\u00a0: \d+ sur [\d\u202f]+\u00a0achats \((—|[\d,]+\u00a0%)\)/);
+    expect(t).toMatch(/claude-opus-5-5 [\d\u202f]+\u00a0lignes sur [\d\u202f]+\u00a0convs, [\d,\u202f]+\u00a0\$ \([\d,]+\u00a0\$ la ligne\)/);
+    /* Les deux compteurs du suivi : les vidéos arrêtées par un refus, la mémoire gardée en direct par une alerte */
+    expect(t).toMatch(/Vidéos arrêtées par un refus de lecture\u00a0: \d+ sur [\d\u202f]+\u00a0vidéos envoyées/);
+    expect(t).toMatch(/Mémoire gardée en direct par une alerte\u00a0: \d+\u00a0mises? à jour au calme, face à \d+\u00a0parties? en lot \(\d+\u00a0% gardées en direct\)/);
+    /* Les images en deux postes */
+    for (const poste of ["Captures", "Vidéo"]) expect(html, poste).toMatch(new RegExp(`<span class="truncate">${poste}</span>`));
     /* Un « ? » par carte et par chiffre clé, chacun nommé */
     for (const cle of [
       "ca",
@@ -83,6 +94,9 @@ describe("le pilotage, rendu", () => {
       "sources",
       "mix",
       "coups",
+      "avantLAchat",
+      "lecturePartielle",
+      "parLongueur",
       "couts",
       "sante",
     ] as const)
@@ -146,6 +160,25 @@ describe("le pilotage, rendu", () => {
       quiImporte: { importees: personne, payees: personne },
       mix: s.pilotage.mix.map((m) => ({ ...m, n: 0, centimes: 0 })),
       iaDuJour: { dollars: 0, budget: 30, sansCompte: { dollars: 0, budget: 50 } },
+      parLongueur: {
+        tranches: s.pilotage.parLongueur.tranches.map((x) => ({
+          ...x,
+          ventes: 0,
+          offres: { rapport: 0, premium: 0, suite: 0, second: 0, rapport_garde: 0, autre: 0 },
+          convs: 0,
+          lues: 0,
+          dollarsMedian: null,
+          verdicts: 0,
+          plusieursVerdicts: 0,
+          jetonsParMessage: null,
+          verdictsMesures: 0,
+        })),
+        effacees: 0,
+        tard: { payes: 0, plusDe48h: 0, sansPaywall: 0 },
+        modeles: [],
+        chers: [],
+      },
+      compteurs: { videosRefusees: 0, majEnDirectParAlerte: 0 },
       suiviDepuis: null,
     };
     s.couts = {
@@ -165,6 +198,9 @@ describe("le pilotage, rendu", () => {
     expect(t).toContain("Ni visite ni vente sur la période.");
     expect(t).toContain("Aucune conv importée sur la période.");
     expect(t).toContain("Aucun appel au modèle sur la période.");
+    expect(t).toContain("Aucune conv payée sur la période.");
+    expect(t).toContain("Payés plus de 48\u00a0h après l’arrivée de leur conv au paywall\u00a0: 0 sur 0\u00a0achat (—).");
+    expect(t).toContain("Mémoire gardée en direct par une alerte\u00a0: 0\u00a0mise à jour au calme, face à 0\u00a0partie en lot (— gardées en direct).");
     expect(t).toContain("Pas encore de fuite à comparer");
     expect(t).toContain("Personne sur le site en ce moment.");
     expect(t).toContain("0 personne en ligne");

@@ -1,4 +1,4 @@
-import { PAIRES, type Paire } from "@/contenu/pilotage";
+import { PAIRES, type Paire, type TrancheDeLongueur } from "@/contenu/pilotage";
 import type { CaseDuPilotage, Genres, Periode, Pilotage, StatsAdmin } from "@/server/stats";
 import type { AppKind } from "@/types";
 import type { Direct, GesteDuFil } from "@/types/api";
@@ -252,6 +252,59 @@ function pilotageDe(jours: Periode, { calme = false, suivi = true }: Variante): 
       dollarsEpargnables: mesurees * 0.7,
     },
   };
+  /*
+   * Par longueur : les convs payées (Premium, le rapport et la suite de « Ce qui se vend »), surtout de longs exports ;
+   * leur lecture coûte plus quand la conv s’allonge, puis plus beaucoup au-delà de ce que lit le modèle (les jetons par
+   * message y baissent : la conv est coupée) ; un verdict refait sur dix, un modèle de repli sur un verdict sur vingt,
+   * une conv effacée depuis sur trente, et un achat sur douze venu plus de 48 h après le paywall (les relances)
+   */
+  const ventesDesConvs = premium + rapport + suite;
+  const longueurs: [TrancheDeLongueur, number, number, number][] = [
+    ["moins_de_1000", 0.18, 1.25, 44],
+    ["de_1000_a_3000", 0.31, 1.52, 38],
+    ["de_3000_a_7000", 0.33, 2.1, 35],
+    ["7000_et_plus", 0.18, 2.62, 21],
+  ];
+  const tranches = longueurs.map(([tranche, part, dollarsMedian, jetonsParMessage]) => {
+    const ventes = Math.round(ventesDesConvs * part);
+    const offres = { premium: Math.round(ventes * 0.5), suite: Math.round(ventes * 0.17), second: 0, rapport_garde: ventes >= 6 ? 1 : 0, autre: 0 };
+    const verdicts = ventes + Math.round(ventes * 0.1);
+    return {
+      tranche,
+      ventes,
+      offres: { rapport: ventes - somme(Object.values(offres), (x) => x), ...offres },
+      convs: ventes,
+      lues: ventes,
+      dollarsMedian: ventes ? dollarsMedian : null,
+      verdicts,
+      plusieursVerdicts: Math.round(ventes * 0.1),
+      jetonsParMessage: ventes ? jetonsParMessage : null,
+      verdictsMesures: verdicts,
+    };
+  });
+  const verdictsPayes = somme(tranches, (t) => t.verdicts);
+  const payesDesConvs = somme(tranches, (t) => t.ventes);
+  const parLongueur: Pilotage["parLongueur"] = {
+    tranches,
+    effacees: Math.round(ventesDesConvs / 30),
+    tard: { payes: payesDesConvs, plusDe48h: Math.round(payesDesConvs / 12), sansPaywall: 0 },
+    modeles: [
+      { modele: "claude-opus-5-5", lignes: verdictsPayes - Math.round(verdictsPayes / 20), convs: payesDesConvs, dollars: (verdictsPayes - Math.round(verdictsPayes / 20)) * 0.92 },
+      ...(verdictsPayes >= 20
+        ? [{ modele: "claude-fable-5-1", lignes: Math.round(verdictsPayes / 20), convs: Math.round(verdictsPayes / 20), dollars: Math.round(verdictsPayes / 20) * 2.3 }]
+        : []),
+    ],
+    chers: [
+      { dollars: 2.41, lignes: 2, modeles: ["claude-fable-5-1", "claude-opus-5-5"], messages: 8_412 },
+      { dollars: 2.28, lignes: 1, modeles: ["claude-fable-5-1"], messages: 6_930 },
+      { dollars: 1.62, lignes: 2, modeles: ["claude-opus-5-5"], messages: 3_105 },
+    ].slice(0, payesDesConvs ? 3 : 0),
+  };
+  /*
+   * Les compteurs du suivi : une vidéo sur trente-cinq arrêtée par un refus, et les mises à jour gardées en direct par le
+   * garde-fou de la mémoire en lot, environ une sur six de celles parties au calme (le poste « Mémoire (en lot) » : 10)
+   */
+  const compteurs: Pilotage["compteurs"] = { videosRefusees: Math.round(importsParType.find((t) => t.type === "video")!.imports / 35), majEnDirectParAlerte: 2 };
   const jalonsParAppli = applis
     .map(([appli, part, passe]) => {
       const choisie = Math.round(jalons.appli * part);
@@ -343,6 +396,8 @@ function pilotageDe(jours: Periode, { calme = false, suivi = true }: Variante): 
     abDerniere: { avec: { n: 38, payes: 6 }, sans: { n: 41, payes: 3 } },
     importsParType,
     lecturePartielle,
+    parLongueur,
+    compteurs,
     iaDuJour: { dollars: 12.4, budget: 30, sansCompte: { dollars: 3.1, budget: 50 } },
     sante: calme
       ? { echecs: 0, bloquees: 0, paiementsEchoues: 0, alertes: 0, pannes: 0, pannesDuJour: 0 }
@@ -393,13 +448,16 @@ export function statsDExemple(jours: Periode, variante: Variante = {}): StatsAdm
       ],
       parRapport: rapports ? Math.round(((total * 0.85 * 0.38) / rapports) * 100) / 100 : null,
       parVerdict: verdicts ? Math.round(((total * 0.85 * 0.11) / verdicts) * 100) / 100 : null,
+      /* Les images en deux postes : les vidéos lues avant l’achat pèsent plus que les captures */
       postes: (
         [
           ["Chat", 46, 412],
-          ["Rapport", 38, rapports * 2],
+          ["Rapport", 37, rapports * 2],
           ["Verdict", 11, verdicts],
-          ["Mémoire (mise à jour)", 2, 14],
-          ["Mémoire (création)", 2, rapports],
+          ["Vidéo", 2, 96],
+          ["Captures", 1, 31],
+          ["Mémoire (mise à jour)", 1, 14],
+          ["Mémoire (création)", 1, rapports],
           ["Mémoire (en lot)", 1, 11],
         ] as const
       ).map(([nom, part, appels]) => ({

@@ -320,6 +320,19 @@ describe("les outils", () => {
     expect(couts).toHaveProperty("produitDollars.valeur");
     expect(couts).toHaveProperty("testsDollars.valeur");
     expect(couts).toHaveProperty("parAcheteurDollars");
+    /* Les convs payées par longueur, chaque tranche même vide, et les deux compteurs du suivi avec ce à quoi ils se comparent */
+    const { parLongueur } = couts as unknown as { parLongueur: { tranches: { longueur: string }[] } };
+    expect(parLongueur.tranches.map((t) => t.longueur)).toEqual(["Moins de 1\u202f000 messages", "1\u202f000 à 3\u202f000", "3\u202f000 à 7\u202f000", "7\u202f000 et plus"]);
+    for (const champ of [
+      "parLongueur.ventesDe3000MessagesOuPlus",
+      "parLongueur.payesPlusDe48hApresLePaywall.plusDe48h",
+      "parLongueur.achatsDontLaConvEstEffacee",
+      "parLongueur.verdictsParModele",
+      "parLongueur.verdictsLesPlusChers",
+      "videosArreteesParUnRefus.videosEnvoyees",
+      "memoireEnDirectParAlerte.majsEnLot",
+    ])
+      expect(couts, champ).toHaveProperty(champ);
     const faux = (await mcp("tools/call", { name: "pilotage", arguments: { jours: 5 } }, acces)).json?.result as { isError: boolean; content: { text: string }[] };
     expect(faux.isError).toBe(true);
     expect(faux.content[0]!.text).toContain("1, 7, 30");

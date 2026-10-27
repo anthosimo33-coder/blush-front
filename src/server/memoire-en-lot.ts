@@ -3,12 +3,14 @@ import { and, asc, eq, inArray, isNotNull, isNull, lt, lte, or, sql, type SQL } 
 import { Maj07, type Maj } from "@prompts/lib/schemas";
 import { payeurDe, payeurDuCompte, type Payeur, type Reserve } from "./budget";
 import * as coffre from "./coffre";
+import { CLES, compter } from "./compteurs";
 import { db, schema } from "./db";
 import { donneesMemoire } from "./depot";
 import { memoireEnLot } from "./env";
 import { ErreurTache, estBudget } from "./erreurs";
 import type { EtatDuLot, IssueDuLot, Presse } from "./ia/claude";
 import { auMieux, journal, journalErreur } from "./journal";
+import { duProduitMaintenant } from "./population";
 import { passerLaMain } from "./relais";
 import { aRelancer, autreEnCours, entreeDe, ESSAIS_MAX, finir, sansLotEnVol, type Tache } from "./taches";
 
@@ -17,8 +19,8 @@ import { aRelancer, autreEnCours, entreeDe, ESSAIS_MAX, finir, sansLotEnVol, typ
  * échange), personne ne l’attend : la personne est partie, le chat relit ses derniers échanges, et sa fiche la rapatrie
  * quand elle s’ouvre. Avec BLUSH_MEMOIRE_EN_LOT, le passage des 5 minutes (GET /api/cron/relances) l’envoie donc en lot au
  * prestataire (l’API Message Batches, src/server/ia/claude.ts : la même requête qu’en direct, deux fois moins chère),
- * sauf celle d’une conv en alerte, qui part en direct (ALERTE : une alerte qu’elle lèverait n’attend pas le lot), puis
- * relève les lots à chaque passage :
+ * sauf celle d’une conv en alerte, qui part en direct (ALERTE : une alerte qu’elle lèverait n’attend pas le lot ; /admin
+ * les compte, CLES.majEnDirectParAlerte), puis relève les lots à chaque passage :
  *   - fini : la réponse s’applique à la mémoire gardée à l’envoi (tasks.lot_avant), ou à elle et aux alertes que le chat
  *     a notées depuis (majDuLot, src/server/analyse.ts) ; la tâche finit ;
  *   - un refus (le repli du prestataire n’existe pas en lot), une erreur, une expiration, une annulation, une sortie
@@ -377,7 +379,15 @@ async function envoyer(id: string): Promise<{ envoyee: boolean; direct: string |
      * La conv en alerte (ALERTE) : en direct, avant toute requête au prestataire. Sans heure, ni le passage suivant ni un
      * échange qui la rejoint (`due`, retenir) ne la renvoient en lot ; la suivante de la conv repasse ici
      */
-    if (lue.etat.alerte || echanges.some((e) => e.levee)) return { envoyee: false, direct: await versLeDirect(tache.id, "en_cours", ALERTE, battement) };
+    if (lue.etat.alerte || echanges.some((e) => e.levee)) {
+      const direct = await versLeDirect(tache.id, "en_cours", ALERTE, battement);
+      /* Comptée pour /admin (le code s’efface quand elle finit) : ce que le garde-fou retire au lot, pour le produit seul */
+      if (direct)
+        await auMieux(async () => {
+          if (await duProduitMaintenant({ storyId: direct })) await compter(CLES.majEnDirectParAlerte);
+        }, "mise à jour en alerte non comptée");
+      return { envoyee: false, direct };
+    }
     const { req } = (await analyse()).preparerLaMaj(story, lue, echanges);
     const ia = await claude();
     const reserve = await reserveDesLots(story.userId);

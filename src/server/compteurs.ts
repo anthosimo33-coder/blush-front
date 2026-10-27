@@ -31,6 +31,16 @@ export const CLES = {
   lienParrainage: "parrainage_lien",
   /** Une réponse du chat sortie en alerte (danger, détresse, mineur) : la santé de /admin les compte (src/server/stats.ts). */
   alerteChat: "chat_alerte",
+  /**
+   * Un import de vidéo arrêté par un refus de lecture (le modèle refuse un lot, malgré son repli : le navigateur arrête
+   * tout, src/services/api.ts), une fois par envoi, seulement pour le produit (noterLeRefusDUneVideo, src/server/imports.ts).
+   */
+  videoRefusee: "video_refus",
+  /**
+   * Une mise à jour de la mémoire au calme gardée en direct parce que sa conv est en alerte (le garde-fou de la mémoire
+   * en lot, « lot:alerte », src/server/memoire-en-lot.ts), seulement pour le produit : tasks.error s’efface quand elle finit.
+   */
+  majEnDirectParAlerte: "memoire_alerte_direct",
 } as const;
 /**
  * La note d’un rapport écrit (src/server/note-du-rapport.ts) : « Oui, grave », « Bof », ce qui n’allait pas après

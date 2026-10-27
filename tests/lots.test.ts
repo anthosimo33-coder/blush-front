@@ -498,6 +498,39 @@ describe("la mesure des imports", () => {
     expect(ecart(avant, await duType("export"))).toMatchObject({ imports: 1, micros: 0, pourRien: 0 });
   });
 
+  it("un refus de lecture arrête l’import de la vidéo : compté une fois par envoi, pour le produit seul (ni sans clé, ni pour un invité)", async () => {
+    const refusees = async () => (await statsAdmin(1)).pilotage.compteurs.videosRefusees;
+    const avant = await refusees();
+    const refus = async (): Promise<MessageRecu> => ({
+      content: [],
+      usage: USAGE,
+      model: "claude-sonnet-5-5",
+      stop_reason: "refusal",
+      stop_details: { category: "general_harms" },
+    });
+    prestataire = refus;
+    /* Deux lots du même envoi refusés (lus en même temps) : un seul import arrêté */
+    const cle = randomUUID();
+    for (const r of await Promise.all([lot(ecrans(2), { cle }), lot(ecrans(3), { cle })])) expect(await r.json()).toEqual({ erreur: "refus" });
+    expect(await refusees()).toBe(avant + 1);
+    /* Sans clé (aucun envoi à compter), puis un invité de l’équipe (la règle le range « offert ») : rien */
+    expect((await lot(ecrans(2))).status).toBe(502);
+    etat.equipe = [compte.email];
+    try {
+      expect((await lot(ecrans(2), { cle: randomUUID() })).status).toBe(502);
+    } finally {
+      etat.equipe = [];
+    }
+    expect(await refusees()).toBe(avant + 1);
+    /* Un lot lu ne compte pas ; un nouvel essai refusé, sous une autre clé, si */
+    prestataire = lue;
+    await luDe(await lot(ecrans(2), { cle: randomUUID() }));
+    expect(await refusees()).toBe(avant + 1);
+    prestataire = refus;
+    expect((await lot(ecrans(2), { cle: randomUUID() })).status).toBe(502);
+    expect(await refusees()).toBe(avant + 2);
+  });
+
   it("lu pour rien : des lots lus pour un envoi qui n’est jamais devenu une conv", async () => {
     const avant = await duType("video");
     await luDe(await lot(ecrans(2), { cle: randomUUID() }));

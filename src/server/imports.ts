@@ -3,10 +3,13 @@ import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import type { GenreDuHaut } from "@/contenu/haut-du-paywall";
 import type { AppKind, BrasDeLaLecture, IssueDeLaSuite, TypeDImport } from "@/types";
 import { empreinte, jeton } from "./chiffrement";
+import { CLES, compter } from "./compteurs";
 import { db, schema } from "./db";
 import { estEquipe } from "./droits";
 import { auMieux } from "./journal";
 import type { MesureDeLaRegle } from "./lecture-partielle";
+import { compter as compterUnPassage } from "./limites";
+import { duProduitMaintenant } from "./population";
 
 /*
  * La mesure des imports (/admin, « L’IA avant l’achat ») : ce que coûte une conv avant que la personne paie, selon
@@ -180,4 +183,23 @@ export async function reprendreLeLot(lot: string, envoi: string): Promise<void> 
         .where(and(eq(schema.aiUsage.lot, lot), isNull(schema.aiUsage.storyId))),
     "lot repris non mesuré",
   );
+}
+
+/* Le temps où un refus d’un envoi se reconnaît (rate_limits) : celui d’un enregistrement, ses lots et sa fin (comme src/server/lots.ts) */
+const FENETRE_DU_REFUS = { fenetreS: 15 * 60 };
+
+/**
+ * Un import de vidéo arrêté par un refus de lecture (POST /api/captures/lot : le modèle refuse un lot malgré son repli,
+ * et le navigateur arrête tout l’enregistrement, src/services/api.ts) : compté pour /admin (CLES.videoRefusee), une fois
+ * par envoi (deux lots refusés en même temps n’arrêtent qu’un import ; un nouvel essai de la même vidéo, sous une autre
+ * clé, compte encore), et seulement pour le produit, la règle « qui est qui » jugée maintenant sur le compte de la session
+ * (`compte`), sinon sur l’envoi (un prospect sans compte) : l’équipe qui essaie un refus n’y entre pas. Un refus ne se
+ * voyait jusque-là que dans les logs (« route /api en échec », son code) : il ne laisse ni import ni conv, et sa lecture
+ * se range parmi le lu pour rien, avec les abandons. Ne lève jamais.
+ */
+export async function noterLeRefusDUneVideo(envoi: string, compte: { id: string } | null): Promise<void> {
+  await auMieux(async () => {
+    if ((await compterUnPassage(`imports:refus:${envoi}`, FENETRE_DU_REFUS)) > 1) return;
+    if (await duProduitMaintenant({ compte, envoi })) await compter(CLES.videoRefusee);
+  }, "refus de la vidéo non compté");
 }

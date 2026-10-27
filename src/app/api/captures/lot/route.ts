@@ -1,8 +1,9 @@
 import { AppliCaptures } from "@/server/appli-captures";
 import { humainRefuse } from "@/server/captcha";
 import { cleEnvoi, imagesDe, LectureRefusee, lecturePermise, lireLot } from "@/server/captures";
+import { estRefus, ErreurTache } from "@/server/erreurs";
 import { erreur, repondre, route } from "@/server/http";
-import { envoiDe } from "@/server/imports";
+import { envoiDe, noterLeRefusDUneVideo } from "@/server/imports";
 import { consentementImport } from "@/server/juridique";
 import { LIMITES } from "@/server/limites";
 import { attendreLePremier, empreinteDuLot, envoiArrete, ErreurLot, premierLot, unSeulLot } from "@/server/lots";
@@ -50,7 +51,8 @@ async function traiter(req: Request) {
   /* Le mode tournage (src/server/tournage.ts) : rien n’est lu, la fin de l’enregistrement reprend la conv de tournage */
   if (await tournageDuNavigateur()) return repondre("POST /api/captures/lot", { lot: LOT_DU_TOURNAGE });
   /* Son lien arrêté (ou une créatrice sans son lien) : le modèle ne lit rien, qu’elle rouvre le nouveau */
-  if (await lecturePayeeRefusee(await utilisateurDeSession(await lireSession()))) return erreur("tournage");
+  const compte = await utilisateurDeSession(await lireSession());
+  if (await lecturePayeeRefusee(compte)) return erreur("tournage");
   const app = appli.success ? appli.data : "autre";
   const envoi = envoiDe(cleEnvoi(fd?.get("cle")));
   const ordre = fd?.get("ordre");
@@ -70,6 +72,10 @@ async function traiter(req: Request) {
       return lireLot(images, app, "captures_video", { envoi, lot: empreinte, signal, ...(surAvance ? { surAvance } : {}), ...(commence ? { auDebut: commence } : {}) });
     });
     return repondre("POST /api/captures/lot", { lot });
+  } catch (e) {
+    /* Un refus de lecture arrête tout l’import (le navigateur ne le relance pas) : compté pour /admin, une fois par envoi */
+    if (envoi && e instanceof ErreurTache && estRefus(e)) await noterLeRefusDUneVideo(envoi, compte);
+    throw e;
   } finally {
     commence?.();
   }

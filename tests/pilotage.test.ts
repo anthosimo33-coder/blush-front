@@ -3,6 +3,7 @@ import { and, eq, gte, inArray, lt, sql } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { POST as postJalon } from "@/app/api/jalon/route";
 import { POST as postPresence } from "@/app/api/presence/route";
+import { TRANCHES_DE_LONGUEUR, type TrancheDeLongueur } from "@/contenu/pilotage";
 import { NOMS_DU_TOURNAGE } from "@/lib/noms-cookies";
 import { db, schema } from "@/server/db";
 import { direct } from "@/server/direct";
@@ -10,7 +11,7 @@ import { definirPronomAutre, importer } from "@/server/histoires";
 import { purger } from "@/server/purge";
 import { compterUnClicDeMail, HAUT } from "@/server/compteurs";
 import { CLES_DES_MAILS } from "@/server/sequences";
-import { statsAdmin, type Genres } from "@/server/stats";
+import { statsAdmin, type Genres, type Pilotage } from "@/server/stats";
 import { attendreLePaiement } from "@/server/taches";
 import { aujourdhuiParis } from "@/server/temps";
 import { noterAchatAuFil, noterAuFil, noterJalon, noterLaSourceDuCompte, noterSigne, sourceDeLaVisite } from "@/server/visites";
@@ -464,6 +465,130 @@ describe("le haut du paywall dans le pilotage", () => {
       expect((await volume(1)).depuis).toBeNull();
     } finally {
       await effacer();
+    }
+  });
+});
+
+describe("les convs payées par longueur (/admin)", () => {
+  it("par tranche : les ventes et l’offre prise, l’IA médiane d’une lecture payée et les jetons par message des verdicts (le produit seul), leurs nouveaux essais et leurs modèles ; à part, les achats payés plus de 48 h après le paywall et ceux d’une conv effacée", async () => {
+    const tranche = (p: Pilotage, t: TrancheDeLongueur) => p.parLongueur.tranches.find((x) => x.tranche === t)!;
+    const modele = (p: Pilotage, m: string) => p.parLongueur.modeles.find((x) => x.modele === m) ?? { lignes: 0, convs: 0, dollars: 0 };
+    const avant = (await statsAdmin(7)).pilotage;
+    expect(avant.parLongueur.tranches.map((x) => x.tranche)).toEqual([...TRANCHES_DE_LONGUEUR]);
+    /* Les convs longues ne sont qu’à ce test (celles des autres fichiers sont effacées avec leur compte) */
+    for (const t of ["de_3000_a_7000", "7000_et_plus"] as const) expect(tranche(avant, t).convs).toBe(0);
+    const u = await compteDeTest("pilotage-longueur");
+    const longue = await convRattachee(u, "01-a-deux-doigts.txt");
+    const tresLongue = await convRattachee(u, "01-a-deux-doigts.txt");
+    const courte = await convRattachee(u, "01-a-deux-doigts.txt");
+    const maintenant = new Date();
+    const ilYa = (jours: number) => new Date(maintenant.getTime() - jours * 86400e3);
+    await db().update(schema.stories).set({ messageCount: 4000 }).where(eq(schema.stories.id, longue.id));
+    await db().update(schema.stories).set({ messageCount: 8000 }).where(eq(schema.stories.id, tresLongue.id));
+    /* Arrivées au paywall (la tâche du verdict posée) : la très longue il y a 3 jours ; la courte n’y est jamais passée (jugée depuis l’import) */
+    await attendreLePaiement(longue.id, "verdict");
+    await attendreLePaiement(tresLongue.id, "verdict");
+    await db()
+      .update(schema.tasks)
+      .set({ createdAt: ilYa(3) })
+      .where(and(eq(schema.tasks.storyId, tresLongue.id), eq(schema.tasks.kind, "verdict")));
+    const achat = (offre: OffreId, plus: Partial<typeof schema.achats.$inferInsert> = {}) =>
+      db()
+        .insert(schema.achats)
+        .values({ userId: u.id, offre, centimes: 990, bulles: 3, fournisseur: "factice", statut: "paye", payeLe: maintenant, ...plus });
+    /* La longue payée deux fois (deux ventes, une conv) ; la très longue par ①, 3 jours après son paywall ; la courte par ⑤, payé il y a 10 jours et utilisé aujourd’hui */
+    await achat("premium", { storyId: longue.id });
+    await achat("rapport", { storyId: longue.id, statut: "rembourse", annuleLe: maintenant });
+    await achat("suite", { storyId: tresLongue.id });
+    await achat("second", { storyId: courte.id, payeLe: ilYa(10), creeLe: ilYa(10), utiliseLe: maintenant });
+    /* Une conv effacée depuis ; des bulles (pas une conv) ; un achat d’essai de l’équipe (retiré de toutes les ventes) */
+    await achat("rapport");
+    await achat("pack25");
+    await achat("rapport", { storyId: courte.id, population: "equipe" });
+    const ligne = (storyId: string, task: string, micros: number, plus: Partial<typeof schema.aiUsage.$inferInsert> = {}) =>
+      ({ storyId, task, model: "claude-opus-5-5", costMicros: micros, population: "client", ...plus }) satisfies typeof schema.aiUsage.$inferInsert;
+    await db()
+      .insert(schema.aiUsage)
+      .values([
+        /* Un verdict du montage partagé (le socle et 140 000 jetons de conv écrits en cache), et un essai d’avant, sur un autre modèle : compté, pas mesuré */
+        ligne(longue.id, "verdict", 900_000, { inputTokens: 2_000, cacheWriteTokens: 15_300 + 140_000 }),
+        ligne(longue.id, "verdict", 1_100_000, { model: "claude-fable-5-1", inputTokens: 160_000, createdAt: new Date("2026-10-20T10:00:00Z") }),
+        ligne(longue.id, "rapport_plan", 300_000),
+        ligne(longue.id, "rapport_chapitres", 400_000),
+        ligne(longue.id, "memoire", 200_000),
+        ligne(longue.id, "vocal", 50_000),
+        /* Pas de la lecture : la voix (son étiquette est aussi celle des vocaux du chat), le chat ; ni un appel d’un test */
+        ligne(longue.id, "vocal_voix", 90_000),
+        ligne(longue.id, "chat", 120_000),
+        ligne(longue.id, "verdict", 5_000_000, { population: "equipe" }),
+        /* Le socle lu dans le cache d’un autre verdict : il compte aussi, puis se retire */
+        ligne(tresLongue.id, "verdict", 2_500_000, { inputTokens: 1_000, cacheReadTokens: 15_300, cacheWriteTokens: 160_000 }),
+        ligne(courte.id, "verdict", 400_000),
+      ]);
+    try {
+      const apres = (await statsAdmin(7)).pilotage;
+      expect(tranche(apres, "de_3000_a_7000")).toEqual({
+        tranche: "de_3000_a_7000",
+        ventes: 2,
+        offres: { rapport: 1, premium: 1, suite: 0, second: 0, rapport_garde: 0, autre: 0 },
+        convs: 1,
+        lues: 1,
+        /* 0,9 + 1,1 (le verdict et son essai) + 0,3 + 0,4 (le rapport) + 0,2 (la mémoire) + 0,05 (le vocal) */
+        dollarsMedian: 2.95,
+        verdicts: 2,
+        plusieursVerdicts: 1,
+        /* (2 000 + 155 300 − 15 300) ÷ 4 000 */
+        jetonsParMessage: 35.5,
+        verdictsMesures: 1,
+      });
+      expect(tranche(apres, "7000_et_plus")).toMatchObject({
+        ventes: 1,
+        offres: { suite: 1 },
+        convs: 1,
+        dollarsMedian: 2.5,
+        verdicts: 1,
+        plusieursVerdicts: 0,
+        jetonsParMessage: 20.125,
+      });
+      const d = (f: (p: Pilotage) => number) => f(apres) - f(avant);
+      expect([d((p) => tranche(p, "moins_de_1000").ventes), d((p) => tranche(p, "moins_de_1000").offres.second), d((p) => tranche(p, "moins_de_1000").lues)]).toEqual([1, 1, 1]);
+      expect(d((p) => p.parLongueur.effacees)).toBe(1);
+      expect([d((p) => p.parLongueur.tard.payes), d((p) => p.parLongueur.tard.plusDe48h), d((p) => p.parLongueur.tard.sansPaywall)]).toEqual([4, 1, 1]);
+      expect([d((p) => modele(p, "claude-opus-5-5").lignes), d((p) => modele(p, "claude-opus-5-5").convs), d((p) => modele(p, "claude-fable-5-1").lignes)]).toEqual([3, 3, 1]);
+      /* Les plus chers : la très longue, puis la longue et son essai ; jamais l’appel d’un test */
+      expect(apres.parLongueur.chers.slice(0, 2)).toEqual([
+        { dollars: 2.5, lignes: 1, modeles: ["claude-opus-5-5"], messages: 8000 },
+        { dollars: 2, lignes: 2, modeles: ["claude-fable-5-1", "claude-opus-5-5"], messages: 4000 },
+      ]);
+    } finally {
+      await db()
+        .delete(schema.aiUsage)
+        .where(inArray(schema.aiUsage.storyId, [longue.id, tresLongue.id, courte.id]));
+      await db().delete(schema.achats).where(eq(schema.achats.userId, u.id));
+    }
+  });
+
+  it("les images en trois postes : les captures (« 01 », l’étiquette d’avant, comprise), les lots d’une vidéo, et la suite lue après le paiement", async () => {
+    const poste = (s: Awaited<ReturnType<typeof statsAdmin>>, nom: string) => s.couts.postes.find((p) => p.nom === nom)?.produit.appels ?? 0;
+    const avant = await statsAdmin(1);
+    const ids = (
+      await db()
+        .insert(schema.aiUsage)
+        .values(
+          (["captures", "01", "captures_video", "captures_video", "captures_suite"] as const).map((task) => ({
+            task,
+            model: "claude-opus-5-5",
+            costMicros: 1_000,
+            population: "prospect" as const,
+          })),
+        )
+        .returning({ id: schema.aiUsage.id })
+    ).map((l) => l.id);
+    try {
+      const apres = await statsAdmin(1);
+      expect(["Captures", "Vidéo", "Vidéo (la suite)", "Autres"].map((nom) => poste(apres, nom) - poste(avant, nom))).toEqual([2, 2, 1, 0]);
+    } finally {
+      await db().delete(schema.aiUsage).where(inArray(schema.aiUsage.id, ids));
     }
   });
 });

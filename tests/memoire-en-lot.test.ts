@@ -674,6 +674,30 @@ describe("le garde-fou des alertes : la mise à jour au calme d’une conv en al
     expect(majsLues()[0]!.includes("ta réponse a levé l’alerte : danger")).toBe(true);
   });
 
+  it("chacune se compte pour /admin (tasks.error s’efface quand elle finit), seulement celles du produit : une conv de l’équipe part en direct sans compter", async () => {
+    const comptees = async () => (await statsAdmin(1)).pilotage.compteurs.majEnDirectParAlerte;
+    const avant = await comptees();
+    const { id } = await convLue();
+    await enAlerte(id, "danger");
+    await calmee(id);
+    await traiterLesLots();
+    expect(await comptees()).toBe(avant + 1);
+    /* Finie (son code effacé), elle reste comptée ; la suivante de la conv, à son calme, compte aussi */
+    await executerChaine(id);
+    await calmee(id, 3, 4);
+    await traiterLesLots();
+    expect(await comptees()).toBe(avant + 2);
+    /* Un alias de l’équipe (BLUSH_ALERTES) : le garde-fou la garde en direct, sans la compter */
+    const equipe = await compteDeTest("equipe+lot", "debloque");
+    const { id: deLEquipe } = await histoireLue(equipe, "02-reciproque.txt");
+    requetes.length = 0;
+    await enAlerte(deLEquipe, "danger");
+    const tid = await calmee(deLEquipe);
+    await traiterLesLots();
+    expect(await tache(tid)).toMatchObject({ status: "attente", error: "lot:alerte" });
+    expect(await comptees()).toBe(avant + 2);
+  });
+
   it("éteint (BLUSH_MEMOIRE_EN_LOT=0) : rien ne change, la conv en alerte part au calme en direct comme toutes, par la chaîne, sans code", async () => {
     LOT.on = false;
     const { id } = await convLue();

@@ -3,7 +3,18 @@ import { sql, type SQL } from "drizzle-orm";
 import type { Pronom } from "@prompts/lib/conv";
 import { GENRES_DU_HAUT, type GenreDuHaut } from "@/contenu/haut-du-paywall";
 import { CATALOGUE, RAPPORT_D_AVANCE } from "@/contenu/offres";
-import { GROUPE_DE_L_OFFRE, GROUPES_D_OFFRES, PAIRES, type GroupeDOffres, type Paire } from "@/contenu/pilotage";
+import {
+  GROUPE_DE_L_OFFRE,
+  GROUPES_D_OFFRES,
+  OFFRES_D_UNE_CONV,
+  PAIRES,
+  TRANCHES_DE_LONGUEUR,
+  trancheDe,
+  type GroupeDOffres,
+  type OffreDUneConv,
+  type Paire,
+  type TrancheDeLongueur,
+} from "@/contenu/pilotage";
 import {
   CLES_DES_APPLIS,
   GENRES_VENDUS,
@@ -339,6 +350,47 @@ export type Pilotage = {
     };
   };
   /**
+   * Les convs payées par les vrais clients sur la période, par longueur (ce qui manque pour décider d’une conv très longue,
+   * le plan du 27 octobre 2026) : les achats qui débloquent une conv (le rapport, Premium, ①, ⑥, payés sur la période ;
+   * ⑤, utilisé sur la période), d’un vrai client (achatDuProduit), même remboursés depuis, rangés par la longueur de leur
+   * conv (`stories.message_count`, joint par achats.story_id : tous les messages reçus, pas ce que lit le modèle).
+   * `tranches` : chacune (TRANCHES_DE_LONGUEUR, dans l’ordre, même vide), ses ventes et l’offre prise ; ses convs, celles
+   * dont la lecture a coûté (`lues`) et l’IA médiane d’une lecture (le verdict, ses essais compris, le rapport, la
+   * création de la mémoire et le script du vocal : leurs appels du produit, en dollars ; null sans aucune) ; les lignes de
+   * verdict et les convs qui en ont plusieurs (les nouveaux essais, les verdicts refaits) ; les jetons par message des
+   * verdicts du montage partagé (`jetonsParMessage`, sur `verdictsMesures` lignes : null sans aucune). `effacees` : les
+   * achats de la période dont la conv a été effacée depuis (story_id vide : ni longueur, ni paywall). `tard` : les achats
+   * dont la conv est encore là, ceux payés plus de 48 h après son arrivée au paywall (la tâche du verdict posée), et ceux
+   * sans tâche du verdict, jugés depuis l’import. `modeles` : les lignes de verdict de ces convs par modèle (le plus cher
+   * d’abord), et `chers` : les cinq convs au verdict le plus cher (que des nombres : son coût, ses lignes, ses modèles,
+   * ses messages).
+   */
+  parLongueur: {
+    tranches: {
+      tranche: TrancheDeLongueur;
+      ventes: number;
+      offres: Record<OffreDUneConv, number>;
+      convs: number;
+      lues: number;
+      dollarsMedian: number | null;
+      verdicts: number;
+      plusieursVerdicts: number;
+      jetonsParMessage: number | null;
+      verdictsMesures: number;
+    }[];
+    effacees: number;
+    tard: { payes: number; plusDe48h: number; sansPaywall: number };
+    modeles: { modele: string; lignes: number; convs: number; dollars: number }[];
+    chers: { dollars: number; lignes: number; modeles: string[]; messages: number }[];
+  };
+  /**
+   * Deux compteurs du suivi, par jour de Paris (counters : sur la période en jours entiers, comme les pannes), du produit
+   * seul (la règle « qui est qui » jugée à l’écriture) : les imports de vidéo arrêtés par un refus de lecture
+   * (`videosRefusees`, une fois par envoi), et les mises à jour de la mémoire au calme gardées en direct parce que leur
+   * conv est en alerte (`majEnDirectParAlerte`, le garde-fou de la mémoire en lot : seulement quand elle est allumée).
+   */
+  compteurs: { videosRefusees: number; majEnDirectParAlerte: number };
+  /**
    * La dépense de l’IA aujourd’hui (jour de Paris) et le budget du jour (BUDGET_IA.jour), en dollars ; `sansCompte` : la
    * part sans compte (les lectures d’avant l’email, celles en cours comprises par leur réservation) et son budget
    * (BUDGET_IA.anonyme), qui arrête tous les visiteurs sans compte une fois atteint.
@@ -435,10 +487,59 @@ const appelDuProduit = (conv: string, tache: SQL) => sql`exists (select 1 from a
 const ACHAT_DU_PRODUIT = achatDuProduit("a0");
 
 /**
+ * Un achat qui débloque une conv sur la période (en SQL brut, `achats` sous l’alias `a0` ; `W` : la période sur une
+ * colonne), payé par un vrai client, même remboursé depuis : une offre d’une conv (OFFRES_DU_RAPPORT : le rapport,
+ * Premium, ①, ⑥) payée sur la période, ou un rapport d’avance (⑤) utilisé sur la période, qui n’a sa conv qu’alors
+ * (achats.utilise_le). Les bulles et ③ (le passage en Premium) n’ont pas de conv. « Par longueur » les lit.
+ */
+const achatDUneConv = (W: (col: string) => SQL) =>
+  sql`a0.paye_le is not null and ${ACHAT_DU_PRODUIT} and ((a0.offre in (${sql.join(
+    OFFRES_DU_RAPPORT.map((o) => sql`${o}`),
+    sql`, `,
+  )}) and ${W("a0.paye_le")}) or (a0.offre = ${RAPPORT_D_AVANCE.offre} and a0.utilise_le is not null and ${W("a0.utilise_le")}))`;
+
+/**
+ * Les appels d’une lecture payée (en SQL brut, `ai_usage` sous l’alias `u`) : le verdict (ses essais, ses verdicts
+ * refaits), le rapport (son plan, ses chapitres), la création de la mémoire, et le script du vocal (« vocal »). Pas la
+ * voix du vocal (« vocal_voix ») : la même étiquette dit les vocaux du chat, qui ne sont pas de la lecture (environ
+ * 0,09 $ par vocal du rapport, la mesure du 22 octobre 2026).
+ */
+const APPEL_DE_LA_LECTURE = sql.raw("(u.task in ('verdict', 'memoire', 'vocal') or u.task like 'rapport%')");
+
+/**
+ * Le socle du montage partagé (prompts/lib/contextes.ts : le système, le même pour toutes les étapes de la lecture),
+ * environ 15 300 jetons (15 267 comptés en octobre 2026) : ce qu’on retire d’un verdict pour n’en garder que la conv.
+ * Sa consigne (le prompt 04 et son format, quelques milliers de jetons) y reste : sur une conv de 1 000 messages, environ
+ * 3 jetons par message de trop, qui s’effacent sur les longues.
+ */
+const JETONS_DU_SOCLE = 15_300;
+
+/**
+ * La mise en ligne du montage partagé (BLUSH_MONTAGE=partage, le 22 octobre 2026 à 22 h 10 à Paris) : ai_usage ne note
+ * pas le montage de chaque appel, et le système du verdict n’est pas le même dans les deux (son prompt en « separe », le
+ * socle en « partage ») ; les jetons par message ne lisent donc que les verdicts d’après. Ils comptent tout ce que le
+ * verdict a lu (`input_tokens`, `cache_write_tokens` et `cache_read_tokens` : le socle peut venir du cache d’un autre
+ * verdict, la conv s’écrit en cache), moins le socle, divisé par les messages de sa conv.
+ */
+const MONTAGE_PARTAGE_DEPUIS = "2026-10-22T20:10:00Z";
+const VERDICT_MESURE = sql.raw(
+  `(u.task = 'verdict' and u.created_at >= '${MONTAGE_PARTAGE_DEPUIS}' and u.input_tokens + u.cache_write_tokens + u.cache_read_tokens > ${JETONS_DU_SOCLE})`,
+);
+
+/** Le nombre d’heures après l’arrivée au paywall au-delà duquel un achat est « tard » (« Par longueur » : la décision de la garde des écrans). */
+const TARD_H = 48;
+
+/** Les convs au verdict le plus cher que « Par longueur » montre. */
+const VERDICTS_CHERS = 5;
+
+/**
  * Les postes de coût, d’après l’étiquette de chaque appel au modèle. La mémoire en trois : sa création après le rapport
  * (une par rapport), ses mises à jour en direct, et celles parties en lot (src/server/memoire-en-lot.ts, à moitié prix) :
- * leurs appels se comparent aux messages du chat sans en retirer les créations à l’estime. Les captures en deux : la
- * suite d’une longue vidéo, lue après le paiement (src/server/suite-video.ts), à part de ce qui se lit avant l’achat.
+ * leurs appels se comparent aux messages du chat sans en retirer les créations à l’estime. Les images en trois, d’après
+ * l’étiquette que leur donne lireLot (src/server/captures.ts) : les captures (« captures » : celles lues avant l’import,
+ * et celles envoyées au chat après, src/server/ajouts.ts ; « 01 », l’étiquette d’avant le 10 octobre 2026, qui réunissait
+ * captures et vidéos), les lots d’une vidéo lus avant l’achat (« captures_video », POST /api/captures/lot) et la suite
+ * d’une longue vidéo, lue après le paiement (« captures_suite », src/server/suite-video.ts).
  */
 const POSTES: [string, (tache: string) => boolean][] = [
   ["Verdict", (t) => t === "verdict"],
@@ -447,8 +548,9 @@ const POSTES: [string, (tache: string) => boolean][] = [
   ["Mémoire (mise à jour)", (t) => t === "memoire_maj"],
   ["Mémoire (en lot)", (t) => t === "memoire_maj_lot"],
   ["Chat", (t) => t === "chat"],
-  ["Captures", (t) => (t.startsWith("captures") && t !== "captures_suite") || t === "01"],
-  ["Captures (la suite)", (t) => t === "captures_suite"],
+  ["Captures", (t) => t === "captures" || t === "01"],
+  ["Vidéo", (t) => t === "captures_video"],
+  ["Vidéo (la suite)", (t) => t === "captures_suite"],
 ];
 
 /*
@@ -726,6 +828,10 @@ async function pilotageDe(jours: Periode): Promise<Pilotage> {
     parBras,
     parBrasImports,
     contrefactuels,
+    achatsDesConvs,
+    convsPayees,
+    modelesDuVerdict,
+    duSuivi,
   ] = await Promise.all([
     lignes<{ debut: string; visiteurs: string; acheteurs: string; centimes: string; micros: string; micros_produit: string }>(
       sql`with c as (${cases}),
@@ -926,6 +1032,50 @@ async function pilotageDe(jours: Periode): Promise<Pilotage> {
             coalesce(sum(c.micros), 0) as micros, coalesce(sum(c.micros::float8 * i.ecrans_epargnables / nullif(i.ecrans, 0)), 0) as micros_epargnables
           from i left join c on c.envoi = i.envoi group by i.arret, i.contrefactuel`,
     ),
+    /*
+     * Par longueur : les achats qui débloquent une conv sur la période, un par ligne (quelques dizaines par semaine), avec
+     * la longueur de leur conv (vide : effacée depuis), et s’ils sont venus plus de TARD_H heures après son arrivée au
+     * paywall (la tâche du verdict posée, au statut « paiement » : src/server/taches.ts ; sans elle, l’import). Pour ⑤,
+     * l’heure de l’achat de la conv est celle où il l’a débloquée
+     */
+    lignes<{ offre: OffreId; messages: number | null; au_paywall: boolean; tard: boolean | null }>(
+      sql`with a as (select a0.offre, a0.story_id, coalesce(a0.utilise_le, a0.paye_le) as le from achats a0 where ${achatDUneConv(W)}),
+            p as (select t.story_id, min(t.created_at) as le from tasks t where t.kind = 'verdict' and t.story_id in (select story_id from a) group by t.story_id)
+          select a.offre, s.message_count as messages, p.le is not null as au_paywall,
+            a.le > coalesce(p.le, s.created_at) + make_interval(hours => ${TARD_H}::int) as tard
+          from a left join stories s on s.id = a.story_id left join p on p.story_id = a.story_id`,
+    ),
+    /*
+     * … et conv par conv (une conv payée deux fois compte une fois) : ce qu’ont coûté sa lecture et son verdict (les
+     * appels du produit seuls), ses lignes de verdict et leurs modèles, et les jetons lus par ses verdicts du montage
+     * partagé, le socle retiré (VERDICT_MESURE)
+     */
+    lignes<{ messages: number; micros: string; micros_verdict: string; verdicts: string; jetons: string; mesures: string; modeles: string[] }>(
+      sql`with a as (select distinct a0.story_id from achats a0 where a0.story_id is not null and ${achatDUneConv(W)}),
+            u as (select u.story_id,
+                    sum(u.cost_micros) filter (where ${APPEL_DE_LA_LECTURE}) as micros,
+                    sum(u.cost_micros) filter (where u.task = 'verdict') as micros_verdict,
+                    count(*) filter (where u.task = 'verdict') as verdicts,
+                    sum(u.input_tokens + u.cache_write_tokens + u.cache_read_tokens - ${JETONS_DU_SOCLE}) filter (where ${VERDICT_MESURE}) as jetons,
+                    count(*) filter (where ${VERDICT_MESURE}) as mesures,
+                    array_agg(distinct u.model order by u.model) filter (where u.task = 'verdict') as modeles
+                  from ai_usage u where u.story_id in (select story_id from a) and ${duProduit(sql`u.population`)} group by u.story_id)
+          select s.message_count as messages, coalesce(u.micros, 0) as micros, coalesce(u.micros_verdict, 0) as micros_verdict, coalesce(u.verdicts, 0) as verdicts,
+            coalesce(u.jetons, 0) as jetons, coalesce(u.mesures, 0) as mesures, coalesce(u.modeles, '{}') as modeles
+          from a join stories s on s.id = a.story_id left join u on u.story_id = a.story_id`,
+    ),
+    /* … et leurs lignes de verdict par modèle : un modèle de repli, plus cher, s’y voit */
+    lignes<{ modele: string; lignes: string; convs: string; micros: string }>(
+      sql`select u.model as modele, count(*) as lignes, count(distinct u.story_id) as convs, sum(u.cost_micros) as micros from ai_usage u
+          where u.task = 'verdict' and ${duProduit(sql`u.population`)}
+            and u.story_id in (select a0.story_id from achats a0 where a0.story_id is not null and ${achatDUneConv(W)})
+          group by u.model order by 4 desc, 1`,
+    ),
+    /* Les compteurs du suivi : par jour de Paris, sur la période en jours entiers (comme les pannes) */
+    lignes<{ key: string; n: string }>(
+      sql`select key, sum(count) as n from counters where key in (${CLES.videoRefusee}, ${CLES.majEnDirectParAlerte})
+            and day > (now() at time zone 'Europe/Paris')::date - ${jours}::int group by key`,
+    ),
   ]);
 
   const m = (c: unknown) => n(c);
@@ -960,6 +1110,41 @@ async function pilotageDe(jours: Periode): Promise<Pilotage> {
     arrets: Object.fromEntries(ARRETS_DE_LA_REGLE.map((a) => [a, somme((l) => l.arret === a, "videos")])) as Record<ArretDeLaRegle, number>,
     dollars: somme(mesuree, "micros") / 1e6,
     dollarsEpargnables: somme(mesuree, "micros_epargnables") / 1e6,
+  };
+
+  /* Par longueur : chaque tranche, ses ventes et ses offres, puis ses convs, l’IA médiane de leur lecture et leurs verdicts */
+  const offreDe = (o: OffreId): OffreDUneConv => ((OFFRES_D_UNE_CONV as readonly string[]).includes(o) ? (o as OffreDUneConv) : "autre");
+  const tranches: Pilotage["parLongueur"]["tranches"] = TRANCHES_DE_LONGUEUR.map((tranche) => {
+    const ventes = achatsDesConvs.filter((a) => a.messages !== null && trancheDe(a.messages) === tranche);
+    const convs = convsPayees.filter((c) => trancheDe(c.messages) === tranche);
+    const lues = convs.map((c) => n(c.micros)).filter((m) => m > 0);
+    const jetons = convs.reduce((t, c) => t + n(c.jetons), 0);
+    const mesures = convs.reduce((t, c) => t + n(c.mesures), 0);
+    const messagesMesures = convs.reduce((t, c) => t + n(c.mesures) * c.messages, 0);
+    return {
+      tranche,
+      ventes: ventes.length,
+      offres: Object.fromEntries(OFFRES_D_UNE_CONV.map((o) => [o, ventes.filter((a) => offreDe(a.offre) === o).length])) as Record<OffreDUneConv, number>,
+      convs: convs.length,
+      lues: lues.length,
+      dollarsMedian: lues.length ? mediane(lues) / 1e6 : null,
+      verdicts: convs.reduce((t, c) => t + n(c.verdicts), 0),
+      plusieursVerdicts: convs.filter((c) => n(c.verdicts) > 1).length,
+      jetonsParMessage: messagesMesures > 0 ? jetons / messagesMesures : null,
+      verdictsMesures: mesures,
+    };
+  });
+  const avecConv = achatsDesConvs.filter((a) => a.messages !== null);
+  const parLongueur: Pilotage["parLongueur"] = {
+    tranches,
+    effacees: achatsDesConvs.length - avecConv.length,
+    tard: { payes: avecConv.length, plusDe48h: avecConv.filter((a) => a.tard === true).length, sansPaywall: avecConv.filter((a) => !a.au_paywall).length },
+    modeles: modelesDuVerdict.map((m) => ({ modele: m.modele, lignes: n(m.lignes), convs: n(m.convs), dollars: n(m.micros) / 1e6 })),
+    chers: convsPayees
+      .filter((c) => n(c.verdicts) > 0)
+      .sort((a, b) => n(b.micros_verdict) - n(a.micros_verdict))
+      .slice(0, VERDICTS_CHERS)
+      .map((c) => ({ dollars: n(c.micros_verdict) / 1e6, lignes: n(c.verdicts), modeles: c.modeles, messages: c.messages })),
   };
 
   return {
@@ -1063,6 +1248,11 @@ async function pilotageDe(jours: Periode): Promise<Pilotage> {
       }),
       contrefactuel,
     },
+    parLongueur,
+    compteurs: {
+      videosRefusees: n(duSuivi.find((l) => l.key === CLES.videoRefusee)?.n),
+      majEnDirectParAlerte: n(duSuivi.find((l) => l.key === CLES.majEnDirectParAlerte)?.n),
+    },
     iaDuJour: { dollars: n(iaDuJour.micros) / 1e6, budget: BUDGET_IA.jour, sansCompte: { dollars: sansCompte / 1e6, budget: BUDGET_IA.anonyme } },
     sante: {
       echecs: n(sante.echecs),
@@ -1074,6 +1264,13 @@ async function pilotageDe(jours: Periode): Promise<Pilotage> {
     },
     suiviDepuis: suivi.depuis,
   };
+}
+
+/** La médiane de ces nombres (au moins un). */
+function mediane(xs: number[]): number {
+  const tries = [...xs].sort((a, b) => a - b);
+  const m = tries.length >> 1;
+  return tries.length % 2 ? tries[m]! : (tries[m - 1]! + tries[m]!) / 2;
 }
 
 /* La paire d’une conv : le pronom de celui qui importe, puis celui de l’autre */

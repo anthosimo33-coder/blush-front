@@ -11,12 +11,16 @@ import {
   NOMS_DES_ETAPES,
   NOMS_DES_GENRES,
   NOMS_DES_GROUPES,
+  NOMS_DES_OFFRES_D_UNE_CONV,
   NOMS_DES_PAIRES,
   NOMS_DES_POPULATIONS,
   NOMS_DES_SOURCES,
+  NOMS_DES_TRANCHES,
   NOMS_DES_TYPES_D_IMPORT,
+  OFFRES_D_UNE_CONV,
   PAIRES,
   SOURCE_INCONNUE,
+  TRANCHES_TRES_LONGUES,
 } from "@/contenu/pilotage";
 import type { SourceVisite } from "@/types";
 import { delivrabilite } from "../delivrabilite";
@@ -85,7 +89,7 @@ export const OUTILS: readonly OutilMcp[] = [
     name: "couts_ia",
     title: "Coûts de l’IA",
     description:
-      "Ce qu’a coûté l’IA sur la période et celle d’avant, en dollars, rangée par une seule règle « qui est qui » : le total (la facture), celle du produit (les clients et les prospects) et celle des tests (l’équipe et le tournage), chaque population (clients, prospects, invités, équipe, tournage, non classé), par acheteur, par rapport et par verdict (le produit seul, la même population en haut et en bas), par poste (en tout et pour le produit, avec le nombre d’appels), la dépense d’aujourd’hui face au budget du jour (et la part sans compte face à la sienne), et l’IA avant l’achat par type d’import (export, captures, vidéo, hors des tests et des invités : les convs importées, leurs écrans et leurs lots par import, l’IA par import, le temps médian jusqu’au paywall, la part au paywall et la part qui paie, à partir de 30 convs, l’IA par acheteur, et ce qui a été lu pour rien), et la lecture partielle des longues vidéos (l’A/B, hors des tests et des invités : pour chaque moitié, entière ou partielle, ses vidéos comptées dès leur plan, importées ou non, celles importées, la part au paywall et qui paie, celles payées plus de 24 h après l’import, l’IA avant l’achat par vidéo, la suite lue après par acheteur, l’IA de lecture par acheteur, le temps médian jusqu’au paywall, les écrans et les lots lus avant, les lots gardés et la part des vidéos coupées, la part du titre « Tendance », les suites lues, incomplètes ou perdues, les titres que la conv entière aurait changés une fois sa suite lue ; et le contrefactuel des vidéos lues en entier, en « mesure » toutes celles de deux lots ou plus : la règle visée rejouée, un premier tour du lot le plus récent puis un lot à la fois, où elle se serait arrêtée (assez au premier tour, plus loin, jusqu’au bout, ou « tout » pour le sens douteux, des dates qui reculent, trop peu de messages), le titre qu’aurait montré sa partie lue face au vrai, les lots et les dollars qu’elle aurait épargnés, estimés au prorata des écrans, et les taux de ses critères).",
+      "Ce qu’a coûté l’IA sur la période et celle d’avant, en dollars, rangée par une seule règle « qui est qui » : le total (la facture), celle du produit (les clients et les prospects) et celle des tests (l’équipe et le tournage), chaque population (clients, prospects, invités, équipe, tournage, non classé), par acheteur, par rapport et par verdict (le produit seul, la même population en haut et en bas), par poste (en tout et pour le produit, avec le nombre d’appels), la dépense d’aujourd’hui face au budget du jour (et la part sans compte face à la sienne), et l’IA avant l’achat par type d’import (export, captures, vidéo, hors des tests et des invités : les convs importées, leurs écrans et leurs lots par import, l’IA par import, le temps médian jusqu’au paywall, la part au paywall et la part qui paie, à partir de 30 convs, l’IA par acheteur, et ce qui a été lu pour rien), et la lecture partielle des longues vidéos (l’A/B, hors des tests et des invités : pour chaque moitié, entière ou partielle, ses vidéos comptées dès leur plan, importées ou non, celles importées, la part au paywall et qui paie, celles payées plus de 24 h après l’import, l’IA avant l’achat par vidéo, la suite lue après par acheteur, l’IA de lecture par acheteur, le temps médian jusqu’au paywall, les écrans et les lots lus avant, les lots gardés et la part des vidéos coupées, la part du titre « Tendance », les suites lues, incomplètes ou perdues, les titres que la conv entière aurait changés une fois sa suite lue ; et le contrefactuel des vidéos lues en entier, en « mesure » toutes celles de deux lots ou plus : la règle visée rejouée, un premier tour du lot le plus récent puis un lot à la fois, où elle se serait arrêtée (assez au premier tour, plus loin, jusqu’au bout, ou « tout » pour le sens douteux, des dates qui reculent, trop peu de messages), le titre qu’aurait montré sa partie lue face au vrai, les lots et les dollars qu’elle aurait épargnés, estimés au prorata des écrans, et les taux de ses critères), les imports de vidéo arrêtés par un refus de lecture (face aux vidéos envoyées), les mises à jour de la mémoire gardées en direct par une alerte (face à celles parties en lot), et les convs payées par longueur (`parLongueur` : moins de 1 000, 1 000 à 3 000, 3 000 à 7 000, 7 000 messages et plus ; leurs ventes, l’offre prise, l’IA médiane d’une lecture payée, les jetons par message des verdicts du montage partagé, les lignes de verdict par conv, la part des achats payés plus de 48 h après l’arrivée de la conv au paywall, les achats dont la conv a été effacée, les verdicts par modèle et les plus chers).",
     inputSchema: AVEC_JOURS,
   },
   {
@@ -376,6 +380,62 @@ function coutsIA(s: StatsAdmin) {
       }),
       contrefactuel: contrefactuelDuMcp(s.pilotage.lecturePartielle.contrefactuel),
     },
+    /* Les compteurs du suivi (le produit seul, par jour de Paris), avec ce à quoi ils se comparent ; les taux, null sous les 30 */
+    videosArreteesParUnRefus: (() => {
+      const n = s.pilotage.compteurs.videosRefusees;
+      const envoyees = (s.pilotage.importsParType.find((t) => t.type === "video")?.imports ?? 0) + n;
+      return { arretees: n, videosEnvoyees: envoyees, arreteesPct: tauxPct(n, envoyees) };
+    })(),
+    memoireEnDirectParAlerte: (() => {
+      const n = s.pilotage.compteurs.majEnDirectParAlerte;
+      const enLot = c.postes.find((x) => x.nom === "Mémoire (en lot)")?.produit.appels ?? 0;
+      return { majsGardeesEnDirect: n, majsEnLot: enLot, gardeesPct: tauxPct(n, n + enLot) };
+    })(),
+    parLongueur: parLongueurDuMcp(s.pilotage.parLongueur),
+  };
+}
+
+/** Une part en %, à une décimale, ou null sous les PERSONNES_D_UN_TAUX du dénominateur (comme dans /admin). */
+const tauxPct = (n: number, sur: number) => {
+  const v = tauxLisible(n, sur);
+  return v === null ? null : arrondi(v * 100);
+};
+
+/**
+ * Les convs payées par longueur, pour le MCP : chaque tranche (ses ventes et l’offre prise, l’IA médiane d’une lecture,
+ * les jetons par message de ses verdicts, ses lignes de verdict par conv et celles qui en ont plusieurs), la part des
+ * ventes d’une conv de 3 000 messages ou plus, les achats payés plus de 48 h après le paywall, ceux dont la conv est
+ * effacée, et les verdicts par modèle et les plus chers.
+ */
+function parLongueurDuMcp(l: Pilotage["parLongueur"]) {
+  const ventes = l.tranches.reduce((t, x) => t + x.ventes, 0);
+  const tresLongues = l.tranches.filter((x) => TRANCHES_TRES_LONGUES.includes(x.tranche)).reduce((t, x) => t + x.ventes, 0);
+  return {
+    ventes,
+    ventesDe3000MessagesOuPlus: tresLongues,
+    ventesDe3000MessagesOuPlusPct: tauxPct(tresLongues, ventes),
+    tranches: l.tranches.map((x) => ({
+      longueur: NOMS_DES_TRANCHES[x.tranche],
+      ventes: x.ventes,
+      offres: Object.fromEntries(OFFRES_D_UNE_CONV.filter((o) => x.offres[o] > 0).map((o) => [NOMS_DES_OFFRES_D_UNE_CONV[o], x.offres[o]])),
+      convs: x.convs,
+      iaMedianeDUneLectureDollars: arrondi(x.dollarsMedian, 2),
+      lecturesMesurees: x.lues,
+      jetonsParMessage: arrondi(x.jetonsParMessage, 0),
+      verdictsMesures: x.verdictsMesures,
+      lignesDeVerdictParConv: arrondi(rapport(x.verdicts, x.convs), 2),
+      convsAPlusieursVerdicts: x.plusieursVerdicts,
+    })),
+    payesPlusDe48hApresLePaywall: { achats: l.tard.payes, plusDe48h: l.tard.plusDe48h, plusDe48hPct: tauxPct(l.tard.plusDe48h, l.tard.payes), sansPaywallNote: l.tard.sansPaywall },
+    achatsDontLaConvEstEffacee: l.effacees,
+    verdictsParModele: l.modeles.map((m) => ({
+      modele: m.modele,
+      lignes: m.lignes,
+      convs: m.convs,
+      dollars: arrondi(m.dollars, 2),
+      dollarsParLigne: arrondi(rapport(m.dollars, m.lignes), 3),
+    })),
+    verdictsLesPlusChers: l.chers.map((v) => ({ dollars: arrondi(v.dollars, 2), lignes: v.lignes, modeles: v.modeles, messages: v.messages })),
   };
 }
 
