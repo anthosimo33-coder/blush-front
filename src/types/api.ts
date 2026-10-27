@@ -389,8 +389,10 @@ type Reponses = {
   "POST /api/auth/deconnexion": Ok;
   /** Un mauvais code : `{ ok: false }`, en 200, la même réponse pour tous. */
   "POST /api/auth/verifier": { ok: false } | { ok: true; email: string };
-  /** Le laissez-passer du CAPTCHA, posé en cookie (src/server/captcha.ts). */
-  /** Le laissez-passer posé ; `planDesVideos` : une longue vidéo demande-t-elle son plan (seulement dans l’A/B de la lecture partielle) ? */
+  /**
+   * Le laissez-passer du CAPTCHA, posé en cookie (src/server/captcha.ts) ; `planDesVideos` : une longue vidéo demande-t-elle
+   * son plan (seulement dans l’A/B de la lecture partielle) ?
+   */
   "POST /api/captcha": Ok & { planDesVideos: boolean };
   "POST /api/captures": ConvImportee & { messagesRead: number };
   /** La lecture brute d’un lot : le navigateur ne la lit pas, il la rend à /api/captures/video. */
