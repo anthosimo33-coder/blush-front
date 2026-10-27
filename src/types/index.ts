@@ -336,8 +336,10 @@ export type ScoreRow = {
  * du paywall en tire son titre (src/contenu/haut-du-paywall.ts). `cote` : qui y met le plus (qui ouvre, reprend, relance,
  * répond le plus vite, écrit le plus long), ou personne nettement (« pareil »). `toi` et `elle` : des jours ou des fois
  * (ouvre, reprend, relance), des millisecondes (delai, le délai de réponse médian), des mots (longueur, par message).
+ * Sans l’heure des messages (proposition du 27 octobre 2026) : des messages (qui écrit le plus) et des questions (qui
+ * les pose), comptés sur toute la conv (`sansHeures`).
  */
-export type SignalDuPaywall = { id: "ouvre" | "reprend" | "relance" | "delai" | "longueur"; cote: Side; toi: number; elle: number };
+export type SignalDuPaywall = { id: "ouvre" | "reprend" | "relance" | "delai" | "longueur" | "messages" | "questions"; cote: Side; toi: number; elle: number };
 
 /**
  * Ses messages ont chuté, et ne sont pas remontés depuis (src/server/ecrans/tendance.ts). `depuis` : le premier jour de
@@ -363,6 +365,12 @@ export type ApercuDuPaywall = {
   signaux: SignalDuPaywall[];
   tendance: TendanceDuPaywall | null;
   objectif?: Goal;
+  /**
+   * Proposition du 27 octobre 2026 : ce qui se compte sans l’heure des messages (des captures, une vidéo, une conv de
+   * quelques jours), qui écrit le plus, qui pose les questions, qui écrit le plus long ; le titre « volume » en sort
+   * quand les cinq autres n’ont pas assez de chiffres. Absent : trop peu de messages pour rien en dire.
+   */
+  sansHeures?: SignalDuPaywall[];
 };
 
 export type ChapterBlock =

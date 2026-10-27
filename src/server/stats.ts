@@ -227,9 +227,11 @@ export type Pilotage = {
   /**
    * Le haut du paywall (src/contenu/haut-du-paywall.ts) : pour chaque titre, dans l’ordre de GENRES_DU_HAUT, même vide,
    * les convs arrivées au paywall avec lui et les rapports débloqués après lui, comptés par jour de Paris (counters,
-   * « haut:vu:<titre> », « haut:paye:<titre> ») : sur la période en jours entiers, comme les pannes.
+   * « haut:vu:<titre> », « haut:paye:<titre> ») : sur la période en jours entiers, comme les pannes. `depuis` : le
+   * premier jour où ce titre a été vu (AAAA-MM-JJ), seulement s’il tombe dans la période (un titre mis en ligne en
+   * cours de route, comme « volume » : ses chiffres ne couvrent pas toute la période) ; sinon null.
    */
-  hauts: { genre: GenreDuHaut; vus: number; payes: number }[];
+  hauts: { genre: GenreDuHaut; vus: number; payes: number; depuis: string | null }[];
   /**
    * La vente dans le chat (src/server/vente.ts) : pour chaque carte, dans l’ordre de GENRES_VENDUS, même vide, celles
    * posées sous une réponse, touchées (leur bouton) et refusées (« Pas maintenant »), comptées par jour de Paris
@@ -774,8 +776,11 @@ async function pilotageDe(jours: Periode): Promise<Pilotage> {
           from counters where key like ${`${PANNE}%`}`,
     ),
     ligne<{ depuis: string | null }>(sql`select to_char(min(jour), 'YYYY-MM-DD') as depuis from visites`),
-    lignes<{ key: string; n: string }>(
-      sql`select key, sum(count) as n from counters where key like ${`${HAUT}%`} and day > (now() at time zone 'Europe/Paris')::date - ${jours}::int group by key`,
+    /* Sur la période, et le premier jour où chaque titre a été compté quand il tombe dedans (un titre arrivé en cours de route) */
+    lignes<{ key: string; n: string | null; depuis: string | null }>(
+      sql`select key, sum(count) filter (where day > (now() at time zone 'Europe/Paris')::date - ${jours}::int) as n,
+            case when min(day) > (now() at time zone 'Europe/Paris')::date - ${jours}::int then to_char(min(day), 'YYYY-MM-DD') end as depuis
+          from counters where key like ${`${HAUT}%`} group by key`,
     ),
     lignes<{ cle: string; envoyes: string; payes: string }>(
       sql`select e.cle, count(*) as envoyes,
@@ -946,6 +951,7 @@ async function pilotageDe(jours: Periode): Promise<Pilotage> {
       genre,
       vus: n(hauts.find((h) => h.key === `${HAUT}vu:${genre}`)?.n),
       payes: n(hauts.find((h) => h.key === `${HAUT}paye:${genre}`)?.n),
+      depuis: hauts.find((h) => h.key === `${HAUT}vu:${genre}`)?.depuis ?? null,
     })),
     ventesDuChat: GENRES_VENDUS.map((genre) => {
       const compte = (evenement: string) => n(ventesCompteurs.find((v) => v.key === `${VENTE}${evenement}:${genre}`)?.n);

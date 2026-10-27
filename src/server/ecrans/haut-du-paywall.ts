@@ -58,11 +58,55 @@ export function signaux(c: Chiffres): SignalDuPaywall[] {
 }
 
 /**
+ * Sans l’heure des messages (proposition du 27 octobre 2026) : les seuils d’un écart net sur ce qui se compte quand
+ * même. Des captures ou une vidéo n’ont que des heures approximatives, que les chiffres du temps écartent (qui ouvre, qui
+ * reprend, qui relance, les délais) : leur paywall tombait toujours sur le titre d’avant, celui qui vendait le moins
+ * (/admin, « Le haut du paywall »).
+ */
+const SEUILS_SANS_HEURES = {
+  /** Assez de messages pour en dire quelque chose : 10 en tout, 2 de chaque côté au moins. */
+  messages: 10,
+  parCote: 2,
+  /** Qui écrit le plus : 1,5 fois plus de messages. */
+  messagesFois: 1.5,
+  /** Qui pose les questions : 3 au moins, et 2 fois plus que l’autre (ou l’autre jamais). */
+  questions: 3,
+  questionsFois: 2,
+} as const;
+
+/** Un message qui pose une question : un texte (pas un média) avec un point d’interrogation. */
+const questionne = (m: Message) => !m.media && m.texte.includes("?");
+
+/**
+ * Ce qui se compte sans l’heure des messages, sur toute la conv : qui écrit le plus (des messages), qui pose les
+ * questions, qui écrit le plus long (le signal « longueur », le même que pour les cinq titres). null : trop peu de
+ * messages, ou un côté presque muet.
+ */
+export function signauxSansHeures(c: Chiffres, messages: Message[]): SignalDuPaywall[] | null {
+  const S = SEUILS_SANS_HEURES;
+  const { toi: mt, autre: ma } = c.total;
+  if (mt + ma < S.messages || Math.min(mt, ma) < S.parCote) return null;
+  const plusDeMessages = mt / ma >= S.messagesFois ? "toi" : ma / mt >= S.messagesFois ? "elle" : "pareil";
+  const qt = messages.filter((m) => m.role === "toi" && questionne(m)).length;
+  const qa = messages.filter((m) => m.role === "autre" && questionne(m)).length;
+  const plus = Math.max(qt, qa);
+  const questionsNettes = plus >= S.questions && (Math.min(qt, qa) === 0 || plus / Math.min(qt, qa) >= S.questionsFois);
+  const longueur = signaux(c).find((s) => s.id === "longueur");
+  return [
+    { id: "messages", cote: plusDeMessages, toi: mt, elle: ma },
+    { id: "questions", cote: !questionsNettes ? "pareil" : qt > qa ? "toi" : "elle", toi: qt, elle: qa },
+    ...(longueur ? [longueur] : []),
+  ];
+}
+
+/**
  * Le haut du paywall d’une conv : ses déséquilibres, et la chute de ses messages s’il y en a une ; avec `h` (une
- * proposition du 22 octobre 2026), ce que tu veux savoir, sur « Qui es-tu ? » (le 1er chapitre du paywall le dit).
+ * proposition du 22 octobre 2026), ce que tu veux savoir, sur « Qui es-tu ? » (le 1er chapitre du paywall le dit). Et ce
+ * qui se compte sans l’heure des messages (une proposition du 27 octobre 2026), quand il y a assez de messages.
  */
 export function apercuDuPaywall(c: Chiffres, messages: Message[], h?: Pick<Histoire, "objectif">): ApercuDuPaywall {
-  const base = { signaux: signaux(c), tendance: tendance(messages) };
+  const sansHeures = signauxSansHeures(c, messages);
+  const base = { signaux: signaux(c), tendance: tendance(messages), ...(sansHeures && { sansHeures }) };
   if (!h) return base;
   return { ...base, objectif: h.objectif };
 }

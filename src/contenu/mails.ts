@@ -496,6 +496,13 @@ const S1_SELON_LE_HAUT: Record<GenreDuHaut, { sujet: string; apercu: string; bou
     bouton: () => "Voir ce qui se joue",
     ps: "ps\u00a0: les convs «\u00a0parfaites\u00a0» cachent souvent le truc le plus intéressant",
   },
+  /* Proposition du 27 octobre 2026, à valider avec le titre « volume » */
+  volume: {
+    sujet: "j’ai compté vos messages",
+    apercu: "y a un chiffre qui m’a fait tilter.",
+    bouton: () => "Voir ce que ça veut dire",
+    ps: "ps\u00a0: celui qui écrit le moins n’est pas toujours celui qui tient le moins",
+  },
   aucun: {
     sujet: "t’as fermé juste avant le meilleur",
     apercu: "ta conv est prête à être lue. il ne manque que toi.",

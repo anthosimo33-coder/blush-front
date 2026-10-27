@@ -1,14 +1,14 @@
 import { describe, expect, it } from "vitest";
 import type { Chiffres, Message } from "@prompts/lib/conv";
 import { dateDuHaut, genreDuHaut, hautDuPaywall, semaineDeLaCourbe } from "@/contenu/haut-du-paywall";
-import { signaux } from "@/server/ecrans/haut-du-paywall";
+import { signaux, signauxSansHeures } from "@/server/ecrans/haut-du-paywall";
 import { tendance } from "@/server/ecrans/tendance";
-import type { ApercuDuPaywall } from "@/types";
+import type { ApercuDuPaywall, SignalDuPaywall } from "@/types";
 
 /*
  * Le haut du paywall (la maquette « Le mix ») : les déséquilibres comptés par le code, la chute de ses messages, la règle
- * qui choisit un titre parmi cinq, et ses textes. Des chiffres écrits à la main et des convs fabriquées, deux prénoms
- * inventés (Lucas, Léa).
+ * qui choisit un titre parmi cinq, et ses textes ; et le titre « volume » (une proposition du 27 octobre 2026), compté
+ * sans l’heure des messages. Des chiffres écrits à la main et des convs fabriquées, deux prénoms inventés (Lucas, Léa).
  */
 
 const MIN = 60e3;
@@ -204,5 +204,95 @@ describe("les textes du haut", () => {
   it("les dates : « 1er mars », « 3\u00a0janv. » en court", () => {
     expect(dateDuHaut("2026-03-01")).toBe("1er\u00a0mars");
     expect(dateDuHaut("2026-01-03", { court: true })).toBe("3\u00a0janv.");
+  });
+});
+
+/** Des messages lus sur des captures (l’heure approximative) : `n` de chaque côté, dont `q` avec une question. */
+function lusSurCaptures(toi: { n: number; q: number }, autre: { n: number; q: number }): Message[] {
+  const cote = (role: "toi" | "autre", nom: string, { n, q }: { n: number; q: number }) =>
+    Array.from({ length: n }, (_, k): Message => ({ id: "", t: 0, nom, role, texte: k < q ? "tu fais quoi ce soir ?" : "ok", approx: "heure", ligne: 0 }));
+  return [...cote("toi", "Inès", toi), ...cote("autre", "Lucas", autre)].map((m, i) => ({ ...m, id: `m${String(i + 1).padStart(4, "0")}`, ligne: i + 1 }));
+}
+
+/** Les chiffres d’une conv lue sur des captures : ni ouvertures, ni reprises, ni relances, ni délais. */
+const sansHeures = (autres: Partial<Chiffres> = {}) =>
+  chiffres({ ouvre: { toi: 0, autre: 0 }, reprend: { toi: 0, autre: 0 }, relance: { toi: 0, autre: 0 }, delai: { toi: null, autre: null }, ...autres });
+
+const v = (id: SignalDuPaywall["id"], cote: SignalDuPaywall["cote"], toi: number, elle: number): SignalDuPaywall => ({ id, cote, toi, elle });
+/** Le haut d’une conv lue sur des captures, d’après ce qui se compte sans heures. */
+const volume = (liste: SignalDuPaywall[]): ApercuDuPaywall => ({ signaux: signaux(sansHeures()), tendance: null, sansHeures: liste });
+
+describe("sans l’heure des messages : ce qui se compte quand même", () => {
+  it("qui écrit le plus (1,5 fois), qui pose les questions (3 au moins, 2 fois plus), qui écrit le plus long (1,8 fois)", () => {
+    const c = sansHeures({ total: { toi: 44, autre: 22 }, motsMoyens: { toi: 6, autre: 13 } });
+    expect(signauxSansHeures(c, lusSurCaptures({ n: 44, q: 6 }, { n: 22, q: 2 }))?.map((x) => [x.id, x.cote, x.toi, x.elle])).toEqual([
+      ["messages", "toi", 44, 22],
+      ["questions", "toi", 6, 2],
+      ["longueur", "elle", 6, 13],
+    ]);
+  });
+
+  it("sous les seuils : pareil (1,4 fois plus de messages, 2 questions contre 0, 4 contre 3)", () => {
+    const pareils = (q: [number, number]) =>
+      signauxSansHeures(sansHeures({ total: { toi: 28, autre: 20 } }), lusSurCaptures({ n: 28, q: q[0] }, { n: 20, q: q[1] }))!.filter((x) => x.cote !== "pareil");
+    expect(pareils([2, 0])).toEqual([]);
+    expect(pareils([4, 3])).toEqual([]);
+    expect(pareils([3, 0]).map((x) => x.id)).toEqual(["questions"]);
+  });
+
+  it("trop peu pour en dire quelque chose : moins de 10 messages, ou un côté presque muet", () => {
+    expect(signauxSansHeures(sansHeures({ total: { toi: 6, autre: 3 } }), lusSurCaptures({ n: 6, q: 0 }, { n: 3, q: 0 }))).toBeNull();
+    expect(signauxSansHeures(sansHeures({ total: { toi: 30, autre: 1 } }), lusSurCaptures({ n: 30, q: 0 }, { n: 1, q: 0 }))).toBeNull();
+  });
+
+  it("le titre « volume » quand les cinq autres n’ont pas assez de chiffres ; sans assez de messages, le titre d’avant", () => {
+    expect(genreDuHaut(volume([v("messages", "toi", 44, 22), v("questions", "pareil", 1, 1)]))).toBe("volume");
+    expect(genreDuHaut(volume([v("messages", "pareil", 31, 35), v("questions", "pareil", 4, 5)]))).toBe("volume");
+    expect(genreDuHaut({ ...volume([]), sansHeures: undefined })).toBe("aucun");
+    /* Les cinq titres passent avant : une conv à égalité le reste */
+    expect(genreDuHaut({ ...apercu(), sansHeures: [v("messages", "toi", 44, 22)] })).toBe("egalite");
+  });
+});
+
+describe("les textes du titre « volume »", () => {
+  it("tu écris plus, lui plus long : son écart en rose, « Mais » avant", () => {
+    const h = hautDuPaywall(volume([v("messages", "toi", 44, 22), v("questions", "toi", 6, 2), v("longueur", "elle", 6, 13)]), LUCAS);
+    expect(h.genre).toBe("volume");
+    expect(h.titre).toEqual(["Tu lui envoies 2 fois plus de messages.", "Lucas, lui, écrit plus long."]);
+    expect(h.sous).toBe("Tu lui envoies 2 fois plus de messages\u00a0: 44 contre 22. Tu poses 3 fois plus de questions que lui. Mais Lucas écrit 2 fois plus long que toi.");
+    expect(h.question).toBe("BLUSH t’écrit ce que ça dit de lui");
+    expect(h.cases.map((c) => `${c.valeur}${c.unite} ${c.texte}`)).toEqual(["2× tu lui écris plus", "2× il écrit plus long"]);
+    expect(h.carte?.lignes.map((l) => [l.label, l.toi.n, l.elle.n, l.cote])).toEqual([
+      ["Envoie le plus de messages", "44", "22", "toi"],
+      ["Pose les questions", "6", "2", "toi"],
+      ["Écrit le plus long", "6", "13", "elle"],
+    ]);
+  });
+
+  it("tout vient de toi : « Lucas, lui, répond », et les questions qu’il ne pose jamais", () => {
+    const h = hautDuPaywall(volume([v("messages", "toi", 44, 22), v("questions", "toi", 9, 0)]), LUCAS);
+    expect(h.titre).toEqual(["Tu lui envoies 2 fois plus de messages.", "Lucas, lui, répond."]);
+    expect(h.cases.map((c) => `${c.valeur}${c.unite} ${c.texte}`)).toEqual(["2× tu lui écris plus", "9\u00a0questions de toi, aucune de lui"]);
+  });
+
+  it("tout vient d’elle, au féminin : « Toi, tu la laisses venir », sans arrondir 2,3 à 2", () => {
+    const h = hautDuPaywall(volume([v("messages", "elle", 20, 46), v("questions", "elle", 0, 7)]), LEA);
+    expect(h.titre).toEqual(["Léa t’envoie 2,3 fois plus de messages.", "Toi, tu la laisses venir."]);
+    expect(h.sous).toBe("Léa t’envoie 2,3 fois plus de messages que toi\u00a0: 46 contre 20. Léa te pose 7 questions, toi aucune.");
+    expect(h.question).toBe("BLUSH t’écrit ce qu’elle attend de toi");
+    expect(h.cases.map((c) => `${c.valeur}${c.unite} ${c.texte}`)).toEqual(["2,3× elle t’écrit plus", "7\u00a0questions d’elle, aucune de toi"]);
+  });
+
+  it("autant l’un que l’autre : leurs chiffres, et ce qui se joue ailleurs", () => {
+    const h = hautDuPaywall(volume([v("messages", "pareil", 31, 35), v("questions", "pareil", 4, 5), v("longueur", "pareil", 9, 11)]), LUCAS);
+    expect(h.titre).toEqual(["Vous vous écrivez autant.", "Ce qui se joue est ailleurs."]);
+    expect(h.sous).toBe("Personne ne court après l’autre\u00a0: 31 messages pour toi, 35 pour lui.");
+    expect(h.cases.map((c) => `${c.valeur} ${c.texte}`)).toEqual(["31–35 messages envoyés", "4–5 questions posées"]);
+  });
+
+  it("une seule question posée, côté questions : la seconde case compte les messages", () => {
+    const h = hautDuPaywall(volume([v("messages", "pareil", 30, 28), v("questions", "elle", 0, 5)]), LUCAS);
+    expect(h.titre).toEqual(["C’est Lucas qui pose toutes les questions.", "Toi, tu le laisses venir."]);
+    expect(h.cases.map((c) => `${c.valeur}${c.unite} ${c.texte}`)).toEqual(["5\u00a0questions de lui, aucune de toi", "30–28 messages envoyés"]);
   });
 });

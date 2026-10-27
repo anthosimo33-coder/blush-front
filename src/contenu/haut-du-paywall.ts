@@ -10,12 +10,16 @@ import type { ApercuDuPaywall, SignalDuPaywall, TendanceDuPaywall } from "@/type
  *   3. elle : l’inverse (« Lucas court après toi. ») ;
  *   4. contraste : un de chaque côté au moins (« Tu ouvres la conv. Lucas, lui, revient. ») ;
  *   5. égalité : un déséquilibre au plus (« Vous êtes à égalité. Presque. »).
- * Sans assez de chiffres (une conv trop courte, des captures sans heures), le titre d’avant (« aucun »). Le genre montré
- * est gardé sur la conv (stories.accroche) : /admin compte les achats de chacun.
+ * Sans assez de chiffres pour eux (une conv de quelques jours, des captures dont les heures sont approximatives), une
+ * proposition du 27 octobre 2026 : le titre « volume », tiré de ce qui se compte sans l’heure des messages (qui écrit le
+ * plus, qui pose les questions, qui écrit le plus long : « Tu lui envoies 2 fois plus de messages. »). Le titre d’avant
+ * (« aucun ») ne reste qu’aux convs de moins de 10 messages. Le genre montré est gardé sur la conv (stories.accroche) :
+ * /admin compte les achats de chacun, et le jour où « volume » a été compté la première fois : son taux se compare à
+ * celui qu’avait le titre d’avant, sans A/B (trop peu de convs pour le trancher vite).
  */
 
 /** Les titres du haut du paywall, dans l’ordre où la règle les essaie (aussi l’ordre de /admin). */
-export const GENRES_DU_HAUT = ["tendance", "toi", "elle", "contraste", "egalite", "aucun"] as const;
+export const GENRES_DU_HAUT = ["tendance", "toi", "elle", "contraste", "egalite", "volume", "aucun"] as const;
 export type GenreDuHaut = (typeof GENRES_DU_HAUT)[number];
 
 /** Le nom d’un titre, dans /admin. */
@@ -25,6 +29,7 @@ export const NOM_DU_GENRE: Record<GenreDuHaut, string> = {
   elle: "Tout vient de l’autre\u00a0: «\u00a0… court après toi\u00a0»",
   contraste: "Contraste\u00a0: «\u00a0Tu ouvres la conv. …, lui, revient\u00a0»",
   egalite: "Égalité\u00a0: «\u00a0Vous êtes à égalité. Presque\u00a0»",
+  volume: "Sans heures\u00a0: «\u00a0Tu lui envoies 2 fois plus de messages\u00a0»",
   aucun: "Sans assez de chiffres\u00a0: le titre d’avant",
 };
 
@@ -46,7 +51,8 @@ export function genreDuHaut(a: ApercuDuPaywall): GenreDuHaut {
   if (toi >= 2 && elle <= 1) return "toi";
   if (elle >= 2 && toi <= 1) return "elle";
   if (toi && elle) return "contraste";
-  return assezPourLEgalite(a) ? "egalite" : "aucun";
+  if (assezPourLEgalite(a)) return "egalite";
+  return a.sansHeures ? "volume" : "aucun";
 }
 
 /* ———— Ce que l’écran montre ———— */
@@ -106,6 +112,11 @@ export const nombre = (x: number) => String(x).replace(".", ",");
 
 const sur10 = (x: number, y: number) => (x + y ? Math.round((10 * x) / (x + y)) : 5);
 const fois = (x: number, y: number) => Math.round(x / Math.max(1, y));
+/** Combien de fois plus, sans arrondir 1,5 à 2 ni 4,5 à 5 : au dixième sous 10 (« 1,6 », « 2 », « 4,5 »), à l’unité au-delà (« 12 »). */
+const combienDeFois = (x: number, y: number) => {
+  const r = x / Math.max(1, y);
+  return r >= 10 ? String(Math.round(r)) : nombre(Math.round(r * 10) / 10);
+};
 
 /** Un délai : « 4 » « min », « 2 » « h ». */
 function duree(ms: number): { n: string; unite: string } {
@@ -116,7 +127,7 @@ const enTexte = (d: { n: string; unite: string }) => `${d.n}\u00a0${d.unite}`;
 /** La première lettre en minuscule, sauf quand la phrase commence par son prénom. */
 const ensuite = (phrase: string, a: Autre) => (phrase.startsWith(a.nom) ? phrase : phrase.charAt(0).toLowerCase() + phrase.slice(1));
 
-const pronoms = (a: Autre) => ({ il: a.il ? "il" : "elle", lui: a.il ? "lui" : "elle", le: a.il ? "le" : "la" });
+const pronoms = (a: Autre) => ({ il: a.il ? "il" : "elle", lui: a.il ? "lui" : "elle", le: a.il ? "le" : "la", de: a.il ? "de lui" : "d’elle" });
 
 const LABELS: Record<SignalDuPaywall["id"], string> = {
   ouvre: "Ouvre la journée",
@@ -124,6 +135,8 @@ const LABELS: Record<SignalDuPaywall["id"], string> = {
   relance: "Relance sans réponse",
   delai: "Répond le plus vite",
   longueur: "Écrit le plus long",
+  messages: "Envoie le plus de messages",
+  questions: "Pose les questions",
 };
 
 /** Le début du titre, de ton côté. */
@@ -133,6 +146,8 @@ const TITRE_TOI: Record<SignalDuPaywall["id"], string> = {
   relance: "Tu relances.",
   delai: "Tu réponds vite.",
   longueur: "Tu écris plus long.",
+  messages: "Tu écris plus.",
+  questions: "Tu poses les questions.",
 };
 
 /** La ligne rose, du sien : « Lucas, lui, revient. » */
@@ -142,6 +157,8 @@ const TITRE_ELLE: Record<SignalDuPaywall["id"], string> = {
   relance: "relance.",
   delai: "répond vite.",
   longueur: "écrit plus long.",
+  messages: "écrit plus.",
+  questions: "pose les questions.",
 };
 const titreElle = (s: SignalDuPaywall, a: Autre) => `${a.nom}, ${pronoms(a).lui}, ${TITRE_ELLE[s.id]}`;
 
@@ -163,6 +180,13 @@ function phrase(s: SignalDuPaywall, a: Autre): string {
       return `${a.nom} te répond en ${enTexte(duree(s.elle))}, toi en ${enTexte(duree(s.toi))}.`;
     case "longueur":
       return elle ? `${a.nom} écrit ${fois(s.elle, s.toi)} fois plus long que toi.` : `Tu écris ${fois(s.toi, s.elle)} fois plus long que ${lui}.`;
+    case "messages":
+      return elle
+        ? `${a.nom} t’envoie ${combienDeFois(s.elle, s.toi)} fois plus de messages que toi\u00a0: ${s.elle} contre ${s.toi}.`
+        : `Tu lui envoies ${combienDeFois(s.toi, s.elle)} fois plus de messages\u00a0: ${s.toi} contre ${s.elle}.`;
+    case "questions":
+      if (elle) return s.toi === 0 ? `${a.nom} te pose ${s.elle} questions, toi aucune.` : `${a.nom} te pose ${combienDeFois(s.elle, s.toi)} fois plus de questions que toi.`;
+      return s.elle === 0 ? `Tu lui poses ${s.toi} questions, ${lui} aucune.` : `Tu poses ${combienDeFois(s.toi, s.elle)} fois plus de questions que ${lui}.`;
   }
 }
 
@@ -183,12 +207,16 @@ function ligne(s: SignalDuPaywall): LigneDuHaut {
       return { ...base, toi: duree(s.toi), elle: duree(s.elle), partToi: part(s.elle, s.toi) };
     case "longueur":
       return { ...base, toi: { n: String(Math.round(s.toi)), unite: "mots" }, elle: { n: String(Math.round(s.elle)), unite: "mots" }, partToi: part(s.toi, s.elle) };
+    case "messages":
+      return { ...base, toi: { n: String(s.toi), unite: "msg" }, elle: { n: String(s.elle), unite: "msg" }, partToi: part(s.toi, s.elle) };
+    case "questions":
+      return { ...base, toi: { n: String(s.toi), unite: "fois" }, elle: { n: String(s.elle), unite: "fois" }, partToi: part(s.toi, s.elle) };
   }
 }
 
 /** La case d’un déséquilibre : son chiffre le plus parlant, et ce qu’il dit. */
 function caseDe(s: SignalDuPaywall, a: Autre): CaseDuHaut {
-  const { il, lui } = pronoms(a);
+  const { il, lui, de } = pronoms(a);
   const elle = s.cote === "elle";
   const cote = s.cote;
   switch (s.id) {
@@ -217,7 +245,22 @@ function caseDe(s: SignalDuPaywall, a: Autre): CaseDuHaut {
       return { valeur: d.n, unite: `\u00a0${d.unite}`, texte: elle ? `pour qu’${il} te réponde` : "pour que tu répondes", cote };
     }
     case "longueur":
+      if (cote === "pareil") return { valeur: `${Math.round(s.toi)}–${Math.round(s.elle)}`, unite: "", texte: "mots par message", cote };
       return { valeur: `${fois(elle ? s.elle : s.toi, elle ? s.toi : s.elle)}×`, unite: "", texte: elle ? `${il} écrit plus long` : "tu écris plus long", cote };
+    case "messages":
+      if (cote === "pareil") return { valeur: `${s.toi}–${s.elle}`, unite: "", texte: "messages envoyés", cote };
+      return elle
+        ? { valeur: `${combienDeFois(s.elle, s.toi)}×`, unite: "", texte: `${il} t’écrit plus`, cote }
+        : { valeur: `${combienDeFois(s.toi, s.elle)}×`, unite: "", texte: "tu lui écris plus", cote };
+    case "questions":
+      if (cote === "pareil") return { valeur: `${s.toi}–${s.elle}`, unite: "", texte: "questions posées", cote };
+      if (elle)
+        return s.toi === 0
+          ? { valeur: String(s.elle), unite: "\u00a0questions", texte: `${de}, aucune de toi`, cote }
+          : { valeur: `${combienDeFois(s.elle, s.toi)}×`, unite: "", texte: `${il} pose plus de questions`, cote };
+      return s.elle === 0
+        ? { valeur: String(s.toi), unite: "\u00a0questions", texte: `de toi, aucune ${de}`, cote }
+        : { valeur: `${combienDeFois(s.toi, s.elle)}×`, unite: "", texte: "tu poses plus de questions", cote };
   }
 }
 
@@ -234,6 +277,20 @@ const ORDRE_TOI: SignalDuPaywall["id"][] = ["ouvre", "relance", "reprend", "dela
 const ORDRE_ELLE: SignalDuPaywall["id"][] = ["reprend", "relance", "ouvre", "delai"];
 
 const QUESTION = (fin: string) => `BLUSH t’écrit ${fin}`;
+
+/** La première ligne du titre « volume », d’un déséquilibre net sans heures : qui écrit plus, qui pose les questions, qui écrit plus long. */
+function titreSansHeures(s: SignalDuPaywall, a: Autre): string {
+  const elle = s.cote === "elle";
+  switch (s.id) {
+    case "messages":
+      return elle ? `${a.nom} t’envoie ${combienDeFois(s.elle, s.toi)} fois plus de messages.` : `Tu lui envoies ${combienDeFois(s.toi, s.elle)} fois plus de messages.`;
+    case "questions":
+      if (elle) return s.toi === 0 ? `C’est ${a.nom} qui pose toutes les questions.` : `${a.nom} te pose ${combienDeFois(s.elle, s.toi)} fois plus de questions.`;
+      return s.elle === 0 ? "C’est toi qui poses toutes les questions." : `Tu poses ${combienDeFois(s.toi, s.elle)} fois plus de questions.`;
+    default:
+      return phrase(s, a);
+  }
+}
 
 /** Le haut du paywall d’une conv, d’après ses chiffres : son titre, sa phrase, la bulle de BLUSH, la carte et les cases. */
 export function hautDuPaywall(a: ApercuDuPaywall, autre: Autre, { annee = new Date().getFullYear() }: { annee?: number } = {}): HautDuPaywall {
@@ -333,6 +390,46 @@ export function hautDuPaywall(a: ApercuDuPaywall, autre: Autre, { annee = new Da
           detail ? caseDe(detail, autre) : caseDe({ ...ouvre, cote: "pareil" }, autre),
           detail === delai ? caseDe({ ...ouvre, cote: "pareil" }, autre) : caseDe({ ...delai, cote: "pareil" }, autre),
         ],
+        courbe: null,
+      };
+    }
+    case "volume": {
+      /* Sans heures : ce qui se compte quand même (des messages, des questions, leur longueur), dans cet ordre */
+      const liste = a.sansHeures ?? [];
+      const messages = liste.find((s) => s.id === "messages")!;
+      const questions = liste.find((s) => s.id === "questions");
+      const longueur = liste.find((s) => s.id === "longueur");
+      const carte = { titre: "Qui écrit le plus", lignes: lignes(liste) };
+      const nets = liste.filter((s) => s.cote !== "pareil");
+      const n1 = nets[0];
+      /* Personne n’écrit nettement plus : leurs chiffres, à peu près pareils, et ce qui se joue ailleurs */
+      if (!n1) {
+        const second = questions && questions.toi + questions.elle > 0 ? questions : longueur;
+        return {
+          genre,
+          titre: ["Vous vous écrivez autant.", "Ce qui se joue est ailleurs."],
+          sous: `Personne ne court après l’autre\u00a0: ${messages.toi} messages pour toi, ${messages.elle} pour ${lui}.`,
+          question: QUESTION("ce qui se joue vraiment"),
+          carte,
+          cases: [caseDe(messages, autre), ...(second ? [caseDe(second, autre)] : [])],
+          courbe: null,
+        };
+      }
+      const toi = n1.cote === "toi";
+      const oppose = nets.find((s) => s.cote !== n1.cote);
+      /* La seconde case : le déséquilibre d’en face, un autre du même côté, ou le compte des messages (ou des questions) */
+      const compteur = n1.id === "messages" ? (questions && questions.toi + questions.elle > 0 ? questions : null) : messages;
+      const seconde = oppose ?? nets[1] ?? (compteur && { ...compteur, cote: "pareil" as const });
+      return {
+        genre,
+        titre: [
+          titreSansHeures(n1, autre),
+          toi ? (oppose ? titreElle(oppose, autre) : `${autre.nom}, ${lui}, répond.`) : oppose ? `Toi, ${ensuite(TITRE_TOI[oppose.id], autre)}` : `Toi, tu ${le} laisses venir.`,
+        ],
+        sous: [...nets.filter((s) => s !== oppose).map((s) => phrase(s, autre)), oppose && `Mais ${ensuite(phrase(oppose, autre), autre)}`].filter(Boolean).join(" "),
+        question: QUESTION(toi ? `ce que ça dit de ${lui}` : `ce qu’${il} attend de toi`),
+        carte,
+        cases: [caseDe(n1, autre), ...(seconde ? [caseDe(seconde, autre)] : [])],
         courbe: null,
       };
     }
