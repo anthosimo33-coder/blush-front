@@ -283,9 +283,9 @@ describe("les textes du titre « volume »", () => {
     expect(h.cases.map((c) => `${c.valeur}${c.unite} ${c.texte}`)).toEqual(["2,3× elle t’écrit plus", "7\u00a0questions d’elle, aucune de toi"]);
   });
 
-  it("autant l’un que l’autre : leurs chiffres, et ce qui se joue ailleurs", () => {
+  it("autant l’un que l’autre : leurs chiffres, et ce qui se joue ailleurs, en nommant l’autre", () => {
     const h = hautDuPaywall(volume([v("messages", "pareil", 31, 35), v("questions", "pareil", 4, 5), v("longueur", "pareil", 9, 11)]), LUCAS);
-    expect(h.titre).toEqual(["Vous vous écrivez autant.", "Ce qui se joue est ailleurs."]);
+    expect(h.titre).toEqual(["Lucas et toi, vous vous écrivez autant.", "Ce qui se joue est ailleurs."]);
     expect(h.sous).toBe("Personne ne court après l’autre\u00a0: 31 messages pour toi, 35 pour lui.");
     expect(h.cases.map((c) => `${c.valeur} ${c.texte}`)).toEqual(["31–35 messages envoyés", "4–5 questions posées"]);
   });
