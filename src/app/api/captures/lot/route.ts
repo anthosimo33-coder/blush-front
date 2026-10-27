@@ -1,8 +1,9 @@
 import { AppliCaptures } from "@/server/appli-captures";
 import { humainRefuse } from "@/server/captcha";
 import { cleEnvoi, imagesDe, LectureRefusee, lecturePermise, lireLot } from "@/server/captures";
+import { estRefus, ErreurTache } from "@/server/erreurs";
 import { erreur, repondre, route } from "@/server/http";
-import { envoiDe } from "@/server/imports";
+import { envoiDe, noterLeRefusDUneVideo } from "@/server/imports";
 import { consentementImport } from "@/server/juridique";
 import { LIMITES } from "@/server/limites";
 import { attendreLePremier, empreinteDuLot, envoiArrete, ErreurLot, premierLot, unSeulLot } from "@/server/lots";
@@ -13,7 +14,7 @@ import { lireSession } from "@/server/cookies";
 import { avecEcheance, echeancePour } from "@/server/echeance";
 import { aujourdhuiParis } from "@/server/temps";
 
-/* Un lot de six à douze images (ECRANS_PAR_LOT) : une demi-minute de lecture, une minute et demie au pire */
+/* Un lot de douze images au plus (ECRANS_PAR_LOT) : une demi-minute de lecture, une minute et demie au pire */
 export const maxDuration = 180;
 
 /** Le lot d’un enregistrement en mode tournage : vide, sans appel au modèle (POST /api/captures/video n’en lit rien). */
@@ -25,7 +26,9 @@ const LOT_DU_TOURNAGE = { appli: null, autre: null, captures: [], blocs: [], pro
  * Jamais payé deux fois (src/server/lots.ts) : un lot déjà lu (ses images, son appli, le jour), ici ou sur une autre
  * instance, revient sans rappeler le modèle ni compter les plafonds de lecture. `cle` : celle de l’envoi (la même pour
  * tous ses lots, et pour leur fin), dont l’empreinte range le coût de chaque lot (src/server/imports.ts) ; `ordre` :
- * « premier » pour le lot qui part d’abord, « suite » pour ceux qui attendent que sa réponse commence. Un envoi
+ * « premier » pour le lot qui part d’abord, « suite » pour ceux qui attendent que sa réponse commence ; `mode` : « import »
+ * pour le lot d’un premier import, « ajout » pour celui d’un morceau ajouté à la conv qu’on importe (seulement pour la
+ * mesure des refus). Un envoi
  * abandonné par le navigateur (pour de bon, ou sa page fermée avant que le lot appelle le modèle) : 409 `abandon`.
  */
 async function traiter(req: Request) {
@@ -50,10 +53,17 @@ async function traiter(req: Request) {
   /* Le mode tournage (src/server/tournage.ts) : rien n’est lu, la fin de l’enregistrement reprend la conv de tournage */
   if (await tournageDuNavigateur()) return repondre("POST /api/captures/lot", { lot: LOT_DU_TOURNAGE });
   /* Son lien arrêté (ou une créatrice sans son lien) : le modèle ne lit rien, qu’elle rouvre le nouveau */
-  if (await lecturePayeeRefusee(await utilisateurDeSession(await lireSession()))) return erreur("tournage");
+  const compte = await utilisateurDeSession(await lireSession());
+  if (await lecturePayeeRefusee(compte)) return erreur("tournage");
   const app = appli.success ? appli.data : "autre";
   const envoi = envoiDe(cleEnvoi(fd?.get("cle")));
   const ordre = fd?.get("ordre");
+  /*
+   * Le lot d’un premier import (`mode=import`) : son refus arrête l’import, il se compte (/admin). Pas celui d’un morceau
+   * ajouté (`mode=ajout`, la conv est déjà là), ni d’un onglet resté sur le JS d’avant, qui ne dit pas son mode (pendant
+   * une mise en ligne : on ne sait pas s’il ajoutait un morceau)
+   */
+  const premierImport = fd?.get("mode") === "import";
   /* Le premier lot de l’envoi dit aux autres quand sa réponse commence, ou qu’il a fini (lu, retrouvé, refusé, en échec) */
   const commence = ordre === "premier" && envoi ? premierLot(envoi) : null;
   try {
@@ -70,6 +80,13 @@ async function traiter(req: Request) {
       return lireLot(images, app, "captures_video", { envoi, lot: empreinte, signal, ...(surAvance ? { surAvance } : {}), ...(commence ? { auDebut: commence } : {}) });
     });
     return repondre("POST /api/captures/lot", { lot });
+  } catch (e) {
+    /*
+     * Un refus de lecture arrête tout l’import (le navigateur ne le relance pas) : compté pour /admin, une fois par envoi
+     * d’un premier import (face aux premiers imports de vidéo)
+     */
+    if (envoi && premierImport && e instanceof ErreurTache && estRefus(e)) await noterLeRefusDUneVideo(envoi, compte);
+    throw e;
   } finally {
     commence?.();
   }

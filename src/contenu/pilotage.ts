@@ -81,6 +81,44 @@ export const NOMS_DES_POPULATIONS: Record<Population, string> = {
 /** Le nom de chaque type d’import (src/server/imports.ts), dans /admin « L’IA avant l’achat » et le serveur MCP. */
 export const NOMS_DES_TYPES_D_IMPORT: Record<TypeDImport, string> = { export: "Export", captures: "Captures", video: "Vidéo" };
 
+/**
+ * Les tranches de longueur d’une conv payée (« Par longueur », src/server/stats.ts), par son nombre de messages
+ * (stories.message_count : tous ceux reçus, pas seulement ceux que lit le modèle) : moins de 1 000, de 1 000 à 3 000, de
+ * 3 000 à 7 000, et 7 000 ou plus. 3 000 : la conv très longue du plan du 27 octobre 2026 (environ 100 000 jetons lus) ;
+ * 7 000 : à peu près ce que le modèle lit au plus (CONV_MAX, prompts/lib/conv.ts : 500 000 caractères, le début et
+ * surtout la fin), au-delà duquel une lecture ne coûte plus davantage.
+ */
+export const TRANCHES_DE_LONGUEUR = ["moins_de_1000", "de_1000_a_3000", "de_3000_a_7000", "7000_et_plus"] as const;
+export type TrancheDeLongueur = (typeof TRANCHES_DE_LONGUEUR)[number];
+/* Le premier nombre de messages de chaque tranche, la première exceptée (dans l’ordre de TRANCHES_DE_LONGUEUR) */
+const BORNES_DES_TRANCHES = [1000, 3000, 7000] as const;
+/** Les tranches d’une conv très longue (3 000 messages ou plus) : la part des ventes qu’elles font décide d’en réserver la lecture à Premium. */
+export const TRANCHES_TRES_LONGUES: readonly TrancheDeLongueur[] = ["de_3000_a_7000", "7000_et_plus"];
+/** La tranche d’une conv de `messages` messages. */
+export const trancheDe = (messages: number): TrancheDeLongueur => TRANCHES_DE_LONGUEUR[BORNES_DES_TRANCHES.filter((b) => messages >= b).length]!;
+export const NOMS_DES_TRANCHES: Record<TrancheDeLongueur, string> = {
+  moins_de_1000: "Moins de 1\u202f000 messages",
+  de_1000_a_3000: "1\u202f000 à 3\u202f000",
+  de_3000_a_7000: "3\u202f000 à 7\u202f000",
+  "7000_et_plus": "7\u202f000 et plus",
+};
+
+/**
+ * L’offre qui a débloqué une conv payée (« Par longueur ») : le rapport, Premium, ① (le rapport moins cher, l’offre
+ * unique du paywall), ⑤ (le 2e rapport, payé d’avance et utilisé sur elle), ⑥ (le rapport à −50 % gardé 7 jours), ou une
+ * autre offre d’une conv (aucune aujourd’hui : une offre à venir s’y range d’elle-même).
+ */
+export const OFFRES_D_UNE_CONV = ["rapport", "premium", "suite", "second", "rapport_garde", "autre"] as const satisfies readonly (OffreId | "autre")[];
+export type OffreDUneConv = (typeof OFFRES_D_UNE_CONV)[number];
+export const NOMS_DES_OFFRES_D_UNE_CONV: Record<OffreDUneConv, string> = {
+  rapport: "Le rapport",
+  premium: "Premium",
+  suite: "①\u00a0offre unique",
+  second: "⑤\u00a02e rapport",
+  rapport_garde: "⑥\u00a0−50\u00a0%",
+  autre: "Autre",
+};
+
 /** Le nom de chaque carte d’achat du chat (src/server/vente.ts), dans /admin. */
 export const NOMS_DES_VENTES: Record<GenreVendu, string> = {
   bulles: "Recharge",

@@ -8,9 +8,9 @@ import { ErreurApi } from "@/types/erreurs-api";
  * L’envoi d’un enregistrement d’écran (uploadRecording, src/services/api.ts) quand le serveur répond une 5xx : ses lots
  * partent cinq à la fois vers /api/captures/lot, puis leurs lectures vers /api/captures/video. Le réseau est un `fetch`
  * simulé, et l’extraction des écrans de la vidéo (qui demande un vrai navigateur) rend des images toutes faites, que
- * lotsDe découpe pour de vrai, à la taille de tailleDesLots (six à douze écrans), chaque lot reprenant le dernier écran du
- * précédent. Les lots déjà lus restent dans l’onglet (preparer-video.ts) : chaque test a ses images à lui (`sel`), sauf
- * ceux qui renvoient exprès la même vidéo.
+ * lotsDe découpe pour de vrai, en lots de douze écrans (tailleDesLots) en partant de la fin : le plus récent plein, chaque
+ * lot reprenant le dernier écran du précédent, le reste dans le plus ancien. Les lots déjà lus restent dans l’onglet
+ * (preparer-video.ts) : chaque test a ses images à lui (`sel`), sauf ceux qui renvoient exprès la même vidéo.
  */
 vi.mock("@/services/preparer-video", async (importOriginal) => {
   const vrai = await importOriginal<typeof import("@/services/preparer-video")>();
@@ -36,11 +36,16 @@ vi.mock("@/services/preparer-video", async (importOriginal) => {
     empreinteDuLot: async (images: Blob[], appli: string, jour: string) => `${appli}:${jour}:${images.map((b) => signatures.get(b)).join(",")}`,
   };
 });
+/*
+ * Le jeton du widget du CAPTCHA, tout de suite : seulement quand un test pose la clé publique (sinon, ni jeton ni
+ * laissez-passer, comme en local)
+ */
+vi.mock("@/services/captcha", async (importOriginal) => ({ ...(await importOriginal<typeof import("@/services/captcha")>()), jetonCaptcha: async () => "jeton" }));
 /** Ce que chaque écran de la vidéo simulée contient (son `sel` et son rang), que lit l’empreinte simulée. */
 const signatures = new WeakMap<Blob, string>();
 
-/** Combien d’écrans la vidéo simulée donne : 11 font deux lots de six (1 à 6, 6 à 11), 80 en font huit de douze. */
-let ecrans = 11;
+/** Combien d’écrans la vidéo simulée donne : 23 font deux lots de douze (0 à 11, 11 à 22), 80 en font huit (indiceDuLot). */
+let ecrans = 23;
 /** Les octets des écrans de la vidéo simulée : un autre à chaque test, pour que les lots lus d’un test ne servent pas au suivant. */
 let sel = 0;
 /** La vidéo simulée a-t-elle défilé dans un seul sens (ses écrans sûrement dans l’ordre) ? */
@@ -58,7 +63,7 @@ const IMPORTEE = { source: SOURCE, story: { id: "s1" }, messagesRead: 42 };
  * `indice` : sa place dans la vidéo, d’après son premier écran, pour des lots de douze), par une Response, tout de suite
  * ou plus tard, ou « pend » : pas de réponse avant l’arrêt de l’envoi ; `video(corps, k)` répond à la k-ième fin (une
  * question sur une longue vidéo, ou l’assemblage), `plan` au plan d’une longue vidéo (en entier, par défaut), `ecrans`
- * à l’envoi d’un lot gardé. Rend la liste des appels, les signaux, ce que portait chaque essai d’un lot (sa clé, son
+ * à l’envoi d’un lot gardé, `captcha` au laissez-passer (seulement avec la clé publique du CAPTCHA : l’A/B allumé, par défaut). Rend la liste des appels, les signaux, ce que portait chaque essai d’un lot (sa clé, son
  * ordre, sa place), les abandons reçus, les plans demandés et les lots gardés (leur rang).
  */
 function serveur({
@@ -66,16 +71,18 @@ function serveur({
   video = () => json(IMPORTEE),
   plan = () => json({ lecture: "entiere" }),
   ecrans: garder = () => json({ ok: true }),
+  captcha = () => json({ ok: true, planDesVideos: true }),
 }: {
   lot: (n: number, essai: number, indice: number) => Response | Promise<Response> | "pend";
   video?: (corps: unknown, k: number) => Response;
   plan?: (corps: unknown) => Response;
   ecrans?: (rang: number) => Response | Promise<Response>;
+  captcha?: () => Response;
 }) {
   const appels: string[] = [];
   const corpsVideo: unknown[] = [];
-  /* Ce que chaque essai d’un lot porte (sa clé d’envoi, son ordre, sa place), et les abandons reçus */
-  const champs: { n: number; cle: unknown; ordre: unknown; indice: number }[] = [];
+  /* Ce que chaque essai d’un lot porte (sa clé d’envoi, son ordre, son mode, sa place), et les abandons reçus */
+  const champs: { n: number; cle: unknown; ordre: unknown; mode: unknown; indice: number }[] = [];
   const abandons: { corps: unknown; keepalive: boolean | undefined }[] = [];
   const plans: unknown[] = [];
   const gardes: { rang: number; cle: unknown; images: number; priorite: RequestPriority | undefined }[] = [];
@@ -94,6 +101,10 @@ function serveur({
       const corps: unknown = JSON.parse(String(init?.body));
       corpsVideo.push(corps);
       return video(corps, corpsVideo.length);
+    }
+    if (url === "/api/captcha") {
+      appels.push("captcha");
+      return captcha();
     }
     if (url === "/api/captures/video/plan") {
       appels.push("plan");
@@ -115,9 +126,8 @@ function serveur({
     if (url !== "/api/captures/lot") throw new Error(`appel inattendu : ${String(url)}`);
     const n = lotDe(init);
     const fd = init?.body as FormData;
-    /* Des lots de douze écrans, chacun reprenant le dernier du précédent : le premier écran du lot j est le n° 11 j (de taille 11 j + 1) */
-    const indice = ((fd.getAll("captures")[0] as Blob).size - 1) / 11;
-    champs.push({ n, cle: fd.get("cle"), ordre: fd.get("ordre"), indice });
+    const indice = indiceDuLot((fd.getAll("captures")[0] as Blob).size - 1);
+    champs.push({ n, cle: fd.get("cle"), ordre: fd.get("ordre"), mode: fd.get("mode"), indice });
     const essai = (essais.get(n) ?? 0) + 1;
     essais.set(n, essai);
     appels.push(`lot ${n} · essai ${essai}`);
@@ -129,13 +139,23 @@ function serveur({
   return { appels, corpsVideo, signaux, champs, abandons, plans, gardes };
 }
 
+/**
+ * La place d’un lot dans la vidéo simulée (0 : le plus ancien), d’après son premier écran (`premier`, de taille premier + 1).
+ * Des lots de douze écrans découpés en partant de la fin, chacun reprenant le dernier du précédent : le plus récent
+ * commence à l’écran ecrans − 12, chacun onze écrans avant le suivant, et le plus ancien, le reste, à l’écran 0.
+ */
+function indiceDuLot(premier: number): number {
+  const lots = ecrans <= 12 ? 1 : 1 + Math.ceil((ecrans - 12) / 11);
+  return premier === 0 ? 0 : lots - 1 - (ecrans - 12 - premier) / 11;
+}
+
 /* L’extraction est chargée à la demande (pVideo) : chargée d’avance, son import ne dépend plus du temps simulé */
 beforeAll(async () => {
   await import("@/services/preparer-video");
 });
 beforeEach(() => {
   vi.useFakeTimers();
-  ecrans = 11;
+  ecrans = 23;
   sel++;
   sensSur = true;
 });
@@ -207,12 +227,12 @@ describe("uploadRecording sur une 5xx", () => {
 });
 
 describe("uploadRecording : un lot n’est jamais payé deux fois", () => {
-  it("tous les lots portent la même clé que leur fin ; le premier part « premier », les autres « suite »", async () => {
+  it("tous les lots portent la même clé que leur fin ; le premier part « premier », les autres « suite » ; tous disent un premier import", async () => {
     const { champs, corpsVideo } = serveur({ lot: (n) => json({ lot: `lecture ${n}` }) });
     await expect(uploadRecording(VIDEO, "imessage", CASE_IMPORT.version)).resolves.toMatchObject({ messagesRead: 42 });
-    expect(champs.map((c) => [c.n, c.ordre])).toEqual([
-      [1, "premier"],
-      [2, "suite"],
+    expect(champs.map((c) => [c.n, c.ordre, c.mode])).toEqual([
+      [1, "premier", "import"],
+      [2, "suite", "import"],
     ]);
     const cle = champs[0]!.cle;
     expect(cle).toEqual(expect.stringMatching(/^[0-9a-f-]{16,64}$/i));
@@ -281,7 +301,7 @@ describe("uploadRecording : une longue vidéo lue en partie avant l’achat", ()
   /** Une lecture de lot simulée, d’après sa place dans la vidéo. */
   const lu = (_n: number, _essai: number, indice: number) => json({ lot: `lecture ${indice}` });
   const lectures = (...indices: number[]) => indices.map((i) => `lecture ${i}`);
-  /* Huit lots de douze écrans (de 0 à 7), le dernier n’en ayant que trois : une longue vidéo */
+  /* Huit lots (de 0 à 7) : le plus récent, et les six d’avant, de douze écrans ; le plus ancien n’en a que trois. Une longue vidéo */
   beforeEach(() => {
     ecrans = 80;
   });
@@ -295,8 +315,9 @@ describe("uploadRecording : une longue vidéo lue en partie avant l’achat", ()
     const avance: AvanceVideo[] = [];
     await expect(uploadRecording(VIDEO, "imessage", CASE_IMPORT.version, (a) => avance.push(a))).resolves.toEqual(IMPORTEE);
     const cle = champs[0]!.cle;
-    /* Le plan : la longue vidéo, l’empreinte de son lot le plus récent, son sens, et la clé de l’envoi (sa moitié s’y note) */
-    expect(plans).toEqual([{ lots: 8, video: expect.stringContaining(`:${sel}:77`), sensSur: true, cle, consentement: CASE_IMPORT.version }]);
+    /* Le plan : la longue vidéo, l’empreinte de son lot le plus récent (ses douze derniers écrans), son sens, et la clé de l’envoi (sa moitié s’y note) */
+    const recent = `imessage:ab:${Array.from({ length: 12 }, (_, k) => `${sel}:${68 + k}`).join(",")}`;
+    expect(plans).toEqual([{ lots: 8, video: recent, sensSur: true, cle, consentement: CASE_IMPORT.version }]);
     /* Du plus récent au plus ancien, le plus récent d’abord (« premier ») */
     expect(champs.map((c) => [c.indice, c.ordre])).toEqual([
       [7, "premier"],
@@ -305,14 +326,18 @@ describe("uploadRecording : une longue vidéo lue en partie avant l’achat", ()
       [4, "suite"],
       [3, "suite"],
     ]);
-    const partiel = { restants: 3, ecrans: 80, video: (plans[0] as { video: string }).video, sensSur: true };
+    const partiel = { restants: 3, ecrans: 80, video: (plans[0] as { video: string }).video, sensSur: true, decoupe: "fin" };
     expect(corpsVideo).toEqual([
       expect.objectContaining({ cle, lots: lectures(3, 4, 5, 6, 7), partiel }),
       expect.objectContaining({ cle, lots: lectures(3, 4, 5, 6, 7), partiel: { ...partiel, gardes: true } }),
     ]);
     /* Ses trois lots plus anciens, gardés tels quels (jamais lus avant l’achat), sous la même clé, un à la fois, du plus ancien au plus récent */
-    expect(gardes.map((g) => g.rang)).toEqual([0, 1, 2]);
-    expect(gardes.every((g) => g.cle === cle && g.images === 12 && g.priorite === "low")).toBe(true);
+    expect(gardes.map((g) => [g.rang, g.images])).toEqual([
+      [0, 3],
+      [1, 12],
+      [2, 12],
+    ]);
+    expect(gardes.every((g) => g.cle === cle && g.priorite === "low")).toBe(true);
     /* Partis pendant la lecture, une fois la première lecture rendue (les images à lire d’abord), avant la question */
     expect(appels.slice(0, 7)).toEqual(["plan", ...[1, 2, 3, 4, 5].map((n) => `lot ${n} · essai 1`), "ecrans 0"]);
     expect(appels.filter((a) => a.startsWith("lot"))).toHaveLength(5);
@@ -443,7 +468,9 @@ describe("uploadRecording : une longue vidéo lue en partie avant l’achat", ()
     const { champs, corpsVideo, gardes } = serveur({ lot: lu });
     await uploadRecording(VIDEO, "imessage", CASE_IMPORT.version);
     expect(champs.map((c) => c.indice)).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
-    expect(corpsVideo).toEqual([expect.objectContaining({ lots: lectures(0, 1, 2, 3, 4, 5, 6, 7), partiel: expect.objectContaining({ restants: 0, ecrans: 80, sensSur: true }) })]);
+    expect(corpsVideo).toEqual([
+      expect.objectContaining({ lots: lectures(0, 1, 2, 3, 4, 5, 6, 7), partiel: expect.objectContaining({ restants: 0, ecrans: 80, sensSur: true, decoupe: "fin" }) }),
+    ]);
     expect(gardes).toEqual([]);
     /* Le plan sans réponse (le réseau) : en entier aussi */
     sel++;
@@ -452,22 +479,66 @@ describe("uploadRecording : une longue vidéo lue en partie avant l’achat", ()
     expect(secondes.champs.map((c) => c.indice)).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
   });
 
-  it("un morceau ajouté, ou une courte vidéo : aucun plan demandé, rien de la longue vidéo dans la fin ; un sens douteux se dit au plan", async () => {
+  it("un morceau ajouté, une courte vidéo, un seul lot : aucun plan demandé ; la courte de deux lots ou plus dit à sa fin de quoi mesurer la règle visée (lue en entier) ; un sens douteux se dit au plan", async () => {
     const ajout = serveur({ lot: lu });
     await uploadRecording(VIDEO, "imessage", CASE_IMPORT.version, undefined, { ajout: true });
     expect(ajout.plans).toEqual([]);
     expect(ajout.corpsVideo).toEqual([expect.not.objectContaining({ partiel: expect.anything() })]);
+    /* Ses lots disent le morceau ajouté : leur refus ne compte pas comme un premier import arrêté */
+    expect([...new Set(ajout.champs.map((c) => c.mode))]).toEqual(["ajout"]);
     sel++;
-    ecrans = 11;
+    /* La plus longue des courtes : cinq lots de douze, un seul tour, lus sans attendre de plan ; sa fin dit l’empreinte de son lot le plus récent */
+    ecrans = 56;
     const courte = serveur({ lot: lu });
     await uploadRecording(VIDEO, "imessage", CASE_IMPORT.version);
     expect(courte.plans).toEqual([]);
-    expect(courte.corpsVideo).toEqual([expect.not.objectContaining({ partiel: expect.anything() })]);
+    expect(courte.appels[0]).toBe("lot 1 · essai 1");
+    const recente = `imessage:ab:${Array.from({ length: 12 }, (_, k) => `${sel}:${44 + k}`).join(",")}`;
+    expect(courte.corpsVideo).toEqual([
+      expect.objectContaining({ lots: lectures(0, 1, 2, 3, 4), partiel: { restants: 0, ecrans: 56, video: recente, sensSur: true, decoupe: "fin" } }),
+    ]);
+    sel++;
+    /* Deux lots : pareil */
+    ecrans = 23;
+    const deux = serveur({ lot: lu });
+    await uploadRecording(VIDEO, "imessage", CASE_IMPORT.version);
+    expect(deux.plans).toEqual([]);
+    expect(deux.corpsVideo).toEqual([expect.objectContaining({ partiel: expect.objectContaining({ restants: 0, ecrans: 23 }) })]);
+    sel++;
+    /* Un seul lot : rien à épargner, rien à mesurer */
+    ecrans = 12;
+    const seul = serveur({ lot: lu });
+    await uploadRecording(VIDEO, "imessage", CASE_IMPORT.version);
+    expect(seul.plans).toEqual([]);
+    expect(seul.corpsVideo).toEqual([expect.not.objectContaining({ partiel: expect.anything() })]);
     sel++;
     ecrans = 80;
     sensSur = false;
     const douteuse = serveur({ lot: lu });
     await uploadRecording(VIDEO, "imessage", CASE_IMPORT.version);
     expect(douteuse.plans).toEqual([expect.objectContaining({ sensSur: false })]);
+  });
+
+  it("le laissez-passer dit si l’A/B est allumé : éteint (« 0 », « mesure »), aucun plan demandé, les lots partent sans l’attendre ; allumé, le plan d’abord ; un serveur qui ne le dit pas, le plan aussi", async () => {
+    vi.stubEnv("NEXT_PUBLIC_TURNSTILE_SITE_KEY", "1x00000000000000000000AA");
+    try {
+      const eteint = serveur({ lot: lu, captcha: () => json({ ok: true, planDesVideos: false }) });
+      await expect(uploadRecording(VIDEO, "imessage", CASE_IMPORT.version)).resolves.toEqual(IMPORTEE);
+      expect(eteint.appels.slice(0, 2)).toEqual(["captcha", "lot 1 · essai 1"]);
+      expect(eteint.plans).toEqual([]);
+      /* Lue en entier, dans l’ordre ; sa fin dit quand même de quoi mesurer la règle visée */
+      expect(eteint.champs.map((c) => c.indice)).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
+      expect(eteint.corpsVideo).toEqual([expect.objectContaining({ partiel: expect.objectContaining({ restants: 0, ecrans: 80 }) })]);
+      sel++;
+      const allume = serveur({ lot: lu });
+      await uploadRecording(VIDEO, "imessage", CASE_IMPORT.version);
+      expect(allume.appels.slice(0, 3)).toEqual(["captcha", "plan", "lot 1 · essai 1"]);
+      sel++;
+      const ancien = serveur({ lot: lu, captcha: () => json({ ok: true }) });
+      await uploadRecording(VIDEO, "imessage", CASE_IMPORT.version);
+      expect(ancien.appels.slice(0, 3)).toEqual(["captcha", "plan", "lot 1 · essai 1"]);
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 });

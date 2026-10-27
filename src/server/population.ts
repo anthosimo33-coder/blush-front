@@ -161,6 +161,18 @@ export function quiAFaitLAppel({ storyId, compte, envoi }: { storyId?: string | 
 }
 
 /**
+ * Ce qui arrive maintenant à cette conv, ce compte ou cet envoi (comme quiAFaitLAppel) est-il du produit (un client ou un
+ * prospect) ? La règle jugée une fois, à l’écriture d’un compteur qui n’a pas de ligne où poser sa population (un import
+ * de vidéo arrêté par un refus, une mise à jour de la mémoire gardée en direct : src/server/compteurs.ts) : les tests et
+ * les invités n’y entrent pas, comme ailleurs. Une règle en échec lève : le compteur, appelé au mieux, ne compte pas.
+ */
+export async function duProduitMaintenant(qui: { storyId?: string | null; compte?: { id: string } | null; envoi?: string | null }): Promise<boolean> {
+  const { population } = quiAFaitLAppel(qui);
+  const [r] = (await db().execute<{ produit: boolean }>(sql`select ${duProduit(population)} as produit`)).rows;
+  return r?.produit === true;
+}
+
+/**
  * Les étiquettes des lectures d’avant l’import (src/server/captures.ts : des captures, les lots d’une vidéo ; « 01 »,
  * celle d’avant les étiquettes) : faites avant l’email, chez un visiteur qui importe. Une ligne de ces lectures que rien
  * ne rattache (d’avant la mesure des imports du 26 octobre, #142 : ni conv ni envoi) est d’un prospect, le coût

@@ -1,4 +1,4 @@
-import { PAIRES, type Paire } from "@/contenu/pilotage";
+import { PAIRES, type Paire, type TrancheDeLongueur } from "@/contenu/pilotage";
 import type { CaseDuPilotage, Genres, Periode, Pilotage, StatsAdmin } from "@/server/stats";
 import type { AppKind } from "@/types";
 import type { Direct, GesteDuFil } from "@/types/api";
@@ -203,7 +203,8 @@ function pilotageDe(jours: Periode, { calme = false, suivi = true }: Variante): 
   /*
    * La lecture partielle des longues vidéos, en A/B : la moitié des longues vidéos de la période dans chaque moitié, la
    * partielle lisant un tiers des lots avant l’achat (le reste gardé, lu après le paiement), un peu plus vite au paywall,
-   * et perdant moins de monde en route ; le contrefactuel des vidéos lues en entier, presque toujours le même titre
+   * et perdant moins de monde en route ; le contrefactuel des vidéos lues en entier, presque toujours le même titre, la
+   * règle visée assez dès son premier tour pour près de trois sur quatre
    */
   const longues = Math.round(importsParType.find((t) => t.type === "video")!.imports * 0.6);
   const moitie = (bras: "entiere" | "partielle") => {
@@ -231,18 +232,87 @@ function pilotageDe(jours: Periode, { calme = false, suivi = true }: Variante): 
       titresEntiers: partielle ? { entiers: payes, changes: 0 } : { entiers: 0, changes: 0 },
     };
   };
+  const mesurees = Math.round(longues / 2);
+  const part = (x: number) => Math.round(mesurees * x);
+  const arrets = { premier_tour: part(0.72), plus_loin: part(0.1), jusqu_au_bout: part(0.05), tout_sens: part(0.06), tout_dates: part(0.03), tout_court: 0 };
+  arrets.tout_court = Math.max(0, mesurees - Object.values(arrets).reduce((t, x) => t + x, 0));
   const lecturePartielle: Pilotage["lecturePartielle"] = {
     bras: [moitie("entiere"), moitie("partielle")],
     contrefactuel: {
-      videos: Math.round(longues / 2),
-      pareil: Math.round(longues / 2) - 1,
+      videos: mesurees,
+      pareil: Math.max(0, mesurees - 1),
       tendancePerdue: 0,
-      dateDecalee: 1,
+      dateDecalee: mesurees ? 1 : 0,
       autreTitre: 0,
-      lots: Math.round(longues / 2) * 14,
-      lotsEpargnables: Math.round(longues / 2) * 9,
+      lots: mesurees * 14,
+      lotsEpargnables: mesurees * 9,
+      mesurees,
+      arrets,
+      dollars: mesurees * 1.2,
+      dollarsEpargnables: mesurees * 0.7,
     },
   };
+  /*
+   * Par longueur : les convs payées (Premium, le rapport et la suite de « Ce qui se vend »), surtout de longs exports ;
+   * leur lecture coûte plus quand la conv s’allonge, puis plus beaucoup au-delà de ce que lit le modèle (les jetons par
+   * message y baissent : la conv est coupée) ; avant l’achat, les courtes (des captures, des vidéos) ont été lues, les
+   * longues sont des exports (rien de lu) ; un verdict refait sur dix, un modèle de repli sur un verdict sur vingt,
+   * une conv effacée depuis sur trente, et un achat sur douze venu plus de 48 h après le paywall (les relances)
+   */
+  const ventesDesConvs = premium + rapport + suite;
+  const longueurs: [TrancheDeLongueur, number, number, number, number][] = [
+    ["moins_de_1000", 0.18, 1.25, 44, 0.31],
+    ["de_1000_a_3000", 0.31, 1.52, 38, 0],
+    ["de_3000_a_7000", 0.33, 2.1, 35, 0],
+    ["7000_et_plus", 0.18, 2.62, 21, 0],
+  ];
+  const tranches = longueurs.map(([tranche, part, dollarsMedian, jetonsParMessage, dollarsMedianAvant]) => {
+    const ventes = Math.round(ventesDesConvs * part);
+    const offres = { premium: Math.round(ventes * 0.5), suite: Math.round(ventes * 0.17), second: 0, rapport_garde: ventes >= 6 ? 1 : 0, autre: 0 };
+    const verdicts = ventes + Math.round(ventes * 0.1);
+    return {
+      tranche,
+      ventes,
+      offres: { rapport: ventes - somme(Object.values(offres), (x) => x), ...offres },
+      convs: ventes,
+      lues: ventes,
+      dollarsMedian: ventes ? dollarsMedian : null,
+      importsMesures: ventes,
+      dollarsMedianAvant: ventes ? dollarsMedianAvant : null,
+      totaux: ventes,
+      dollarsMedianTotal: ventes ? dollarsMedian + dollarsMedianAvant : null,
+      verdicts,
+      plusieursVerdicts: Math.round(ventes * 0.1),
+      jetonsParMessage: ventes ? jetonsParMessage : null,
+      verdictsMesures: verdicts,
+    };
+  });
+  const verdictsPayes = somme(tranches, (t) => t.verdicts);
+  const payesDesConvs = somme(tranches, (t) => t.ventes);
+  const parLongueur: Pilotage["parLongueur"] = {
+    tranches,
+    effacees: Math.round(ventesDesConvs / 30),
+    tard: { payes: payesDesConvs, plusDe48h: Math.round(payesDesConvs / 12), sansPaywall: 0 },
+    modeles: [
+      { modele: "claude-opus-5-5", lignes: verdictsPayes - Math.round(verdictsPayes / 20), convs: payesDesConvs, dollars: (verdictsPayes - Math.round(verdictsPayes / 20)) * 0.92 },
+      ...(verdictsPayes >= 20
+        ? [{ modele: "claude-fable-5-1", lignes: Math.round(verdictsPayes / 20), convs: Math.round(verdictsPayes / 20), dollars: Math.round(verdictsPayes / 20) * 2.3 }]
+        : []),
+    ],
+    chers: [
+      { dollars: 2.41, lignes: 2, modeles: ["claude-fable-5-1", "claude-opus-5-5"], messages: 8_412 },
+      { dollars: 2.28, lignes: 1, modeles: ["claude-fable-5-1"], messages: 6_930 },
+      { dollars: 1.62, lignes: 2, modeles: ["claude-opus-5-5"], messages: 3_105 },
+    ].slice(0, payesDesConvs ? 3 : 0),
+  };
+  /*
+   * Les compteurs du suivi et ce à quoi ils se comparent, sur les mêmes jours de Paris : une vidéo sur trente-cinq arrêtée
+   * par un refus (face aux vidéos importées, celles du tableau), et les mises à jour gardées en direct par le garde-fou de
+   * la mémoire en lot, environ une sur six de celles parties au calme (les appels du poste « Mémoire (en lot) » : 11, trop
+   * peu pour un taux)
+   */
+  const videosImportees = importsParType.find((t) => t.type === "video")!.imports;
+  const compteurs: Pilotage["compteurs"] = { videosRefusees: Math.round(videosImportees / 35), videosImportees, majEnDirectParAlerte: 2, majEnLot: 11 };
   const jalonsParAppli = applis
     .map(([appli, part, passe]) => {
       const choisie = Math.round(jalons.appli * part);
@@ -334,6 +404,8 @@ function pilotageDe(jours: Periode, { calme = false, suivi = true }: Variante): 
     abDerniere: { avec: { n: 38, payes: 6 }, sans: { n: 41, payes: 3 } },
     importsParType,
     lecturePartielle,
+    parLongueur,
+    compteurs,
     iaDuJour: { dollars: 12.4, budget: 30, sansCompte: { dollars: 3.1, budget: 50 } },
     sante: calme
       ? { echecs: 0, bloquees: 0, paiementsEchoues: 0, alertes: 0, pannes: 0, pannesDuJour: 0 }
@@ -384,13 +456,16 @@ export function statsDExemple(jours: Periode, variante: Variante = {}): StatsAdm
       ],
       parRapport: rapports ? Math.round(((total * 0.85 * 0.38) / rapports) * 100) / 100 : null,
       parVerdict: verdicts ? Math.round(((total * 0.85 * 0.11) / verdicts) * 100) / 100 : null,
+      /* Les images en deux postes : les vidéos lues avant l’achat pèsent plus que les captures */
       postes: (
         [
           ["Chat", 46, 412],
-          ["Rapport", 38, rapports * 2],
+          ["Rapport", 37, rapports * 2],
           ["Verdict", 11, verdicts],
-          ["Mémoire (mise à jour)", 2, 14],
-          ["Mémoire (création)", 2, rapports],
+          ["Vidéo", 2, 96],
+          ["Captures", 1, 31],
+          ["Mémoire (mise à jour)", 1, 14],
+          ["Mémoire (création)", 1, rapports],
           ["Mémoire (en lot)", 1, 11],
         ] as const
       ).map(([nom, part, appels]) => ({

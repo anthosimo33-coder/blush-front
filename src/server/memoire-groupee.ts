@@ -17,8 +17,8 @@ import { echangesDepuisLeLot, rapatrier } from "./memoire-en-lot";
  * ajoutés. Ouvrir sa fiche la fait partir aussi (sansAttendre, par ses routes) : la fiche qu’il regarde est à jour.
  * Celle qui part au calme peut partir en lot (src/server/memoire-en-lot.ts, BLUSH_MEMOIRE_EN_LOT) : tant que sa réponse
  * n’est pas revenue, ses échanges et tous ceux d’après comptent ensemble (echangesDepuisLeLot), et ce qui ne peut pas
- * attendre la rapatrie (rapatrier) ; sa réponse déjà là, la mémoire a rattrapé le fil, et ce qui ne partait que pour elle
- * reprend son calme.
+ * attendre la rapatrie (rapatrier), une alerte levée par le chat comprise ; sa réponse déjà là, la mémoire a rattrapé le
+ * fil, et ce qui ne partait que pour elle reprend son calme.
  */
 
 /** Sans nouvel échange pendant ce temps, le chat est calme : la mise à jour part (le passage des 5 minutes la prend). */
@@ -55,9 +55,11 @@ const auCalme = () => and(eq(schema.tasks.status, "attente"), isNotNull(schema.t
  * Un lot en vol (src/server/memoire-en-lot.ts) : ses échanges ne sont pas encore dans la mémoire, et le fil du chat les
  * relit avec tous ceux d’après, retenus ou non (un échange sans neuf ne se retient pas). Ils comptent donc tous : au
  * ECHANGES_PAR_MAJ-ième depuis le lot, comme sur un niveau ou un ajout, le lot est rapatrié (rapatrier : sa réponse
- * appliquée s’il a fini, sinon il part en direct avec ceux qui attendent). Sa réponse appliquée, la mémoire a rattrapé le
- * fil : une mise à jour qui ne partait que pour le lot (ni `maintenant`, ni ses ECHANGES_PAR_MAJ échanges à elle) reprend
- * son calme, au lieu de partir en direct pour un ou deux échanges.
+ * appliquée s’il a fini, sinon il part en direct avec ceux qui attendent). Un échange qui lève une alerte (`levee`) le
+ * rapatrie aussi : la mise à jour qui le relit (le garde-fou de la mémoire en lot) ne doit jamais attendre un lot, jusqu’à
+ * LOT_AU_PLUS_S. Sa réponse appliquée, la mémoire a rattrapé le fil : une mise à jour qui ne partait que pour le lot (ni
+ * `maintenant`, ni ses ECHANGES_PAR_MAJ échanges à elle) reprend son calme, au lieu de partir en direct pour un ou deux
+ * échanges ; celle qui porte l’alerte partira alors en direct à son calme, par le garde-fou (envoyer, lot:alerte).
  */
 export async function retenir(storyId: string, echange: Echange, { neuf, maintenant }: { neuf: boolean; maintenant: boolean }): Promise<{ id: string | null; part: boolean }> {
   const depuisLeLot = await echangesDepuisLeLot(storyId);
@@ -70,7 +72,8 @@ export async function retenir(storyId: string, echange: Echange, { neuf, mainten
 
 /**
  * L’échange gardé (retenir), sous le verrou de la conv : `depuisLeLot`, les échanges du fil depuis un lot en vol (0 sans
- * lot). `urgente` : elle part pour elle-même, lot ou non.
+ * lot). `urgente` : elle part pour elle-même, lot ou non. `part` sans être urgente : pour le lot seul (son
+ * ECHANGES_PAR_MAJ-ième échange, ou une alerte levée pendant qu’il est en vol), qu’il faut rapatrier.
  */
 function garder(storyId: string, echange: Echange, { neuf, maintenant, depuisLeLot }: { neuf: boolean; maintenant: boolean; depuisLeLot: number }) {
   return db().transaction(async (tx): Promise<{ id: string | null; part: boolean; urgente: boolean }> => {
@@ -88,14 +91,15 @@ function garder(storyId: string, echange: Echange, { neuf, maintenant, depuisLeL
       .orderBy(desc(schema.tasks.createdAt))
       .limit(1)
       .for("update");
-    /* Rien à retenir ; mais avec un lot en vol, l’échange compte (son ECHANGES_PAR_MAJ-ième le rapatrie) */
+    /* Rien à retenir ; mais avec un lot en vol, l’échange compte (son ECHANGES_PAR_MAJ-ième le rapatrie). Une alerte levée est toujours du neuf */
     if (!attend && !neuf) return { id: null, part: depuisLeLot >= ECHANGES_PAR_MAJ, urgente: false };
     const echanges = [...(attend?.input ? coffre.lire("tasks.input", attend.input) : []), echange];
     /* Une mise à jour déjà partie le reste ; une heure passée la fait partir, sauf si le passage des 5 minutes l’envoie en lot */
     const enLot = memoireEnLot();
     const due = !!attend && (attend.partie || (attend.due && !enLot));
     const urgente = partTout(echanges.length, { maintenant, due });
-    const part = urgente || depuisLeLot >= ECHANGES_PAR_MAJ;
+    /* Un lot en vol : rapatrié au ECHANGES_PAR_MAJ-ième échange depuis lui, ou tout de suite pour une alerte levée (le garde-fou) */
+    const part = urgente || depuisLeLot >= ECHANGES_PAR_MAJ || (depuisLeLot > 0 && !!echange.levee);
     /* En lot, une heure passée reste passée : le passage suivant l’envoie, cet échange avec */
     const garderSonHeure = !part && !!attend?.due && enLot;
     const valeurs = {
