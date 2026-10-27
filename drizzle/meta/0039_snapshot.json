@@ -1,5 +1,5 @@
 {
-  "id": "5c40893a-7eb7-49e1-908a-97d0a4da0867",
+  "id": "05e6bbe2-8647-41c3-ab0b-2d9c5c178a1e",
   "prevId": "bc6c64de-83a0-44b5-be52-cad4c819a741",
   "version": "7",
   "dialect": "postgresql",
@@ -1472,6 +1472,12 @@
         },
         "lots_mesures": {
           "name": "lots_mesures",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "micros_mesures": {
+          "name": "micros_mesures",
           "type": "integer",
           "primaryKey": false,
           "notNull": false

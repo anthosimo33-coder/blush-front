@@ -52,7 +52,8 @@ export const envoiOuNouveau = (cle: string | null): string => empreinte(`mesure:
  * export, ou sans clé), et celles des envois d’avant dont l’onglet a repris des lots déjà lus (`repris`). Une longue
  * vidéo (src/server/lecture-partielle.ts) : sa moitié de l’A/B, les lots gardés pour après le paiement ; une vidéo lue
  * en entier quand la règle visée se mesure : son contrefactuel (le titre qu’aurait montré sa partie récente, où la règle
- * se serait arrêtée, et les lots et les écrans qu’elle aurait épargnés, face à ses `ecrans` et ses `lots`, gardés à part).
+ * se serait arrêtée, et les lots et les écrans qu’elle aurait épargnés, face à ses `ecrans`, ses `lots` et leur coût,
+ * gardés à part).
  */
 type Import = {
   storyId: string;
@@ -98,6 +99,17 @@ export async function noterImport({ storyId, type, appli, ecrans, lots, envoi, r
         })
         .onConflictDoNothing();
       await relier([...(envoi ? [envoi] : []), ...repris], { storyId, envoi: e });
+      /*
+       * … et ce qu’ont coûté ses lots, maintenant qu’ils sont tous sous son empreinte (les siens, ceux repris par le serveur
+       * ou par l’onglet) : un morceau vidéo ajouté ensuite range les siens sous la même empreinte, ceux qu’il reprend d’un
+       * envoi lu avant l’import compris (noterAjout), et une date ne les distinguerait pas. Une seule fois (un nouvel essai
+       * ne la refait pas)
+       */
+      if (contrefactuel)
+        await db()
+          .update(schema.imports)
+          .set({ microsMesures: sql`(select coalesce(sum(u.cost_micros), 0) from ai_usage u where u.envoi = ${e} and u.task = 'captures_video')` })
+          .where(and(eq(schema.imports.storyId, storyId), isNull(schema.imports.microsMesures)));
     },
     "import non mesuré",
     { type },
@@ -146,8 +158,8 @@ export async function noterLaSuite(storyId: string, suite: IssueDeLaSuite): Prom
 /**
  * Un morceau ajouté à une conv (avant « Qui es-tu ? ») : ses écrans et ses lots s’ajoutent aux siens, et ses lectures
  * (celles des envois repris aussi) passent sous l’empreinte de la conv. Ceux de la vidéo mesurée (ecrans_mesures,
- * lots_mesures) ne bougent pas : la règle visée ne lit pas les morceaux. Une conv sans mesure (importée avant elle) ne
- * relie que ses lectures. Ne lève jamais.
+ * lots_mesures, et le coût de ses lots, micros_mesures) ne bougent pas : la règle visée ne lit pas les morceaux. Une conv
+ * sans mesure (importée avant elle) ne relie que ses lectures. Ne lève jamais.
  */
 export async function noterAjout(storyId: string, { ecrans, lots, envoi, repris = [] }: Pick<Import, "ecrans" | "lots" | "envoi" | "repris">): Promise<void> {
   await auMieux(async () => {

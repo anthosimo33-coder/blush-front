@@ -746,6 +746,42 @@ describe("l’A/B et son interrupteur", () => {
     }
   });
 
+  it("en mesure, une vidéo B lue puis sa fin ratée, une vidéo A mesurée, puis B ajoutée à A en reprenant ses lots : les dollars de A restent les siens (figés à son import)", async () => {
+    etat.mode = "mesure";
+    const avant = (await statsAdmin(1)).pilotage.lecturePartielle.contrefactuel;
+    const serie = randomUUID();
+    const envois: string[] = [];
+    /* Ce que deux lots ont coûté, sous l’empreinte de leur envoi (le modèle factice n’en note pas) : `micros` chacun */
+    const payer = async (cle: string, micros: number) => {
+      const envoi = envoiDe(cle)!;
+      envois.push(envoi);
+      await db()
+        .insert(schema.aiUsage)
+        .values([0, 1].map(() => ({ task: "captures_video", model: "factice", costMicros: micros, envoi, population: "prospect" as const })));
+    };
+    try {
+      /* B : deux lots de la même conv (les écrans 33 à 55), lus et payés (0,30 $ chacun) avant l’import de A, puis sa fin ratée (aucune conv) */
+      const cleB = randomUUID();
+      const lotsB = [await lireLeLot(serie, cleB, 3), await lireLeLot(serie, cleB, 4)];
+      await payer(cleB, 300_000);
+      /* A : la vidéo mesurée, ses deux lots à 0,10 $ */
+      const { id } = await importCourt(serie, (c) => payer(c, 100_000));
+      expect(await mesureDe(id)).toMatchObject({ lotsMesures: 2, ecransMesures: 23, microsMesures: 200_000 });
+      /* B renvoyée en morceau ajouté : l’onglet reprend ses lots déjà lus (`repris`), leur coût passe sous l’empreinte de A */
+      const cle = randomUUID();
+      expect((await fin({ lots: lotsB, cle, mode: "ajout", repris: [cleB] })).story?.id).toBe(id);
+      const sousA = await db().select({ micros: schema.aiUsage.costMicros }).from(schema.aiUsage).where(eq(schema.aiUsage.storyId, id));
+      expect(sousA.reduce((t, l) => t + l.micros, 0)).toBe(800_000);
+      expect(await mesureDe(id)).toMatchObject({ lots: 4, lotsMesures: 2, microsMesures: 200_000 });
+      const apres = (await statsAdmin(1)).pilotage.lecturePartielle.contrefactuel;
+      /* Les deux lots de A seuls (0,20 $), lus avant son import comme ceux de B : pas 0,80 $ */
+      expect(apres.dollars - avant.dollars).toBeCloseTo(0.2, 6);
+      expect(apres.dollarsEpargnables - avant.dollarsEpargnables).toBeCloseTo((0.2 * 12) / 23, 6);
+    } finally {
+      if (envois.length) await db().delete(schema.aiUsage).where(inArray(schema.aiUsage.envoi, envois));
+    }
+  });
+
   it("en mesure, la fin d’un onglet resté sur le JS d’avant (sans `decoupe` : son lot le plus récent n’était que le reste) : importée comme avant, pas mesurée ; une longue vidéo de la moitié entière non plus", async () => {
     etat.mode = "mesure";
     const avant = (await statsAdmin(1)).pilotage.lecturePartielle.contrefactuel;

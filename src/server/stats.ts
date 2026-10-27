@@ -1039,20 +1039,20 @@ async function pilotageDe(jours: Periode): Promise<Pilotage> {
     ),
     /*
      * Le contrefactuel des vidéos lues en entier de la période (« mesure », la moitié entière), par arrêt de la règle et
-     * par titre : les lots de la vidéo mesurée, ceux épargnables, ce qu’ont coûté ses lots (« captures_video », sous
-     * l’empreinte de son envoi, ceux repris d’un envoi d’avant compris) et la part de ce coût que ses écrans épargnables
-     * représentent. La vidéo seule, telle que mesurée : ses écrans et ses lots figés à sa mesure (ecrans_mesures,
-     * lots_mesures ; à défaut, ceux de l’import), et les lots lus avant son import, pas ceux d’un morceau vidéo ajouté
-     * ensuite (rangés sous la même empreinte, lus après), que la règle ne lirait pas
+     * par titre : les lots de la vidéo mesurée, ceux épargnables, ce qu’ont coûté ses lots et la part de ce coût que ses
+     * écrans épargnables représentent. La vidéo seule, telle que mesurée à son import : ses écrans, ses lots et leur coût
+     * figés à sa mesure (ecrans_mesures, lots_mesures, micros_mesures : « captures_video » sous l’empreinte de son envoi,
+     * ceux repris d’un envoi d’avant compris ; à défaut, les écrans et les lots de l’import, et aucun dollar). Pas ceux
+     * d’un morceau vidéo ajouté ensuite, rangés sous la même empreinte (ceux qu’il reprend d’un envoi lu avant l’import
+     * compris), que la règle ne lirait pas
      */
     lignes<{ arret: ArretDeLaRegle | null; contrefactuel: Contrefactuel; videos: string; lots: string; epargnables: string; micros: string; micros_epargnables: string }>(
-      sql`with i as (select envoi, cree_le, coalesce(ecrans_mesures, ecrans) as ecrans, coalesce(lots_mesures, lots) as lots, contrefactuel, arret, lots_epargnables, ecrans_epargnables
-                     from imports where ${W("cree_le")} and type = 'video' and contrefactuel is not null and ${horsDesTests("imports")}),
-            c as (select u.envoi, sum(u.cost_micros) as micros from ai_usage u join i on i.envoi = u.envoi
-                  where u.task = 'captures_video' and u.created_at <= i.cree_le group by u.envoi)
+      sql`with i as (select coalesce(ecrans_mesures, ecrans) as ecrans, coalesce(lots_mesures, lots) as lots, coalesce(micros_mesures, 0) as micros,
+                       contrefactuel, arret, lots_epargnables, ecrans_epargnables
+                     from imports where ${W("cree_le")} and type = 'video' and contrefactuel is not null and ${horsDesTests("imports")})
           select i.arret, i.contrefactuel, count(*) as videos, coalesce(sum(i.lots), 0) as lots, coalesce(sum(i.lots_epargnables), 0) as epargnables,
-            coalesce(sum(c.micros), 0) as micros, coalesce(sum(c.micros::float8 * i.ecrans_epargnables / nullif(i.ecrans, 0)), 0) as micros_epargnables
-          from i left join c on c.envoi = i.envoi group by i.arret, i.contrefactuel`,
+            coalesce(sum(i.micros), 0) as micros, coalesce(sum(i.micros::float8 * i.ecrans_epargnables / nullif(i.ecrans, 0)), 0) as micros_epargnables
+          from i group by i.arret, i.contrefactuel`,
     ),
     /*
      * Par longueur : les achats qui débloquent une conv sur la période, un par ligne (quelques dizaines par semaine), avec
