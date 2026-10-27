@@ -565,10 +565,21 @@ describe("le tableau de bord : l’IA du produit et celle des tests à part, la 
         await tx.execute(
           sql`insert into imports (story_id, envoi, type, appli, cree_le) select id, 'jit-' || id::text, 'video', 'whatsapp', ${loin} from stories where id in ${ids} and created_at < now() - interval '2 days'`,
         );
+        /*
+         * Et ceux des convs d’hier, dans la période, avec le plan de leur vidéo : « L’IA avant l’achat » et la lecture
+         * partielle cherchaient l’achat de chacun (un `exists` lié, rejoué import par import) et passaient le seuil dès
+         * 3 000 imports récents ; datés d’il y a 100 jours, ils n’entraient dans aucune période et ne le montraient pas
+         */
+        await tx.execute(
+          sql`insert into imports (story_id, envoi, type, appli, cree_le) select id, 'jit-' || id::text, 'video', 'whatsapp', ${pres} from stories where id in ${recentes}`,
+        );
+        await tx.execute(
+          sql`insert into plans_video (envoi, video, bras, cree_le) select envoi, 'jit-video-' || envoi, case when random() < 0.5 then 'entiere' else 'partielle' end, ${pres} from imports where story_id in ${recentes}`,
+        );
         await tx.execute(
           sql`insert into mouvements_bulles (user_id, delta, raison, ref, cree_le) select ${u.id}, 3, 'achat', id::text, ${pres} from achats where user_id = ${u.id} and paye_le > now() - interval '2 days'`,
         );
-        await tx.execute(sql`analyze users, stories, ai_usage, achats, tasks, mouvements_bulles, imports`);
+        await tx.execute(sql`analyze users, stories, ai_usage, achats, tasks, mouvements_bulles, imports, plans_video`);
         for (const q of prises) await estimer(q, (x) => tx.execute(x), true);
         tx.rollback();
       })

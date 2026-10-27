@@ -976,17 +976,19 @@ async function pilotageDe(jours: Periode): Promise<Pilotage> {
     /*
      * Les imports de la période (hors des tests et des invités), ce qu’ont coûté leurs lectures (ai_usage, sous l’empreinte de leur
      * envoi), et le temps de leur première lecture (le début de son appel : sa fin moins sa durée ; l’import, pour un
-     * export) jusqu’au paywall (la tâche du verdict posée)
+     * export) jusqu’au paywall (la tâche du verdict posée), et ceux dont la conv a un achat payé (`a` : leurs convs payées,
+     * une fois chacune, jointes à gauche ; imports.story_id est unique, une ligne au plus. Pas un `exists` lié rejoué
+     * import par import, qui passait le seuil du JIT dès 3 000 imports dans la période)
      */
     lignes<{ type: TypeDImport; imports: string; ecrans: string; lots: string; micros: string; paywall: string; payes: string; secondes: string | null }>(
       sql`with i as (select type, envoi, story_id, ecrans, lots, cree_le from imports where ${W("cree_le")} and ${horsDesTests("imports")}),
             c as (select envoi, sum(cost_micros) as micros, min(created_at - ms * interval '1 millisecond') as debut from ai_usage where envoi in (select envoi from i) group by envoi),
-            p as (select story_id, min(created_at) as le from tasks where kind = 'verdict' and story_id in (select story_id from i) group by story_id)
+            p as (select story_id, min(created_at) as le from tasks where kind = 'verdict' and story_id in (select story_id from i) group by story_id),
+            a as (select distinct story_id from achats where paye_le is not null and story_id in (select story_id from i))
           select i.type, count(*) as imports, sum(i.ecrans) as ecrans, sum(i.lots) as lots, coalesce(sum(c.micros), 0) as micros,
-            count(p.story_id) as paywall,
-            count(*) filter (where exists (select 1 from achats a where a.story_id = i.story_id and a.paye_le is not null)) as payes,
+            count(p.story_id) as paywall, count(a.story_id) as payes,
             percentile_cont(0.5) within group (order by extract(epoch from p.le - coalesce(c.debut, i.cree_le))) filter (where p.le is not null) as secondes
-          from i left join c on c.envoi = i.envoi left join p on p.story_id = i.story_id group by i.type`,
+          from i left join c on c.envoi = i.envoi left join p on p.story_id = i.story_id left join a on a.story_id = i.story_id group by i.type`,
     ),
     /*
      * Les lectures d’avant l’import de la période dont aucun import n’est né : des captures (« captures »), des lots
@@ -1006,7 +1008,10 @@ async function pilotageDe(jours: Periode): Promise<Pilotage> {
      * Les deux moitiés de la lecture partielle, vidéo par vidéo : leurs longues vidéos planifiées sur la période (une par
      * empreinte de vidéo : ses essais réunis), sans celles dont une conv est un test ; celles qui ont donné une conv,
      * arrivée au paywall (la tâche du verdict posée), payée, payée plus de 24 h après l’import ; ce qu’ont coûté les
-     * lectures de leurs envois (sous leur empreinte, importés ou non) et leur suite (« captures_suite », sous la conv)
+     * lectures de leurs envois (sous leur empreinte, importés ou non) et leur suite (« captures_suite », sous la conv). Le
+     * paywall et les achats de leurs convs, une fois chacune (`t`, `a` : le dernier paiement de chaque conv, qui dit aussi
+     * s’il en est venu un plus de 24 h après l’import), joints à gauche : pas trois `exists` liés rejoués import par
+     * import, qui passaient le seuil du JIT dès 3 000 imports dans la période
      */
     lignes<{ bras: BrasDeLaLecture; videos: string; importees: string; paywall: string; payes: string; tard: string; avant: string; suite: string }>(
       sql`with pl as (select envoi, video, bras from plans_video where ${W("cree_le")}),
@@ -1015,11 +1020,11 @@ async function pilotageDe(jours: Periode): Promise<Pilotage> {
             v as (select video, min(bras) as bras from pl where video not in (select video from equipe) group by video),
             c as (select pl.video, sum(u.cost_micros) as micros from ai_usage u join pl on pl.envoi = u.envoi group by pl.video),
             s as (select i.video, sum(u.cost_micros) as micros from ai_usage u join i on i.story_id = u.story_id where u.task = 'captures_suite' group by i.video),
-            e as (select i.video,
-                    bool_or(exists (select 1 from tasks t where t.story_id = i.story_id and t.kind = 'verdict')) as paywall,
-                    bool_or(exists (select 1 from achats a where a.story_id = i.story_id and a.paye_le is not null)) as paye,
-                    bool_or(exists (select 1 from achats a where a.story_id = i.story_id and a.paye_le > i.cree_le + interval '24 hours')) as tard
-                  from i group by i.video)
+            t as (select distinct story_id from tasks where kind = 'verdict' and story_id in (select story_id from i)),
+            a as (select story_id, max(paye_le) as dernier from achats where paye_le is not null and story_id in (select story_id from i) group by story_id),
+            e as (select i.video, bool_or(t.story_id is not null) as paywall, bool_or(a.story_id is not null) as paye,
+                    bool_or(coalesce(a.dernier > i.cree_le + interval '24 hours', false)) as tard
+                  from i left join t on t.story_id = i.story_id left join a on a.story_id = i.story_id group by i.video)
           select v.bras, count(*) as videos, count(e.video) as importees, count(*) filter (where e.paywall) as paywall,
             count(*) filter (where e.paye) as payes, count(*) filter (where e.tard) as tard,
             coalesce(sum(c.micros), 0) as avant, coalesce(sum(s.micros), 0) as suite
