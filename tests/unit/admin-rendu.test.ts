@@ -59,6 +59,15 @@ describe("le pilotage, rendu", () => {
     for (const titre of ["D’où ils viennent", "Ce qui se vend", "Les coups de pouce", "Ce que coûte l’IA", "Santé", "Outils", "Bêta", "Les derniers gestes"])
       expect(t, titre).toContain(titre);
     expect(t).toContain("Que des nombres\u00a0: aucune conv, aucun message, aucun email ne sort d’ici.");
+    /* La règle visée de la lecture partielle, rejouée sur les vidéos lues en entier : où elle s’arrête, ses titres, ce qu’elle épargne */
+    for (const titre of [
+      "Vidéos\u00a0: lecture partielle",
+      "Assez au premier tour (le lot le plus récent)",
+      "«\u00a0Tout\u00a0»\u00a0: trop peu de messages lus",
+      "La tendance perdue",
+    ])
+      expect(t, titre).toContain(titre);
+    expect(t).toMatch(/Sur [\d\u202f]+\u00a0vidéos? mesurées? depuis le 27\u00a0octobre, [\d,\u202f]+\u00a0\$ d’IA épargnables sur [\d,\u202f]+\u00a0\$ lus avant l’achat/);
     /* Un « ? » par carte et par chiffre clé, chacun nommé */
     for (const cle of [
       "ca",

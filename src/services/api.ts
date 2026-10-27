@@ -57,7 +57,7 @@ import { ErreurApi } from "@/types/erreurs-api";
 import { CASE_RENONCIATION } from "@/contenu/consentements";
 import { codeDe, messageErreur, problemeAjout } from "@/lib/messages-erreur";
 import { jourDeParis } from "@/lib/jours";
-import { ENVOI_IMAGES_MAX, ENVOIS_REPRIS_MAX, extensionAudio, LECTEURS_DE_LOTS } from "@/lib/limites";
+import { ENVOI_IMAGES_MAX, ENVOIS_REPRIS_MAX, extensionAudio, LECTEURS_DE_LOTS, LOTS_MIN_PARTIELLE } from "@/lib/limites";
 import { ENTETE_CAPTCHA } from "@/lib/captcha";
 import { cleDuSiteCaptcha } from "@/lib/publique";
 import { retenirSecrets } from "@/lib/secrets";
@@ -395,7 +395,9 @@ export async function uploadScreenshots(
  * Une longue vidéo (plus de lots qu’un tour de lecteurs) peut ne se lire qu’en partie avant l’achat
  * (src/server/lecture-partielle.ts, le plan que donne le serveur) : ses lots les plus récents d’abord, un tour à la fois,
  * jusqu’à ce que le serveur dise « assez » ; ses lots plus anciens partent tels quels pendant la lecture, gardés chiffrés
- * et lus après le paiement (POST /api/captures/ecrans). S’ils ne partent pas, ils se lisent avant, comme avant.
+ * et lus après le paiement (POST /api/captures/ecrans). S’ils ne partent pas, ils se lisent avant, comme avant. Toute
+ * vidéo de deux lots ou plus, longue ou non, donne aussi à sa fin de quoi rejouer la règle visée (la mesure, sans rien
+ * changer à sa lecture).
  */
 export async function uploadRecording(
   file: File,
@@ -442,13 +444,17 @@ export async function uploadRecording(
   /* Le même laissez-passer pour tous les lots, puis pour les rassembler */
   await passe;
   /*
-   * Une longue vidéo d’un premier import : le serveur dit comment la lire avant l’achat (en entier, ou d’abord sa partie
-   * la plus récente), d’après l’empreinte de son lot le plus récent. Sans le jour (« ab » à sa place) : la même vidéo
-   * renvoyée le lendemain tombe dans la même moitié de l’A/B. Sans réponse (le réseau), en entier, comme avant
+   * Une vidéo de deux lots ou plus d’un premier import : l’empreinte de son lot le plus récent, sans le jour (« ab » à sa
+   * place : la même vidéo renvoyée le lendemain tombe dans la même moitié de l’A/B), que sa fin envoie au serveur
+   * (`partiel`) avec ce qu’il faut pour rejouer la règle d’arrêt sur ses lots (en « mesure », le contrefactuel de toute
+   * vidéo de deux lots ou plus : src/server/lecture-partielle.ts). Seule une longue vidéo demande d’abord comment la lire
+   * avant l’achat (en entier, ou d’abord sa partie la plus récente : l’A/B), et sa lecture attend la réponse ; une plus
+   * courte n’est jamais dans l’A/B, elle se lit en entier sans rien demander. Sans réponse (le réseau), en entier, comme
+   * avant
    */
   const recent = lots.at(-1);
-  const empreinteVideo = !ajout && lots.length > LECTEURS_DE_LOTS && recent ? await empreinteDuLot(recent, app, "ab") : null;
-  const longue = !!empreinteVideo;
+  const empreinteVideo = !ajout && lots.length >= LOTS_MIN_PARTIELLE && recent ? await empreinteDuLot(recent, app, "ab") : null;
+  const longue = !!empreinteVideo && lots.length > LECTEURS_DE_LOTS;
   const partielle =
     longue &&
     (await appel("POST /api/captures/video/plan", { corps: { lots: lots.length, video: empreinteVideo, sensSur, cle, consentement } }).then(
@@ -526,8 +532,9 @@ export async function uploadRecording(
     await Promise.all(Array.from({ length: Math.min(LECTEURS_DE_LOTS, aLire.length) }, lecteur));
   };
   /*
-   * La fin : les lots lus (à partir de `restants`, ceux d’avant n’étant pas lus), rassemblés par le serveur. Une longue
-   * vidéo dit ce qu’il en reste : le serveur répond alors quoi en faire (SuiteDeLaVideo), ou crée la conv
+   * La fin : les lots lus (à partir de `restants`, ceux d’avant n’étant pas lus), rassemblés par le serveur. Une vidéo de
+   * deux lots ou plus dit ce qu’il en reste (rien, lue en entier) : pour une longue lue en partie, le serveur répond
+   * alors quoi en faire (SuiteDeLaVideo), ou crée la conv
    */
   const fin = (restants: number, gardes = false) =>
     avecReprise(
@@ -540,7 +547,7 @@ export async function uploadRecording(
             consentement,
             ...(repris.size ? { repris: [...repris].slice(0, ENVOIS_REPRIS_MAX) } : {}),
             ...(ajout ? { mode: "ajout" as const } : {}),
-            ...(longue && empreinteVideo ? { partiel: { restants, ecrans: images.length, video: empreinteVideo, sensSur, ...(gardes ? { gardes: true as const } : {}) } } : {}),
+            ...(empreinteVideo ? { partiel: { restants, ecrans: images.length, video: empreinteVideo, sensSur, ...(gardes ? { gardes: true as const } : {}) } } : {}),
           },
         }),
       () => onAvance?.({ etape: "reprise" }),

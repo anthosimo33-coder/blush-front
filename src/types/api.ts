@@ -286,9 +286,10 @@ type Ok = { ok: true };
 export type SuiteDeLaVideo = { suite: "lire" | "garder"; lots: number };
 
 /*
- * Ce que le navigateur dit d’une longue vidéo (POST /api/captures/video) : ses lots plus anciens pas encore lus
- * (`restants`), tous ses écrans, l’empreinte de son lot le plus récent (`video`, la moitié de l’A/B), si son sens de
- * défilement est sûr, et si ses lots plus anciens sont déjà envoyés (`gardes`)
+ * Ce que le navigateur dit d’une vidéo de deux lots ou plus (POST /api/captures/video ; une longue, ou une plus courte
+ * pour la mesure de la règle visée) : ses lots plus anciens pas encore lus (`restants`, 0 lue en entier), tous ses
+ * écrans, l’empreinte de son lot le plus récent (`video`, la moitié de l’A/B), si son sens de défilement est sûr, et si
+ * ses lots plus anciens sont déjà envoyés (`gardes`)
  */
 const LongueVideo = z.object({
   restants: z.number().int().min(0).max(LOTS_MAX),
@@ -575,7 +576,7 @@ export const ROUTES = {
       consentement: z.string().max(40).optional(),
       mode: z.literal("ajout").optional(),
       repris: z.array(z.string().max(64)).max(ENVOIS_REPRIS_MAX).optional(),
-      /* Une longue vidéo : ce qui permet de n’en lire avant l’achat que la partie la plus récente (src/server/lecture-partielle.ts) */
+      /* Une vidéo de deux lots ou plus : ce qui permet de n’en lire avant l’achat que la partie la plus récente, ou de le mesurer (src/server/lecture-partielle.ts) */
       partiel: LongueVideo.optional(),
     }),
   },

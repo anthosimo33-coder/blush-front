@@ -203,7 +203,8 @@ function pilotageDe(jours: Periode, { calme = false, suivi = true }: Variante): 
   /*
    * La lecture partielle des longues vidéos, en A/B : la moitié des longues vidéos de la période dans chaque moitié, la
    * partielle lisant un tiers des lots avant l’achat (le reste gardé, lu après le paiement), un peu plus vite au paywall,
-   * et perdant moins de monde en route ; le contrefactuel des vidéos lues en entier, presque toujours le même titre
+   * et perdant moins de monde en route ; le contrefactuel des vidéos lues en entier, presque toujours le même titre, la
+   * règle visée assez dès son premier tour pour près de trois sur quatre
    */
   const longues = Math.round(importsParType.find((t) => t.type === "video")!.imports * 0.6);
   const moitie = (bras: "entiere" | "partielle") => {
@@ -231,16 +232,24 @@ function pilotageDe(jours: Periode, { calme = false, suivi = true }: Variante): 
       titresEntiers: partielle ? { entiers: payes, changes: 0 } : { entiers: 0, changes: 0 },
     };
   };
+  const mesurees = Math.round(longues / 2);
+  const part = (x: number) => Math.round(mesurees * x);
+  const arrets = { premier_tour: part(0.72), plus_loin: part(0.1), jusqu_au_bout: part(0.05), tout_sens: part(0.06), tout_dates: part(0.03), tout_court: 0 };
+  arrets.tout_court = Math.max(0, mesurees - Object.values(arrets).reduce((t, x) => t + x, 0));
   const lecturePartielle: Pilotage["lecturePartielle"] = {
     bras: [moitie("entiere"), moitie("partielle")],
     contrefactuel: {
-      videos: Math.round(longues / 2),
-      pareil: Math.round(longues / 2) - 1,
+      videos: mesurees,
+      pareil: Math.max(0, mesurees - 1),
       tendancePerdue: 0,
-      dateDecalee: 1,
+      dateDecalee: mesurees ? 1 : 0,
       autreTitre: 0,
-      lots: Math.round(longues / 2) * 14,
-      lotsEpargnables: Math.round(longues / 2) * 9,
+      lots: mesurees * 14,
+      lotsEpargnables: mesurees * 9,
+      mesurees,
+      arrets,
+      dollars: mesurees * 1.2,
+      dollarsEpargnables: mesurees * 0.7,
     },
   };
   const jalonsParAppli = applis

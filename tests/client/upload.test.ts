@@ -466,18 +466,34 @@ describe("uploadRecording : une longue vidéo lue en partie avant l’achat", ()
     expect(secondes.champs.map((c) => c.indice)).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
   });
 
-  it("un morceau ajouté, ou une courte vidéo : aucun plan demandé, rien de la longue vidéo dans la fin ; un sens douteux se dit au plan", async () => {
+  it("un morceau ajouté, une courte vidéo, un seul lot : aucun plan demandé ; la courte de deux lots ou plus dit à sa fin de quoi mesurer la règle visée (lue en entier) ; un sens douteux se dit au plan", async () => {
     const ajout = serveur({ lot: lu });
     await uploadRecording(VIDEO, "imessage", CASE_IMPORT.version, undefined, { ajout: true });
     expect(ajout.plans).toEqual([]);
     expect(ajout.corpsVideo).toEqual([expect.not.objectContaining({ partiel: expect.anything() })]);
     sel++;
-    /* La plus longue des courtes : cinq lots de douze, un seul tour */
+    /* La plus longue des courtes : cinq lots de douze, un seul tour, lus sans attendre de plan ; sa fin dit l’empreinte de son lot le plus récent */
     ecrans = 56;
     const courte = serveur({ lot: lu });
     await uploadRecording(VIDEO, "imessage", CASE_IMPORT.version);
     expect(courte.plans).toEqual([]);
-    expect(courte.corpsVideo).toEqual([expect.not.objectContaining({ partiel: expect.anything() })]);
+    expect(courte.appels[0]).toBe("lot 1 · essai 1");
+    const recente = `imessage:ab:${Array.from({ length: 12 }, (_, k) => `${sel}:${44 + k}`).join(",")}`;
+    expect(courte.corpsVideo).toEqual([expect.objectContaining({ lots: lectures(0, 1, 2, 3, 4), partiel: { restants: 0, ecrans: 56, video: recente, sensSur: true } })]);
+    sel++;
+    /* Deux lots : pareil */
+    ecrans = 23;
+    const deux = serveur({ lot: lu });
+    await uploadRecording(VIDEO, "imessage", CASE_IMPORT.version);
+    expect(deux.plans).toEqual([]);
+    expect(deux.corpsVideo).toEqual([expect.objectContaining({ partiel: expect.objectContaining({ restants: 0, ecrans: 23 }) })]);
+    sel++;
+    /* Un seul lot : rien à épargner, rien à mesurer */
+    ecrans = 12;
+    const seul = serveur({ lot: lu });
+    await uploadRecording(VIDEO, "imessage", CASE_IMPORT.version);
+    expect(seul.plans).toEqual([]);
+    expect(seul.corpsVideo).toEqual([expect.not.objectContaining({ partiel: expect.anything() })]);
     sel++;
     ecrans = 80;
     sensSur = false;

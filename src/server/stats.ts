@@ -14,11 +14,14 @@ import {
   POPULATIONS,
   POPULATIONS_DES_TESTS,
   POPULATIONS_DU_PRODUIT,
+  ARRETS_DE_LA_REGLE,
   BRAS_DE_LA_LECTURE,
   RAISONS_DE_LA_NOTE,
   TYPES_D_IMPORT,
   type AppKind,
+  type ArretDeLaRegle,
   type BrasDeLaLecture,
+  type Contrefactuel,
   type GenreVendu,
   type Jalon,
   type JalonParAppli,
@@ -293,8 +296,13 @@ export type Pilotage = {
    * combien ont vu le titre « Tendance » parmi celles dont le titre est noté, le temps médian de la première lecture au
    * paywall (en secondes, null sans aucune), leurs suites lues, incomplètes ou perdues, et, parmi les suites lues, combien
    * de titres la conv entière aurait changés (`titres.entiers`, `titres.changes`).
-   * `contrefactuel` : les longues vidéos lues en entier (le mode « mesure », la moitié entière), ce qu’aurait montré le
-   * haut de leur paywall sur leur seule partie récente, et les lots que la règle aurait épargnés.
+   * `contrefactuel` : les vidéos lues en entier dont la règle visée se mesure (en « mesure », toutes celles de deux lots
+   * ou plus ; la moitié entière de l’A/B), ce qu’aurait montré le haut de leur paywall sur la seule partie qu’elle aurait
+   * lue (le même titre, la tendance perdue, sa date décalée, un autre titre), leurs lots lus et ceux qu’elle aurait
+   * épargnés ; et, pour celles mesurées depuis le 27 octobre 2026 (`mesurees`), où elle se serait arrêtée (`arrets`,
+   * ARRETS_DE_LA_REGLE, dans l’ordre, même à 0), ce qu’ont coûté leurs lots avant l’achat (`dollars`, sous l’empreinte
+   * de leur envoi) et ce qu’elle en aurait épargné (`dollarsEpargnables`, estimé : le coût de chaque vidéo au prorata
+   * de ses écrans épargnables, sans modèle).
    */
   lecturePartielle: {
     bras: {
@@ -316,7 +324,19 @@ export type Pilotage = {
       suites: { lues: number; incompletes: number; perdues: number };
       titresEntiers: { entiers: number; changes: number };
     }[];
-    contrefactuel: { videos: number; pareil: number; tendancePerdue: number; dateDecalee: number; autreTitre: number; lots: number; lotsEpargnables: number };
+    contrefactuel: {
+      videos: number;
+      pareil: number;
+      tendancePerdue: number;
+      dateDecalee: number;
+      autreTitre: number;
+      lots: number;
+      lotsEpargnables: number;
+      mesurees: number;
+      arrets: Record<ArretDeLaRegle, number>;
+      dollars: number;
+      dollarsEpargnables: number;
+    };
   };
   /**
    * La dépense de l’IA aujourd’hui (jour de Paris) et le budget du jour (BUDGET_IA.jour), en dollars ; `sansCompte` : la
@@ -893,12 +913,18 @@ async function pilotageDe(jours: Periode): Promise<Pilotage> {
             count(*) filter (where i.suite = 'lue') as lues, count(*) filter (where i.suite = 'incomplete') as incompletes, count(*) filter (where i.suite = 'perdue') as perdues
           from i left join c on c.envoi = i.envoi left join p on p.story_id = i.story_id group by i.bras`,
     ),
-    /* Le contrefactuel des longues vidéos lues en entier de la période (« mesure », la moitié entière) */
-    ligne<{ videos: string; pareil: string; perdue: string; decalee: string; autre: string; lots: string; epargnables: string }>(
-      sql`select count(*) as videos, count(*) filter (where contrefactuel = 'pareil') as pareil, count(*) filter (where contrefactuel = 'tendance_perdue') as perdue,
-            count(*) filter (where contrefactuel = 'date_decalee') as decalee, count(*) filter (where contrefactuel = 'autre_titre') as autre,
-            coalesce(sum(lots), 0) as lots, coalesce(sum(lots_epargnables), 0) as epargnables
-          from imports where ${W("cree_le")} and type = 'video' and contrefactuel is not null and ${horsDesTests("imports")}`,
+    /*
+     * Le contrefactuel des vidéos lues en entier de la période (« mesure », la moitié entière), par arrêt de la règle et
+     * par titre : leurs lots, ceux épargnables, ce qu’ont coûté leurs lots (« captures_video », sous l’empreinte de leur
+     * envoi, ceux repris d’un envoi d’avant compris) et la part de ce coût que leurs écrans épargnables représentent
+     */
+    lignes<{ arret: ArretDeLaRegle | null; contrefactuel: Contrefactuel; videos: string; lots: string; epargnables: string; micros: string; micros_epargnables: string }>(
+      sql`with i as (select envoi, ecrans, lots, contrefactuel, arret, lots_epargnables, ecrans_epargnables from imports
+                     where ${W("cree_le")} and type = 'video' and contrefactuel is not null and ${horsDesTests("imports")}),
+            c as (select envoi, sum(cost_micros) as micros from ai_usage where task = 'captures_video' and envoi in (select envoi from i) group by envoi)
+          select i.arret, i.contrefactuel, count(*) as videos, coalesce(sum(i.lots), 0) as lots, coalesce(sum(i.lots_epargnables), 0) as epargnables,
+            coalesce(sum(c.micros), 0) as micros, coalesce(sum(c.micros::float8 * i.ecrans_epargnables / nullif(i.ecrans, 0)), 0) as micros_epargnables
+          from i left join c on c.envoi = i.envoi group by i.arret, i.contrefactuel`,
     ),
   ]);
 
@@ -915,6 +941,26 @@ async function pilotageDe(jours: Periode): Promise<Pilotage> {
     g.centimes += n(o.centimes);
   }
   const convs = convsDeLaPeriode.map((c) => ({ meta: metaDe(c), payee: c.payee }));
+  /* Le contrefactuel, ses lignes (par arrêt et par titre) additionnées ; les dollars et les arrêts, des seules vidéos mesurées depuis le 27 octobre 2026 */
+  type LigneDuContrefactuel = (typeof contrefactuels)[number];
+  const somme = (garder: (l: LigneDuContrefactuel) => boolean, champ: "videos" | "lots" | "epargnables" | "micros" | "micros_epargnables") =>
+    contrefactuels.filter(garder).reduce((t, l) => t + n(l[champ]), 0);
+  const titre = (c: Contrefactuel) => somme((l) => l.contrefactuel === c, "videos");
+  const toutes = () => true;
+  const mesuree = (l: LigneDuContrefactuel) => l.arret !== null;
+  const contrefactuel: Pilotage["lecturePartielle"]["contrefactuel"] = {
+    videos: somme(toutes, "videos"),
+    pareil: titre("pareil"),
+    tendancePerdue: titre("tendance_perdue"),
+    dateDecalee: titre("date_decalee"),
+    autreTitre: titre("autre_titre"),
+    lots: somme(toutes, "lots"),
+    lotsEpargnables: somme(toutes, "epargnables"),
+    mesurees: somme(mesuree, "videos"),
+    arrets: Object.fromEntries(ARRETS_DE_LA_REGLE.map((a) => [a, somme((l) => l.arret === a, "videos")])) as Record<ArretDeLaRegle, number>,
+    dollars: somme(mesuree, "micros") / 1e6,
+    dollarsEpargnables: somme(mesuree, "micros_epargnables") / 1e6,
+  };
 
   return {
     pas,
@@ -1015,15 +1061,7 @@ async function pilotageDe(jours: Periode): Promise<Pilotage> {
           titresEntiers: { entiers: n(l?.entiers), changes: n(l?.changes) },
         };
       }),
-      contrefactuel: {
-        videos: n(contrefactuels.videos),
-        pareil: n(contrefactuels.pareil),
-        tendancePerdue: n(contrefactuels.perdue),
-        dateDecalee: n(contrefactuels.decalee),
-        autreTitre: n(contrefactuels.autre),
-        lots: n(contrefactuels.lots),
-        lotsEpargnables: n(contrefactuels.epargnables),
-      },
+      contrefactuel,
     },
     iaDuJour: { dollars: n(iaDuJour.micros) / 1e6, budget: BUDGET_IA.jour, sansCompte: { dollars: sansCompte / 1e6, budget: BUDGET_IA.anonyme } },
     sante: {

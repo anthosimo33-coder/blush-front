@@ -1,11 +1,12 @@
 import "server-only";
 import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import type { GenreDuHaut } from "@/contenu/haut-du-paywall";
-import type { AppKind, BrasDeLaLecture, Contrefactuel, IssueDeLaSuite, TypeDImport } from "@/types";
+import type { AppKind, BrasDeLaLecture, IssueDeLaSuite, TypeDImport } from "@/types";
 import { empreinte, jeton } from "./chiffrement";
 import { db, schema } from "./db";
 import { estEquipe } from "./droits";
 import { auMieux } from "./journal";
+import type { MesureDeLaRegle } from "./lecture-partielle";
 
 /*
  * La mesure des imports (/admin, « L’IA avant l’achat ») : ce que coûte une conv avant que la personne paie, selon
@@ -46,9 +47,9 @@ export const envoiOuNouveau = (cle: string | null): string => empreinte(`mesure:
 /**
  * Un import à noter : sa conv, comment elle est arrivée, ce que le modèle en a lu, l’empreinte de son envoi (null : un
  * export, ou sans clé), et celles des envois d’avant dont l’onglet a repris des lots déjà lus (`repris`). Une longue
- * vidéo (src/server/lecture-partielle.ts) : sa moitié de l’A/B, les lots gardés pour après le paiement, et le
- * contrefactuel d’une vidéo lue en entier (le titre qu’aurait montré sa partie récente, et les lots qu’elle aurait
- * épargnés).
+ * vidéo (src/server/lecture-partielle.ts) : sa moitié de l’A/B, les lots gardés pour après le paiement ; une vidéo lue
+ * en entier quand la règle visée se mesure : son contrefactuel (le titre qu’aurait montré sa partie récente, où la règle
+ * se serait arrêtée, et les lots et les écrans qu’elle aurait épargnés).
  */
 type Import = {
   storyId: string;
@@ -60,7 +61,7 @@ type Import = {
   repris?: string[];
   bras?: BrasDeLaLecture | null;
   lotsGardes?: number;
-  contrefactuel?: { contrefactuel: Contrefactuel; epargnables: number } | null;
+  contrefactuel?: MesureDeLaRegle | null;
 };
 
 /**
@@ -85,7 +86,9 @@ export async function noterImport({ storyId, type, appli, ecrans, lots, envoi, r
           lotsGardes,
           suite: lotsGardes ? "attente" : null,
           contrefactuel: contrefactuel?.contrefactuel ?? null,
+          arret: contrefactuel?.arret ?? null,
           lotsEpargnables: contrefactuel?.epargnables ?? null,
+          ecransEpargnables: contrefactuel?.ecransEpargnables ?? null,
         })
         .onConflictDoNothing();
       await relier([...(envoi ? [envoi] : []), ...repris], { storyId, envoi: e });

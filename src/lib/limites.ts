@@ -33,6 +33,21 @@ export const ENVOIS_REPRIS_MAX = 10;
  */
 export const LECTEURS_DE_LOTS = 5;
 
+/**
+ * La lecture partielle visée par le plan du 27 octobre 2026, pour toutes les vidéos et non plus les seules longues :
+ * une vidéo d’au moins ce nombre de lots peut ne se lire avant l’achat que dans sa partie la plus récente (un lot seul se
+ * lit toujours en entier). Mesurée d’abord sans rien changer à la lecture (BLUSH_LECTURE_PARTIELLE à « mesure » :
+ * leContrefactuel, src/server/lecture-partielle.ts) ; l’A/B la suivra.
+ */
+export const LOTS_MIN_PARTIELLE = 2;
+
+/**
+ * La taille commune d’un tour de cette lecture partielle visée : son premier tour (le lot le plus récent, plein depuis
+ * la découpe en partant de la fin), puis chaque tour de plus, jusqu’à ce que la règle d’arrêt dise « assez » (decider).
+ * Un tour d’un lot se lit en 25 à 30 s.
+ */
+export const LOTS_PAR_TOUR = 1;
+
 /** Les lots d’un enregistrement, au plus, pour le serveur (/api/captures/video, /api/captures/ecrans) : un très long en fait quinze. */
 export const LOTS_MAX = 40;
 

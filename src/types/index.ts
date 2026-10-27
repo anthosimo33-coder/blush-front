@@ -207,12 +207,22 @@ export const ISSUES_DE_LA_SUITE = ["attente", "lue", "incomplete", "perdue"] as 
 export type IssueDeLaSuite = (typeof ISSUES_DE_LA_SUITE)[number];
 
 /**
- * Le contrefactuel d’une longue vidéo lue en entier (src/server/lecture-partielle.ts) : le haut du paywall qu’aurait
- * montré sa seule partie récente, comparé au vrai. Le même titre (« pareil ») ; la tendance perdue ; la tendance datée à
- * plus de 7 jours de la vraie ; un autre titre.
+ * Le contrefactuel d’une vidéo lue en entier (src/server/lecture-partielle.ts) : le haut du paywall qu’aurait montré sa
+ * seule partie récente, comparé au vrai. Le même titre (« pareil », aussi quand la règle aurait tout lu) ; la tendance
+ * perdue ; la tendance datée à plus de 7 jours de la vraie ; un autre titre (une autre forme du titre « volume » aussi).
  */
 export const CONTREFACTUELS = ["pareil", "tendance_perdue", "date_decalee", "autre_titre"] as const;
 export type Contrefactuel = (typeof CONTREFACTUELS)[number];
+
+/**
+ * Où la règle visée de la lecture partielle (src/server/lecture-partielle.ts, leContrefactuel) se serait arrêtée sur une
+ * vidéo lue en entier : « assez » dès son premier tour (son lot le plus récent), ou après un tour de plus au moins ;
+ * jusqu’au bout, un tour après l’autre, sans rien laisser ; ou « tout » d’un coup, et pourquoi : le sens douteux dit par
+ * le navigateur, des dates de repère qui reculent (ou après le jour de l’import), trop peu de messages lus
+ * (MIN_MESSAGES_CAPTURES).
+ */
+export const ARRETS_DE_LA_REGLE = ["premier_tour", "plus_loin", "jusqu_au_bout", "tout_sens", "tout_dates", "tout_court"] as const;
+export type ArretDeLaRegle = (typeof ARRETS_DE_LA_REGLE)[number];
 
 /** Les mesures de vitesse que les navigateurs envoient (les Web Vitals : src/lib/sentinelle.tsx), en millisecondes sauf CLS. */
 export const METRIQUES_WEB = ["LCP", "INP", "CLS", "FCP", "TTFB"] as const;

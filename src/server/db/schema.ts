@@ -36,6 +36,7 @@ import {
   POPULATIONS,
   SOURCES_VISITE,
   BRAS_DE_LA_LECTURE,
+  ARRETS_DE_LA_REGLE,
   CONTREFACTUELS,
   ISSUES_DE_LA_SUITE,
   STATUTS_ACHAT,
@@ -613,17 +614,22 @@ export const imports = pgTable(
     /*
      * La lecture partielle d’une longue vidéo (src/server/lecture-partielle.ts), rien de son contenu : sa moitié de l’A/B
      * (vide hors de l’A/B), les lots gardés pour après le paiement (ses écrans chiffrés, ecrans_gardes) et ce qu’est
-     * devenue leur suite (vide sans lots gardés). `contrefactuel` : une longue vidéo lue en entier, ce qu’aurait montré
-     * le haut de son paywall sur sa seule partie récente, et les lots que la règle aurait laissés pour après
-     * (`lots_epargnables`). `titre` : le titre que son paywall a montré (GENRES_DU_HAUT), noté avec le contexte ;
-     * `titre_entier` : celui qu’aurait montré la conv entière, une fois sa suite lue après le paiement (la moitié
-     * partielle : ses titres perdus, comme le contrefactuel ceux de la moitié entière).
+     * devenue leur suite (vide sans lots gardés). `contrefactuel` : une vidéo lue en entier quand la règle se mesure (en
+     * « mesure », toute vidéo de deux lots ou plus ; en « ab », une longue de la moitié entière), ce qu’aurait montré le
+     * haut de son paywall sur la seule partie que la règle visée aurait lue, où elle se serait arrêtée (`arret`,
+     * ARRETS_DE_LA_REGLE : vide avant le 27 octobre 2026, quand elle rejouait la règle de l’A/B), les lots qu’elle aurait
+     * laissés pour après (`lots_epargnables`) et leurs écrans (`ecrans_epargnables`, comptés comme `ecrans` : les dollars
+     * épargnables au prorata ; vides avant le 27 octobre). `titre` : le titre que son paywall a montré (GENRES_DU_HAUT),
+     * noté avec le contexte ; `titre_entier` : celui qu’aurait montré la conv entière, une fois sa suite lue après le
+     * paiement (la moitié partielle : ses titres perdus, comme le contrefactuel ceux de la moitié entière).
      */
     bras: text("bras", { enum: BRAS_DE_LA_LECTURE }),
     lotsGardes: integer("lots_gardes").notNull().default(0),
     suite: text("suite", { enum: ISSUES_DE_LA_SUITE }),
     contrefactuel: text("contrefactuel", { enum: CONTREFACTUELS }),
+    arret: text("arret", { enum: ARRETS_DE_LA_REGLE }),
     lotsEpargnables: integer("lots_epargnables"),
+    ecransEpargnables: integer("ecrans_epargnables"),
     titre: text("titre"),
     titreEntier: text("titre_entier"),
     creeLe: quand("cree_le").notNull().defaultNow(),

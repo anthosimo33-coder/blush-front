@@ -85,7 +85,7 @@ export const OUTILS: readonly OutilMcp[] = [
     name: "couts_ia",
     title: "Coûts de l’IA",
     description:
-      "Ce qu’a coûté l’IA sur la période et celle d’avant, en dollars, rangée par une seule règle « qui est qui » : le total (la facture), celle du produit (les clients et les prospects) et celle des tests (l’équipe et le tournage), chaque population (clients, prospects, invités, équipe, tournage, non classé), par acheteur, par rapport et par verdict (le produit seul, la même population en haut et en bas), par poste (en tout et pour le produit, avec le nombre d’appels), la dépense d’aujourd’hui face au budget du jour (et la part sans compte face à la sienne), et l’IA avant l’achat par type d’import (export, captures, vidéo, hors des tests et des invités : les convs importées, leurs écrans et leurs lots par import, l’IA par import, le temps médian jusqu’au paywall, la part au paywall et la part qui paie, à partir de 30 convs, l’IA par acheteur, et ce qui a été lu pour rien), et la lecture partielle des longues vidéos (l’A/B, hors des tests et des invités : pour chaque moitié, entière ou partielle, ses vidéos comptées dès leur plan, importées ou non, celles importées, la part au paywall et qui paie, celles payées plus de 24 h après l’import, l’IA avant l’achat par vidéo, la suite lue après par acheteur, l’IA de lecture par acheteur, le temps médian jusqu’au paywall, les écrans et les lots lus avant, les lots gardés et la part des vidéos coupées, la part du titre « Tendance », les suites lues, incomplètes ou perdues, les titres que la conv entière aurait changés une fois sa suite lue ; et le contrefactuel des vidéos lues en entier).",
+      "Ce qu’a coûté l’IA sur la période et celle d’avant, en dollars, rangée par une seule règle « qui est qui » : le total (la facture), celle du produit (les clients et les prospects) et celle des tests (l’équipe et le tournage), chaque population (clients, prospects, invités, équipe, tournage, non classé), par acheteur, par rapport et par verdict (le produit seul, la même population en haut et en bas), par poste (en tout et pour le produit, avec le nombre d’appels), la dépense d’aujourd’hui face au budget du jour (et la part sans compte face à la sienne), et l’IA avant l’achat par type d’import (export, captures, vidéo, hors des tests et des invités : les convs importées, leurs écrans et leurs lots par import, l’IA par import, le temps médian jusqu’au paywall, la part au paywall et la part qui paie, à partir de 30 convs, l’IA par acheteur, et ce qui a été lu pour rien), et la lecture partielle des longues vidéos (l’A/B, hors des tests et des invités : pour chaque moitié, entière ou partielle, ses vidéos comptées dès leur plan, importées ou non, celles importées, la part au paywall et qui paie, celles payées plus de 24 h après l’import, l’IA avant l’achat par vidéo, la suite lue après par acheteur, l’IA de lecture par acheteur, le temps médian jusqu’au paywall, les écrans et les lots lus avant, les lots gardés et la part des vidéos coupées, la part du titre « Tendance », les suites lues, incomplètes ou perdues, les titres que la conv entière aurait changés une fois sa suite lue ; et le contrefactuel des vidéos lues en entier, en « mesure » toutes celles de deux lots ou plus : la règle visée rejouée, un premier tour du lot le plus récent puis un lot à la fois, où elle se serait arrêtée (assez au premier tour, plus loin, jusqu’au bout, ou « tout » pour le sens douteux, des dates qui reculent, trop peu de messages), le titre qu’aurait montré sa partie lue face au vrai, les lots et les dollars qu’elle aurait épargnés, estimés au prorata des écrans, et les taux de ses critères).",
     inputSchema: AVEC_JOURS,
   },
   {
@@ -342,7 +342,10 @@ function coutsIA(s: StatsAdmin) {
         luPourRienDollars: arrondi(t.pourRien, 2),
       };
     }),
-    /* Les deux moitiés de l’A/B, comptées dès leur plan, avec les mêmes taux (null sous les 30 vidéos) et leurs effectifs ; le contrefactuel des vidéos lues en entier */
+    /*
+     * Les deux moitiés de l’A/B, comptées dès leur plan, avec les mêmes taux (null sous les 30 vidéos) et leurs effectifs ;
+     * le contrefactuel des vidéos lues en entier : la règle visée rejouée, ses arrêts, ses titres et ce qu’elle épargne
+     */
     lecturePartielle: {
       moities: s.pilotage.lecturePartielle.bras.map((b) => {
         const taux = (n: number, sur: number) => {
@@ -371,8 +374,40 @@ function coutsIA(s: StatsAdmin) {
           titresChangesParLaSuite: b.titresEntiers,
         };
       }),
-      contrefactuel: s.pilotage.lecturePartielle.contrefactuel,
+      contrefactuel: contrefactuelDuMcp(s.pilotage.lecturePartielle.contrefactuel),
     },
+  };
+}
+
+/**
+ * Le contrefactuel de la lecture partielle, pour le MCP : ses nombres tels quels, et les taux des critères du passage de
+ * « mesure » à « ab » (null sous les 30 vidéos, comme dans /admin) : assez au premier tour (sur les vidéos mesurées
+ * depuis le 27 octobre 2026, `mesurees`), les « tout », les tendances perdues, un autre titre ou une date décalée (sur
+ * toutes), et les dollars lus et épargnables (estimés, au prorata des écrans épargnables).
+ */
+function contrefactuelDuMcp(c: Pilotage["lecturePartielle"]["contrefactuel"]) {
+  const taux = (n: number, sur: number) => {
+    const v = tauxLisible(n, sur);
+    return v === null ? null : arrondi(v * 100);
+  };
+  const { arrets } = c;
+  return {
+    videos: c.videos,
+    pareil: c.pareil,
+    tendancePerdue: c.tendancePerdue,
+    dateDecalee: c.dateDecalee,
+    autreTitre: c.autreTitre,
+    lots: c.lots,
+    lotsEpargnables: c.lotsEpargnables,
+    lotsEpargnablesPct: arrondi(rapport(100 * c.lotsEpargnables, c.lots)),
+    mesurees: c.mesurees,
+    arrets,
+    assezAuPremierTourPct: taux(arrets.premier_tour, c.mesurees),
+    toutPct: taux(arrets.tout_sens + arrets.tout_dates + arrets.tout_court, c.mesurees),
+    tendancePerduePct: taux(c.tendancePerdue, c.videos),
+    autreTitreOuDateDecaleePct: taux(c.autreTitre + c.dateDecalee, c.videos),
+    dollarsLus: arrondi(c.dollars, 2),
+    dollarsEpargnablesEstimes: arrondi(c.dollarsEpargnables, 2),
   };
 }
 

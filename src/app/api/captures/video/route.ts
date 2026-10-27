@@ -15,7 +15,7 @@ import { storyEtSource } from "@/server/conv-affichee";
 import { ajouterDesCaptures, importerCaptures, morceauDejaAjoute } from "@/server/histoires";
 import { journalErreur } from "@/server/journal";
 import { consentementImport } from "@/server/juridique";
-import { brasDeLaVideo, decider, estLongue, leContrefactuel, modeDeLaLecture, planDeLecture } from "@/server/lecture-partielle";
+import { brasDeLaVideo, decider, leContrefactuel, modeDeLaLecture, planDeLecture, seMesure } from "@/server/lecture-partielle";
 import { LIMITES } from "@/server/limites";
 import { garde, octetsDansLeBudget, sousLaLimiteDeLIp } from "@/server/requete";
 import { aujourdhuiParis } from "@/server/temps";
@@ -72,7 +72,8 @@ const Envoi = ROUTES["POST /api/captures/video"].corps.extend({ app: AppliCaptur
  * un morceau de plus pour la conv qu’on importe, comme des captures ajoutées (POST /api/captures, `mode=add`).
  * Une longue vidéo lue en partie (`partiel`, src/server/lecture-partielle.ts) : tant que ses lots plus anciens ne sont
  * ni lus ni envoyés, la route dit seulement quoi en faire (SuiteDeLaVideo : en lire encore, ou les garder), sans rien
- * créer ; renvoyée avec `gardes`, la conv naît avec sa suite (src/server/ecrans-gardes.ts), lue après le paiement.
+ * créer ; renvoyée avec `gardes`, la conv naît avec sa suite (src/server/ecrans-gardes.ts), lue après le paiement. Toute
+ * vidéo de deux lots ou plus envoie `partiel` (lue en entier : `restants` à 0), pour la mesure de la règle visée.
  */
 export const POST = route("POST /api/captures/video", async (req: Request) => {
   const g = await garde(req, { session: "aucune" });
@@ -89,9 +90,9 @@ export const POST = route("POST /api/captures/video", async (req: Request) => {
   /* Le mode tournage (src/server/tournage.ts) : ses lots n’ont rien lu, le brouillon reprend la conv de tournage */
   const tournage = await tournageDuNavigateur();
   /*
-   * Une longue vidéo (src/server/lecture-partielle.ts) : sa moitié de l’A/B, et, dans la moitié partielle, ce qu’il reste
-   * à faire de ses lots plus anciens. Hors de la moitié partielle (l’interrupteur coupé entre-temps, le mode tournage),
-   * ils se lisent tous, comme avant.
+   * Une vidéo de deux lots ou plus (src/server/lecture-partielle.ts) : longue, sa moitié de l’A/B, et, dans la moitié
+   * partielle, ce qu’il reste à faire de ses lots plus anciens ; sinon (une courte, hors de l’A/B), seulement sa mesure.
+   * Hors de la moitié partielle (l’interrupteur coupé entre-temps, le mode tournage), ils se lisent tous, comme avant.
    */
   const jour = aujourdhuiParis().iso;
   const e = envoiDe(cleEnvoi(cle));
@@ -176,11 +177,12 @@ export const POST = route("POST /api/captures/video", async (req: Request) => {
     }
   }
   /*
-   * Une longue vidéo lue en entier, quand la lecture partielle se mesure (« mesure », ou la moitié entière de l’A/B) : ce
-   * qu’elle aurait changé au haut du paywall (le contrefactuel, sans modèle). Une erreur n’arrête jamais l’import
+   * Une vidéo lue en entier, quand la lecture partielle se mesure (seMesure : en « mesure », toute vidéo de deux lots ou
+   * plus ; en « ab », une longue vidéo de la moitié entière) : ce que la règle visée en aurait lu, épargné et changé au
+   * haut du paywall (le contrefactuel, sans modèle). Rien de plus n’est lu ni gardé. Une erreur n’arrête jamais l’import
    */
   const contrefactuel = () => {
-    if (!partiel || !video || tournage || aGarder || bras === "partielle" || modeDeLaLecture() === "0" || !estLongue(video.lots)) return null;
+    if (!partiel || !video || tournage || aGarder || bras === "partielle" || modeDeLaLecture() === "0" || !seMesure(video.lots)) return null;
     try {
       return leContrefactuel(lots, { ecrans: partiel.ecrans, appli: app, jour, sensSur: partiel.sensSur });
     } catch (err) {

@@ -267,6 +267,13 @@
       "when": 1793054403412,
       "tag": "0037_email_canonique",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1793098616288,
+      "tag": "0038_regle_mesuree",
+      "breakpoints": true
     }
   ]
 }

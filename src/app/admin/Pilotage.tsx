@@ -1357,14 +1357,15 @@ function IAAvantLAchat({ p }: { p: Chiffres }) {
   );
 }
 
-/* ———— La lecture partielle des longues vidéos ———— */
+/* ———— La lecture partielle des vidéos ———— */
 
 /**
  * Les deux moitiés de l’A/B de la lecture partielle (src/server/lecture-partielle.ts), côte à côte : la moitié qui lit
  * tout avant l’achat, celle qui n’en lit que la partie récente (le reste lu après le paiement). Comptées dès leur plan
  * (importées ou non) : ce qu’elles coûtent avant l’achat, ce qu’elles vendent (avec les effectifs, un taux n’étant
  * lisible qu’à partir de PERSONNES_D_UN_TAUX vidéos), en combien de temps elles arrivent au paywall, et le titre qu’elles y
- * montrent. Puis le contrefactuel des vidéos lues en entier : ce que la lecture partielle leur aurait changé.
+ * montrent. Puis le contrefactuel des vidéos lues en entier (en « mesure », toutes celles de deux lots ou plus) : où la
+ * règle visée se serait arrêtée, ce qu’elle leur aurait changé au paywall, et ce qu’elle aurait épargné.
  */
 function LecturePartielle({ p }: { p: Chiffres }) {
   const { bras, contrefactuel: c } = p.lecturePartielle;
@@ -1394,13 +1395,70 @@ function LecturePartielle({ p }: { p: Chiffres }) {
     /* La conv entière, une fois sa suite lue : un autre titre que celui que le paywall a montré (la moitié entière : le contrefactuel, plus bas) */
     ["Titre changé par la suite", (b) => (b.bras === "partielle" && b.titresEntiers.entiers ? `${nombre(b.titresEntiers.changes)} sur ${nombre(b.titresEntiers.entiers)}` : "—")],
   ];
+  /*
+   * La règle visée, rejouée sur les vidéos lues en entier : chaque ligne, son nombre et sa part (« — » sous
+   * PERSONNES_D_UN_TAUX). Où elle s’arrête, sur les vidéos mesurées depuis le 27 octobre 2026 ; le titre, sur toutes
+   */
+  const { arrets: a } = c;
+  const mesure: [string, number, number][] = [
+    ["Assez au premier tour (le lot le plus récent)", a.premier_tour, c.mesurees],
+    ["Assez un tour plus loin, ou davantage", a.plus_loin, c.mesurees],
+    ["Lues jusqu’au bout, tour par tour", a.jusqu_au_bout, c.mesurees],
+    ["«\u00a0Tout\u00a0»\u00a0: le sens douteux (le navigateur)", a.tout_sens, c.mesurees],
+    ["«\u00a0Tout\u00a0»\u00a0: des dates qui reculent", a.tout_dates, c.mesurees],
+    ["«\u00a0Tout\u00a0»\u00a0: trop peu de messages lus", a.tout_court, c.mesurees],
+    ["Le même titre au paywall", c.pareil, c.videos],
+    ["La tendance perdue", c.tendancePerdue, c.videos],
+    ["Sa date décalée de plus de 7\u00a0jours", c.dateDecalee, c.videos],
+    ["Un autre titre", c.autreTitre, c.videos],
+  ];
+  /* Le « ? » : l’A/B quand il tourne, sinon la mesure */
+  const aide = videos
+    ? { valeur: dollars(avant), contexte: `lus avant l’achat pour ${pluriel(videos, "longue vidéo", "longues vidéos")}` }
+    : { valeur: dollars(c.dollarsEpargnables), contexte: `épargnables (estimé) sur ${pluriel(c.mesurees, "vidéo mesurée", "vidéos mesurées")}` };
   return (
     <Bloc
       id="lecture-partielle"
-      titre={"Longues vidéos\u00a0: lecture partielle"}
-      sous={"L’A/B\u00a0: tout lire avant l’achat, ou seulement la partie récente"}
-      aide={{ cle: "lecturePartielle", valeur: dollars(avant), contexte: `lus avant l’achat pour ${pluriel(videos, "longue vidéo", "longues vidéos")}` }}
+      titre={"Vidéos\u00a0: lecture partielle"}
+      sous={"Ce que la règle visée aurait épargné, puis l’A/B des longues vidéos"}
+      aide={{ cle: "lecturePartielle", ...aide }}
     >
+      {c.videos ? (
+        <div role="region" aria-label="La règle visée, rejouée sur les vidéos lues en entier, à faire défiler" tabIndex={0} className="-mx-2 mt-[18px] overflow-x-auto px-2">
+          <table className="w-full min-w-[420px] border-collapse text-left">
+            <caption className="sr-only">Pour les vidéos lues en entier, où la règle visée se serait arrêtée et le titre qu’aurait montré la partie qu’elle aurait lue</caption>
+            <thead>
+              <tr className="text-micro font-black uppercase tracking-[0.06em] text-grey">
+                <th scope="col" className="pb-2.5 pr-3 font-black">
+                  La règle visée
+                </th>
+                <th scope="col" className="pb-2.5 pr-3 text-right font-black">
+                  Vidéos
+                </th>
+                <th scope="col" className="pb-2.5 text-right font-black">
+                  Part
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {mesure.map(([nom, n, sur]) => (
+                <tr key={nom} className="border-t border-sep text-detail font-extrabold">
+                  <th scope="row" className="py-2.5 pr-3 text-left font-extrabold">
+                    {nom}
+                  </th>
+                  <td className="py-2.5 pr-3 text-right tabular-nums">{nombre(n)}</td>
+                  <td className="py-2.5 text-right tabular-nums">{taux(n, sur)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
+      <p className="m-0 mt-3 text-legende font-bold text-grey">
+        {c.videos
+          ? `Lues en entier, sur ${pluriel(c.videos, "vidéo")}\u00a0: la règle aurait laissé ${c.lots ? pourcent((100 * c.lotsEpargnables) / c.lots, 0) : "0\u00a0%"} des lots pour après le paiement. Sur ${pluriel(c.mesurees, "vidéo mesurée", "vidéos mesurées")} depuis le 27\u00a0octobre, ${dollars(c.dollarsEpargnables)} d’IA épargnables sur ${dollars(c.dollars)} lus avant l’achat (estimé, au prorata de leurs écrans).`
+          : "Aucune vidéo mesurée sur la période (BLUSH_LECTURE_PARTIELLE à «\u00a0mesure\u00a0» ou «\u00a0ab\u00a0»)."}
+      </p>
       {videos ? (
         <div role="region" aria-label="Les deux moitiés de la lecture partielle, à faire défiler" tabIndex={0} className="-mx-2 mt-[18px] overflow-x-auto px-2">
           <table className="w-full min-w-[520px] border-collapse text-left">
@@ -1441,12 +1499,7 @@ function LecturePartielle({ p }: { p: Chiffres }) {
           Aucune longue vidéo en A/B sur la période (BLUSH_LECTURE_PARTIELLE à «{NBSP}ab{NBSP}»).
         </p>
       )}
-      <p className="m-0 mt-3 text-legende font-bold text-grey">
-        {c.videos
-          ? `Lues en entier, sur ${pluriel(c.videos, "vidéo")}\u00a0: la partie récente aurait montré le même titre ${pluriel(c.pareil, "fois", "fois")}, perdu la tendance ${pluriel(c.tendancePerdue, "fois", "fois")}, décalé sa date de plus de 7\u00a0jours ${pluriel(c.dateDecalee, "fois", "fois")}, changé de titre ${pluriel(c.autreTitre, "fois", "fois")}, et laissé ${c.lots ? pourcent((100 * c.lotsEpargnables) / c.lots, 0) : "0\u00a0%"} des lots pour après le paiement.`
-          : "Aucun contrefactuel sur la période (BLUSH_LECTURE_PARTIELLE à «\u00a0mesure\u00a0» ou «\u00a0ab\u00a0»)."}{" "}
-        {`«\u00a0—\u00a0»\u00a0: moins de ${PERSONNES_D_UN_TAUX}\u00a0vidéos, trop peu pour un taux.`}
-      </p>
+      <p className="m-0 mt-3 text-legende font-bold text-grey">{`«\u00a0—\u00a0»\u00a0: moins de ${PERSONNES_D_UN_TAUX}\u00a0vidéos, trop peu pour un taux.`}</p>
     </Bloc>
   );
 }
