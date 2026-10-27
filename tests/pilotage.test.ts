@@ -470,7 +470,7 @@ describe("le haut du paywall dans le pilotage", () => {
 });
 
 describe("les convs payées par longueur (/admin)", () => {
-  it("par tranche : les ventes et l’offre prise, l’IA médiane d’une lecture payée et les jetons par message des verdicts (le produit seul), leurs nouveaux essais et leurs modèles ; à part, les achats payés plus de 48 h après le paywall et ceux d’une conv effacée", async () => {
+  it("par tranche : les ventes et l’offre prise, l’IA médiane d’avant l’achat, d’une lecture payée et des deux réunis, et les jetons par message des verdicts (le produit seul), leurs nouveaux essais et leurs modèles ; à part, les achats payés plus de 48 h après le paywall et ceux d’une conv effacée", async () => {
     const tranche = (p: Pilotage, t: TrancheDeLongueur) => p.parLongueur.tranches.find((x) => x.tranche === t)!;
     const modele = (p: Pilotage, m: string) => p.parLongueur.modeles.find((x) => x.modele === m) ?? { lignes: 0, convs: 0, dollars: 0 };
     const avant = (await statsAdmin(7)).pilotage;
@@ -507,9 +507,29 @@ describe("les convs payées par longueur (/admin)", () => {
     await achat("rapport", { storyId: courte.id, population: "equipe" });
     const ligne = (storyId: string, task: string, micros: number, plus: Partial<typeof schema.aiUsage.$inferInsert> = {}) =>
       ({ storyId, task, model: "claude-opus-5-5", costMicros: micros, population: "client", ...plus }) satisfies typeof schema.aiUsage.$inferInsert;
+    /*
+     * Les imports mesurés (une ligne d’imports, sous l’empreinte de leur envoi) : la longue, une vidéo, et la courte, un
+     * export (rien de lu avant l’achat). La très longue n’en a pas (importée avant la mesure) : son avant n’est pas connu
+     */
+    const envoi = randomUUID();
+    await db()
+      .insert(schema.imports)
+      .values([
+        { storyId: longue.id, envoi, type: "video", appli: "imessage", ecrans: 23, lots: 2 },
+        { storyId: courte.id, envoi: randomUUID(), type: "export", appli: "whatsapp" },
+      ]);
     await db()
       .insert(schema.aiUsage)
       .values([
+        /* Avant l’achat : les deux lots de la vidéo et un morceau de captures, rangés sous sa conv et son envoi */
+        ligne(longue.id, "captures_video", 200_000, { envoi }),
+        ligne(longue.id, "captures_video", 200_000, { envoi }),
+        ligne(longue.id, "captures", 50_000, { envoi }),
+        /* Pas avant l’achat : des captures envoyées au chat (sans envoi, les bulles les paient) ; ni l’essai d’un test */
+        ligne(longue.id, "captures", 70_000),
+        ligne(longue.id, "captures_video", 3_000_000, { envoi, population: "equipe" }),
+        /* La suite de la vidéo, lue après le paiement : de la lecture */
+        ligne(longue.id, "captures_suite", 300_000),
         /* Un verdict du montage partagé (le socle et 140 000 jetons de conv écrits en cache), et un essai d’avant, sur un autre modèle : compté, pas mesuré */
         ligne(longue.id, "verdict", 900_000, { inputTokens: 2_000, cacheWriteTokens: 15_300 + 140_000 }),
         ligne(longue.id, "verdict", 1_100_000, { model: "claude-fable-5-1", inputTokens: 160_000, createdAt: new Date("2026-10-20T10:00:00Z") }),
@@ -533,8 +553,13 @@ describe("les convs payées par longueur (/admin)", () => {
         offres: { rapport: 1, premium: 1, suite: 0, second: 0, rapport_garde: 0, autre: 0 },
         convs: 1,
         lues: 1,
-        /* 0,9 + 1,1 (le verdict et son essai) + 0,3 + 0,4 (le rapport) + 0,2 (la mémoire) + 0,05 (le vocal) */
-        dollarsMedian: 2.95,
+        /* 0,9 + 1,1 (le verdict et son essai) + 0,3 + 0,4 (le rapport) + 0,2 (la mémoire) + 0,05 (le vocal) + 0,3 (la suite) */
+        dollarsMedian: 3.25,
+        importsMesures: 1,
+        /* 0,2 + 0,2 (les lots) + 0,05 (le morceau de captures) */
+        dollarsMedianAvant: 0.45,
+        totaux: 1,
+        dollarsMedianTotal: 3.7,
         verdicts: 2,
         plusieursVerdicts: 1,
         /* (2 000 + 155 300 − 15 300) ÷ 4 000 */
@@ -546,12 +571,19 @@ describe("les convs payées par longueur (/admin)", () => {
         offres: { suite: 1 },
         convs: 1,
         dollarsMedian: 2.5,
+        /* Sans import mesuré : ni avant, ni les deux réunis */
+        importsMesures: 0,
+        dollarsMedianAvant: null,
+        totaux: 0,
+        dollarsMedianTotal: null,
         verdicts: 1,
         plusieursVerdicts: 0,
         jetonsParMessage: 20.125,
       });
       const d = (f: (p: Pilotage) => number) => f(apres) - f(avant);
       expect([d((p) => tranche(p, "moins_de_1000").ventes), d((p) => tranche(p, "moins_de_1000").offres.second), d((p) => tranche(p, "moins_de_1000").lues)]).toEqual([1, 1, 1]);
+      /* La courte, un export mesuré : rien de lu avant l’achat, mais une conv de plus dans les deux médianes */
+      expect([d((p) => tranche(p, "moins_de_1000").importsMesures), d((p) => tranche(p, "moins_de_1000").totaux)]).toEqual([1, 1]);
       expect(d((p) => p.parLongueur.effacees)).toBe(1);
       expect([d((p) => p.parLongueur.tard.payes), d((p) => p.parLongueur.tard.plusDe48h), d((p) => p.parLongueur.tard.sansPaywall)]).toEqual([4, 1, 1]);
       expect([d((p) => modele(p, "claude-opus-5-5").lignes), d((p) => modele(p, "claude-opus-5-5").convs), d((p) => modele(p, "claude-fable-5-1").lignes)]).toEqual([3, 3, 1]);
@@ -564,6 +596,9 @@ describe("les convs payées par longueur (/admin)", () => {
       await db()
         .delete(schema.aiUsage)
         .where(inArray(schema.aiUsage.storyId, [longue.id, tresLongue.id, courte.id]));
+      await db()
+        .delete(schema.imports)
+        .where(inArray(schema.imports.storyId, [longue.id, courte.id]));
       await db().delete(schema.achats).where(eq(schema.achats.userId, u.id));
     }
   });

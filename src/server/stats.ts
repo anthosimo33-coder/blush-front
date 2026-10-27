@@ -357,7 +357,12 @@ export type Pilotage = {
    * conv (`stories.message_count`, joint par achats.story_id : tous les messages reçus, pas ce que lit le modèle).
    * `tranches` : chacune (TRANCHES_DE_LONGUEUR, dans l’ordre, même vide), ses ventes et l’offre prise ; ses convs, celles
    * dont la lecture a coûté (`lues`) et l’IA médiane d’une lecture (le verdict, ses essais compris, le rapport, la
-   * création de la mémoire et le script du vocal : leurs appels du produit, en dollars ; null sans aucune) ; les lignes de
+   * création de la mémoire, le script du vocal et la suite d’une vidéo, lue après le paiement : leurs appels du produit,
+   * en dollars ; null sans aucune) ; celles dont l’import est mesuré (`importsMesures`, une ligne d’imports : depuis le
+   * 26 octobre 2026, ses lectures d’avant sont rangées sous elle) et l’IA médiane d’avant l’achat (`dollarsMedianAvant`,
+   * les lectures de son import, ses morceaux compris : APPEL_D_AVANT_L_ACHAT ; 0 pour un export ; null sans aucune) ;
+   * l’IA médiane de tout ce qu’a coûté une vente, avant l’achat et sa lecture réunis conv par conv (`dollarsMedianTotal`,
+   * sur `totaux` convs, lues et à l’import mesuré : ce qui se compare au budget d’une vente) ; les lignes de
    * verdict et les convs qui en ont plusieurs (les nouveaux essais, les verdicts refaits) ; les jetons par message des
    * verdicts du montage partagé (`jetonsParMessage`, sur `verdictsMesures` lignes : null sans aucune). `effacees` : les
    * achats de la période dont la conv a été effacée depuis (story_id vide : ni longueur, ni paywall). `tard` : les achats
@@ -374,6 +379,10 @@ export type Pilotage = {
       convs: number;
       lues: number;
       dollarsMedian: number | null;
+      importsMesures: number;
+      dollarsMedianAvant: number | null;
+      totaux: number;
+      dollarsMedianTotal: number | null;
       verdicts: number;
       plusieursVerdicts: number;
       jetonsParMessage: number | null;
@@ -504,11 +513,21 @@ const achatDUneConv = (W: (col: string) => SQL) =>
 
 /**
  * Les appels d’une lecture payée (en SQL brut, `ai_usage` sous l’alias `u`) : le verdict (ses essais, ses verdicts
- * refaits), le rapport (son plan, ses chapitres), la création de la mémoire, et le script du vocal (« vocal »). Pas la
- * voix du vocal (« vocal_voix ») : la même étiquette dit les vocaux du chat, qui ne sont pas de la lecture (environ
- * 0,09 $ par vocal du rapport, la mesure du 22 octobre 2026).
+ * refaits), le rapport (son plan, ses chapitres), la création de la mémoire, le script du vocal (« vocal »), et la suite
+ * d’une longue vidéo lue en partie (« captures_suite », src/server/suite-video.ts : lue après le paiement, avant le
+ * verdict). Pas la voix du vocal (« vocal_voix ») : la même étiquette dit les vocaux du chat, qui ne sont pas de la
+ * lecture (environ 0,09 $ par vocal du rapport, la mesure du 22 octobre 2026).
  */
-const APPEL_DE_LA_LECTURE = sql.raw("(u.task in ('verdict', 'memoire', 'vocal') or u.task like 'rapport%')");
+const APPEL_DE_LA_LECTURE = sql.raw("(u.task in ('verdict', 'memoire', 'vocal', 'captures_suite') or u.task like 'rapport%')");
+
+/**
+ * Les appels d’avant l’achat d’une conv payée (en SQL brut, `ai_usage` sous l’alias `u`) : les lectures de son import
+ * (des captures, les lots d’une vidéo ; « 01 », l’étiquette d’avant le 10 octobre 2026), ses morceaux ajoutés avant
+ * « Qui es-tu ? » compris, rangées sous sa conv et l’empreinte de son envoi (src/server/imports.ts). Pas les captures
+ * envoyées au chat ou pour sa fiche, après (« captures » aussi, mais sans envoi : src/server/ajouts.ts), que paient
+ * les bulles.
+ */
+const APPEL_D_AVANT_L_ACHAT = sql.raw("(u.task in ('captures', 'captures_video', '01') and u.envoi is not null)");
 
 /**
  * Le socle du montage partagé (prompts/lib/contextes.ts : le système, le même pour toutes les étapes de la lecture),
@@ -1068,21 +1087,34 @@ async function pilotageDe(jours: Periode): Promise<Pilotage> {
           from a left join stories s on s.id = a.story_id left join p on p.story_id = a.story_id`,
     ),
     /*
-     * … et conv par conv (une conv payée deux fois compte une fois) : ce qu’ont coûté sa lecture et son verdict (les
-     * appels du produit seuls), ses lignes de verdict et leurs modèles, et les jetons lus par ses verdicts du montage
-     * partagé, le socle retiré (VERDICT_MESURE)
+     * … et conv par conv (une conv payée deux fois compte une fois) : ce qu’ont coûté sa lecture, son verdict et ce qui a
+     * été lu avant l’achat (les appels du produit seuls), si son import est mesuré (une ligne d’imports, par son index
+     * unique), ses lignes de verdict et leurs modèles, et les jetons lus par ses verdicts du montage partagé, le socle
+     * retiré (VERDICT_MESURE)
      */
-    lignes<{ messages: number; micros: string; micros_verdict: string; verdicts: string; jetons: string; mesures: string; modeles: string[] }>(
+    lignes<{
+      messages: number;
+      micros: string;
+      micros_avant: string;
+      mesuree: boolean;
+      micros_verdict: string;
+      verdicts: string;
+      jetons: string;
+      mesures: string;
+      modeles: string[];
+    }>(
       sql`with a as (select distinct a0.story_id from achats a0 where a0.story_id is not null and ${achatDUneConv(W)}),
             u as (select u.story_id,
                     sum(u.cost_micros) filter (where ${APPEL_DE_LA_LECTURE}) as micros,
+                    sum(u.cost_micros) filter (where ${APPEL_D_AVANT_L_ACHAT}) as micros_avant,
                     sum(u.cost_micros) filter (where u.task = 'verdict') as micros_verdict,
                     count(*) filter (where u.task = 'verdict') as verdicts,
                     sum(u.input_tokens + u.cache_write_tokens + u.cache_read_tokens - ${JETONS_DU_SOCLE}) filter (where ${VERDICT_MESURE}) as jetons,
                     count(*) filter (where ${VERDICT_MESURE}) as mesures,
                     array_agg(distinct u.model order by u.model) filter (where u.task = 'verdict') as modeles
                   from ai_usage u where u.story_id in (select story_id from a) and ${duProduit(sql`u.population`)} group by u.story_id)
-          select s.message_count as messages, coalesce(u.micros, 0) as micros, coalesce(u.micros_verdict, 0) as micros_verdict, coalesce(u.verdicts, 0) as verdicts,
+          select s.message_count as messages, coalesce(u.micros, 0) as micros, coalesce(u.micros_avant, 0) as micros_avant,
+            exists (select 1 from imports i where i.story_id = a.story_id) as mesuree, coalesce(u.micros_verdict, 0) as micros_verdict, coalesce(u.verdicts, 0) as verdicts,
             coalesce(u.jetons, 0) as jetons, coalesce(u.mesures, 0) as mesures, coalesce(u.modeles, '{}') as modeles
           from a join stories s on s.id = a.story_id left join u on u.story_id = a.story_id`,
     ),
@@ -1143,12 +1175,18 @@ async function pilotageDe(jours: Periode): Promise<Pilotage> {
     dollarsEpargnables: somme(mesuree, "micros_epargnables") / 1e6,
   };
 
-  /* Par longueur : chaque tranche, ses ventes et ses offres, puis ses convs, l’IA médiane de leur lecture et leurs verdicts */
+  /*
+   * Par longueur : chaque tranche, ses ventes et ses offres, puis ses convs, l’IA médiane de leur lecture, de ce qui a été
+   * lu avant leur achat (les seules convs à l’import mesuré : avant, rien n’était rangé sous elles), et des deux réunis
+   * conv par conv (celles lues et à l’import mesuré), et leurs verdicts
+   */
   const offreDe = (o: OffreId): OffreDUneConv => ((OFFRES_D_UNE_CONV as readonly string[]).includes(o) ? (o as OffreDUneConv) : "autre");
   const tranches: Pilotage["parLongueur"]["tranches"] = TRANCHES_DE_LONGUEUR.map((tranche) => {
     const ventes = achatsDesConvs.filter((a) => a.messages !== null && trancheDe(a.messages) === tranche);
     const convs = convsPayees.filter((c) => trancheDe(c.messages) === tranche);
     const lues = convs.map((c) => n(c.micros)).filter((m) => m > 0);
+    const mesurees = convs.filter((c) => c.mesuree);
+    const totaux = mesurees.filter((c) => n(c.micros) > 0).map((c) => n(c.micros) + n(c.micros_avant));
     const jetons = convs.reduce((t, c) => t + n(c.jetons), 0);
     const mesures = convs.reduce((t, c) => t + n(c.mesures), 0);
     const messagesMesures = convs.reduce((t, c) => t + n(c.mesures) * c.messages, 0);
@@ -1159,6 +1197,10 @@ async function pilotageDe(jours: Periode): Promise<Pilotage> {
       convs: convs.length,
       lues: lues.length,
       dollarsMedian: lues.length ? mediane(lues) / 1e6 : null,
+      importsMesures: mesurees.length,
+      dollarsMedianAvant: mesurees.length ? mediane(mesurees.map((c) => n(c.micros_avant))) / 1e6 : null,
+      totaux: totaux.length,
+      dollarsMedianTotal: totaux.length ? mediane(totaux) / 1e6 : null,
       verdicts: convs.reduce((t, c) => t + n(c.verdicts), 0),
       plusieursVerdicts: convs.filter((c) => n(c.verdicts) > 1).length,
       jetonsParMessage: messagesMesures > 0 ? jetons / messagesMesures : null,

@@ -255,17 +255,18 @@ function pilotageDe(jours: Periode, { calme = false, suivi = true }: Variante): 
   /*
    * Par longueur : les convs payées (Premium, le rapport et la suite de « Ce qui se vend »), surtout de longs exports ;
    * leur lecture coûte plus quand la conv s’allonge, puis plus beaucoup au-delà de ce que lit le modèle (les jetons par
-   * message y baissent : la conv est coupée) ; un verdict refait sur dix, un modèle de repli sur un verdict sur vingt,
+   * message y baissent : la conv est coupée) ; avant l’achat, les courtes (des captures, des vidéos) ont été lues, les
+   * longues sont des exports (rien de lu) ; un verdict refait sur dix, un modèle de repli sur un verdict sur vingt,
    * une conv effacée depuis sur trente, et un achat sur douze venu plus de 48 h après le paywall (les relances)
    */
   const ventesDesConvs = premium + rapport + suite;
-  const longueurs: [TrancheDeLongueur, number, number, number][] = [
-    ["moins_de_1000", 0.18, 1.25, 44],
-    ["de_1000_a_3000", 0.31, 1.52, 38],
-    ["de_3000_a_7000", 0.33, 2.1, 35],
-    ["7000_et_plus", 0.18, 2.62, 21],
+  const longueurs: [TrancheDeLongueur, number, number, number, number][] = [
+    ["moins_de_1000", 0.18, 1.25, 44, 0.31],
+    ["de_1000_a_3000", 0.31, 1.52, 38, 0],
+    ["de_3000_a_7000", 0.33, 2.1, 35, 0],
+    ["7000_et_plus", 0.18, 2.62, 21, 0],
   ];
-  const tranches = longueurs.map(([tranche, part, dollarsMedian, jetonsParMessage]) => {
+  const tranches = longueurs.map(([tranche, part, dollarsMedian, jetonsParMessage, dollarsMedianAvant]) => {
     const ventes = Math.round(ventesDesConvs * part);
     const offres = { premium: Math.round(ventes * 0.5), suite: Math.round(ventes * 0.17), second: 0, rapport_garde: ventes >= 6 ? 1 : 0, autre: 0 };
     const verdicts = ventes + Math.round(ventes * 0.1);
@@ -276,6 +277,10 @@ function pilotageDe(jours: Periode, { calme = false, suivi = true }: Variante): 
       convs: ventes,
       lues: ventes,
       dollarsMedian: ventes ? dollarsMedian : null,
+      importsMesures: ventes,
+      dollarsMedianAvant: ventes ? dollarsMedianAvant : null,
+      totaux: ventes,
+      dollarsMedianTotal: ventes ? dollarsMedian + dollarsMedianAvant : null,
       verdicts,
       plusieursVerdicts: Math.round(ventes * 0.1),
       jetonsParMessage: ventes ? jetonsParMessage : null,

@@ -68,7 +68,8 @@ describe("le pilotage, rendu", () => {
     ])
       expect(t, titre).toContain(titre);
     expect(t).toMatch(/Sur [\d\u202f]+\u00a0vidéos? mesurées? depuis le 27\u00a0octobre, [\d,\u202f]+\u00a0\$ d’IA épargnables sur [\d,\u202f]+\u00a0\$ lus avant l’achat/);
-    /* Les convs payées par longueur : chaque tranche, l’offre prise, l’IA d’une lecture, les verdicts ; puis les achats tardifs et les verdicts chers */
+    /* Les convs payées par longueur : chaque tranche, l’offre prise, l’IA avant l’achat, d’une lecture et des deux réunies, les verdicts ; puis les achats tardifs et les verdicts chers */
+    expect(t).toContain("Offres IA avant l’achat IA d’une lecture Les deux Jetons par message");
     for (const titre of ["Par longueur", "Moins de 1\u202f000 messages", "1\u202f000 à 3\u202f000", "3\u202f000 à 7\u202f000", "7\u202f000 et plus", "Les verdicts les plus chers"])
       expect(t, titre).toContain(titre);
     expect(t).toMatch(/Premium \d+ · Le rapport \d+ · ①\u00a0offre unique \d+/);
@@ -185,6 +186,10 @@ describe("le pilotage, rendu", () => {
           convs: 0,
           lues: 0,
           dollarsMedian: null,
+          importsMesures: 0,
+          dollarsMedianAvant: null,
+          totaux: 0,
+          dollarsMedianTotal: null,
           verdicts: 0,
           plusieursVerdicts: 0,
           jetonsParMessage: null,

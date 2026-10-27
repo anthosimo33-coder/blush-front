@@ -1521,9 +1521,10 @@ function LecturePartielle({ p }: { p: Chiffres }) {
 
 /**
  * Les convs payées par les vrais clients sur la période, par longueur (src/server/stats.ts, parLongueur) : ce qui manque
- * pour décider d’une conv très longue. Par tranche, les ventes et l’offre prise, l’IA médiane d’une lecture, les jetons
- * par message des verdicts et leurs nouveaux essais ; puis les achats faits plus de 48 h après le paywall, ceux dont la
- * conv est effacée, et les verdicts les plus chers (leur modèle, leurs lignes).
+ * pour décider d’une conv très longue. Par tranche, les ventes et l’offre prise, l’IA médiane d’une lecture, de ce qui a
+ * été lu avant l’achat et des deux réunis (ce qui se compare au budget d’une vente, le « ? »), les jetons par message des
+ * verdicts et leurs nouveaux essais ; puis les achats faits plus de 48 h après le paywall, ceux dont la conv est
+ * effacée, et les verdicts les plus chers (leur modèle, leurs lignes).
  */
 function ParLongueur({ p }: { p: Chiffres }) {
   const { tranches, effacees, tard, modeles, chers } = p.parLongueur;
@@ -1545,9 +1546,10 @@ function ParLongueur({ p }: { p: Chiffres }) {
     >
       {ventes ? (
         <div role="region" aria-label="Les convs payées par longueur, à faire défiler" tabIndex={0} className="-mx-2 mt-[18px] overflow-x-auto px-2">
-          <table className="w-full min-w-[760px] border-collapse text-left">
+          <table className="w-full min-w-[980px] border-collapse text-left">
             <caption className="sr-only">
-              Par longueur de conv, les ventes, l’offre prise, l’IA médiane d’une lecture, les jetons par message des verdicts et les verdicts par conv
+              Par longueur de conv, les ventes, l’offre prise, l’IA médiane avant l’achat, d’une lecture et des deux réunis, les jetons par message des verdicts et les verdicts par
+              conv
             </caption>
             <thead>
               <tr className="text-micro font-black uppercase tracking-[0.06em] text-grey">
@@ -1561,7 +1563,13 @@ function ParLongueur({ p }: { p: Chiffres }) {
                   Offres
                 </th>
                 <th scope="col" className="pb-2.5 pr-3 text-right font-black">
+                  IA avant l’achat
+                </th>
+                <th scope="col" className="pb-2.5 pr-3 text-right font-black">
                   IA d’une lecture
+                </th>
+                <th scope="col" className="pb-2.5 pr-3 text-right font-black">
+                  Les deux
                 </th>
                 <th scope="col" className="pb-2.5 pr-3 text-right font-black">
                   Jetons par message
@@ -1582,8 +1590,16 @@ function ParLongueur({ p }: { p: Chiffres }) {
                     <td className="py-3 pr-3 text-right tabular-nums">{nombre(x.ventes)}</td>
                     <td className="py-3 pr-3 text-legende font-bold text-soft">{offres(x) || "—"}</td>
                     <td className="py-3 pr-3 text-right tabular-nums">
+                      {x.dollarsMedianAvant === null ? "—" : dollars(x.dollarsMedianAvant)}
+                      {x.importsMesures > 0 && <span className="ml-1.5 text-micro text-grey">{`médiane de ${nombre(x.importsMesures)}`}</span>}
+                    </td>
+                    <td className="py-3 pr-3 text-right tabular-nums">
                       {x.dollarsMedian === null ? "—" : dollars(x.dollarsMedian)}
                       {x.lues > 0 && <span className="ml-1.5 text-micro text-grey">{`médiane de ${nombre(x.lues)}`}</span>}
+                    </td>
+                    <td className="py-3 pr-3 text-right tabular-nums">
+                      {x.dollarsMedianTotal === null ? "—" : dollars(x.dollarsMedianTotal)}
+                      {x.totaux > 0 && <span className="ml-1.5 text-micro text-grey">{`médiane de ${nombre(x.totaux)}`}</span>}
                     </td>
                     <td className="py-3 pr-3 text-right tabular-nums">
                       {x.jetonsParMessage === null ? "—" : nombre(Math.round(x.jetonsParMessage))}

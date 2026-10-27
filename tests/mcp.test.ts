@@ -323,6 +323,9 @@ describe("les outils", () => {
     /* Les convs payées par longueur, chaque tranche même vide, et les deux compteurs du suivi avec ce à quoi ils se comparent */
     const { parLongueur } = couts as unknown as { parLongueur: { tranches: { longueur: string }[] } };
     expect(parLongueur.tranches.map((t) => t.longueur)).toEqual(["Moins de 1\u202f000 messages", "1\u202f000 à 3\u202f000", "3\u202f000 à 7\u202f000", "7\u202f000 et plus"]);
+    /* Chaque tranche dit aussi l’IA d’avant l’achat et celle des deux réunies, avec leurs effectifs (ce qui se compare au budget d’une vente) */
+    for (const champ of ["iaMedianeAvantLAchatDollars", "importsMesures", "iaMedianeAvantEtLectureDollars", "avantEtLectureMesurees"])
+      expect(parLongueur.tranches[0], champ).toHaveProperty(champ);
     for (const champ of [
       "parLongueur.ventesDe3000MessagesOuPlus",
       "parLongueur.payesPlusDe48hApresLePaywall.plusDe48h",
