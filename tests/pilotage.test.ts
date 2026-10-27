@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { and, eq, gte, inArray } from "drizzle-orm";
+import { and, eq, gte, inArray, lt, sql } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { POST as postJalon } from "@/app/api/jalon/route";
 import { POST as postPresence } from "@/app/api/presence/route";
@@ -8,7 +8,7 @@ import { db, schema } from "@/server/db";
 import { direct } from "@/server/direct";
 import { definirPronomAutre, importer } from "@/server/histoires";
 import { purger } from "@/server/purge";
-import { compterUnClicDeMail } from "@/server/compteurs";
+import { compterUnClicDeMail, HAUT } from "@/server/compteurs";
 import { CLES_DES_MAILS } from "@/server/sequences";
 import { statsAdmin, type Genres } from "@/server/stats";
 import { attendreLePaiement } from "@/server/taches";
@@ -439,5 +439,31 @@ describe("qui importe (/admin)", () => {
       autre: { elle: 1, il: 1, devines: 0 },
       paires: { fille_garcon: 0, garcon_fille: 0, deux_filles: 1, deux_garcons: 1 },
     });
+  });
+});
+
+describe("le haut du paywall dans le pilotage", () => {
+  it("un titre compté pour la première fois pendant la période dit depuis quand (« volume », mis en ligne en cours de route) ; avant, rien", async () => {
+    const cle = `${HAUT}vu:volume`;
+    const aujourdhui = sql`(now() at time zone 'Europe/Paris')::date`;
+    /* Seul ce test écrit des jours passés pour ce titre : ceux d’un lancement d’avant interrompu s’effacent d’abord */
+    const effacer = () =>
+      db()
+        .delete(schema.counters)
+        .where(and(eq(schema.counters.key, cle), lt(schema.counters.day, aujourdhui)));
+    await effacer();
+    try {
+      const [l] = await db()
+        .insert(schema.counters)
+        .values({ day: sql`${aujourdhui} - 3`, key: cle, count: 2 })
+        .returning({ day: schema.counters.day });
+      const volume = async (jours: 1 | 7) => (await statsAdmin(jours)).pilotage.hauts.find((h) => h.genre === "volume")!;
+      expect(await volume(7)).toMatchObject({ depuis: l!.day });
+      expect((await volume(7)).vus).toBeGreaterThanOrEqual(2);
+      /* Sur la dernière journée, le titre était déjà compté avant : pas de « depuis » */
+      expect((await volume(1)).depuis).toBeNull();
+    } finally {
+      await effacer();
+    }
   });
 });

@@ -276,12 +276,14 @@ function pilotageDe(jours: Periode, { calme = false, suivi = true }: Variante): 
     ],
     /* Le haut du paywall : des vus et des payés inventés, un taux différent par titre */
     hauts: [
-      { genre: "tendance", vus: 41, payes: 9 },
-      { genre: "toi", vus: 118, payes: 21 },
-      { genre: "elle", vus: 64, payes: 7 },
-      { genre: "contraste", vus: 152, payes: 31 },
-      { genre: "egalite", vus: 57, payes: 6 },
-      { genre: "aucun", vus: 12, payes: 1 },
+      { genre: "tendance", vus: 41, payes: 9, depuis: null },
+      { genre: "toi", vus: 118, payes: 21, depuis: null },
+      { genre: "elle", vus: 64, payes: 7, depuis: null },
+      { genre: "contraste", vus: 152, payes: 31, depuis: null },
+      { genre: "egalite", vus: 57, payes: 6, depuis: null },
+      /* Arrivé en cours de période : compté depuis trois jours */
+      { genre: "volume", vus: 22, payes: 3, depuis: new Date(Date.now() - 3 * 24 * 3600e3).toISOString().slice(0, 10) },
+      { genre: "aucun", vus: 12, payes: 1, depuis: null },
     ],
     note: {
       oui: Math.round(acheteurs * 0.62),

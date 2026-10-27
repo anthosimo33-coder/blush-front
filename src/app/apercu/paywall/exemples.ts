@@ -4,7 +4,9 @@ import type { ApercuDuPaywall, SignalDuPaywall, Story } from "@/types";
 /*
  * Les exemples de /apercu/paywall : une conv inventée (Inès et Lucas, 4 365 messages, les chiffres des maquettes « Le
  * mix »), et ce que le code en aurait compté (src/server/ecrans/haut-du-paywall.ts) pour chacun des cinq titres, et
- * celui d’avant. Des données fictives, pour l’équipe seulement (jamais sur Vercel : src/proxy.ts).
+ * celui d’avant. Le titre « volume » (une proposition du 27 octobre 2026) et celui d’avant montrent la même conv courte,
+ * lue sur des captures (66 messages, sans heures) : ce sont elles qui les reçoivent. Des données fictives, pour l’équipe
+ * seulement (jamais sur Vercel : src/proxy.ts).
  */
 
 const MIN = 60e3;
@@ -25,8 +27,15 @@ export const STORY_D_EXEMPLE: Story = {
   me: "p0",
 };
 
-type Id = SignalDuPaywall["id"];
-const s = (id: Id, cote: SignalDuPaywall["cote"], toi: number, elle: number): SignalDuPaywall => ({ id, cote, toi, elle });
+/** Une conv courte, lue sur des captures : celle des titres sans assez de chiffres pour les cinq autres. */
+export const STORY_COURTE: Story = { ...STORY_D_EXEMPLE, totalMessages: 66, period: "22 → 24 avr.", durationLabel: "3 jours" };
+
+/** Les titres qui se montrent sur la conv courte. */
+export const SUR_LA_CONV_COURTE: readonly GenreDuHaut[] = ["volume", "aucun"];
+
+/* Les signaux des cinq titres ; ceux comptés sans heures (messages, questions) ont leurs exemples à part */
+type Id = Exclude<SignalDuPaywall["id"], "messages" | "questions">;
+const s = (id: SignalDuPaywall["id"], cote: SignalDuPaywall["cote"], toi: number, elle: number): SignalDuPaywall => ({ id, cote, toi, elle });
 
 /** Une conv où personne ne court après l’autre, sauf ce que chaque exemple change. */
 function signaux(changes: Partial<Record<Id, SignalDuPaywall>>): SignalDuPaywall[] {
@@ -59,7 +68,24 @@ const BASES: Record<GenreDuHaut, ApercuDuPaywall> = {
       delai: { avant: 4 * MIN, apres: 13 * MIN },
     },
   },
+  volume: { signaux: signaux({ ouvre: s("ouvre", "pareil", 2, 2) }).filter((x) => x.id !== "delai"), tendance: null },
   aucun: { signaux: signaux({ ouvre: s("ouvre", "pareil", 2, 2) }).filter((x) => x.id !== "delai"), tendance: null },
 };
 
+/**
+ * Le titre « volume » sur la conv courte, selon ce qu’elle compte sans heures (`?variante=`) : Inès écrit plus et Lucas
+ * plus long (par défaut), Inès porte tout (`toi`), Lucas écrit plus et pose les questions (`elle`), ou autant l’un que
+ * l’autre (`autant`).
+ */
+export const VARIANTES_DU_VOLUME = {
+  contraste: [s("messages", "toi", 44, 22), s("questions", "toi", 6, 2), s("longueur", "elle", 6, 13)],
+  toi: [s("messages", "toi", 44, 22), s("questions", "toi", 9, 0), s("longueur", "pareil", 8, 7)],
+  elle: [s("messages", "elle", 20, 46), s("questions", "elle", 0, 7), s("longueur", "pareil", 7, 9)],
+  autant: [s("messages", "pareil", 31, 35), s("questions", "pareil", 4, 5), s("longueur", "pareil", 9, 11)],
+} satisfies Record<string, SignalDuPaywall[]>;
+export type VarianteDuVolume = keyof typeof VARIANTES_DU_VOLUME;
+
 export const EXEMPLES = Object.fromEntries(Object.entries(BASES).map(([genre, a]) => [genre, avecLaSuite(a)])) as Record<GenreDuHaut, ApercuDuPaywall>;
+
+/** L’exemple du titre « volume » dans une de ses variantes (contraste par défaut). */
+export const exempleDuVolume = (v: VarianteDuVolume = "contraste"): ApercuDuPaywall => ({ ...EXEMPLES.volume, sansHeures: VARIANTES_DU_VOLUME[v] });

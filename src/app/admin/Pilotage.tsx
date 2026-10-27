@@ -890,7 +890,7 @@ function HautsDuPaywall({ p }: { p: Chiffres }) {
     <Bloc
       id="haut-du-paywall"
       titre="Le haut du paywall"
-      sous="Chaque conv voit un titre parmi cinq, d’après ses chiffres"
+      sous="Chaque conv voit un titre parmi six, d’après ses chiffres"
       aide={{ cle: "hauts", valeur: pluriel(vus, "paywall vu", "paywalls vus"), contexte: "sur la période" }}
     >
       {lignes.length ? (
@@ -920,6 +920,12 @@ function HautsDuPaywall({ p }: { p: Chiffres }) {
                   <tr key={h.genre} className="border-t border-sep text-detail font-extrabold">
                     <th scope="row" className="py-3 pr-3 text-left font-extrabold">
                       {NOM_DU_GENRE[h.genre]}
+                      {/* Un titre arrivé en cours de période (mis en ligne, ou vu pour la première fois) : ses chiffres n’en couvrent qu’une partie */}
+                      {h.depuis && (
+                        <span className="mt-0.5 block text-micro font-black text-elle-ink">
+                          {`compté depuis le ${new Date(`${h.depuis}T12:00:00Z`).toLocaleDateString("fr-FR", { day: "numeric", month: "long", timeZone: "UTC" })}`}
+                        </span>
+                      )}
                     </th>
                     <td className="py-3 pr-3">
                       <span className="flex items-center gap-2.5">

@@ -64,7 +64,7 @@ export const OUTILS: readonly OutilMcp[] = [
     name: "tunnel",
     title: "Tunnel détaillé",
     description:
-      "Le tunnel écran par écran sur la période : les jalons de l’import (du choix de l’appli au lancement de la lecture), l’import appli par appli (WhatsApp, Instagram, iMessage, Captures ou vidéo : ceux qui ouvrent son écran, qui y choisissent un fichier, et le taux de passage à partir de 30 personnes, puis les convs bien reçues et les envois ratés), les jalons du paywall (de l’arrivée au paiement), « Qu’est-ce qui coince ? » (la question posée, et chaque réponse : trop cher, pas confiance, pas maintenant, ça a bugué), les titres du haut du paywall (vus, payés), les offres uniques (montrées, prises), les commandes des vrais clients (payées, échouées, en attente) et jusqu’où vont les convs importées.",
+      "Le tunnel écran par écran sur la période : les jalons de l’import (du choix de l’appli au lancement de la lecture), l’import appli par appli (WhatsApp, Instagram, iMessage, Captures ou vidéo : ceux qui ouvrent son écran, qui y choisissent un fichier, et le taux de passage à partir de 30 personnes, puis les convs bien reçues et les envois ratés), les jalons du paywall (de l’arrivée au paiement), « Qu’est-ce qui coince ? » (la question posée, et chaque réponse : trop cher, pas confiance, pas maintenant, ça a bugué), les titres du haut du paywall (vus, payés, et le jour où il a été compté la première fois, pour un titre arrivé en cours de période), les offres uniques (montrées, prises), les commandes des vrais clients (payées, échouées, en attente) et jusqu’où vont les convs importées.",
     inputSchema: AVEC_JOURS,
   },
   {
@@ -268,7 +268,7 @@ function tunnel(s: StatsAdmin) {
       questionPosee: p.jalons.coince,
       reponses: QUI_COINCE.raisons.map((r) => ({ reponse: r.texte, personnes: p.jalons[`coince_${r.id}`] })),
     },
-    hautsDuPaywall: p.hauts.map((h) => ({ titre: NOM_DU_GENRE[h.genre], vus: h.vus, payes: h.payes })),
+    hautsDuPaywall: p.hauts.map((h) => ({ titre: NOM_DU_GENRE[h.genre], vus: h.vus, payes: h.payes, ...(h.depuis && { compteDepuis: h.depuis }) })),
     offresUniques: s.offresUniques,
     commandes: s.achats,
     convsImportees: s.parcours,
