@@ -402,12 +402,12 @@ export function hautDuPaywall(a: ApercuDuPaywall, autre: Autre, { annee = new Da
       const carte = { titre: "Qui écrit le plus", lignes: lignes(liste) };
       const nets = liste.filter((s) => s.cote !== "pareil");
       const n1 = nets[0];
-      /* Personne n’écrit nettement plus : leurs chiffres, à peu près pareils, et ce qui se joue ailleurs */
+      /* Personne n’écrit nettement plus : leurs chiffres, à peu près pareils, et ce qui se joue ailleurs ; le titre nomme l’autre, comme les autres */
       if (!n1) {
         const second = questions && questions.toi + questions.elle > 0 ? questions : longueur;
         return {
           genre,
-          titre: ["Vous vous écrivez autant.", "Ce qui se joue est ailleurs."],
+          titre: [`${autre.nom} et toi, vous vous écrivez autant.`, "Ce qui se joue est ailleurs."],
           sous: `Personne ne court après l’autre\u00a0: ${messages.toi} messages pour toi, ${messages.elle} pour ${lui}.`,
           question: QUESTION("ce qui se joue vraiment"),
           carte,
