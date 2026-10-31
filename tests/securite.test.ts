@@ -1067,7 +1067,8 @@ describe("S-10 · les limites par adresse IP", () => {
   };
 
   it("un envoi invalide ne compte pas ; une IPv6 compte pour son /64 : changer d’adresse dans sa box ne remet pas le compteur à zéro", async () => {
-    const reseau = `2001:db8:${(n % 65535).toString(16)}:${((n >> 16) % 65535).toString(16)}`;
+    /* Pas `n >> 16` : il passe par un entier signé de 32 bits, négatif un mois sur deux (« 2001:db8:22b3:-6e73 », pas une IPv6) */
+    const reseau = `2001:db8:${(n % 65535).toString(16)}:${(Math.floor(n / 65536) % 65535).toString(16)}`;
     const cle = `import:ip:${reseau}::/64`;
     await poserLimite(cle, LIMITES.importParIp.max - 1);
     try {
