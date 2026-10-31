@@ -170,7 +170,9 @@ export function lectureReunie(
   const captures = conv.morceaux.reduce((n, m) => n + (m.format === "captures" ? +(m.texte.match(/^# captures · [^\n]* · (\d+) captures?/)?.[1] ?? 0) : 0), 0);
   return {
     messages,
+    /* Ce que la lecture de chaque morceau a noté ou jeté reste à son import : la conv réunie ne le redit pas */
     problemes: [],
+    inconnues: { lignes: 0, forme: null },
     participants: [...new Set(messages.map((m) => m.nom))],
     captures: captures || null,
     doublons,

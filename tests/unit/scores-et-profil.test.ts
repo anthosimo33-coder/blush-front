@@ -104,4 +104,21 @@ describe("le profil d’écriture", () => {
   it("une abréviation ou un surnom vu une seule fois ne compte pas", () => {
     expect(profil(QUI, messages.slice(0, 6))).toMatchObject({ abreviations: [["mdr", 2]], surnoms: [] });
   });
+
+  it("une abréviation allongée compte sous sa forme courte (« mdrrr » est « mdr »)", () => {
+    const allongees = ["mdrrr", "mdrrrr", "MDRRR t’es bête", "ptdrrr", "ptdrrrrr", "jsp", "jsp", "jsp", "cccc", "cc", "frrr", "frr"].map((t) => m("toi", t));
+    expect(profil(QUI, allongees).abreviations).toEqual([
+      ["mdr", 3],
+      ["jsp", 3],
+      ["ptdr", 2],
+      ["cc", 2],
+      ["frr", 2],
+    ]);
+  });
+
+  it("le repère d’un média après sa légende n’est pas un mot écrit (« trop bien 😍 [réponse à une story] » : 3 mots)", () => {
+    /* La lecture d’une réponse à une story d’Instagram (lib/instagram.ts, lib/conv.ts), et d’une photo légendée */
+    const legendes = [...Array.from({ length: 6 }, () => m("toi", "trop bien 😍 [réponse à une story]")), m("toi", "regarde [photo]"), m("toi", "ok"), m("toi", "ok")];
+    expect(profil(QUI, legendes)).toMatchObject({ n: 9, mediane: 3, emojis: [["😍", 6]] });
+  });
 });

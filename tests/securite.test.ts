@@ -190,6 +190,72 @@ describe("S-02 · un nom de participant démesuré n’entre pas dans ce qu’on
   });
 });
 
+describe("le journal de l’import : une ligne marquée qu’aucune règle ne lit y laisse sa silhouette, jamais un mot", () => {
+  /* Un export inventé de 60 messages (iOS, ou Android) ; `marquees` : ses messages 10, 11…, marqués d’un U+200E */
+  const exportAvec = (marquees: string[], android = false) =>
+    Array.from({ length: 60 }, (_, k) => {
+      const texte = k >= 10 && k < 10 + marquees.length ? `\u200e${marquees[k - 10]}` : `on se voit samedi ? ${k}`;
+      const [nom, minute] = [k % 2 ? "Tom" : "Léa", String(k).padStart(2, "0")];
+      return android ? `12/09/2026 10:${minute} - ${nom}: ${texte}` : `[12/09/2026 10:${minute}:00] ${nom}: ${texte}`;
+    }).join("\n");
+  const exportIos = (marquees: string[]) => exportAvec(marquees);
+  /** Les lignes que l’import écrit au journal (console.warn, par src/server/journal.ts) pour chaque export. */
+  const journalDe = async (...textes: string[]) => {
+    const lignes: string[] = [];
+    vi.spyOn(console, "warn").mockImplementation((...l: unknown[]) => void lignes.push(l.join(" ")));
+    const ids: string[] = [];
+    for (const texte of textes) ids.push((await importer({ nom: "WhatsApp Chat - Léa.txt", appli: "whatsapp", texte }, accordDeTest())).id);
+    await db().delete(schema.stories).where(inArray(schema.stories.id, ids));
+    return lignes;
+  };
+
+  it("une ligne d’alerte : le format, le compte et la silhouette qui revient ; rien sans ligne inconnue", async () => {
+    const lignes: string[] = [];
+    vi.spyOn(console, "warn").mockImplementation((...l: unknown[]) => void lignes.push(l.join(" ")));
+    const avec = await importer(
+      {
+        nom: "WhatsApp Chat - Léa.txt",
+        appli: "whatsapp",
+        /* Deux libellés de même forme, et un vrai message marqué : lui ne revient pas, rien de lui n’en sort */
+        texte: exportIos(["<adjunto: 00000005-VIDEO-2025-01-09-12-23-16.mp4>", "rendez-vous à la gare", "<adjunto: 00000006-VIDEO-2025-01-09-12-23-20.mp4>"]),
+      },
+      accordDeTest(),
+    );
+    const sans = await importer({ nom: "WhatsApp Chat - Léa.txt", appli: "whatsapp", texte: exportIos([]) }, accordDeTest());
+    await db()
+      .delete(schema.stories)
+      .where(inArray(schema.stories.id, [avec.id, sans.id]));
+    expect(lignes).toHaveLength(1);
+    expect(JSON.parse(lignes[0]!)).toEqual({
+      evenement: "import : lignes marquées inconnues",
+      niveau: "alerte",
+      format: "whatsapp-ios",
+      lignes: 3,
+      forme: "<aaaaaaa: 00000000-AAAAA",
+    });
+    for (const mot of ["samedi", "gare", "adjunto", "VIDEO"]) expect(lignes[0]).not.toContain(mot);
+  });
+
+  it("deux messages marqués identiques : sur iOS, leur silhouette seule ; sur Android, ce sont des messages, rien au journal", async () => {
+    const message = "bonne nuit mon cœur ❤️";
+    const [ios, android] = [exportAvec([message, "salut", message]), exportAvec([message, "salut", message], true)];
+    const lignes = await journalDe(ios, android);
+    expect(lignes).toHaveLength(1);
+    expect(JSON.parse(lignes[0]!)).toMatchObject({ format: "whatsapp-ios", lignes: 3, forme: "aaaaa aaaa aaa aaaa ··" });
+    for (const mot of ["bonne", "nuit", "cœur", "❤"]) expect(lignes.join("\n")).not.toContain(mot);
+  });
+
+  it("deux documents Android dont le nom a des espaces : des médias, ou sa silhouette dans une langue qu’on ne lit pas", async () => {
+    const francais = exportAvec(["Bulletin de salaire Tom Durand janvier.pdf (fichier joint)", "Bulletin de salaire Tom Durand février.pdf (fichier joint)"], true);
+    /* Le libellé espagnol d’un fichier joint, relevé sur de vrais exports */
+    const espagnol = exportAvec(["Contrato de alquiler Tom Durand.pdf (archivo adjunto)", "Contrato de alquiler Tom Durand.pdf (archivo adjunto)"], true);
+    const lignes = await journalDe(francais, espagnol);
+    expect(lignes).toHaveLength(1);
+    expect(JSON.parse(lignes[0]!)).toMatchObject({ format: "whatsapp-android", lignes: 2, forme: "Aaaaaaaa aa aaaaaaaa Aaa" });
+    for (const mot of ["Bulletin", "salaire", "Contrato", "alquiler", "Tom", "Durand", "archivo"]) expect(lignes.join("\n")).not.toContain(mot);
+  });
+});
+
 describe("S-01 · lire des captures (le modèle payant) avant l’email", () => {
   it("bêta fermée, sans compte : refusé avant tout appel au modèle", async () => {
     etat.fermee = true;
