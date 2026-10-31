@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { erreurImport, lire, participantsDe, principaux } from "@prompts/lib/conv";
+import { chiffrer, erreurImport, lire, participantsDe, principaux } from "@prompts/lib/conv";
 import { depuisInstagramHtml, depuisInstagramJson } from "@prompts/lib/instagram";
 
 /* Une conv WhatsApp iOS entre Léa et Tom : un message toutes les 10 minutes, à partir du 12 septembre 2026 à 10 h */
@@ -63,6 +63,48 @@ describe("lire un export WhatsApp", () => {
     medias.forEach((m, k) => (lignes[10 + k] = ligne(10 + k, k % 2 ? "Tom" : "Léa", m)));
     const lu = lire(lignes.join("\n"), qui("Tom", "Léa"));
     expect(lu.messages.slice(10, 20).map((m) => m.media)).toEqual(["vocal", "photo", "vidéo", "autocollant", "vocal", "photo", "vidéo", "autocollant", "média", "média"]);
+  });
+
+  it("reconnaît les médias d’un export iOS en français « sans médias », « sticker omis » compris", () => {
+    const lignes = conv(60);
+    ["\u200eaudio omis", "\u200eimage absente", "\u200evidéo absente", "\u200esticker omis", "\u200eautocollant omis", "\u200eGIF retiré"].forEach(
+      (m, k) => (lignes[10 + k] = ligne(10 + k, k % 2 ? "Tom" : "Léa", m)),
+    );
+    const lu = lire(lignes.join("\n"), qui("Tom", "Léa"));
+    expect(lu.messages).toHaveLength(60);
+    expect(lu.messages.slice(10, 16).map((m) => m.media)).toEqual(["vocal", "photo", "vidéo", "autocollant", "autocollant", "autocollant"]);
+  });
+
+  it("garde la légende d’un média, en français comme en anglais, et le média devient un repère", () => {
+    const legendes: [string, string][] = [
+      ["regarde \u200eimage absente", "regarde [photo]"],
+      ["le voilà \u200evidéo absente", "le voilà [vidéo]"],
+      ["regarde \u200e<pièce jointe : 00000014-PHOTO-2026-09-12-10-47-00.jpg>", "regarde [photo]"],
+      ["mdr \u200e<attached: 00000015-VIDEO-2026-09-12-10-48-00.mp4>", "mdr [vidéo]"],
+      ["on y va ? \u200eimage omitted", "on y va ? [photo]"],
+      /* Pas un média : un texte qui finit comme un libellé, un appel manqué après un mot */
+      ["il manque l’audio omis", "il manque l’audio omis"],
+      ["rappelle \u200eAppel vocal manqué", "rappelle Appel vocal manqué"],
+    ];
+    const lignes = conv(60);
+    legendes.forEach(([m], k) => (lignes[10 + k] = ligne(10 + k, "Léa", m)));
+    const lu = lire(lignes.join("\n"), qui("Tom", "Léa"));
+    expect(lu.messages.slice(10, 10 + legendes.length).map((m) => m.media ?? m.texte)).toEqual(legendes.map(([, attendu]) => attendu));
+  });
+
+  it("garde les appels pour le modèle, sans les compter comme leurs mots", () => {
+    /* Des appels sous leur forme iOS (« Appel vocal », une espace fine, la durée) : avant, « vocal » était « leur mot » */
+    const lignes = conv(60);
+    for (let k = 10; k < 40; k += 2) lignes[k] = ligne(k, "Léa", k % 4 ? "\u200eAppel vocal\u202f \u200e7\u00a0s" : "\u200eVoice call, \u200e12 min");
+    lignes[41] = ligne(41, "Tom", "regarde \u200e<pièce jointe : 00000014-PHOTO-2026-09-12-10-47-00.jpg>");
+    const lu = lire(lignes.join("\n"), qui("Tom", "Léa"));
+    expect(lu.messages).toHaveLength(60);
+    const appels = lu.messages.filter((m) => m.deWhatsApp);
+    expect(appels).toHaveLength(15);
+    expect(appels.every((m) => /^(Appel vocal|Voice call)/.test(m.texte))).toBe(true);
+    const mots = chiffrer(qui("Tom", "Léa"), lu.messages).recurrents.map(([w]) => w);
+    expect(mots).toContain("message");
+    for (const w of ["appel", "vocal", "voice", "call", "photo"]) expect(mots).not.toContain(w);
   });
 });
 
