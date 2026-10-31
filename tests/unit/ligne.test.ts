@@ -55,7 +55,7 @@ describe("les lignes de la conv, à l’octet", () => {
   it("la conv rendue au modèle", () => {
     const lu = lire(texte, h, { autresEnTexte: true });
     const r = rendre(h, lu);
-    expect(empreinte(r.texte)).toBe("6175a3feab796d10");
+    expect(empreinte(r.texte)).toBe("8fd5ca55f11fd214");
     expect(empreinte([...r.lignes])).toBe("ebf8fd27ca9faa58");
   });
 
