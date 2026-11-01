@@ -1,7 +1,7 @@
 import "server-only";
-import { prenomDe } from "@prompts/lib/ajouts";
 import { lire, type Format, type Histoire, type Lecture, type Message } from "@prompts/lib/conv";
 import { idMessage } from "@prompts/lib/ligne";
+import { accordDesNoms, aplatir, estUnSurnom, memeCle, prenomDe } from "@prompts/lib/noms";
 import { nomLu } from "@/lib/participants";
 import { ErreurPublique } from "./erreurs";
 import type { CodeErreur } from "@/types/erreurs-api";
@@ -55,25 +55,42 @@ export class ErreurMorceau extends ErreurPublique<Extract<CodeErreur, "autre_con
 
 /* ———— Les noms ———— */
 
-const sansAccent = (t: string) => t.normalize("NFD").replace(/[̀-ͯ]/g, "");
-/** Le prénom d’un nom, comparable : sans accents ni majuscules (« Léa 🌸 », « lea.dupont », « LÉA » : « lea »). */
-const clePrenom = (nom: string) => sansAccent(prenomDe(nom)).toLowerCase();
-/** Un vrai nom, lu : ni « Moi », ni « Elle » (pas lu), ni un numéro. */
+/** Un vrai nom, lu : ni « Moi », ni « Elle » (pas lu), ni un numéro, ni un compte supprimé. */
 const vraiNom = (nom: string) => nom !== MOI && nomLu(nom);
-/** Deux noms du même prénom (deux vrais noms) : « Léa 🌸 » sur WhatsApp, « Léa Dupont » sur Instagram. */
-export const memePrenom = (a: string, b: string) => vraiNom(a) && vraiNom(b) && clePrenom(a) === clePrenom(b);
+/**
+ * Un nom qui dit un prénom : un vrai nom, et pas un surnom (« Bébé ❤️ », « Mon amour »). Deux prénoms différents disent
+ * deux personnes différentes ; un surnom face à un prénom, non : le même contact peut être « Bébé » dans un téléphone et
+ * « Léa » sur Instagram.
+ */
+const prenomSur = (nom: string) => vraiNom(nom) && !estUnSurnom(nom);
+/** Deux noms du même prénom (deux vrais noms, memeCle) : « Léa 🌸 » sur WhatsApp, « Léa Dupont » sur Instagram, « Anne Sophie » et « Anne-Sophie ». */
+export const memePrenom = (a: string, b: string) => vraiNom(a) && vraiNom(b) && memeCle(a, b);
+/** Le prénom de deux vrais noms, accordé : `2` les mêmes mots, `1` le même début (« Marie » et « Marie-Lou »), `0` non. */
+const accordDuPrenom = (a: string, b: string) => (vraiNom(a) && vraiNom(b) ? accordDesNoms(a, b) : 0);
+/**
+ * La place du nom (parmi deux) qui a ce prénom : celle qui a ses mots, sinon son début (« Marie-Lou » face à « Marie » et
+ * « Marie-Lou 🌸 » : la seconde) ; aucune si les deux l’ont autant (deux Léa), ou aucun.
+ */
+const placeDuPrenom = (noms: readonly [string, string], nom: string) => {
+  const [a, b] = [accordDuPrenom(noms[0], nom), accordDuPrenom(noms[1], nom)];
+  return a === b ? undefined : a > b ? 0 : 1;
+};
 
 /**
  * Le nom que le fichier d’un export WhatsApp désigne : « Discussion WhatsApp avec Léa.txt », « WhatsApp Chat - Léa
  * 🌸.zip » nomment le contact, l’autre personne. Un seul des deux noms, parmi les mots du fichier ; sinon, rien.
  */
 export function contactDuFichier(fichier: string, noms: readonly string[]): string | undefined {
-  const mots = new Set(
-    sansAccent(fichier)
-      .toLowerCase()
-      .split(/[^\p{L}\p{N}]+/u),
+  const mots = new Set(aplatir(fichier).split(/[^\p{L}\p{N}]+/u));
+  /* Tous les mots de son prénom (« Marie-Lou » : marie et lou), pour ne pas désigner Marie-Claire */
+  const nommes = noms.filter(
+    (n) =>
+      vraiNom(n) &&
+      aplatir(prenomDe(n))
+        .split(/[^\p{L}\p{N}]+/u)
+        .filter(Boolean)
+        .every((m) => mots.has(m)),
   );
-  const nommes = noms.filter((n) => vraiNom(n) && mots.has(clePrenom(n)));
   return nommes.length === 1 ? nommes[0] : undefined;
 }
 
@@ -218,14 +235,14 @@ export function relier(conv: ConvEnMorceaux, id: Identite, recu: MorceauRecu): {
     /* Des captures de plus, sur des captures : « Moi » y est le participant 0. Deux noms lus de deux prénoms : quelqu’un d’autre */
     if (capturesSeules) {
       const lu = id.noms[1];
-      if (vraiNom(lu) && vraiNom(autre) && !memePrenom(lu, autre) && communs(false) < COMMUNS_MIN) throw autreConv();
+      if (prenomSur(lu) && prenomSur(autre) && !memePrenom(lu, autre) && communs(false) < COMMUNS_MIN) throw autreConv();
       return { morceaux: ajoute([MOI, autre]), identite: { noms: [MOI, vraiNom(lu) ? lu : autre], moi: 0, contact: 1 } };
     }
-    /* Des captures, sur des exports : l’autre est celui qu’un nom a désigné, sinon le même prénom, sinon celui des messages en commun, sinon le second */
-    const parNom = ([0, 1] as const).find((k) => memePrenom(id.noms[k], autre));
+    /* Des captures, sur des exports : l’autre est celui qu’un nom a désigné, sinon le même prénom (s’il n’est qu’à un des deux), sinon celui des messages en commun, sinon le second */
+    const parNom = placeDuPrenom(id.noms, autre);
     const k = id.contact ?? parNom ?? (communs(true) > communs(false) ? 0 : 1);
     const noms = croiser([MOI, autre], k === 0);
-    if (id.contact !== undefined && vraiNom(autre) && vraiNom(id.noms[k]) && !memePrenom(autre, id.noms[k]) && communs(k === 0) < COMMUNS_MIN) throw autreConv();
+    if (id.contact !== undefined && prenomSur(autre) && prenomSur(id.noms[k]) && !memePrenom(autre, id.noms[k]) && communs(k === 0) < COMMUNS_MIN) throw autreConv();
     return { morceaux: ajoute(noms), identite: { ...id, ...(parNom === undefined ? {} : { contact: id.contact ?? parNom }) } };
   }
 
@@ -234,9 +251,17 @@ export function relier(conv: ConvEnMorceaux, id: Identite, recu: MorceauRecu): {
   /* Un premier export, sur des captures : ses noms deviennent ceux de la conv, « Moi » va à celui qui n’est pas l’autre */
   if (capturesSeules) {
     const lu = id.noms[1];
-    const parNom = ([0, 1] as const).find((k) => memePrenom(recu.noms[k], lu));
+    const parNom = placeDuPrenom(recu.noms, lu);
     if (parNom !== undefined && parFichier !== undefined && parNom !== parFichier) throw autreConv();
-    if (parNom === undefined && parFichier !== undefined && vraiNom(lu) && communs(false, parFichier === 0 ? existants.map(inverser) : existants) < COMMUNS_MIN) throw autreConv();
+    if (
+      parNom === undefined &&
+      parFichier !== undefined &&
+      prenomSur(lu) &&
+      prenomSur(recu.noms[parFichier]) &&
+      !memePrenom(lu, recu.noms[parFichier]) &&
+      communs(false, parFichier === 0 ? existants.map(inverser) : existants) < COMMUNS_MIN
+    )
+      throw autreConv();
     const contact = parNom ?? parFichier;
     /* Rien ne dit qui est l’autre : les messages en commun, sinon le second, comme sur les écrans */
     const moi = contact !== undefined ? (contact === 0 ? 1 : 0) : communs(false, existants.map(inverser)) > communs(false) ? 1 : 0;
@@ -249,7 +274,7 @@ export function relier(conv: ConvEnMorceaux, id: Identite, recu: MorceauRecu): {
   /* Un export de plus : ses noms à la place des mêmes (le même nom, sinon le même prénom), puis du nom du fichier, puis des messages en commun */
   const points = (croise: boolean) => {
     const noms = croiser([a, b], croise);
-    const egal = (k: 0 | 1) => (noms[k] === id.noms[k] ? 3 : memePrenom(noms[k], id.noms[k]) ? 2 : 0);
+    const egal = (k: 0 | 1) => (noms[k] === id.noms[k] ? 3 : accordDuPrenom(noms[k], id.noms[k]));
     const fichier = designe === undefined || id.contact === undefined ? 0 : noms[id.contact] === designe ? 2 : -2;
     return egal(0) + egal(1) + fichier;
   };
@@ -266,7 +291,7 @@ export function relier(conv: ConvEnMorceaux, id: Identite, recu: MorceauRecu): {
      * rien ne dit qui elle est, c’est quelqu’un d’autre ; si c’est celui qui importe, il a changé de nom
      */
     const change = ([0, 1] as const).find((j) => !memes.includes(j));
-    if (change !== undefined && vraiNom(noms[change]) && vraiNom(id.noms[change]) && (id.contact ?? k ?? change) === change) throw autreConv();
+    if (change !== undefined && prenomSur(noms[change]) && prenomSur(id.noms[change]) && (id.contact ?? k ?? change) === change) throw autreConv();
     /* Les deux fichiers désignent l’autre, chacun à une place différente : l’un des deux parle avec quelqu’un d’autre */
     if (k !== undefined && id.contact !== undefined && k !== id.contact) throw autreConv();
   }

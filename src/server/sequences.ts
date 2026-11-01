@@ -40,7 +40,7 @@ import { donneesMemoire, donneesVerdict } from "./depot";
 import { estEquipe } from "./droits";
 import { envoyerMail, refusDuPrestataire } from "./email";
 import { boiteAMails, env } from "./env";
-import { histoireDe, metaDe, quiRempli, type Meta } from "./histoires";
+import { histoireDe, metaDe, personnesDe as participantsDe, quiRempli, type Meta } from "./histoires";
 import { entre } from "./invitations";
 import { alerter } from "./alertes";
 import { auMieux, journal, journalErreur } from "./journal";
@@ -165,12 +165,16 @@ export function heureCalme(maintenant = new Date()): boolean {
   return heure >= HEURES_CALMES.de || heure < HEURES_CALMES.a;
 }
 
-/** Leurs prénoms et leurs pronoms, pour accorder les mails, ou null : « Qui es-tu ? » n’est pas rempli. */
+/**
+ * Leurs prénoms et leurs pronoms, pour accorder les mails, ou null : « Qui es-tu ? » n’est pas rempli. Les prénoms tels
+ * qu’on les connaît, pas les noms distincts que lit le modèle (« Léa (l’autre) »).
+ */
 export function personnesDe(meta: Meta): Personnes | null {
   if (!quiRempli(meta)) return null;
   const h = histoireDe(meta);
+  const { moi, autre } = participantsDe(meta);
   const prenom = (p: string) => p.trim() || null;
-  return { moi: { prenom: prenom(h.utilisateur.prenom), elle: h.utilisateur.pronom === "elle" }, autre: { prenom: prenom(h.autre.prenom), il: h.autre.pronom === "il" } };
+  return { moi: { prenom: prenom(moi.prenom), elle: h.utilisateur.pronom === "elle" }, autre: { prenom: prenom(autre.prenom), il: h.autre.pronom === "il" } };
 }
 
 /** A-t-elle pris Premium pour cette conv : Premium d’emblée, ou ③ (Premium pour 6,90 € de plus, ou l’ancien ③) payée après son rapport ? */

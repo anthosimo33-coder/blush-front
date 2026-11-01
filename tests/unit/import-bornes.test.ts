@@ -114,7 +114,12 @@ describe("borner : ce que lit le serveur d’un export", () => {
   });
 });
 
-describe("des exports piégés, lus en temps borné", () => {
+/*
+ * 30 s par test plutôt que 5 : un test lit jusqu’à trois pièges de 6 Mo à la suite, et la CI, sous la couverture, en a
+ * mis 5,4 et 6,6 s le 1er novembre. La vraie borne est celle d’en dessous (FOIS fois la conv ordinaire) : ce délai ne
+ * sert qu’à arrêter un piège qui ne finirait plus.
+ */
+describe("des exports piégés, lus en temps borné", { timeout: 30_000 }, () => {
   /*
    * La borne suit la machine : chaque piège se mesure à l’import d’une conv ordinaire de 6 Mo (la taille du plus gros),
    * chronométré dans le même fichier, donc sur la même machine et sous la même couverture. Une borne en millisecondes

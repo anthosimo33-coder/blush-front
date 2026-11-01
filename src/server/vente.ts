@@ -167,6 +167,8 @@ export type ReponseVendue = {
   storyId: string;
   /** Le prénom de l’autre personne de cette conv. */
   prenom: string;
+  /** Le nom sous lequel le modèle la lit, quand vous avez le même prénom (« Léa D. », nomsDistincts) : c’est encore elle. */
+  nomLu?: string;
   moment: MomentDuChat;
   /** Sortie10.prenom_autre : quelqu’un d’autre dont il parle. */
   prenomAutre: string | null;
@@ -181,11 +183,15 @@ export type ReponseVendue = {
 /** Le même prénom, à la casse et aux espaces près. */
 const memePrenom = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
 
+/** Le prénom dont parle le modèle (Sortie10.prenom_autre) est celui de l’autre personne de cette conv, sous son prénom ou sous le nom qu’il lit. */
+export const estLAutreDeLaConv = (r: Pick<ReponseVendue, "prenom" | "nomLu" | "prenomAutre">) =>
+  !!r.prenomAutre?.trim() && [r.prenom, r.nomLu ?? r.prenom].some((n) => memePrenom(r.prenomAutre!, n));
+
 /** Ce que la règle doit savoir et qui se lit en base, d’un coup. */
 async function lireLaSituation(r: ReponseVendue) {
   const a = schema.achats;
   /* Le prénom de l’autre personne de cette conv n’est pas « quelqu’un d’autre » */
-  const memePersonne = !!r.prenomAutre?.trim() && memePrenom(r.prenomAutre!, r.prenom);
+  const memePersonne = estLAutreDeLaConv(r);
   const prenomAutre = r.prenomAutre?.trim() && !memePersonne ? r.prenomAutre.trim() : null;
   const [[compte], payes, [recents], verdict, [rapport], spontaneeRecente, autreDejaProposee, aJourRecente, ...refus] = await Promise.all([
     db().select({ email: schema.users.email }).from(schema.users).where(eq(schema.users.id, r.userId)),

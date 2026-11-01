@@ -17,7 +17,7 @@ import { donneesMemoire, donneesVerdict, ligneRapport, modifierMemoire } from ".
 import { compterLeHaut } from "./compteurs";
 import { dureeDeLaSuite, garderJusquALAchat, garderJusquALaLecture } from "./ecrans-gardes";
 import { noterLeTitre, noterLeTitreEntier } from "./imports";
-import { contexteDe, convDe, histoireDe, metaDe, provenancesDe, type Ligne, type LigneComplete } from "./histoires";
+import { contexteDe, convDe, histoireDe, metaDe, nomsDeToi, provenancesDe, type Ligne, type LigneComplete } from "./histoires";
 import { messagesAffiches } from "./ecrans/messages";
 import { apercuDuPaywall } from "./ecrans/haut-du-paywall";
 import { chapitresAffiches, lectureDe, scores, sobreAffiche } from "./ecrans/rapport";
@@ -332,11 +332,10 @@ async function rapportChapitres(story: LigneComplete, t: Tache) {
   const ligne = await ligneRapport(story.id);
   if (!v || !ligne?.plan) throw new ErreurTache("plan_absent");
   const plan = coffre.lire("reports.plan", ligne.plan);
-  const h = histoireDe(metaDe(story));
   /* Les titres promis par le verdict : chaque chapitre écrit les porte, au mot près (le plan les a déjà) */
   const titres = titresDuVerdict(v.sortie);
   /* Les deux moitiés s’écrivent en même temps : on suit chacune, chapitre par chapitre */
-  const suivi = suiviDesChapitres(story, t, messagesAffiches(rendu.lignes, h.utilisateur.prenom), v.scores, titres);
+  const suivi = suiviDesChapitres(story, t, messagesAffiches(rendu.lignes, nomsDeToi(metaDe(story))), v.scores, titres);
   /* Une moitié échoue : l’autre s’arrête aussi (tout repart au prochain essai, rien ne continue d’écrire en double) */
   const abandon = new AbortController();
   const moitie = (quels: "1 à 4" | "5 à 8") =>
@@ -398,8 +397,7 @@ const DECOUVERTES_MAX = 3;
 
 async function garderRapport(story: Ligne, brut: Rapport, lignes: Map<string, string>, lignesScores: ScoreRow[]) {
   const r: Rapport = { ...brut, decouvertes: brut.decouvertes.slice(0, DECOUVERTES_MAX) };
-  const h = histoireDe(metaDe(story));
-  const chapitres = chapitresAffiches(r.chapitres ?? [], messagesAffiches(lignes, h.utilisateur.prenom), lignesScores);
+  const chapitres = chapitresAffiches(r.chapitres ?? [], messagesAffiches(lignes, nomsDeToi(metaDe(story))), lignesScores);
   const donnees: DonneesRapport = {
     sortie: r,
     chapitres,

@@ -1,6 +1,7 @@
 import "server-only";
 import { randomBytes } from "node:crypto";
 import { eq } from "drizzle-orm";
+import { motsPropres, prenomDe, prenomsDuSurnom } from "@prompts/lib/noms";
 import type { CibleImage } from "@/types/api";
 import type { CodeErreur } from "@/types/erreurs-api";
 import { empreinte } from "./chiffrement";
@@ -49,15 +50,21 @@ export function masquerPrenoms(texte: string, masquer: string[], garder: string[
 }
 
 /**
- * Le masque de ce qui se partage : l’autre devient une initiale (son prénom et son nom d’export), ton prénom reste en
- * clair, c’est toi qui partages. Sans « Qui es-tu ? », on ne sait pas qui est qui : tous les noms sont masqués.
- * Le « Moi » des captures est le mot, pas un nom.
+ * Le masque de ce qui se partage : l’autre devient une initiale (son prénom et chacun de ses mots, son nom d’export, et
+ * le prénom que ce nom dit : « Ma Léa ❤️ » masque aussi « Léa », même pour une conv lue avant, au prénom « Ma »), ton
+ * prénom reste en clair, c’est toi qui partages. Les autres mots du nom d’export (« Kevin ex », « Léa Tinder ») restent :
+ * le modèle ne lit jamais de nom de famille. Un prénom écrit sur « Qui es-tu ? » se masque aussi mot à mot (« Anne
+ * Sophie »), pas un surnom venu du nom d’export (« Mon ex » ne masque pas « ex »), sauf le prénom qu’il contient
+ * (« Mon amour Léa ❤️ » masque « Léa »). Sans « Qui es-tu ? », on ne sait pas qui est qui : tous les noms sont
+ * masqués. Le « Moi » des captures est le mot, pas un nom.
  */
 export function masqueDe(story: Ligne): (texte: string) => string {
   const meta = metaDe(story);
   const { moi, participants } = meta;
   const unNom = (n: string) => n !== "Moi";
-  const autres = participants.filter((_, k) => k !== moi).flatMap((p) => [p.prenom, p.nom].filter(unNom));
+  const autres = participants
+    .filter((_, k) => k !== moi)
+    .flatMap((p) => [p.prenom, p.nom, prenomDe(p.nom), ...prenomsDuSurnom(p.nom), ...(p.prenom === prenomDe(p.nom) ? [] : motsPropres(p.prenom))].filter(unNom));
   const toi = moi == null ? [] : [participants[moi].prenom].filter(unNom);
   return (texte) => masquerPrenoms(texte, autres, toi);
 }

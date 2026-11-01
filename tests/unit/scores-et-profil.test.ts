@@ -47,6 +47,11 @@ describe("les scores du chapitre 1", () => {
     expect(ouvre(5, 5)).toMatchObject({ captionLeft: "toi\u00a0: 5", captionRight: "léa\u00a0: 5" });
   });
 
+  it("deux prénoms pareils : la légende dit son prénom, sans le « (l’autre) » que lit le modèle", () => {
+    const pareils = { ...chiffres({ ouvre: [3, 7] }), qui: { toi: "Léa", autre: "Léa (l’autre)" } };
+    expect(scores(pareils)[0]).toMatchObject({ captionRight: "léa, 7 fois sur 10" });
+  });
+
   it("rien à comparer (des captures sans heures) : à égalité, au milieu", () => {
     expect(ouvre(0, 0)).toMatchObject({ winner: "pareil", toiPercent: 50 });
   });

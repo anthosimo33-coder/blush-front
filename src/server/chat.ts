@@ -19,7 +19,7 @@ import * as coffre from "./coffre";
 import { CLES, compter } from "./compteurs";
 import { db, schema, uneLigne } from "./db";
 import { modifierMemoire } from "./depot";
-import { contexteDe, histoireDe, metaDe, type Ligne } from "./histoires";
+import { contexteDe, histoireDe, metaDe, nomsDeToi, personnesDe, type Ligne } from "./histoires";
 import { reponseMasquee } from "./historique";
 import { editionsBornees, type DonneesMemoire } from "./stockage/types";
 import { env } from "./env";
@@ -302,7 +302,7 @@ export async function repondre(
     ...(ajout ? { ajout: blocAjout(ajout.ajout) } : {}),
     vocal: vocalAttendu,
   });
-  const messages = messagesAffiches(lignes, h.utilisateur.prenom);
+  const messages = messagesAffiches(lignes, nomsDeToi(meta));
 
   /*
    * Une preuve introuvable : on rejoue (appelVerifie), sauf après une bulle montrée, qu’un nouvel essai réécrirait autrement
@@ -418,7 +418,9 @@ export async function repondre(
       ? await venteDuChat({
           userId: compte,
           storyId: story.id,
-          prenom: h.autre.prenom,
+          /* Son prénom tel qu’on le connaît : les noms distincts (« Léa (l’autre) ») sont pour le modèle */
+          prenom: personnesDe(meta).autre.prenom,
+          nomLu: h.autre.prenom,
           moment: sortie.moment,
           prenomAutre: sortie.prenom_autre,
           alerte: alerte && alerteSobre(sortie.alerte),

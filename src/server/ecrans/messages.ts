@@ -1,4 +1,5 @@
 import { HEURE_INCONNUE, lireLigne } from "@prompts/lib/ligne";
+import { nomAffiche } from "@prompts/lib/noms";
 import type { Message } from "@/types";
 
 /*
@@ -11,16 +12,24 @@ import type { Message } from "@/types";
  * Ici, les preuves : une ligne de la conv (lib/ligne.ts) devient un message daté.
  */
 
-/** Les messages affichables, par identifiant. Un média seul (« [photo] ») n’a rien à montrer : il est écarté. */
-export function messagesAffiches(lignes: Map<string, string>, prenomUtilisateur: string): Map<string, Message> {
+/**
+ * Les messages affichables, par identifiant. Un média seul (« [photo] ») n’a rien à montrer : il est écarté. `toi` : le
+ * nom (ou les noms, nomsDeToi) sous lequel tes messages s’écrivent dans les lignes.
+ */
+export function messagesAffiches(lignes: Map<string, string>, toi: string | readonly string[]): Map<string, Message> {
+  const noms = new Set(typeof toi === "string" ? [toi] : toi);
   const out = new Map<string, Message>();
   for (const [id, ligne] of lignes) {
     const l = lireLigne(ligne);
     /* Son profil (« profil de Sophie ») n’est pas un message : il ne s’affiche pas en bulle */
     if (!l || /^\[[^\]]+\]$/.test(l.texte.trim()) || l.profil) continue;
-    const toi = l.nom === prenomUtilisateur;
+    const deToi = noms.has(l.nom);
     const h = l.heure === HEURE_INCONNUE ? "" : ` ${l.heure.replace("~", "")}`;
-    out.set(id, { from: toi ? "toi" : "elle", text: l.texte.replace(/ ⏎ /g, " "), caption: `${toi ? "Toi" : l.nom} · ${l.jour.slice(8, 10)}/${l.jour.slice(5, 7)}${h}` });
+    out.set(id, {
+      from: deToi ? "toi" : "elle",
+      text: l.texte.replace(/ ⏎ /g, " "),
+      caption: `${deToi ? "Toi" : nomAffiche(l.nom)} · ${l.jour.slice(8, 10)}/${l.jour.slice(5, 7)}${h}`,
+    });
   }
   return out;
 }
