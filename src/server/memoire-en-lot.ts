@@ -3,12 +3,14 @@ import { and, asc, eq, inArray, isNotNull, isNull, lt, lte, or, sql, type SQL } 
 import { Maj07, type Maj } from "@prompts/lib/schemas";
 import { payeurDe, payeurDuCompte, type Payeur, type Reserve } from "./budget";
 import * as coffre from "./coffre";
+import { CLES, compter } from "./compteurs";
 import { db, schema } from "./db";
 import { donneesMemoire } from "./depot";
 import { memoireEnLot } from "./env";
 import { ErreurTache, estBudget } from "./erreurs";
 import type { EtatDuLot, IssueDuLot, Presse } from "./ia/claude";
 import { auMieux, journal, journalErreur } from "./journal";
+import { duProduitMaintenant } from "./population";
 import { passerLaMain } from "./relais";
 import { aRelancer, autreEnCours, entreeDe, ESSAIS_MAX, finir, sansLotEnVol, type Tache } from "./taches";
 
@@ -16,8 +18,9 @@ import { aRelancer, autreEnCours, entreeDe, ESSAIS_MAX, finir, sansLotEnVol, typ
  * La mise à jour de la mémoire, en différé. Celle qui part au calme (src/server/memoire-groupee.ts : 10 minutes sans
  * échange), personne ne l’attend : la personne est partie, le chat relit ses derniers échanges, et sa fiche la rapatrie
  * quand elle s’ouvre. Avec BLUSH_MEMOIRE_EN_LOT, le passage des 5 minutes (GET /api/cron/relances) l’envoie donc en lot au
- * prestataire (l’API Message Batches, src/server/ia/claude.ts : la même requête qu’en direct, deux fois moins chère), puis
- * relève les lots à chaque passage :
+ * prestataire (l’API Message Batches, src/server/ia/claude.ts : la même requête qu’en direct, deux fois moins chère),
+ * sauf celle d’une conv en alerte, qui part en direct (ALERTE : une alerte qu’elle lèverait n’attend pas le lot ; /admin
+ * les compte, CLES.majEnDirectParAlerte), puis relève les lots à chaque passage :
  *   - fini : la réponse s’applique à la mémoire gardée à l’envoi (tasks.lot_avant), ou à elle et aux alertes que le chat
  *     a notées depuis (majDuLot, src/server/analyse.ts) ; la tâche finit ;
  *   - un refus (le repli du prestataire n’existe pas en lot), une erreur, une expiration, une annulation, une sortie
@@ -31,10 +34,15 @@ import { aRelancer, autreEnCours, entreeDe, ESSAIS_MAX, finir, sansLotEnVol, typ
  * la même mise à jour n’est jamais payée deux fois, sauf une annulation arrivée trop tard (un lot déjà en cours de
  * traitement finit quand même : sa réponse, facturée, est notée puis ignorée). Une tâche en lot qui a perdu son lot (sa
  * ligne de `lots` disparue en route) part en direct au passage suivant (sansLeurLot) : rien ne reste en lot pour toujours.
- * Ce qui ne peut pas attendre la rapatrie (rapatrier) : sa fiche ouverte pour de bon, un niveau atteint, un ajout, et le
- * ECHANGES_PAR_MAJ-ième échange depuis le lot (le fil du chat ne relit que les 6 derniers). Une alerte du chat, elle, n’a
- * rien à rapatrier : elle est notée tout de suite dans la mémoire (noterLAlerte, src/server/chat.ts), le lot ne la voit
- * pas, ne peut pas l’effacer, et sa réponse s’applique par-dessus (src/server/memoire-relue.ts).
+ * Ce qui ne peut pas attendre la rapatrie (rapatrier) : sa fiche ouverte pour de bon, un niveau atteint, un ajout, le
+ * ECHANGES_PAR_MAJ-ième échange depuis le lot (le fil du chat ne relit que les 6 derniers), et une alerte levée par le
+ * chat. Celle-ci est notée tout de suite dans la mémoire (noterLAlerte, src/server/chat.ts) : le lot ne la voit pas, ne
+ * peut pas l’effacer, et sa réponse s’applique par-dessus (src/server/memoire-relue.ts). Mais la mise à jour qui relit
+ * l’échange qui l’a levée (et la tranche) n’attend pas le lot, jusqu’à LOT_AU_PLUS_S : comme au garde-fou, une conv en
+ * alerte n’attend jamais un lot. Le lot rapatrié (retenir, src/server/memoire-groupee.ts), sa réponse s’applique et la
+ * mise à jour part en direct à son calme (ALERTE) ; sinon il est annulé, et tout part en direct, réuni. Une alerte
+ * arrivée pendant l’envoi, avant que sa tâche passe en lot (l’échange ne voit pas encore le lot), se relève juste après
+ * l’envoi (envoyer, alerteArrivee) : le lot à peine parti est annulé, la mise à jour part en direct.
  * Le ménage (menage) retrouve chez le prestataire un lot à nous que la base ne connaît pas (l’instance coupée juste après
  * l’envoi, une connexion coupée pendant l’envoi, sa ligne qui n’a pas pu s’écrire) : gardé sans tâche, il est relevé (son
  * coût noté) et effacé comme les autres, au lieu de rester 29 jours chez le prestataire.
@@ -66,8 +74,38 @@ const RESERVE_PAR_LOT = 100_000;
 const ETIQUETTE = "memoire_maj_lot";
 /** Le code d’un envoi raté pour une raison passagère, une première fois : la seconde, la mise à jour part en direct. */
 const REPORTE = "lot:reporte";
+/**
+ * Le code (tasks.error) d’une mise à jour au calme gardée en direct, sans lot, parce que la conv est en alerte : sa
+ * mémoire en a une (la règle de l’âge, « danger » ou « detresse » : de la lecture, d’une mise à jour, ou vue dans le chat
+ * et pas encore tranchée), ou l’un de ses échanges en a levé une que le chat n’a pas pu y noter (noterLAlerte,
+ * src/server/chat.ts). En lot, une alerte que la mise à jour lèverait (« mineur » sous une « detresse » : la règle de
+ * l’âge, que le chat lit sur la ligne de sa mémoire) ne s’écrirait qu’à sa réponse, jusqu’à environ 1 h 26 après le
+ * dernier échange (le calme, le passage, LOT_AU_PLUS_S, puis le direct) ; et un refus s’y paie deux fois (le lot, puis le
+ * direct : `lot:refus`).
+ */
+const ALERTE = "lot:alerte";
 /** Sur le chemin d’une requête (sa fiche, le chat) : des appels courts au prestataire, le direct sans sa réponse. */
 const COURT: Presse = { court: true };
+
+/** Une mise à jour gardée en direct par le garde-fou des alertes (ALERTE), comptée pour /admin : celles du produit seulement. Ne lève jamais. */
+const compterLAlerte = (storyId: string) =>
+  auMieux(async () => {
+    if (await duProduitMaintenant({ storyId })) await compter(CLES.majEnDirectParAlerte);
+  }, "mise à jour en alerte non comptée");
+
+/**
+ * La conv est-elle passée en alerte depuis que l’envoi a lu sa mémoire ? Sa mémoire en porte une maintenant (le chat l’a
+ * notée : noterLAlerte, src/server/chat.ts), ou une mise à jour qui attend relit un échange qui en a levé une (`levee`,
+ * que le chat n’a pas pu noter dans la mémoire).
+ */
+async function alerteArrivee(storyId: string): Promise<boolean> {
+  if ((await donneesMemoire(storyId))?.etat.alerte) return true;
+  const attendent = await db()
+    .select({ input: t.input })
+    .from(t)
+    .where(and(eq(t.storyId, storyId), eq(t.kind, "memoire_maj"), eq(t.status, "attente")));
+  return attendent.some((a) => !!a.input && coffre.lire("tasks.input", a.input).some((e) => !!e.levee));
+}
 
 const claude = () => import("./ia/claude");
 const analyse = () => import("./analyse");
@@ -344,7 +382,8 @@ async function reserveDesLots(userId: string | null): Promise<Reserve> {
  * tâche en lot avec la mémoire de l’envoi, seulement si elle est encore à cet envoi (son battement est le sien) : prise
  * entre-temps par une autre exécution, le lot est annulé, et effacé quand il aura fini. Le budget du jour atteint (les
  * lots en vol comptés d’avance) : elle attend (ErreurTache « budget »). Une erreur passagère du prestataire, une première
- * fois : elle attend le passage suivant (REPORTE). Sans mémoire, ou un envoi impossible : elle part en direct (`direct`).
+ * fois : elle attend le passage suivant (REPORTE). Sans mémoire, la conv en alerte (ALERTE, avant l’envoi, ou une alerte
+ * arrivée pendant : le lot annulé), ou un envoi impossible : elle part en direct (`direct`).
  */
 async function envoyer(id: string): Promise<{ envoyee: boolean; direct: string | null }> {
   const prise = new Date();
@@ -361,6 +400,16 @@ async function envoyer(id: string): Promise<{ envoyee: boolean; direct: string |
     const echanges = entreeDe(tache);
     /* Sans mémoire (la vraie en échec, celle de secours pas encore écrite) : le direct sait l’écrire d’abord */
     if (!story || !lue || !echanges?.length) return { envoyee: false, direct: await versLeDirect(tache.id, "en_cours", "lot:sans_memoire", battement) };
+    /*
+     * La conv en alerte (ALERTE) : en direct, avant toute requête au prestataire. Sans heure, ni le passage suivant ni un
+     * échange qui la rejoint (`due`, retenir) ne la renvoient en lot ; la suivante de la conv repasse ici
+     */
+    if (lue.etat.alerte || echanges.some((e) => e.levee)) {
+      const direct = await versLeDirect(tache.id, "en_cours", ALERTE, battement);
+      /* Comptée pour /admin (le code s’efface quand elle finit) : ce que le garde-fou retire au lot, pour le produit seul */
+      if (direct) await compterLAlerte(direct);
+      return { envoyee: false, direct };
+    }
     const { req } = (await analyse()).preparerLaMaj(story, lue, echanges);
     const ia = await claude();
     const reserve = await reserveDesLots(story.userId);
@@ -388,6 +437,24 @@ async function envoyer(id: string): Promise<{ envoyee: boolean; direct: string |
       await annuler(lot);
       journal("lot : sa mise à jour prise ailleurs pendant l’envoi, annulé", { tache: tache.id, lot }, "alerte");
       return { envoyee: false, direct: null };
+    }
+    /*
+     * Une alerte arrivée pendant l’envoi, entre la lecture de la mémoire et la tâche en lot : l’échange qui l’a levée n’a
+     * pas vu le lot (echangesDepuisLeLot : la tâche n’y était pas encore), et sa mise à jour l’attendrait jusqu’à
+     * LOT_AU_PLUS_S. Relevée juste après lui : le lot à peine parti est annulé (effacé une fois fini, sa réponse ignorée),
+     * et la mise à jour part en direct, réunie à celle qui relit l’échange (le garde-fou, comme avant l’envoi). Arrivée
+     * après, l’échange voit le lot et le rapatrie (retenir). Un relevé en échec laisse le lot partir, comme avant
+     */
+    const arrivee = await alerteArrivee(tache.storyId).catch((e: unknown) => {
+      journalErreur("lot : alerte non relevée après l’envoi", e, { tache: tache.id });
+      return false;
+    });
+    if (arrivee) {
+      await annuler(lot);
+      const direct = await versLeDirect(tache.id, "lot", ALERTE);
+      if (direct) await compterLAlerte(direct);
+      journal("lot : une alerte arrivée pendant l’envoi, annulé", { tache: tache.id, lot }, "alerte");
+      return { envoyee: false, direct };
     }
     journal("mémoire envoyée en lot", { tache: tache.id, lot, echanges: echanges.length });
     return { envoyee: true, direct: null };

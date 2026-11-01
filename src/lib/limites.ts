@@ -12,11 +12,12 @@ const MO = 1024 * 1024;
 export const CAPTURES_MAX = 20;
 
 /**
- * Les écrans d’un lot d’enregistrement d’écran (tailleDesLots, src/services/preparer-video.ts) : six pour une courte
- * vidéo, lue en un seul tour, jusqu’à douze pour une longue. /api/captures/video borne les messages d’un lot en
- * conséquence, et /api/captures/lot les images d’un envoi (CAPTURES_MAX).
+ * Les écrans d’un lot d’enregistrement d’écran, au plus (tailleDesLots et lotsDe, src/services/preparer-video.ts) : douze
+ * pour toutes les vidéos depuis le 27 octobre (de six pour une courte à douze pour une longue avant), découpés en partant
+ * de la fin : le lot le plus récent plein, le reste dans le plus ancien. /api/captures/video borne les messages d’un lot
+ * en conséquence, et /api/captures/lot les images d’un envoi (CAPTURES_MAX).
  */
-export const ECRANS_PAR_LOT = { min: 6, max: 12 } as const;
+export const ECRANS_PAR_LOT = 12;
 
 /**
  * Les envois d’avant dont un enregistrement reprend des lots déjà lus dans l’onglet (src/services/preparer-video.ts), au
@@ -26,10 +27,26 @@ export const ENVOIS_REPRIS_MAX = 10;
 
 /**
  * Les lots d’un enregistrement lus en même temps par le navigateur (chacun est un appel au modèle : lotParIp et
- * lotsParCompte les bornent). Une vidéo de plus de lots que ça ne se lit pas en un seul tour : c’est une longue vidéo,
- * que la lecture partielle peut ne lire qu’en partie avant l’achat (src/server/lecture-partielle.ts).
+ * lotsParCompte les bornent). Une vidéo de plus de lots que ça ne se lit pas en un seul tour : c’est une longue vidéo
+ * (plus de 56 écrans en lots de douze, moins quand des écrans lourds font couper un lot), que la lecture partielle peut
+ * ne lire qu’en partie avant l’achat (src/server/lecture-partielle.ts).
  */
 export const LECTEURS_DE_LOTS = 5;
+
+/**
+ * La lecture partielle visée par le plan du 27 octobre 2026, pour toutes les vidéos et non plus les seules longues :
+ * une vidéo d’au moins ce nombre de lots peut ne se lire avant l’achat que dans sa partie la plus récente (un lot seul se
+ * lit toujours en entier). Mesurée d’abord sans rien changer à la lecture (BLUSH_LECTURE_PARTIELLE à « mesure » :
+ * leContrefactuel, src/server/lecture-partielle.ts) ; l’A/B la suivra.
+ */
+export const LOTS_MIN_PARTIELLE = 2;
+
+/**
+ * La taille commune d’un tour de cette lecture partielle visée : son premier tour (le lot le plus récent, plein depuis
+ * la découpe en partant de la fin), puis chaque tour de plus, jusqu’à ce que la règle d’arrêt dise « assez » (decider).
+ * Un tour d’un lot se lit en 25 à 30 s.
+ */
+export const LOTS_PAR_TOUR = 1;
 
 /** Les lots d’un enregistrement, au plus, pour le serveur (/api/captures/video, /api/captures/ecrans) : un très long en fait quinze. */
 export const LOTS_MAX = 40;

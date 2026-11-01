@@ -134,7 +134,8 @@ export const octetsDansLeBudget = (req: Request, octets: number) => dansLeBudget
 /**
  * Les octets d’un lot d’écrans gardés (POST /api/captures/ecrans) tiennent-ils dans leur budget du jour ? Comme
  * octetsDansLeBudget, sur ses plafonds à lui (LIMITES.koEcransParIp, LIMITES.koEcransParJour) : ces écrans restent
- * chiffrés en base jusqu’à 24 h, sans qu’aucune lecture ne les paie.
+ * chiffrés en base sans qu’aucune lecture ne les paie, jusqu’à 13 jours sans paiement (48 h avant « Qui es-tu ? », puis
+ * 11 jours après le paywall : src/server/ecrans-gardes.ts), et 7 de plus une fois payés.
  */
 export const ecransDansLeBudget = (req: Request, octets: number) => dansLeBudget(BUDGETS.ecrans, req, octets);
 

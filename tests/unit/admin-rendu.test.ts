@@ -59,6 +59,29 @@ describe("le pilotage, rendu", () => {
     for (const titre of ["D’où ils viennent", "Ce qui se vend", "Les coups de pouce", "Ce que coûte l’IA", "Santé", "Outils", "Bêta", "Les derniers gestes"])
       expect(t, titre).toContain(titre);
     expect(t).toContain("Que des nombres\u00a0: aucune conv, aucun message, aucun email ne sort d’ici.");
+    /* La règle visée de la lecture partielle, rejouée sur les vidéos lues en entier : où elle s’arrête, ses titres, ce qu’elle épargne */
+    for (const titre of [
+      "Vidéos\u00a0: lecture partielle",
+      "Assez au premier tour (le lot le plus récent)",
+      "«\u00a0Tout\u00a0»\u00a0: trop peu de messages lus",
+      "La tendance perdue",
+    ])
+      expect(t, titre).toContain(titre);
+    expect(t).toMatch(/Sur [\d\u202f]+\u00a0vidéos? mesurées? depuis le 27\u00a0octobre, [\d,\u202f]+\u00a0\$ d’IA épargnables sur [\d,\u202f]+\u00a0\$ lus avant l’achat/);
+    /* Les convs payées par longueur : chaque tranche, l’offre prise, l’IA avant l’achat, d’une lecture et des deux réunies, les verdicts ; puis les achats tardifs et les verdicts chers */
+    expect(t).toContain("Offres IA avant l’achat IA d’une lecture Les deux Jetons par message");
+    for (const titre of ["Par longueur", "Moins de 1\u202f000 messages", "1\u202f000 à 3\u202f000", "3\u202f000 à 7\u202f000", "7\u202f000 et plus", "Les verdicts les plus chers"])
+      expect(t, titre).toContain(titre);
+    expect(t).toMatch(/Premium \d+ · Le rapport \d+ · ①\u00a0offre unique \d+/);
+    expect(t).toMatch(/Payés plus de 48\u00a0h après l’arrivée de leur conv au paywall\u00a0: \d+ sur [\d\u202f]+\u00a0achats \((—|[\d,]+\u00a0%)\)/);
+    expect(t).toMatch(/claude-opus-5-5 [\d\u202f]+\u00a0lignes sur [\d\u202f]+\u00a0convs, [\d,\u202f]+\u00a0\$ \([\d,]+\u00a0\$ la ligne\)/);
+    /* Les deux compteurs du suivi : les vidéos arrêtées par un refus, la mémoire gardée en direct par une alerte */
+    expect(t).toMatch(/Vidéos arrêtées par un refus de lecture\u00a0: \d+ sur [\d\u202f]+\u00a0vidéos envoyées/);
+    expect(t).toMatch(
+      /Mémoire gardée en direct par une alerte\u00a0: \d+\u00a0mises? à jour au calme, face à \d+\u00a0parties? en lot \((\d+\u00a0% gardées en direct|«\u00a0—\u00a0»\u00a0: moins de 30\u00a0mises à jour, trop peu pour un taux)\)/,
+    );
+    /* Les images en deux postes */
+    for (const poste of ["Captures", "Vidéo"]) expect(html, poste).toMatch(new RegExp(`<span class="truncate">${poste}</span>`));
     /* Un « ? » par carte et par chiffre clé, chacun nommé */
     for (const cle of [
       "ca",
@@ -74,6 +97,9 @@ describe("le pilotage, rendu", () => {
       "sources",
       "mix",
       "coups",
+      "avantLAchat",
+      "lecturePartielle",
+      "parLongueur",
       "couts",
       "sante",
     ] as const)
@@ -110,6 +136,21 @@ describe("le pilotage, rendu", () => {
     expect(t).toContain("Tout tourne");
   });
 
+  it("les deux compteurs du suivi : leurs taux sur ce qui se compte les mêmes jours (pas les imports du tableau ni le poste), « — » sous 30 comme dans le MCP", () => {
+    const rendu = (compteurs: ReturnType<typeof statsDExemple>["pilotage"]["compteurs"]) => {
+      const s = statsDExemple(7);
+      s.pilotage.compteurs = compteurs;
+      return texte(renderToStaticMarkup(createElement(Pilotage, { s, direct: null, base: "/apercu/admin", sonder: false })));
+    };
+    /* Une seule mise à jour gardée en direct, aucune en lot : pas de « 100 % », trop peu pour un taux */
+    expect(rendu({ videosRefusees: 1, videosImportees: 2, majEnDirectParAlerte: 1, majEnLot: 0 })).toContain(
+      "Mémoire gardée en direct par une alerte\u00a0: 1\u00a0mise à jour au calme, face à 0\u00a0partie en lot («\u00a0—\u00a0»\u00a0: moins de 30\u00a0mises à jour, trop peu pour un taux).",
+    );
+    const t = rendu({ videosRefusees: 4, videosImportees: 36, majEnDirectParAlerte: 6, majEnLot: 34 });
+    expect(t).toContain("Vidéos arrêtées par un refus de lecture\u00a0: 4 sur 40\u00a0vidéos envoyées (10,0\u00a0%).");
+    expect(t).toContain("Mémoire gardée en direct par une alerte\u00a0: 6\u00a0mises à jour au calme, face à 34\u00a0parties en lot (15\u00a0% gardées en direct).");
+  });
+
   it("rien du tout (une base neuve) : des zéros et des « — », jamais une division par zéro", () => {
     const s = statsDExemple(1, { calme: true });
     const zero = { valeur: 0, avant: 0 };
@@ -137,6 +178,29 @@ describe("le pilotage, rendu", () => {
       quiImporte: { importees: personne, payees: personne },
       mix: s.pilotage.mix.map((m) => ({ ...m, n: 0, centimes: 0 })),
       iaDuJour: { dollars: 0, budget: 30, sansCompte: { dollars: 0, budget: 50 } },
+      parLongueur: {
+        tranches: s.pilotage.parLongueur.tranches.map((x) => ({
+          ...x,
+          ventes: 0,
+          offres: { rapport: 0, premium: 0, suite: 0, second: 0, rapport_garde: 0, autre: 0 },
+          convs: 0,
+          lues: 0,
+          dollarsMedian: null,
+          importsMesures: 0,
+          dollarsMedianAvant: null,
+          totaux: 0,
+          dollarsMedianTotal: null,
+          verdicts: 0,
+          plusieursVerdicts: 0,
+          jetonsParMessage: null,
+          verdictsMesures: 0,
+        })),
+        effacees: 0,
+        tard: { payes: 0, plusDe48h: 0, sansPaywall: 0 },
+        modeles: [],
+        chers: [],
+      },
+      compteurs: { videosRefusees: 0, videosImportees: 0, majEnDirectParAlerte: 0, majEnLot: 0 },
       suiviDepuis: null,
     };
     s.couts = {
@@ -156,6 +220,11 @@ describe("le pilotage, rendu", () => {
     expect(t).toContain("Ni visite ni vente sur la période.");
     expect(t).toContain("Aucune conv importée sur la période.");
     expect(t).toContain("Aucun appel au modèle sur la période.");
+    expect(t).toContain("Aucune conv payée sur la période.");
+    expect(t).toContain("Payés plus de 48\u00a0h après l’arrivée de leur conv au paywall\u00a0: 0 sur 0\u00a0achat (—).");
+    expect(t).toContain(
+      "Mémoire gardée en direct par une alerte\u00a0: 0\u00a0mise à jour au calme, face à 0\u00a0partie en lot («\u00a0—\u00a0»\u00a0: moins de 30\u00a0mises à jour, trop peu pour un taux).",
+    );
     expect(t).toContain("Pas encore de fuite à comparer");
     expect(t).toContain("Personne sur le site en ce moment.");
     expect(t).toContain("0 personne en ligne");

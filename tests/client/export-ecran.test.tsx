@@ -15,7 +15,16 @@ import { HISTOIRE } from "../aide/rapport-exemple";
  */
 const routeur = { push: vi.fn(), replace: vi.fn(), prefetch: vi.fn(), back: vi.fn() };
 vi.mock("next/navigation", () => ({ useRouter: () => routeur, usePathname: () => "/importer/export", useSearchParams: () => new URLSearchParams() }));
-vi.mock("@/services/api", async (vrai) => ({ ...(await vrai<typeof import("@/services/api")>()), uploadExport: vi.fn(), prechargerExport: vi.fn() }));
+/*
+ * Les jalons de l’écran (src/lib/jalons.ts) ne partent pas : sans serveur, leur fetch échouait après la fin du fichier, et
+ * son journal (tracer) pouvait arriver pendant que Vitest refermait l’environnement (une erreur hors des tests)
+ */
+vi.mock("@/services/api", async (vrai) => ({
+  ...(await vrai<typeof import("@/services/api")>()),
+  uploadExport: vi.fn(),
+  prechargerExport: vi.fn(),
+  envoyerJalon: vi.fn(),
+}));
 /** Les vidéos de l’export, par appli : null comme aujourd’hui, sauf quand un cas en pose une. */
 const videos = vi.hoisted(() => ({ whatsapp: null as string | null, instagram: null as string | null }));
 vi.mock("@/contenu/parcours", async (vrai) => ({ ...(await vrai<typeof import("@/contenu/parcours")>()), VIDEOS_EXPORT: videos }));

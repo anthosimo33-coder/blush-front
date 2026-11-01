@@ -286,9 +286,13 @@ type Ok = { ok: true };
 export type SuiteDeLaVideo = { suite: "lire" | "garder"; lots: number };
 
 /*
- * Ce que le navigateur dit d’une longue vidéo (POST /api/captures/video) : ses lots plus anciens pas encore lus
- * (`restants`), tous ses écrans, l’empreinte de son lot le plus récent (`video`, la moitié de l’A/B), si son sens de
- * défilement est sûr, et si ses lots plus anciens sont déjà envoyés (`gardes`)
+ * Ce que le navigateur dit d’une vidéo de deux lots ou plus (POST /api/captures/video ; une longue, ou une plus courte
+ * pour la mesure de la règle visée) : ses lots plus anciens pas encore lus (`restants`, 0 lue en entier), tous ses
+ * écrans, l’empreinte de son lot le plus récent (`video`, la moitié de l’A/B), si son sens de défilement est sûr, si
+ * ses lots plus anciens sont déjà envoyés (`gardes`), et comment il a découpé ses lots (`decoupe`) : « fin », en partant
+ * de la fin (le lot le plus récent plein, depuis le 27 octobre 2026), ce que la mesure de la règle visée suppose. Un
+ * onglet resté sur le JS d’avant (pendant une mise en ligne) ne le dit pas : il découpait depuis le début, son lot le
+ * plus récent n’était que le reste. Sa vidéo se lit comme avant, sans être mesurée
  */
 const LongueVideo = z.object({
   restants: z.number().int().min(0).max(LOTS_MAX),
@@ -300,6 +304,7 @@ const LongueVideo = z.object({
   video: z.string().min(16).max(128),
   sensSur: z.boolean(),
   gardes: z.literal(true).optional(),
+  decoupe: z.literal("fin").optional(),
 });
 
 /* ———— Ce que les routes reçoivent ———— */
@@ -384,8 +389,11 @@ type Reponses = {
   "POST /api/auth/deconnexion": Ok;
   /** Un mauvais code : `{ ok: false }`, en 200, la même réponse pour tous. */
   "POST /api/auth/verifier": { ok: false } | { ok: true; email: string };
-  /** Le laissez-passer du CAPTCHA, posé en cookie (src/server/captcha.ts). */
-  "POST /api/captcha": Ok;
+  /**
+   * Le laissez-passer du CAPTCHA, posé en cookie (src/server/captcha.ts) ; `planDesVideos` : une longue vidéo demande-t-elle
+   * son plan (seulement dans l’A/B de la lecture partielle) ?
+   */
+  "POST /api/captcha": Ok & { planDesVideos: boolean };
   "POST /api/captures": ConvImportee & { messagesRead: number };
   /** La lecture brute d’un lot : le navigateur ne la lit pas, il la rend à /api/captures/video. */
   "POST /api/captures/lot": { lot: unknown };
@@ -555,7 +563,10 @@ export const ROUTES = {
   /* Le jeton du widget voyage dans l’en-tête x-blush-captcha (ENTETE_CAPTCHA, src/lib/captcha.ts), comme à la demande de code */
   "POST /api/captcha": {},
   "POST /api/captures": { formulaire: true },
-  /* Les images d’un lot, son appli, l’accord de l’import, la clé de l’envoi (`cle`) et son ordre (« premier », « suite ») */
+  /*
+   * Les images d’un lot, son appli, l’accord de l’import, la clé de l’envoi (`cle`), son ordre (« premier », « suite »)
+   * et son `mode` (« import » pour un premier import, « ajout » pour un morceau ajouté ; le JS d’avant n’en disait rien)
+   */
   "POST /api/captures/lot": { formulaire: true },
   /* La clé de l’envoi abandonné, celle de ses lots, et pourquoi (RAISONS_D_ABANDON) */
   "POST /api/captures/lot/abandon": { corps: z.object({ cle: z.string().max(64), raison: z.enum(RAISONS_D_ABANDON) }) },
@@ -575,7 +586,7 @@ export const ROUTES = {
       consentement: z.string().max(40).optional(),
       mode: z.literal("ajout").optional(),
       repris: z.array(z.string().max(64)).max(ENVOIS_REPRIS_MAX).optional(),
-      /* Une longue vidéo : ce qui permet de n’en lire avant l’achat que la partie la plus récente (src/server/lecture-partielle.ts) */
+      /* Une vidéo de deux lots ou plus : ce qui permet de n’en lire avant l’achat que la partie la plus récente, ou de le mesurer (src/server/lecture-partielle.ts) */
       partiel: LongueVideo.optional(),
     }),
   },

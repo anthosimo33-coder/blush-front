@@ -17,7 +17,16 @@ import { HISTOIRE } from "../aide/rapport-exemple";
  */
 const routeur = { push: vi.fn(), replace: vi.fn(), prefetch: vi.fn(), back: vi.fn() };
 vi.mock("next/navigation", () => ({ useRouter: () => routeur, usePathname: () => "/importer/captures", useSearchParams: () => new URLSearchParams() }));
-vi.mock("@/services/api", async (vrai) => ({ ...(await vrai<typeof import("@/services/api")>()), uploadScreenshots: vi.fn(), prechargerVideo: vi.fn() }));
+/*
+ * Les jalons de l’écran (src/lib/jalons.ts) ne partent pas : sans serveur, leur fetch échouait après la fin du fichier, et
+ * son journal (tracer) arrivait pendant que Vitest refermait l’environnement (« Closing rpc while onUserConsoleLog was pending »)
+ */
+vi.mock("@/services/api", async (vrai) => ({
+  ...(await vrai<typeof import("@/services/api")>()),
+  uploadScreenshots: vi.fn(),
+  prechargerVideo: vi.fn(),
+  envoyerJalon: vi.fn(),
+}));
 vi.mock("@/services/preparer-captures", () => ({ prereduire: vi.fn(), vignette: vi.fn(async () => null) }));
 const envoi = vi.mocked(uploadScreenshots);
 

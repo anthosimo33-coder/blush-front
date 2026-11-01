@@ -78,9 +78,12 @@ function formulaire(images: File[], champs: Record<string, string | undefined>):
   for (const [nom, valeur] of Object.entries(champs)) if (valeur !== undefined) fd.append(nom, valeur);
   return fd;
 }
-/** Un lot d’enregistrement envoyé : ses écrans, sous la clé de son envoi et son ordre (« premier », « suite »). */
-const lot = (images: File[], { cle, ordre, app = "imessage" }: { cle?: string; ordre?: "premier" | "suite"; app?: string } = {}) =>
-  postLot(requete("/api/captures/lot", { method: "POST", body: formulaire(images, { app, cle, ordre }) }));
+/**
+ * Un lot d’enregistrement envoyé : ses écrans, sous la clé de son envoi et son ordre (« premier », « suite ») ; `mode`,
+ * celui que dit le navigateur (un premier import, un morceau ajouté), aucun comme le JS d’avant.
+ */
+const lot = (images: File[], { cle, ordre, app = "imessage", mode }: { cle?: string; ordre?: "premier" | "suite"; app?: string; mode?: "import" | "ajout" } = {}) =>
+  postLot(requete("/api/captures/lot", { method: "POST", body: formulaire(images, { app, cle, ordre, mode }) }));
 /** La lecture brute que rend un lot (200). */
 const luDe = async (r: Response): Promise<Captures> => {
   expect(r.status).toBe(200);
@@ -498,9 +501,56 @@ describe("la mesure des imports", () => {
     expect(ecart(avant, await duType("export"))).toMatchObject({ imports: 1, micros: 0, pourRien: 0 });
   });
 
-  it("lu pour rien : des lots lus pour un envoi qui n’est jamais devenu une conv", async () => {
+  it("un refus de lecture arrête l’import de la vidéo : compté une fois par envoi d’un premier import, pour le produit seul (ni sans clé, ni pour un invité, ni pour un morceau ajouté, ni d’un onglet sur le JS d’avant)", async () => {
+    const refusees = async () => (await statsAdmin(1)).pilotage.compteurs.videosRefusees;
+    const avant = await refusees();
+    const refus = async (): Promise<MessageRecu> => ({
+      content: [],
+      usage: USAGE,
+      model: "claude-sonnet-5-5",
+      stop_reason: "refusal",
+      stop_details: { category: "general_harms" },
+    });
+    prestataire = refus;
+    /* Deux lots du même envoi refusés (lus en même temps) : un seul import arrêté */
+    const cle = randomUUID();
+    for (const r of await Promise.all([lot(ecrans(2), { cle, mode: "import" }), lot(ecrans(3), { cle, mode: "import" })])) expect(await r.json()).toEqual({ erreur: "refus" });
+    expect(await refusees()).toBe(avant + 1);
+    /* Sans clé (aucun envoi à compter), puis un invité de l’équipe (la règle le range « offert ») : rien */
+    expect((await lot(ecrans(2), { mode: "import" })).status).toBe(502);
+    etat.equipe = [compte.email];
+    try {
+      expect((await lot(ecrans(2), { cle: randomUUID(), mode: "import" })).status).toBe(502);
+    } finally {
+      etat.equipe = [];
+    }
+    expect(await refusees()).toBe(avant + 1);
+    /* Le lot refusé d’un morceau ajouté (le navigateur dit `mode`) : la conv est déjà là, aucun premier import n’est arrêté */
+    expect((await lot(ecrans(2), { cle: randomUUID(), mode: "ajout" })).status).toBe(502);
+    expect(await refusees()).toBe(avant + 1);
+    /* Un onglet resté sur le JS d’avant (pendant une mise en ligne) ne dit pas son mode : refusé pareil, pas compté (peut-être un morceau) */
+    expect((await lot(ecrans(2), { cle: randomUUID() })).status).toBe(502);
+    expect(await refusees()).toBe(avant + 1);
+    /* Un lot lu ne compte pas ; un nouvel essai refusé, sous une autre clé, si */
+    prestataire = lue;
+    await luDe(await lot(ecrans(2), { cle: randomUUID(), mode: "import" }));
+    expect(await refusees()).toBe(avant + 1);
+    prestataire = refus;
+    expect((await lot(ecrans(2), { cle: randomUUID(), mode: "import" })).status).toBe(502);
+    expect(await refusees()).toBe(avant + 2);
+  });
+
+  it("lu pour rien : des lots lus pour un envoi qui n’est jamais devenu une conv ; pas ceux d’un invité (hors de la mesure, comme ses imports)", async () => {
     const avant = await duType("video");
     await luDe(await lot(ecrans(2), { cle: randomUUID() }));
+    expect(ecart(avant, await duType("video"))).toMatchObject({ imports: 0, micros: 0, pourRien: COUT_MICROS });
+    /* Le même compte, invité (BLUSH_ACCES_LIBRE) : sa lecture se range « offert », sa vidéo abandonnée ne compte pas */
+    etat.equipe = [compte.email];
+    try {
+      await luDe(await lot(ecrans(2), { cle: randomUUID() }));
+    } finally {
+      etat.equipe = [];
+    }
     expect(ecart(avant, await duType("video"))).toMatchObject({ imports: 0, micros: 0, pourRien: COUT_MICROS });
   });
 
