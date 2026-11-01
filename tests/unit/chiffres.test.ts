@@ -1,10 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { blocChiffres, RECENT_J, SANS_REPONSE_H, SILENCE_REPRISE_H, SOIR, type Chiffres, type Recents } from "@prompts/lib/conv";
+import { versTexteCaptures } from "@prompts/lib/captures";
+import { blocChiffres, chiffrer, lire, RECENT_J, SANS_REPONSE_H, SILENCE_REPRISE_H, SOIR, type Chiffres, type Format, type Recents } from "@prompts/lib/conv";
+import { trouvailles } from "@/server/ecrans/trouvailles";
+import { captures, msg } from "../aide/fabriques";
 
 /*
  * Le bloc <chiffres> que reçoit le modèle (prompts/lib/conv.ts) : ce que le code a mesuré, le seul endroit d’où le
  * modèle tient un chiffre. Testé seul, sur des mesures écrites à la main (deux prénoms inventés) : chaque mesure a ses
- * propres nombres, sa ligne se reconnaît à eux (« Tom 12 · Inès 9 »), sans recopier le texte du bloc, privé.
+ * propres nombres, sa ligne se reconnaît à eux (« Tom 12 · Inès 9 »), sans recopier le texte du bloc, privé. Puis les
+ * mots qui reviennent et « Votre mot à vous » (les trouvailles), sur des convs inventées lues comme l’appli les lit.
  */
 const chiffres = (autres: Partial<Chiffres> = {}): Chiffres => ({
   qui: { toi: "Tom", autre: "Inès" },
@@ -147,5 +151,241 @@ describe("le bloc <chiffres>", () => {
     expect(silence({ toi: 1, autre: 1 })).toHaveLength(base);
     /* L’autre n’a jamais écrit : rien n’attend de réponse de lui */
     expect(silence({ toi: 3, autre: 0 }, { autre: null })).toHaveLength(base);
+  });
+});
+
+/*
+ * Les mots qui reviennent (chiffrer) et « Votre mot à vous » (src/server/ecrans/trouvailles.ts). Chaque conv inventée
+ * mêle leur vrai mot à du bruit qui revient plus souvent que lui : des liens, des rires de toutes les longueurs, des
+ * mots allongés, tapés sans accents ou élidés, des mots vides. Avant, le bruit passait devant (« https » × 52).
+ */
+const pad = (n: number) => String(n).padStart(2, "0");
+const fois = <T>(n: number, f: (k: number) => T) => Array.from({ length: n }, (_, k) => f(k));
+/** Un export iOS de `textes`, écrits tour à tour par `noms`, un toutes les 2 h à partir du 1er mars 2026 : en français, ou en anglais (« [3/1/26, 9:00:00 AM] »). */
+const exportDe = (textes: string[], noms: [string, string], anglais = false) =>
+  textes
+    .map((t, k) => {
+      const d = new Date(Date.UTC(2026, 2, 1, 9) + k * 2 * 3600e3);
+      const [j, mo, hh, mi] = [d.getUTCDate(), d.getUTCMonth() + 1, d.getUTCHours(), d.getUTCMinutes()];
+      const date = anglais ? `${mo}/${j}/26, ${hh % 12 || 12}:${pad(mi)}:00 ${hh < 12 ? "AM" : "PM"}` : `${pad(j)}/${pad(mo)}/2026 ${pad(hh)}:${pad(mi)}:00`;
+      return `[${date}] ${noms[k % 2]}: ${t}`;
+    })
+    .join("\n");
+const qui = (moi: string, autre: string, format: Format = "whatsapp-ios") => ({
+  utilisateur: { prenom: moi, pronom: "il" as const, nomExport: moi },
+  autre: { prenom: autre, pronom: "elle" as const, nomExport: autre },
+  format,
+});
+/** Les mots qui reviennent d’une conv, et ses trouvailles, comme l’appli les calcule à l’import. */
+const lus = (texte: string, h: ReturnType<typeof qui>) => {
+  const { messages } = lire(texte, h, { autresEnTexte: true });
+  const c = chiffrer(h, messages);
+  return { c, mots: c.recurrents.map(([w]) => w), trouvailles: trouvailles(c, h, messages) };
+};
+const motAVous = (mot: string, n: number) => `Votre mot à vous\u00a0: «\u00a0${mot}\u00a0»\u00a0×\u00a0${n}`;
+
+describe("les mots qui reviennent et « Votre mot à vous »", () => {
+  it("en français : ni liens, ni rires, ni mots allongés, sans accents, élidés ou vides ; leur mot passe en tête", () => {
+    const textes = [
+      ...fois(30, (k) => `on se fait un libanais ${k % 2 ? "ce soir" : "demain"} ?`),
+      /* Allongé, il compte avec les autres */
+      ...fois(4, () => "libanaiiis"),
+      ...fois(40, (k) => `${k % 3 ? "" : "regarde "}https://www.instagram.com/reel/C${k}xYz${k}AbCd/?igsh=MWQ1ZGUxMzBkMA==`),
+      ...fois(12, (k) => `https://vm.tiktok.com/ZMh${k}aBcDe/ www.youtube.com/watch?v=dQw${k}w9WgXcQ`),
+      ...fois(40, (k) => `non mais ${["ahahaha", "ahahahah", "AHAHAHAHA", "hahahaa", "hihihi"][k % 5]}`),
+      ...fois(36, (k) => `t’es grave ${["mdrrr", "mdrr", "ptdrrr", "xptdr", "looool", "lool"][k % 6]}`),
+      ...fois(40, () => "c’est meme pas vrai"),
+      ...fois(36, () => "t’as deja vu"),
+      ...fois(40, (k) => (k % 2 ? "je sais pas peut-être" : "on peut y aller")),
+      ...fois(36, () => "ils sont où"),
+      ...fois(20, () => "qu’est-ce que tu fais"),
+      ...fois(20, () => "on se voit quand ? vas-y dis-moi"),
+      ...fois(20, () => "voilà bref"),
+      ...fois(10, () => "ouiiii trooooop bien"),
+      ...fois(10, () => "j’sais pas, j'vais dormir"),
+      ...fois(8, () => "l’appart est trop grand"),
+      ...fois(6, () => "on visite un appart samedi"),
+      ...fois(10, () => "à 'genre' jusqu’à demain"),
+      ...fois(10, () => "un café ?"),
+      ...fois(10, () => "un cafe ?"),
+    ];
+    const { c, mots, trouvailles: t } = lus(exportDe(textes, ["Léa", "Tom"]), qui("Tom", "Léa"));
+    expect(c.recurrents[0]).toEqual(["libanais", 34]);
+    /* Seuls leurs vrais mots : « l’appart » et « appart » ensemble, sous leur forme la plus écrite, « café » et « cafe » sous l’accentuée */
+    expect(c.recurrents).toEqual(
+      expect.arrayContaining([
+        ["l’appart", 14],
+        ["café", 20],
+      ]),
+    );
+    expect(new Set(mots)).toEqual(new Set(["libanais", "aller", "café", "regarde", "l’appart", "dormir", "grand", "visite", "samedi"]));
+    expect(t).toContain(motAVous("libanais", 34));
+  });
+
+  it("en anglais, en espagnol et en portugais : leurs mots vides et leurs rires ne sont pas leur mot", () => {
+    const anglais = [
+      ...fois(30, () => "wanna get tacos?"),
+      ...fois(40, () => "what are you doing"),
+      ...fois(36, () => "yeah that was really good"),
+      ...fois(36, () => "i think that you should come"),
+      ...fois(36, () => "just like this, i don't know what's going on"),
+      ...fois(40, (k) => ["hahaha", "lmaooo", "LMFAO", "loool", "lol"][k % 5]!),
+      ...fois(20, (k) => `https://youtu.be/dQw${k}w9WgXcQ`),
+    ];
+    const en = lus(exportDe(anglais, ["Ashley", "Jake"], true), qui("Jake", "Ashley"));
+    expect(en.c.recurrents).toEqual([["tacos", 30]]);
+    expect(en.trouvailles).toContain(motAVous("tacos", 30));
+
+    const ailleurs = [
+      ...fois(15, () => "churros"),
+      ...fois(20, (k) => ["jajaja", "jajajaja", "jsjsjs", "kkkkkk", "kkkkkkkkk", "rsrsrs"][k % 6]!),
+      ...fois(20, () => "pero bueno, vale"),
+      ...fois(20, () => "você está bem? tudo bem, isso"),
+    ];
+    expect(lus(exportDe(ailleurs, ["Léa", "Tom"]), qui("Tom", "Léa")).c.recurrents).toEqual([["churros", 15]]);
+  });
+
+  it("un lieu écrit avec une majuscule après une élision (« l’Italie ») reste un nom, pas leur mot", () => {
+    const textes = [...fois(12, (k) => (k % 4 ? "l’Italie c’est trop bien" : "on retourne en Italie")), ...fois(8, () => "une pizza ce soir"), ...fois(20, () => "ok")];
+    const { c, trouvailles: t } = lus(exportDe(textes, ["Léa", "Tom"]), qui("Tom", "Léa"));
+    /* Le modèle le voit (« en Italie » compté avec), l’écran passe au mot suivant */
+    expect(c.recurrents[0]).toEqual(["l’italie", 12]);
+    expect(t).toContain(motAVous("pizza", 8));
+  });
+
+  it("captures : « [illisible] », écrit par la lecture, n’est pas leur mot, et compte toujours pour un mot du message", () => {
+    const lot = (illisible: string) =>
+      versTexteCaptures(
+        captures({
+          autre: "Léa",
+          blocs: [
+            {
+              repere: { date: "2026-09-12", heure: "21:05" },
+              messages: [
+                ...fois(18, (k) => msg(k % 2 ? "moi" : "autre", k % 3 ? `t’es où ${illisible} ?` : `${illisible} demain`)),
+                ...fois(6, (k) => msg(k % 2 ? "moi" : "autre", "sushi ce soir")),
+              ],
+            },
+          ],
+        }),
+        { aujourdhui: "2026-09-13" },
+      );
+    const h = qui("Moi", "Léa", "captures");
+    const avec = lus(lot("[illisible]").texte, h);
+    expect(avec.mots).toEqual(["sushi"]);
+    expect(avec.trouvailles).toContain(motAVous("sushi", 6));
+    expect(avec.c.motsMoyens).toEqual(lus(lot("machin").texte, h).c.motsMoyens);
+  });
+});
+
+describe("les mots qui reviennent : ce qui reste un mot, ce qui se réunit", () => {
+  const LT = qui("Tom", "Léa");
+  /** Les mots qui reviennent et « Votre mot à vous » d’une conv de `textes`, avec leur vrai mot (libanais) en plus. */
+  const avecLibanais = (textes: string[], libanais = 5) => lus(exportDe([...textes, ...fois(libanais, () => "on se fait un libanais ?")], ["Léa", "Tom"]), LT);
+
+  it("une élision de pronom reste : « je t’aime » et « j’aime » sont deux mots, chacun avec son compte", () => {
+    const { c } = avecLibanais([...fois(10, () => "je t’aime"), ...fois(12, () => "j’aime bien"), ...fois(3, () => "tu m’aimes ?")]);
+    expect(c.recurrents).toEqual(
+      expect.arrayContaining([
+        ["j’aime", 12],
+        ["t’aime", 10],
+        ["m’aimes", 3],
+      ]),
+    );
+    /* Celle d’un article se réunit toujours : « l’appart » et « appart » */
+    expect(avecLibanais([...fois(4, () => "l’appart"), ...fois(3, () => "un appart")]).c.recurrents).toContainEqual(["l’appart", 7]);
+  });
+
+  it("un mot allongé se montre tel qu’il est écrit, et se réunit à sa forme simple quand elle est écrite", () => {
+    const { c } = avecLibanais([
+      ...fois(6, () => "bonne nuit"),
+      ...fois(4, () => "bonnnne nuit"),
+      ...fois(6, () => "t’es mignonnnne"),
+      ...fois(3, () => "trop classsse"),
+      ...fois(2, () => "la classe"),
+    ]);
+    expect(c.recurrents).toEqual(
+      expect.arrayContaining([
+        ["bonne", 10],
+        ["mignonnnne", 6],
+        ["classsse", 5],
+      ]),
+    );
+    /* Jamais une forme que personne n’a écrite */
+    for (const w of ["mignone", "bone", "clase"]) expect(c.recurrents.map(([x]) => x)).not.toContain(w);
+  });
+
+  it("sans accents, un mot rejoint sa forme accentuée ; deux formes accentuées restent deux mots", () => {
+    const { c } = avecLibanais([...fois(6, () => "de mon côté"), ...fois(4, () => "sur la côte"), ...fois(5, () => "un café ?"), ...fois(3, () => "un cafe ?")]);
+    expect(c.recurrents).toEqual(
+      expect.arrayContaining([
+        ["côté", 6],
+        ["côte", 4],
+        ["café", 8],
+      ]),
+    );
+    /* Un mot accentué n’est pas le mot vide qui a ses lettres (« mème » n’est pas « même », « sûre » n’est pas « sure »), ni une élision le mot qui la suit */
+    const mots = avecLibanais([
+      "un mème",
+      "le mème",
+      "t’es sûre ?",
+      "sûre",
+      "j’ai liké",
+      "liké",
+      "à Côme",
+      "Côme",
+      "on est d’accord",
+      "un accord",
+      "l’accord",
+      "t’inquiète",
+      "je suis inquiète",
+      "inquiète",
+      "Jéjé",
+      "Jéjé",
+    ]).mots;
+    expect(mots).toEqual(expect.arrayContaining(["mème", "sûre", "liké", "côme", "accord", "inquiète", "jéjé"]));
+  });
+
+  it("une dernière lettre doublée, une élision tapée sans apostrophe : un mot vide ou banal reste vide ou banal", () => {
+    const { c, trouvailles: t } = avecLibanais(
+      fois(12, (k) => ["mercii", "coucouu", "bisouu", "yess", "nonn", "cetait", "tinquiete", "aujourdhui", "jsais"][k % 9]!).flatMap((x) => [x, x]),
+    );
+    for (const w of ["yess", "nonn", "cetait", "tinquiete", "aujourdhui", "jsais"]) expect(c.recurrents.map(([x]) => x)).not.toContain(w);
+    expect(t).toContain(motAVous("libanais", 5));
+  });
+
+  it("un mot de 4 lettres à la dernière lettre doublée reste un mot : « pass » n’est pas « pas », ni « Tess » « tes »", () => {
+    const { mots } = avecLibanais(["t’as ton pass ?", "mon pass est là", "less is more", "less stress", "quel mess", "le mess", "Tess arrive", "Tess est là"]);
+    expect(mots).toEqual(expect.arrayContaining(["pass", "less", "mess", "tess"]));
+  });
+
+  it("les mots composés : « rendez-vous » reste un mot, « week-end », « c’est-à-dire », « après-midi » ne laissent rien", () => {
+    const { c, trouvailles: t } = avecLibanais([
+      ...fois(8, () => "notre rendez-vous"),
+      ...fois(6, () => "ce week-end"),
+      ...fois(6, () => "c’est-à-dire"),
+      ...fois(6, () => "cet après-midi"),
+      ...fois(6, () => "peut-être"),
+      ...fois(6, () => "qu’est-ce que tu fais"),
+      ...fois(6, () => "vas-y dis-moi"),
+    ]);
+    expect(c.recurrents).toContainEqual(["rendez-vous", 8]);
+    for (const w of ["rendez", "week", "dire", "midi", "après", "peut", "vous"]) expect(c.recurrents.map(([x]) => x)).not.toContain(w);
+    /* Un mot de tous les couples : pas leur mot */
+    expect(t).toContain(motAVous("libanais", 5));
+  });
+
+  it("en anglais, une contraction n’est pas leur mot (« we’ll see »), en espagnol et en portugais leurs mots courants non plus", () => {
+    const anglais = [
+      ...fois(14, () => "we’ll see"),
+      ...fois(8, (k) => ["wouldn’t", "you’ll", "they’ll", "you’ve", "haven’t", "aren’t", "youll", "wouldnt"][k]!),
+      ...fois(8, (k) => ["more", "after", "before", "those", "being", "ever", "down", "away"][k]!),
+      ...fois(6, () => "tacos tonight?"),
+    ];
+    const en = lus(exportDe([...anglais, ...anglais], ["Ashley", "Jake"], true), qui("Jake", "Ashley"));
+    expect(en.c.recurrents).toEqual([["tacos", 12]]);
+    expect(en.trouvailles).toContain(motAVous("tacos", 12));
+    const ailleurs = "também hoje acho tava minha ainda depois sempre coisa tambem ahora mañana creo cosa luego siempre manana".split(" ");
+    expect(avecLibanais([...ailleurs, ...ailleurs]).c.recurrents).toEqual([["libanais", 5]]);
   });
 });

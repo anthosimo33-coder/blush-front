@@ -177,6 +177,26 @@ describe("des exports piégés, lus en temps borné", () => {
     expect(lu.messages.map((m) => m.media ?? null)).toEqual([null, "vocal"]);
   });
 
+  it("des libellés de fichier joint de 300 caractères en série, au genre forgé (« \\u200e<pièce jointe :-PTT-…>x »)", async () => {
+    /* Sous la borne de la lecture (300 caractères) : chaque libellé ne se relit plus depuis chaque « -PTT- » */
+    const formes: [tete: string, motif: string][] = [
+      ["<pièce jointe :", "-PTT-"],
+      ["<attached: ", "-AUDIO-"],
+      ["< pièce jointe : ", "-AUDIO- "],
+    ];
+    for (const [tete, motif] of formes) {
+      const libelle = `\u200e${tete}${motif.repeat(Math.floor((297 - tete.length) / motif.length))}>x`;
+      const piege = exporter(19_500, () => libelle);
+      expect(piege.length).toBeGreaterThan(6_000_000);
+      const p = paquet(piege);
+      const [lu, ms] = await chrono(() => importer(p));
+      viteLu(ms);
+      /* Ni un média ni un message : des lignes marquées qu’on ne lit pas, comptées */
+      expect(lu.messages).toHaveLength(0);
+      expect(lu.inconnues.lignes).toBe(19_500);
+    }
+  });
+
   it("Instagram HTML : des « <audio » sans fin, des « < » sans « > », des <h2 et des liens sans fin", async () => {
     const bloc = (contenu: string, nom = "Léa") =>
       `<div class="pam _3-95 _2ph- _a6-g uiBoxWhite noborder"><h2 class="_3-95 _2pim _a6-h _a6-i">${nom}</h2><div class="_3-95 _a6-p"><div>${contenu}</div></div><div class="_3-94 _a6-o">sep 18, 2026 8:29 am</div></div>`;

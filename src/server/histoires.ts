@@ -28,6 +28,7 @@ import { PREDICATS } from "./depot";
 import type { Utilisateur } from "./auth";
 import { ErreurInvariant, ErreurPublique } from "./erreurs";
 import { borner, ErreurImport, TEXTE_LU_MAX_CARACTERES } from "./import";
+import { journal } from "./journal";
 import type { Consentement } from "./juridique";
 import {
   contactDuFichier,
@@ -202,6 +203,8 @@ export async function importer(recu: ExportLu & { nom: string; coupe?: boolean }
     ...(pronomLu ? { pronomLu } : {}),
   });
   const lu = lire(texte, { utilisateur: personne(premier), autre: personne(second), format }, { autresEnTexte: true });
+  /* Des lignes marquées jetées sans être reconnues : peut-être un libellé qu’on ne sait pas lire (des vocaux perdus). Leur silhouette seule, sans aucune lettre : jamais un mot d’un message */
+  if (lu.inconnues.lignes) journal("import : lignes marquées inconnues", { format, lignes: lu.inconnues.lignes, forme: lu.inconnues.forme }, "alerte");
   if (erreurImport(lu) === "groupe") throw new ErreurImport("groupe");
   /* Le premier participant est lu en « toi », le second en « autre » */
   const lus = pronomsLus(lu.messages);

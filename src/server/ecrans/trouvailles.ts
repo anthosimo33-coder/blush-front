@@ -4,17 +4,21 @@
  * (qui ouvre, qui relance, qui répond vite, qui écrit long), puis leur mot à eux, puis le volume.
  * Textes validés le 8 octobre. Des textes de l’appli : ils vivaient dans le sous-module des prompts (prompts/lib/trouvailles.ts).
  */
-import type { Chiffres, Histoire, Message } from "@prompts/lib/conv";
+import { cleDuMot, debutDuMot, listeDeMots, motsEcrits, type Chiffres, type Histoire, type Message } from "@prompts/lib/conv";
 import { formatCount } from "@/lib/format";
 import { dureeLisible, joursCouverts } from "../temps";
 
 const H = 3600e3;
 
-/* Les mots trop courants pour dire quelque chose d’eux (en plus des mots vides de prompts/lib/conv.ts) */
-const BANALS = new Set(
-  "qu’on qu’il qu’elle qu’ils qu’elles quand comment pourquoi envie merci coucou salut bisous bisou bonne bonnes nuit journée soirée matin semaine weekend week-end après avant toujours jamais beaucoup maintenant moment peut-être petit petite gros grosse super cool truc trucs chose choses fois gens monde parce cette celle celui ceux leur leurs notre votre dire dit voir aller venir viens vient faut fallait pense crois sait savoir avais avait était étais serait sera haha ahah ahahah hahaha lol mdrr vrm hein enfin quand même bientôt cours boulot travail taff jsuis j’suis chuis week tient lundi mardi mercredi jeudi vendredi samedi dimanche ptn putain wsh wesh déjà chez beau belle vers sans sous entre depuis pendant contre autre autres chaque plein très assez tant tellement mieux pire grand grande vraie franchement carrément direct wallah".split(
-    " ",
-  ),
+/*
+ * Les mots trop courants pour dire quelque chose d’eux (en plus des mots vides de prompts/lib/conv.ts), cherchés comme
+ * eux (listeDeMots : « soiree » est « soirée », « mercii » est « merci »). Le français (avec ce que tout couple s’écrit,
+ * qu’on ne leur montre pas comme leur mot : « t’aime », « rendez-vous »), puis l’anglais.
+ */
+const BANALS = listeDeMots(
+  "qu’on qu’il qu’elle qu’ils qu’elles quand comment pourquoi envie merci coucou salut bisous bisou bonne bonnes nuit journée soirée matin semaine weekend avant toujours jamais beaucoup maintenant moment petit petite gros grosse super cool truc trucs chose choses fois gens monde parce cette celle celui ceux leur leurs notre votre dire dit voir aller venir viens vient faut fallait pense crois sait savoir serait sera haha ahah ahahah hahaha lol mdrr vrm hein enfin bientôt cours boulot travail taff jsuis j’suis chuis week tient lundi mardi mercredi jeudi vendredi samedi dimanche ptn putain wsh wesh chez beau belle vers sans sous entre depuis pendant contre autre autres chaque plein assez tant tellement mieux pire grand grande vraie franchement carrément direct wallah",
+  "t’aime j’aime m’aime m’aimes t’adore j’adore rendez-vous côté j’arrive jarrive",
+  "thanks thank sorry please hello night morning week weekend work school people little great nice pretty stuff every each next last better worse always never actually literally probably honestly seriously totally guess mean feel need monday tuesday wednesday thursday friday saturday sunday",
 );
 
 const duree = (ms: number) => {
@@ -26,19 +30,28 @@ const duree = (ms: number) => {
 };
 const pourcent = (s: string) => parseInt(s, 10) || 0;
 
-/** Un prénom ou un lieu : le mot s’écrit surtout avec une majuscule dans leurs messages. */
-function nomPropre(mot: string, messages: Message[]): boolean {
-  let majuscule = 0;
-  let total = 0;
-  const re = new RegExp(`(^|[^\\p{L}’])(${mot.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})(?![\\p{L}’])`, "giu");
-  for (const m of messages) {
-    if (m.media) continue;
-    for (const x of m.texte.normalize("NFC").replace(/'/g, "’").matchAll(re)) {
-      total++;
-      if (/^\p{Lu}/u.test(x[2]!)) majuscule++;
+/**
+ * Les prénoms et les lieux parmi les mots de clé `cles` : ils s’écrivent surtout avec une majuscule dans leurs
+ * messages, lus comme les compte prompts/lib/conv.ts (« l’Italie » pour « italie », « Ines » pour « inès »).
+ */
+function nomsPropres(cles: Set<string>, messages: Message[]): Set<string> {
+  const vus = new Map<string, { majuscule: number; total: number }>();
+  /* La clé d’un mot écrit se calcule une fois, comme dans chiffrer */
+  const cleDe = new Map<string, string>();
+  if (cles.size)
+    for (const m of messages) {
+      if (m.media || m.deWhatsApp) continue;
+      for (const w of motsEcrits(m.texte)) {
+        let k = cleDe.get(w);
+        if (k === undefined) cleDe.set(w, (k = cleDuMot(w)));
+        if (!cles.has(k)) continue;
+        const v = vus.get(k) ?? { majuscule: 0, total: 0 };
+        v.total++;
+        if (/^\p{Lu}/u.test(w.slice(debutDuMot(w)))) v.majuscule++;
+        vus.set(k, v);
+      }
     }
-  }
-  return total > 0 && majuscule / total >= 0.6;
+  return new Set([...vus].filter(([, v]) => v.majuscule / v.total >= 0.6).map(([k]) => k));
 }
 
 /** `messages` : pour écarter les prénoms et les lieux du « mot à vous ». */
@@ -85,8 +98,10 @@ export function trouvailles(c: Chiffres, h: Pick<Histoire, "autre">, messages: M
   const soirPct = total ? Math.round((pourcent(c.soir.toi) * c.total.toi + pourcent(c.soir.autre) * c.total.autre) / total) : 0;
   const soir = soirPct >= 40 ? `${soirPct}\u00a0% de vos messages entre 22\u00a0h et 2\u00a0h` : null;
 
-  /* Leur mot à eux : le plus fréquent qui ne soit pas banal */
-  const mot = c.recurrents.find(([w, n]) => n >= 5 && !BANALS.has(w) && !nomPropre(w, messages));
+  /* Leur mot à eux : le plus fréquent qui ne soit ni banal, ni un prénom ou un lieu */
+  const candidats = c.recurrents.filter(([w, n]) => n >= 5 && !BANALS(w));
+  const noms = nomsPropres(new Set(candidats.map(([w]) => cleDuMot(w))), messages);
+  const mot = candidats.find(([w]) => !noms.has(cleDuMot(w)));
   const motAVous = mot ? `Votre mot à vous\u00a0: «\u00a0${mot[0]}\u00a0»\u00a0×\u00a0${mot[1]}` : null;
 
   /* Le volume, toujours disponible */

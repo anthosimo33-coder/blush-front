@@ -55,7 +55,8 @@ describe("les lignes de la conv, à l’octet", () => {
   it("la conv rendue au modèle", () => {
     const lu = lire(texte, h, { autresEnTexte: true });
     const r = rendre(h, lu);
-    expect(empreinte(r.texte)).toBe("8fd5ca55f11fd214");
+    /* Le 31 octobre 2026, la ligne des médias de <chiffres> compte aussi les médias légendés (« on y va ? [photo] ») : seule elle a changé */
+    expect(empreinte(r.texte)).toBe("6945380b3085d771");
     expect(empreinte([...r.lignes])).toBe("ebf8fd27ca9faa58");
   });
 
@@ -75,7 +76,8 @@ describe("les lignes de la conv, à l’octet", () => {
     );
     const hc: Histoire = { ...h, format: "captures", utilisateur: { ...h.utilisateur, nomExport: "Moi" }, autre: { ...h.autre, nomExport: c.autre } };
     const r = rendre(hc, lire(c.texte, hc));
-    expect(empreinte(r.texte)).toBe("87db259738762116");
+    /* De même : la photo légendée des captures compte dans les médias */
+    expect(empreinte(r.texte)).toBe("66a6cbb817182577");
   });
 
   it("les messages ajoutés, son profil, et le bloc <nouveau> du chat", () => {
