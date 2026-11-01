@@ -266,6 +266,13 @@ export type Person = {
   initial: string;
   /** Son pronom. Sans : « elle ». */
   pronoun?: Pronom;
+  /**
+   * Son nom ne dit pas son prénom (doutePrenom, src/server/histoires.ts) : « Qui es-tu ? » le demande (`unknown` : un
+   * numéro, « Elle », un compte supprimé) ou propose de l’écrire (`nickname` : « Mon amour », « Bébé »).
+   */
+  nameCheck?: "unknown" | "nickname";
+  /** Deux personnes au même prénom : son nom d’export et ses messages (« Léa Martin · 75 messages »), sous son prénom sur « Qui es-tu ? ». */
+  detail?: string;
 };
 
 /** Une source importée : un export ou un lot de captures. */

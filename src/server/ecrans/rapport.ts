@@ -1,4 +1,5 @@
 import type { Chiffres } from "@prompts/lib/conv";
+import { nomAffiche } from "@prompts/lib/noms";
 import type { Chapitre, Rapport, Verdict } from "@prompts/lib/schemas";
 import { CHAPITRE_DU_VERDICT, estOffert, TITRE_DU_VERDICT } from "@/contenu/chapitres";
 import { LIBELLES_RAPPORT } from "@/contenu/rapport";
@@ -10,7 +11,7 @@ import { resoudre } from "./messages";
 /* ———— Les scores du chapitre 1 : calculés par le code, jamais par le modèle ———— */
 
 export function scores(c: Chiffres): ScoreRow[] {
-  const autre = c.qui.autre.toLowerCase();
+  const autre = nomAffiche(c.qui.autre).toLowerCase();
   const ligne = (label: string, toi: number, elle: number): ScoreRow => {
     const total = toi + elle;
     /* Rien à comparer (captures sans heures) : à égalité */

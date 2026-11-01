@@ -29,7 +29,8 @@ export function aideDuPrenom(autre: string): string {
 
 /**
  * « Qui es-tu ? » est-il complet ? Qui est toi, ton pronom, ta devinette et ce que tu veux ; sur des captures (où tu
- * n’es que « Moi »), ton prénom ; et le sien quand la lecture n’a pas lu son nom (`sonPrenom`, voir nomLu).
+ * n’es que « Moi »), ton prénom ; et le sien quand son nom ne le dit pas du tout (`sonPrenom` : « Elle », un numéro, un
+ * compte supprimé, voir doutePrenom). Un surnom ne l’exige pas : on propose seulement de l’écrire.
  */
 export function quiComplet(j: JourneyState, { captures, sonPrenom = false }: { captures: boolean; sonPrenom?: boolean }): j is QuiRempli {
   return !!j.me && (!captures || !!j.prenom.trim()) && (!sonPrenom || !!j.prenomAutre.trim()) && !!j.pronom && !!j.guess && !!j.goal;
@@ -37,7 +38,9 @@ export function quiComplet(j: JourneyState, { captures, sonPrenom = false }: { c
 
 /**
  * Les réponses de « Qui es-tu ? » qui lancent la lecture (startAnalysis). Ton prénom, seulement sur des captures et
- * s’il est écrit : celui d’une conv de captures d’avant, resté dans l’onglet, renommerait sinon toi sur un export.
+ * s’il est écrit : celui d’une conv de captures d’avant, resté dans l’onglet, renommerait sinon toi sur un export. Le
+ * sien, s’il est écrit : un import l’efface (src/app/importer), et le serveur ne le pose que si le nom de l’autre ne dit
+ * pas son prénom (definirQui, doutePrenom).
  */
 export const reponsesQui = (j: QuiRempli, { captures }: { captures: boolean }) => ({
   me: j.me,
@@ -45,6 +48,5 @@ export const reponsesQui = (j: QuiRempli, { captures }: { captures: boolean }) =
   guess: j.guess,
   goal: j.goal,
   prenom: (captures && j.prenom.trim()) || null,
-  /* Le sien, sur des captures : le serveur ne le pose que si la lecture n’a pas lu son nom (definirQui) */
-  prenomAutre: (captures && j.prenomAutre.trim()) || null,
+  prenomAutre: j.prenomAutre.trim() || null,
 });

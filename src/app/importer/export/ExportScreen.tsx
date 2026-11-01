@@ -82,9 +82,9 @@ export function ExportScreen({ initialApp, tournage = false, ajout = false }: { 
     /*
      * Une nouvelle conv : « qui est toi » se redemande. Ses « p0 »/« p1 » sont ceux de cette conv-ci, et celui d’une conv
      * d’avant (un mauvais fichier, puis le retour arrière) cocherait n’importe qui, « Continuer » déjà actif : tout le
-     * rapport à l’envers
+     * rapport à l’envers. Le prénom de l’autre écrit pour cette conv d’avant s’efface aussi
      */
-    setJourney({ exportApp: app, app, exportFileName: fichier, capturesAdded: false, me: null });
+    setJourney({ exportApp: app, app, exportFileName: fichier, capturesAdded: false, me: null, prenomAutre: "" });
     jalon("importee");
     router.push("/importer/ok");
   };

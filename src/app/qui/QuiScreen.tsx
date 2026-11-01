@@ -3,7 +3,6 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useState } from "react";
 import { cn } from "@/lib/cn";
-import { nomLu } from "@/lib/participants";
 import { NBSP } from "@/lib/format";
 import { PRENOM_MAX } from "@/lib/limites";
 import { marquerJalon } from "@/lib/jalons";
@@ -56,8 +55,8 @@ const CHAMP_PRENOM =
  * `connecte` : déjà un compte (une autre conv) : pas d’écran email, la lecture part d’ici.
  */
 export function QuiScreen({ people, captures = false, connecte = false }: { people: [Person, Person]; captures?: boolean; connecte?: boolean }) {
-  /* Leurs prénoms : masqués dans l’enregistrement des visites (src/lib/secrets.ts), retenus avant l’affichage */
-  retenirSecrets(people.map((p) => p.name));
+  /* Leurs prénoms (et leurs noms d’export, sous deux prénoms pareils) : masqués dans l’enregistrement des visites (src/lib/secrets.ts), retenus avant l’affichage */
+  retenirSecrets(people.flatMap((p) => [p.name, p.detail?.split(" · ")[0]]));
   const router = useRouter();
   const [j, set] = useJourney();
   const [busy, setBusy] = useState(false);
@@ -66,8 +65,16 @@ export function QuiScreen({ people, captures = false, connecte = false }: { peop
   /* Les titres des trois groupes de tuiles, qui les nomment */
   const titres = { pronom: useId(), guess: useId(), goal: useId() };
   const goals = goalsFor(j.guess);
-  /* Des captures dont la lecture n’a pas lu le nom de l’autre (nomLu) : on demande aussi le sien */
-  const sonPrenom = captures && !nomLu(people[1].name);
+  /* L’autre : sur des captures, le second ; sur un export, celui que tu n’as pas choisi (personne tant que tu n’as pas choisi) */
+  const autre = captures ? people[1] : j.me ? people.find((p) => p.id !== j.me) : undefined;
+  /*
+   * Son nom ne dit pas son prénom (doutePrenom, src/lib/participants.ts) : on le demande quand rien ne le dit (« Elle »,
+   * un numéro, un compte supprimé), on propose de l’écrire devant un surnom (« Mon amour »)
+   */
+  const doute = autre?.nameCheck;
+  const sonPrenom = doute === "unknown";
+  /* Deux personnes au même prénom : chaque carte dit aussi son nom d’export et ses messages, et grandit pour eux */
+  const details = people.some((p) => p.detail);
   const ready = quiComplet(j, { captures, sonPrenom });
   /* En passant à « On est ensemble » (ou l’inverse), un objectif qui n’existe plus de l’autre côté est décoché */
   const pickGuess = (guess: Guess) => set({ guess, goal: goalsFor(guess).some((g) => g.id === j.goal) ? j.goal : null });
@@ -137,20 +144,6 @@ export function QuiScreen({ people, captures = false, connecte = false }: { peop
               className={CHAMP_PRENOM}
             />
           </label>
-          {/* Son nom n’a pas été lu : sans son prénom, tout le rapport l’appellerait « Elle », ou par un numéro */}
-          {sonPrenom && (
-            <label className="flex flex-col gap-2">
-              <span className="text-legende font-black text-grey">Son prénom (on ne l’a pas trouvé dans votre conv)</span>
-              <input
-                value={j.prenomAutre}
-                onChange={(e) => set({ prenomAutre: e.target.value })}
-                autoComplete="off"
-                maxLength={PRENOM_MAX}
-                placeholder="Son prénom"
-                className={CHAMP_PRENOM}
-              />
-            </label>
-          )}
         </>
       ) : (
         <RadioGroup label={"Qui es-tu dans cette conv\u00a0?"} className="flex gap-3">
@@ -164,10 +157,12 @@ export function QuiScreen({ people, captures = false, connecte = false }: { peop
                 type="button"
                 role="radio"
                 aria-checked={me}
-                onClick={() => set({ me: p.id })}
+                /* Changer de carte change l’autre : le prénom écrit pour l’autre d’avant s’efface (pas au premier choix, après un morceau ajouté) */
+                onClick={() => set({ me: p.id, ...(j.me && !me ? { prenomAutre: "" } : {}) })}
                 /* Hauteur fixe : avatar et prénom centrés dans la carte, « c’est moi » posé en bas sans rien décaler */
                 className={cn(
-                  "lift relative flex h-[156px] flex-1 flex-col items-center justify-center gap-2 rounded-[26px] bg-white px-3 pb-4 text-ink",
+                  "lift relative flex flex-1 flex-col items-center justify-center gap-2 rounded-[26px] bg-white px-3 text-ink",
+                  details ? "h-[184px] pb-8" : "h-[156px] pb-4",
                   me ? "shadow-selected" : "shadow-soft",
                 )}
               >
@@ -180,11 +175,34 @@ export function QuiScreen({ people, captures = false, connecte = false }: { peop
                   {p.initial}
                 </Avatar>
                 <span className="text-carte font-black">{p.name}</span>
+                {/* Le nom d’export entier et ses messages : jamais dans l’enregistrement des visites */}
+                {p.detail && (
+                  <span data-prive="" className="-mt-1 max-w-full truncate text-micro font-extrabold text-grey">
+                    {p.detail}
+                  </span>
+                )}
                 {me && <span className="absolute inset-x-0 bottom-3.5 text-center text-micro font-extrabold text-grey">c’est moi</span>}
               </button>
             );
           })}
         </RadioGroup>
+      )}
+
+      {/* Son nom ne dit pas son prénom : sans lui, tout le rapport l’appellerait « Elle », par un numéro, ou « Mon amour » */}
+      {autre && doute && (
+        <label className="flex flex-col gap-2">
+          <span className="text-legende font-black text-grey">
+            {doute === "unknown" ? "Son prénom (on ne l’a pas trouvé dans votre conv)" : `Son prénom (\u00ab\u00a0${autre.name}\u00a0\u00bb, c’est un surnom\u00a0?)`}
+          </span>
+          <input
+            value={j.prenomAutre}
+            onChange={(e) => set({ prenomAutre: e.target.value })}
+            autoComplete="off"
+            maxLength={PRENOM_MAX}
+            placeholder="Son prénom"
+            className={CHAMP_PRENOM}
+          />
+        </label>
       )}
 
       {/* Ton pronom seulement : celui de l’autre se lit dans la conv, ou se corrige sur sa fiche (src/server/accords.ts). Absent des maquettes, relu le 8 octobre */}

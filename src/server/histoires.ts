@@ -16,10 +16,10 @@ import {
   type Pronom,
   type Provenance,
 } from "@prompts/lib/conv";
-import { prenomDe } from "@prompts/lib/ajouts";
+import { nomsDistincts, prenomDe, prenomEcrit } from "@prompts/lib/noms";
 import type { Appli, ExportLu } from "@prompts/lib/export";
 import type { TexteCaptures } from "@prompts/lib/captures";
-import { nomLu } from "@/lib/participants";
+import { doutePrenom, nomLu } from "@/lib/participants";
 import { pronomDeLAutre, pronomsLus } from "./accords";
 import { empreinte, jeton } from "./chiffrement";
 import * as coffre from "./coffre";
@@ -587,19 +587,33 @@ export function personnesDe(meta: Pick<Meta, "participants" | "moi">): { moi: Pa
 
 /**
  * Qui est qui, une fois « Qui es-tu ? » rempli. L’autre a le pronom choisi sur sa fiche, sinon celui que la conv laisse
- * lire, sinon l’opposé du tien (pronomDeLAutre) : un garçon et une fille, deux filles ou deux garçons.
+ * lire, sinon l’opposé du tien (pronomDeLAutre) : un garçon et une fille, deux filles ou deux garçons. Deux personnes au
+ * même prénom prennent deux noms distincts (nomsDistincts : « Léa M. » et « Léa D. »), lus ici par tous les prompts et
+ * les bulles des preuves : la conv déjà importée en profite aussi.
  */
 export function histoireDe(meta: Meta): Histoire {
   if (!quiRempli(meta)) throw new Error("« Qui es-tu ? » n’est pas rempli");
   const { moi, autre } = personnesDe(meta);
+  const noms = nomsDistincts(meta.participants, meta.moi === 0 ? 1 : 0);
   return {
-    utilisateur: { prenom: moi.prenom, pronom: meta.pronom, nomExport: moi.nom },
-    autre: { prenom: autre.prenom, pronom: pronomDeLAutre(meta, { moi, autre }), nomExport: autre.nom },
+    utilisateur: { prenom: noms[meta.moi], pronom: meta.pronom, nomExport: moi.nom },
+    autre: { prenom: noms[meta.moi === 0 ? 1 : 0], pronom: pronomDeLAutre(meta, { moi, autre }), nomExport: autre.nom },
     devinette: meta.devinette,
     objectif: meta.objectif,
     appli: meta.appli,
     format: meta.format,
   };
+}
+
+/**
+ * Les noms sous lesquels tes messages s’écrivent dans les lignes : celui d’histoireDe, et ton prénom gardé tel quel quand
+ * il diffère de celui de l’autre. Les lignes gardées par la mémoire avant les noms distincts disent « Léa » là où la
+ * conv relue dit « Léa M. » : les bulles de preuve (messagesAffiches) les reconnaissent toutes les deux.
+ */
+export function nomsDeToi(meta: Meta): string[] {
+  const { moi, autre } = personnesDe(meta);
+  const distinct = histoireDe(meta).utilisateur.prenom;
+  return moi.prenom === autre.prenom || moi.prenom === distinct ? [distinct] : [distinct, moi.prenom];
 }
 
 /**
@@ -622,12 +636,13 @@ export async function definirQui(
    */
   const avant = brute && typeof brute !== "string" ? metaReunie(metaDe(ligne), brute, identiteDe(metaDe(ligne)), { k: qui.moi, connu: true }).meta : metaDe(ligne);
   /*
-   * Des captures : l’utilisateur est « Moi », son prénom vient de l’écran. L’autre garde le nom lu en haut de la conv ;
-   * s’il n’a pas été lu (« Elle », un numéro : nomLu), le prénom que l’écran a demandé le remplace
+   * Des captures : l’utilisateur est « Moi », son prénom vient de l’écran. L’autre garde le nom lu en haut de la conv, ou
+   * son nom d’export ; quand il ne dit pas son prénom (« Elle », un numéro, un compte supprimé, un surnom : doutePrenom),
+   * le prénom que l’écran a demandé le remplace
    */
   const renomme = (p: Participant, k: 0 | 1): Participant => {
-    if (prenom && k === qui.moi) return { ...p, prenom: prenomDe(prenom) };
-    if (prenomAutre && k !== qui.moi && avant.format === "captures" && !nomLu(p.nom)) return { ...p, prenom: prenomDe(prenomAutre) };
+    if (prenom && k === qui.moi) return { ...p, prenom: prenomEcrit(prenom) };
+    if (prenomAutre && k !== qui.moi && doutePrenom(p.nom)) return { ...p, prenom: prenomEcrit(prenomAutre) };
     return p;
   };
   const participants: Meta["participants"] = [renomme(avant.participants[0], 0), renomme(avant.participants[1], 1)];

@@ -199,9 +199,10 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
       if (!monte.current) return;
       /*
        * Une première conv de captures prend la place de l’export de cet onglet : le code reçu par email attendra ton prénom
-       * (vientDeCaptures). Un morceau ajouté : « Qui es-tu ? » suit la conv réunie (sur des captures seules, toi y est connu)
+       * (vientDeCaptures), et le prénom de l’autre écrit pour une conv d’avant s’efface. Un morceau ajouté : « Qui es-tu ? »
+       * suit la conv réunie (sur des captures seules, toi y est connu)
        */
-      setJourney(addMode ? { capturesAdded: true, me: r.story.me ?? null } : { app: captureApp, exportFileName: null, me: "p0" });
+      setJourney(addMode ? { capturesAdded: true, me: r.story.me ?? null } : { app: captureApp, exportFileName: null, me: "p0", prenomAutre: "" });
       setResult({ count: items.length, messages: r.messagesRead, video });
       jalon("importee");
       router.push(next);

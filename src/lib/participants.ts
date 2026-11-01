@@ -1,3 +1,4 @@
+import { prenomDouteux, sansPrenom } from "@prompts/lib/noms";
 import type { Person, Story } from "@/types";
 
 /*
@@ -16,11 +17,20 @@ export function moiEtAutre(story: Pick<Story, "participants" | "me">, repli?: Pe
 }
 
 /**
- * Sur des captures (ou un enregistrement), le nom de l’autre a-t-il été lu en haut de la conv ? Sans lui, la lecture
- * l’appelle « Elle » (versTexteCaptures, prompts/lib/captures.ts), et un contact que le téléphone ne connaît pas n’a
- * qu’un numéro : « Qui es-tu ? » demande alors son prénom (src/app/qui), que le serveur pose à sa place (definirQui).
+ * Le nom de l’autre dit-il qui il est ? Sur des captures (ou un enregistrement), sans nom lu en haut de la conv, la
+ * lecture l’appelle « Elle » (versTexteCaptures, prompts/lib/captures.ts) ; un contact que le téléphone ne connaît pas
+ * n’a qu’un numéro ; un compte Instagram supprimé n’est plus que « Utilisateur Instagram » ; « Mon ❤️ » n’a qu’un
+ * possessif (sansPrenom). « Qui es-tu ? » demande alors son prénom (src/app/qui, doutePrenom), que le serveur pose à sa
+ * place (definirQui).
  */
-export const nomLu = (nom: string) => nom !== "Elle" && /\p{L}/u.test(nom);
+export const nomLu = (nom: string) => nom !== "Elle" && /\p{L}/u.test(nom) && !sansPrenom(nom);
+
+/**
+ * Le nom d’export de l’autre (sa place dans meta.participants) dit-il son prénom ? `unknown` : rien ne le dit (nomLu),
+ * « Qui es-tu ? » le demande ; `nickname` : un surnom (« Mon amour ❤️ », « Bébé »), l’écran propose de l’écrire. Le
+ * serveur le redit avant de poser le prénom écrit (definirQui).
+ */
+export const doutePrenom = (nom: string): Person["nameCheck"] => (!nomLu(nom) ? "unknown" : prenomDouteux(nom) ? "nickname" : undefined);
 
 /** Le titre du duo (« Tom & Léa ») : les deux prénoms dans l’ordre de l’export, quel que soit qui est toi. */
 export const titreDuo = (story: Pick<Story, "participants">) => `${story.participants[0].name} & ${story.participants[1].name}`;

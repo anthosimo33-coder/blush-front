@@ -9,7 +9,7 @@ import type { Utilisateur } from "./auth";
 import { donneesVerdict, PREDICATS } from "./depot";
 import { rapportOuvert } from "./droits";
 import { messagesAffiches } from "./ecrans/messages";
-import { histoireDe, metaDe, UUID, type Ligne } from "./histoires";
+import { metaDe, nomsDeToi, UUID, type Ligne } from "./histoires";
 import { COUPE_VOIX, dire, scriptQuiTient, voixPour } from "./ia/voix";
 import { ouvertureDu } from "./presentation/rapport";
 
@@ -64,8 +64,7 @@ export async function enregistrerVocal(story: Ligne, script: Vocal, lignes: Map<
   const dites = scriptQuiTient(script.lignes, COUPE_VOIX.rapport);
   const { texte } = texteDit(dites);
   const { audio, alignement } = await dire(texte, voix, { sobre, storyId: story.id, pour: "rapport" });
-  const prenom = histoireDe(metaDe(story)).utilisateur.prenom;
-  const messages = messagesAffiches(lignes, prenom);
+  const messages = messagesAffiches(lignes, nomsDeToi(metaDe(story)));
   const minutees: VocalLigne[] = minuter(dites, alignement).map((l, k) => {
     const preuve = dites[k]?.preuve;
     const recu = preuve ? messages.get(preuve) : undefined;

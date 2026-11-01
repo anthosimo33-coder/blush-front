@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { choisirLaVente, groupeDeVente, SEUILS_DE_VENTE, type SituationDeVente } from "@/server/vente";
+import { choisirLaVente, estLAutreDeLaConv, groupeDeVente, SEUILS_DE_VENTE, type SituationDeVente } from "@/server/vente";
 
 /*
  * La règle de la vente dans le chat (choisirLaVente, src/server/vente.ts) : quelle carte poser sous la réponse de BLUSH,
@@ -112,5 +112,14 @@ describe("la vente dans le chat : quelle carte, et quand", () => {
     const n = ids.filter((id) => groupeDeVente(id) === "avec").length;
     expect(n).toBeGreaterThan(150);
     expect(n).toBeLessThan(250);
+  });
+});
+
+describe("le prénom dont parle le modèle est-il celui de l’autre de la conv (estLAutreDeLaConv)", () => {
+  it("sous son prénom, ou sous le nom distinct qu’il lit quand vous avez le même prénom", () => {
+    expect(estLAutreDeLaConv({ prenom: "Léa", prenomAutre: " léa " })).toBe(true);
+    expect(estLAutreDeLaConv({ prenom: "Léa", nomLu: "Léa D.", prenomAutre: "Léa D." })).toBe(true);
+    expect(estLAutreDeLaConv({ prenom: "Léa", nomLu: "Léa D.", prenomAutre: "Inès" })).toBe(false);
+    expect(estLAutreDeLaConv({ prenom: "Léa", prenomAutre: null })).toBe(false);
   });
 });

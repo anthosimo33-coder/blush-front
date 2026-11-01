@@ -1,5 +1,8 @@
 import "server-only";
-import { APPLIS, type Source, type Story } from "@/types";
+import { nomsDistincts, prenomDe, seConfondent } from "@prompts/lib/noms";
+import { formatCount } from "@/lib/format";
+import { doutePrenom } from "@/lib/participants";
+import { APPLIS, type Person, type Source, type Story } from "@/types";
 import { pronomDeLAutre } from "./accords";
 import type { Meta, MorceauMeta } from "./histoires";
 import { dureeLisible, joursCouverts } from "./temps";
@@ -65,12 +68,29 @@ export function storyEtSource(id: string, meta: Meta): { story: Story; source: S
   const morceaux = meta.morceaux ?? [meta];
   const ordre = morceaux.map((m, k) => ({ m, k })).sort((x, y) => x.m.resume.debut.localeCompare(y.m.resume.debut) || x.k - y.k);
   const sources = ordre.map(({ m }, i) => sourceDe(`s${i + 1}`, m));
+  /*
+   * Leurs noms, distincts quand ils ont le même prénom (comme ceux que lit le modèle, histoireDe, mais jamais « Léa
+   * (l’autre) », qui ne se lit pas à l’écran : « Léa & Léa ») : sur « Qui es-tu ? », chacun
+   * montre alors son nom d’export et ses messages. Un nom qui ne dit pas son prénom (doutePrenom) : l’écran le demande,
+   * tant que son prénom vient encore de ce nom (une fois écrit sur « Qui es-tu ? », plus rien à demander)
+   */
+  const noms = nomsDistincts(meta.participants);
+  const homonymes = seConfondent(a.prenom, b.prenom);
+  const personne = (k: 0 | 1): Person => {
+    const p = meta.participants[k];
+    const doute = p.prenom === prenomDe(p.nom) ? doutePrenom(p.nom) : undefined;
+    return {
+      id: `p${k}`,
+      name: noms[k],
+      initial: initialeDe(noms[k]),
+      ...pronom(k),
+      ...(doute ? { nameCheck: doute } : {}),
+      ...(homonymes ? { detail: `${p.nom} · ${formatCount(p.messages)} message${p.messages > 1 ? "s" : ""}` } : {}),
+    };
+  };
   const story: Story = {
     id,
-    participants: [
-      { id: "p0", name: a.prenom, initial: initialeDe(a.prenom), ...pronom(0) },
-      { id: "p1", name: b.prenom, initial: initialeDe(b.prenom), ...pronom(1) },
-    ],
+    participants: [personne(0), personne(1)],
     sources,
     totalMessages: total,
     voiceCount: vocaux,

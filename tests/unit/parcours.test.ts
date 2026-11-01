@@ -31,7 +31,7 @@ describe("« Qui es-tu ? » complet (quiComplet)", () => {
     expect(quiComplet({ ...CAPTURES, prenom: "Tom" }, { captures: true })).toBe(true);
   });
 
-  it("sur des captures dont la lecture n’a pas lu son nom : son prénom en plus", () => {
+  it("son nom ne dit rien de son prénom (des captures, un export) : son prénom en plus", () => {
     const tom = { ...CAPTURES, prenom: "Tom" };
     expect(quiComplet(tom, { captures: true, sonPrenom: true })).toBe(false);
     expect(quiComplet({ ...tom, prenomAutre: " " }, { captures: true, sonPrenom: true })).toBe(false);
@@ -57,10 +57,16 @@ describe("les réponses qui lancent la lecture (reponsesQui)", () => {
     expect(reponsesQui(EXPORT, { captures: false })).toEqual({ me: "p1", pronom: "il", guess: "vus", goal: "ensemble", prenom: null, prenomAutre: null });
   });
 
-  it("un export après des captures, dans le même onglet : le prénom resté ne part pas", () => {
-    const apres: JourneyState = { ...EXPORT, prenom: "Tom", prenomAutre: "Léa" };
+  it("un export après des captures, dans le même onglet : ton prénom resté ne part pas", () => {
+    const apres: JourneyState = { ...EXPORT, prenom: "Tom" };
     if (!quiComplet(apres, { captures: vientDeCaptures(apres) })) throw new Error("parcours incomplet");
     expect(reponsesQui(apres, { captures: vientDeCaptures(apres) })).toMatchObject({ me: "p1", prenom: null, prenomAutre: null });
+  });
+
+  it("sur un export, le sien part s’il est écrit : le serveur ne le pose que si son nom ne dit pas son prénom", () => {
+    const ecrit: JourneyState = { ...EXPORT, prenomAutre: " Léa " };
+    if (!quiComplet(ecrit, { captures: false, sonPrenom: true })) throw new Error("parcours incomplet");
+    expect(reponsesQui(ecrit, { captures: false })).toMatchObject({ prenom: null, prenomAutre: "Léa" });
   });
 });
 
