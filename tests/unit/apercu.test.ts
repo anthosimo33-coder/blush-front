@@ -119,7 +119,7 @@ describe("l’aperçu du banc, mis en écrans par l’appli", () => {
       ["Tom", "il"],
       ["Léa", "elle"],
     ]);
-    expect(story).toMatchObject({ totalMessages: 60, voiceCount: 1, period: "1 mars → 1 mars", me: "p0" });
+    expect(story).toMatchObject({ totalMessages: 60, voiceCount: 1, period: "1 mars", me: "p0" });
     expect(story.sources[0]).toMatchObject({ app: "whatsapp", mode: "export", label: "WhatsApp · 1 mars", messageCount: 60 });
   });
 

@@ -335,7 +335,7 @@ async function rapportChapitres(story: LigneComplete, t: Tache) {
   /* Les titres promis par le verdict : chaque chapitre écrit les porte, au mot près (le plan les a déjà) */
   const titres = titresDuVerdict(v.sortie);
   /* Les deux moitiés s’écrivent en même temps : on suit chacune, chapitre par chapitre */
-  const suivi = suiviDesChapitres(story, t, messagesAffiches(rendu.lignes, nomsDeToi(metaDe(story))), v.scores, titres);
+  const suivi = suiviDesChapitres(story, t, messagesAffiches(rendu.lignes, nomsDeToi(metaDe(story)), { fin: metaDe(story).resume.fin }), v.scores, titres);
   /* Une moitié échoue : l’autre s’arrête aussi (tout repart au prochain essai, rien ne continue d’écrire en double) */
   const abandon = new AbortController();
   const moitie = (quels: "1 à 4" | "5 à 8") =>
@@ -397,7 +397,7 @@ const DECOUVERTES_MAX = 3;
 
 async function garderRapport(story: Ligne, brut: Rapport, lignes: Map<string, string>, lignesScores: ScoreRow[]) {
   const r: Rapport = { ...brut, decouvertes: brut.decouvertes.slice(0, DECOUVERTES_MAX) };
-  const chapitres = chapitresAffiches(r.chapitres ?? [], messagesAffiches(lignes, nomsDeToi(metaDe(story))), lignesScores);
+  const chapitres = chapitresAffiches(r.chapitres ?? [], messagesAffiches(lignes, nomsDeToi(metaDe(story)), { fin: metaDe(story).resume.fin }), lignesScores);
   const donnees: DonneesRapport = {
     sortie: r,
     chapitres,

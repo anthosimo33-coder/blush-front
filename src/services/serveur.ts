@@ -12,6 +12,7 @@ import { histoiresDuCompte, metaDe, morceauxDe, quiRempli } from "@/server/histo
 import { storyAffichee } from "@/server/conv-affichee";
 import { achatDuFauxWhop, achatPaye } from "@/server/paiement/commande";
 import { contexte } from "@/server/requete";
+import { jourRelatif } from "@/server/temps";
 import { moiEtAutre } from "@/lib/participants";
 import { connexionPuis } from "@/lib/suite";
 
@@ -28,6 +29,13 @@ import { connexionPuis } from "@/lib/suite";
 export async function getApercuAvantPaiement(): Promise<ApercuDuPaywall | null> {
   const { story } = await contexte();
   return story ? apercuAvantPaiement(story.id) : null;
+}
+
+/** Le jour où BLUSH a lu la conv (l’heure du verdict), dit comme dans Messages (« aujourd’hui », « lun. », « 12 mars ») ; null avant. */
+export async function getLuLe(): Promise<string | null> {
+  const { story } = await contexte();
+  const fin = story ? await finDeLecture(story.id) : null;
+  return fin ? jourRelatif(new Date(fin)) : null;
 }
 
 /** `parcours` : les écrans de l’import, qui montrent la conv en train d’être importée (voir histoireOuverte). */

@@ -10,7 +10,7 @@ import { LienDiscret, NotePrivee } from "@/components/ui/NotePrivee";
 import { ParcoursScreen } from "@/components/shell/ParcoursScreen";
 import { ScreenTitle } from "@/components/shell/Screen";
 import { PROMESSE_CONV } from "@/contenu/confidentialite";
-import { formatCount, NBSP } from "@/lib/format";
+import { accorde, formatCount, NBSP, vocauxOuMedias } from "@/lib/format";
 import { minimumDeMessages, tropCourte } from "@/lib/morceaux";
 import { useSoundOnce } from "@/lib/sound";
 import { useJourney } from "@/state/journey";
@@ -62,7 +62,10 @@ export function ConvOkScreen({ story, source, ajout }: { story: Story; source: S
         </div>
         <div className="flex flex-wrap items-baseline gap-x-2 border-t border-[rgba(17,17,20,0.06)] px-5 pb-5 pt-4">
           <span className="text-affiche font-black leading-none tracking-[-0.035em] tabular-nums">{formatCount(source.messageCount)}</span>
-          <span className="text-corps font-black text-soft">messages · {source.voiceCount} vocaux</span>
+          {/* Ses vocaux, ou ses médias quand l’export ne les distingue pas (Android « sans médias ») */}
+          <span className="text-corps font-black text-soft">
+            {accorde(source.messageCount, "message")} · {formatCount(vocauxOuMedias(source).nombre)} {vocauxOuMedias(source).nom}
+          </span>
         </div>
       </div>
 

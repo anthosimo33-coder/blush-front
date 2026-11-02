@@ -129,7 +129,8 @@ describe("les lignes de la conv, à l’octet", () => {
   it("les preuves affichées et les sources de sa fiche", () => {
     const r = rendre(h, lire(texte, h, { autresEnTexte: true }));
     const lignes = new Map([...r.lignes, ["m0401", "m0401 2024-02-20 mar. --:-- profil de Inès : 24 ans ⏎ étudiante"]]);
-    expect(empreinte([...messagesAffiches(lignes, "Hugo")])).toBe("34bdf6ba3a173510");
+    /* La légende d’un média s’affiche « on y va ? · photo » (le repère « [photo] » est pour le modèle) */
+    expect(empreinte([...messagesAffiches(lignes, "Hugo")])).toBe("36ce56e627187331");
     const etat = memoire({
       memoire: { moments: [{ quand: "2024-02-04", quoi: "le resto", preuves: ["m0012", "m0400", "m0401", "m0009"] }] },
       fiche: {

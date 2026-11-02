@@ -8,6 +8,7 @@ import {
   MIN_MESSAGES_CAPTURES,
   participantsDe,
   principaux,
+  REPERE_MEDIA,
   type Devinette,
   type Format,
   type Histoire,
@@ -70,7 +71,8 @@ export type Meta = {
    * qu’une meta lue en a bien deux (src/server/coffre.ts).
    */
   participants: [Participant, Participant];
-  resume: { debut: string; fin: string; total: number; vocaux: number };
+  /** `medias` : ceux que l’export ne nomme pas (« <Médias omis> »), absent d’une conv importée avant le 2 novembre 2026. */
+  resume: { debut: string; fin: string; total: number; vocaux: number; medias?: number };
   /** Des captures : combien. L’utilisateur y est « Moi » (à droite), son prénom vient de « Qui es-tu ? ». */
   captures?: number;
   /** L’export était trop long pour partir en entier : seule sa partie la plus récente a été gardée (de `resume.debut` à la fin). */
@@ -81,6 +83,8 @@ export type Meta = {
    * Ce que l’écran de l’import en dit (« le début sera lu avec ton rapport »), rien de plus.
    */
   suiteVideo?: boolean;
+  /** Des captures tirées d’un enregistrement d’écran (POST /api/captures/video) : l’écran dit « vidéo », pas « 87 captures ». */
+  video?: true;
   /** Rempli sur « Qui es-tu ? » : l’index de l’utilisateur dans `participants`, son pronom, sa devinette, son objectif. */
   moi?: 0 | 1;
   pronom?: Pronom;
@@ -105,7 +109,10 @@ export type Meta = {
 };
 
 /** Ce que la meta dit d’un morceau : d’où il vient (des captures : combien), et ce qu’il contenait, doublons compris. */
-export type MorceauMeta = Pick<Meta, "appli" | "fichier" | "resume"> & Pick<Meta, "captures" | "coupe" | "suiteVideo">;
+export type MorceauMeta = Pick<Meta, "appli" | "fichier" | "resume"> & Pick<Meta, "captures" | "coupe" | "suiteVideo" | "video">;
+
+/** Le nom d’un lot de captures : « 1 capture », « 12 captures », ou « vidéo » pour un enregistrement d’écran. */
+const nomDesCaptures = (captures: number, video?: boolean) => (video ? "vidéo" : `${captures} capture${captures > 1 ? "s" : ""}`);
 
 /** L’histoire telle qu’en base, avec la conv brute (chiffrée, jusqu’à plusieurs Mo) : pour la chaîne d’analyse (pipeline.ts, executer). */
 export type LigneComplete = typeof schema.stories.$inferSelect;
@@ -117,8 +124,13 @@ export type Ligne = Omit<LigneComplete, "conv" | "status">;
 /** Ce que lisent les écrans et les routes : la ligne sans la conv, et si elle est encore en base (`aConv`). */
 export type LigneEcran = Ligne & { aConv: boolean };
 
-/** Le résumé d’une conv lue (au moins un message) : son premier et son dernier jour, ses messages, dont ses vocaux. */
-export function resumeDe(messages: Message[]): Meta["resume"] {
+/**
+ * Le résumé d’une conv lue (au moins un message) : son premier et son dernier jour, ses messages, dont ses vocaux. Et
+ * ses médias quand l’export ne dit pas lesquels sont des vocaux : un export Android « sans médias » (`format`), qui
+ * n’écrit que « <Médias omis> », légendés compris. Un export qui nomme ses médias (une photo, un vocal), Instagram et ses
+ * partages, des captures : rien, l’écran garde ses vocaux.
+ */
+export function resumeDe(messages: Message[], format?: Format): Meta["resume"] {
   const [premier] = messages;
   const dernier = messages.at(-1);
   /* erreurImport refuse une conv sans message avant d’arriver ici */
@@ -128,7 +140,19 @@ export function resumeDe(messages: Message[]): Meta["resume"] {
     fin: new Date(dernier.t).toISOString().slice(0, 10),
     total: messages.length,
     vocaux: messages.filter((m) => m.media === "vocal").length,
+    ...(format === "whatsapp-android" ? mediasSansNom(messages) : {}),
   };
+}
+
+/** Le média d’un message : le sien, ou celui que nomme le repère de sa légende (« regarde ma tête [média] »). */
+const genreDuMedia = (m: Message) => m.media ?? m.texte.match(REPERE_MEDIA)?.[1];
+
+/** Les médias d’un export qui ne les nomme pas : aucun vocal, photo, vidéo ni autocollant, et des « <Médias omis> » (légendés compris). */
+function mediasSansNom(messages: Message[]): { medias?: number } {
+  const genres = messages.map(genreDuMedia);
+  if (genres.some((g) => g === "vocal" || g === "photo" || g === "vidéo" || g === "autocollant")) return {};
+  const medias = genres.filter((g) => g === "média").length;
+  return medias ? { medias } : {};
 }
 
 /** Une transaction de la base (db().transaction), telle que la reçoit son travail. */
@@ -213,7 +237,7 @@ export async function importer(recu: ExportLu & { nom: string; coupe?: boolean }
     format,
     fichier: nom.slice(0, 200),
     participants: [participant(premier, lus.toi), participant(second, lus.autre)],
-    resume: resumeDe(lu.messages),
+    resume: resumeDe(lu.messages, format),
     ...(coupe ? { coupe: true } : {}),
     ...(contact === undefined ? {} : { contact: contact === premier.nom ? 0 : 1 }),
   };
@@ -230,6 +254,7 @@ export async function importerCaptures({
   secret = jeton(),
   consentement,
   suite,
+  video = false,
 }: {
   appli: Meta["appli"];
   t: TexteCaptures;
@@ -240,6 +265,8 @@ export async function importerCaptures({
    * brouillon, dans sa transaction, et sa meta le dit (`suiteVideo`).
    */
   suite?: AvecLeBrouillon;
+  /** Tirées d’un enregistrement d’écran (POST /api/captures/video). */
+  video?: boolean;
 }): Promise<{ id: string; meta: Meta; secret: string }> {
   const lu = lectureDesCaptures(t);
   /* Courtes, elles restent un brouillon, comme un export : on peut leur ajouter un morceau (tropCourte) */
@@ -247,7 +274,7 @@ export async function importerCaptures({
   const meta: Meta = {
     appli,
     format: "captures",
-    ...comptesDesCaptures(t, lu.messages, [MOI, prenomDe(t.autre)]),
+    ...comptesDesCaptures(t, lu.messages, [MOI, prenomDe(t.autre)], video),
     ...(suite ? { suiteVideo: true } : {}),
     moi: 0,
   };
@@ -261,12 +288,18 @@ function lectureDesCaptures(t: TexteCaptures) {
 }
 
 /** Ce que la meta d’une conv de captures dit de ses messages : son fichier, ses captures, ses deux participants (leurs prénoms donnés) et son résumé. */
-function comptesDesCaptures(t: TexteCaptures, messages: Message[], [prenomMoi, prenomAutre]: [string, string]): Pick<Meta, "fichier" | "captures" | "participants" | "resume"> {
+function comptesDesCaptures(
+  t: TexteCaptures,
+  messages: Message[],
+  [prenomMoi, prenomAutre]: [string, string],
+  video = false,
+): Pick<Meta, "fichier" | "captures" | "participants" | "resume" | "video"> {
   const compte = (nom: string) => messages.filter((m) => m.nom === nom).length;
   const lus = pronomsLus(messages);
   return {
-    fichier: `${t.captures} captures`,
+    fichier: nomDesCaptures(t.captures, video),
     captures: t.captures,
+    ...(video ? { video: true as const } : {}),
     participants: [
       { nom: MOI, prenom: prenomMoi, messages: compte(MOI), ...(lus.toi ? { pronomLu: lus.toi } : {}) },
       { nom: t.autre, prenom: prenomAutre, messages: compte(t.autre), ...(lus.autre ? { pronomLu: lus.autre } : {}) },
@@ -294,7 +327,8 @@ export async function completerLaConv(tx: Transaction, storyId: string, t: Texte
   const brute = coffre.lire("stories.conv", ligne.conv);
   const lu = lectureDesCaptures(t);
   /* Les prénoms de « Qui es-tu ? » restent, par la place de chaque participant (l’autre garde le nom de l’import) */
-  const comptes = comptesDesCaptures(t, lu.messages, [avant.participants[0].prenom, avant.participants[1].prenom]);
+  /* Une suite ne complète qu’une vidéo */
+  const comptes = comptesDesCaptures(t, lu.messages, [avant.participants[0].prenom, avant.participants[1].prenom], true);
   let conv: string | ConvEnMorceaux = t.texte;
   /* La vidéo est entière : sa meta ne dit plus qu’une suite l’attend (suiteVideo) */
   let meta: Meta = { ...sansLaSuite(avant), ...comptes };
@@ -337,13 +371,14 @@ const premierMorceau = (meta: Meta, texte: string): Morceau => ({
 });
 
 /** La meta d’une conv d’un seul morceau, devenue celle de son premier morceau. */
-const morceauMetaDe = ({ appli, fichier, resume, captures, coupe, suiteVideo }: Meta): MorceauMeta => ({
+const morceauMetaDe = ({ appli, fichier, resume, captures, coupe, suiteVideo, video }: Meta): MorceauMeta => ({
   appli,
   fichier,
   resume,
   ...(captures ? { captures } : {}),
   ...(coupe ? { coupe } : {}),
   ...(suiteVideo ? { suiteVideo } : {}),
+  ...(video ? { video } : {}),
 });
 
 /** Ce que la meta sait de qui est qui : les noms des participants, celui qui importe (des captures seules), l’autre (désigné par un nom). */
@@ -352,6 +387,16 @@ const identiteDe = (meta: Meta): Identite => ({
   ...(meta.moi != null && meta.format === "captures" && !meta.morceaux?.some((m) => !m.captures) ? { moi: meta.moi } : {}),
   ...(meta.contact === undefined ? {} : { contact: meta.contact }),
 });
+
+/**
+ * Les médias d’une conv réunie : ceux de ses morceaux Android qui ne nomment aucun média, jugés chacun sur sa propre
+ * lecture (des captures qui montrent une photo n’y changent rien), comptés parmi les messages réunis, sans doublons.
+ */
+function mediasReunis(conv: ConvEnMorceaux, lu: { messages: Message[]; parMorceau: Message[][] }): { medias?: number } {
+  const sansNom = conv.morceaux.map((m, k) => m.format === "whatsapp-android" && mediasSansNom(lu.parMorceau[k] ?? []).medias !== undefined);
+  const medias = lu.messages.filter((m) => m.morceau !== undefined && sansNom[m.morceau] && genreDuMedia(m) === "média").length;
+  return medias ? { medias } : {};
+}
 
 /**
  * La meta d’une conv réunie : ses morceaux relus ensemble (lectureReunie), toi au participant `qui.k`. Les participants
@@ -376,12 +421,13 @@ function metaReunie(avant: Meta, conv: ConvEnMorceaux, id: Identite, qui: QuiLit
   };
   /* Ce qu’une conv d’un seul morceau dit d’elle-même, que ses morceaux disent désormais un à un (ou que l’identité redit) */
   // eslint-disable-next-line @typescript-eslint/no-unused-vars -- écartés, puis redits plus bas
-  const { captures, coupe, suiteVideo, moi, contact, ...reste } = avant;
+  const { captures, coupe, suiteVideo, video, moi, contact, ...reste } = avant;
   const meta: Meta = {
     ...reste,
     format: conv.morceaux.some((m) => m.format === "captures") ? "captures" : conv.morceaux[0]!.format,
     participants: [participant(0), participant(1)],
-    resume: resumeDe(lu.messages),
+    /* Un export Android « sans médias » parmi ses morceaux : ses médias se comptent dans la conv réunie (mediasReunis) */
+    resume: { ...resumeDe(lu.messages), ...mediasReunis(conv, lu) },
     ...(avant.morceaux?.some((m) => m.coupe) ? { coupe: true } : {}),
     ...(id.moi === undefined ? {} : { moi: id.moi }),
     ...(id.contact === undefined ? {} : { contact: id.contact }),
@@ -415,7 +461,7 @@ async function ajouterMorceau(secret: string, recu: MorceauRecu, info: Omit<Morc
     /* Avant « Qui es-tu ? » : toi est le participant 0, comme à l’import d’un seul morceau */
     const { meta: lue, parMorceau, gardes } = metaReunie(avant, reunie, identite, { k: 0, connu: false });
     if (!gardes.at(-1)) throw new ErreurMorceau("rien_de_neuf");
-    const metas = [...(avant.morceaux ?? [morceauMetaDe(avant)]), { ...info, resume: resumeDe(parMorceau.at(-1)!) }];
+    const metas = [...(avant.morceaux ?? [morceauMetaDe(avant)]), { ...info, resume: resumeDe(parMorceau.at(-1)!, recu.format) }];
     const meta: Meta = { ...lue, morceaux: metas, ...(metas.some((m) => m.coupe) ? { coupe: true } : {}) };
     await tx
       .update(schema.stories)
@@ -436,7 +482,10 @@ export async function ajouterUnExport(secret: string, recu: ExportLu & { nom: st
  * Des captures (ou un enregistrement d’écran) ajoutées au brouillon du cookie (ajouterMorceau), déjà lues par le prompt
  * 01. `cle` : celle de l’envoi, qu’un nouvel essai retrouve. Le nom lu en haut de la conv désigne l’autre.
  */
-export async function ajouterDesCaptures(secret: string, { appli, t, cle }: { appli: Meta["appli"]; t: TexteCaptures; cle?: string | null }): Promise<{ id: string; meta: Meta }> {
+export async function ajouterDesCaptures(
+  secret: string,
+  { appli, t, cle, video = false }: { appli: Meta["appli"]; t: TexteCaptures; cle?: string | null; video?: boolean },
+): Promise<{ id: string; meta: Meta }> {
   const morceau: MorceauRecu = {
     format: "captures",
     texte: t.texte,
@@ -445,7 +494,7 @@ export async function ajouterDesCaptures(secret: string, { appli, t, cle }: { ap
     ...(cle ? { cle: empreinte(`ajout:${cle}`) } : {}),
     ...(nomLu(t.autre) ? { contact: t.autre } : {}),
   };
-  return ajouterMorceau(secret, morceau, { appli, fichier: `${t.captures} captures`, captures: t.captures });
+  return ajouterMorceau(secret, morceau, { appli, fichier: nomDesCaptures(t.captures, video), captures: t.captures, ...(video ? { video: true as const } : {}) });
 }
 
 /**

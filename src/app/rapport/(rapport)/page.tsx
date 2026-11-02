@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { heureDuRendu } from "@/lib/rendu";
-import { getReport, getStory, sansHistoire } from "@/services/serveur";
+import { getLuLe, getReport, getStory, sansHistoire } from "@/services/serveur";
 import { ReportScreen } from "../ReportScreen";
 import { PageDeConv } from "@/components/shell/PageDeConv";
 
@@ -16,7 +16,7 @@ export const maxDuration = 800;
 export default async function Page({ searchParams }: PageProps<"/rapport">) {
   const rendu = heureDuRendu();
   const { paiement } = await searchParams;
-  const [initial, story] = await Promise.all([getReport(), getStory()]);
+  const [initial, story, luLe] = await Promise.all([getReport(), getStory(), getLuLe()]);
   /*
    * Les gardes sont dans layout.tsx (une vraie 307, avant le squelette) : celles-ci ne servent qu’au type, et à une
    * navigation qui ne rejoue pas le layout (la même page, d’autres paramètres : ?paiement=1)
@@ -27,7 +27,8 @@ export default async function Page({ searchParams }: PageProps<"/rapport">) {
     <PageDeConv rendu={rendu}>
       {/* data-prive : tout son texte masqué dans l’enregistrement des visites (src/lib/secrets.ts) */}
       <div data-prive="" className="contents">
-        <ReportScreen initial={initial} story={story} openPaywall={paiement === "1"} rendu={rendu} />
+        {/* Le jour de la lecture sous la période (« 14 déc. → 12 mars · lun. ») */}
+        <ReportScreen initial={initial} story={luLe ? { ...story, updatedLabel: luLe } : story} openPaywall={paiement === "1"} rendu={rendu} />
       </div>
     </PageDeConv>
   );

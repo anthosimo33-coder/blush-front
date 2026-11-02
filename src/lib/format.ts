@@ -6,6 +6,19 @@ export function formatCount(n: number) {
   return n.toLocaleString("fr-FR").replace(/\s/g, NBSP);
 }
 
+/** Le nom accordé à son nombre : le singulier pour 0 et 1 (« 0 vocal », « 1 message »), le pluriel au-delà. */
+export const accorde = (n: number, singulier: string, pluriel = `${singulier}s`) => (n > 1 ? pluriel : singulier);
+
+/**
+ * Le chiffre des vocaux d’une conv, à l’écran : ses vocaux, ou ses médias quand l’export ne les distingue pas (Android
+ * « sans médias » écrit « <Médias omis> » pour un vocal comme pour une photo), plutôt qu’un « 0 vocal » faux.
+ */
+export function vocauxOuMedias(c: { voiceCount?: number; mediaCount?: number }): { nombre: number; nom: string } {
+  const vocaux = c.voiceCount ?? 0;
+  if (!vocaux && c.mediaCount) return { nombre: c.mediaCount, nom: accorde(c.mediaCount, "média", "médias") };
+  return { nombre: vocaux, nom: accorde(vocaux, "vocal", "vocaux") };
+}
+
 const JOUR_EN_LETTRES = new Intl.DateTimeFormat("fr-FR", { timeZone: "Europe/Paris", day: "numeric", month: "long" });
 const JOUR_ET_ANNEE = new Intl.DateTimeFormat("fr-FR", { timeZone: "Europe/Paris", day: "numeric", month: "long", year: "numeric" });
 const JOUR_COURT = new Intl.DateTimeFormat("fr-FR", { timeZone: "Europe/Paris", day: "numeric", month: "short" });

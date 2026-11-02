@@ -5,12 +5,25 @@ import { doutePrenom } from "@/lib/participants";
 import { APPLIS, type Person, type Source, type Story } from "@/types";
 import { pronomDeLAutre } from "./accords";
 import type { Meta, MorceauMeta } from "./histoires";
-import { dureeLisible, joursCouverts } from "./temps";
+import { dureeLisible, joursCouverts, moisCouverts } from "./temps";
 
 /* La conv telle que l’affiche le front (le type Story) : tirée de sa meta seule, sans la base ni la conv brute. */
 
 const MOIS = ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."];
-const dateCourte = (iso: string) => `${+iso.slice(8, 10)} ${MOIS[+iso.slice(5, 7) - 1]}`;
+const dateCourte = (iso: string, annee = false) => `${+iso.slice(8, 10)} ${MOIS[+iso.slice(5, 7) - 1]}${annee ? ` ${iso.slice(0, 4)}` : ""}`;
+
+/**
+ * La période d’une conv : « 14 déc. → 12 mars », avec l’année aux deux bouts quand ils ne sont pas de la même année
+ * (« 12 mars 2024 → 12 mars 2025 »), un seul jour quand elle tient en un jour (« 1 janv. »).
+ */
+export function periodeLisible(debut: string, fin: string): string {
+  if (debut.slice(0, 10) === fin.slice(0, 10)) return dateCourte(debut);
+  const annees = debut.slice(0, 4) !== fin.slice(0, 4);
+  return `${dateCourte(debut, annees)} → ${dateCourte(fin, annees)}`;
+}
+
+/** Ses médias que l’export ne nomme pas, quand il y en a (Source.mediaCount). */
+const medias = (resume: Meta["resume"]) => (resume.medias ? { mediaCount: resume.medias } : {});
 
 /**
  * L’histoire telle que l’affiche le front, pour toute conv (GET /api/histoire, un import, l’aperçu). Les participants
@@ -24,7 +37,9 @@ export function storyAffichee(id: string, meta: Meta): Story {
 /** Une source de la conv (son seul morceau, ou l’un d’eux) : un export, ou des captures (combien). */
 function sourceDe(id: string, m: MorceauMeta): Source {
   const { debut, fin, total, vocaux } = m.resume;
-  const periode = `${dateCourte(debut)} → ${dateCourte(fin)}`;
+  const periode = periodeLisible(debut, fin);
+  /* Des captures : combien (« 1 capture »), ou « vidéo » pour un enregistrement d’écran */
+  const lot = m.video ? "vidéo" : `${m.captures} capture${(m.captures ?? 0) > 1 ? "s" : ""}`;
   return m.captures
     ? {
         id,
@@ -32,24 +47,28 @@ function sourceDe(id: string, m: MorceauMeta): Source {
         mode: "captures",
         screenshotCount: m.captures,
         /* « Captures ou vidéo » d’une appli qu’on ne nomme pas : le nombre seul */
-        label: m.appli === "autre" ? `${m.captures} captures` : `${APPLIS[m.appli]} · ${m.captures} captures`,
+        label: m.appli === "autre" ? lot : `${APPLIS[m.appli]} · ${lot}`,
         period: periode,
         messageCount: total,
         voiceCount: vocaux,
+        ...medias(m.resume),
         /* Une longue vidéo lue en partie avant l’achat : le début se lira avec le rapport */
         ...(m.suiteVideo ? { suiteVideo: true } : {}),
+        ...(m.video ? { video: true } : {}),
       }
     : {
         id,
         app: m.appli,
         mode: "export",
         fileName: m.fichier,
-        label: `${APPLIS[m.appli]} · ${dateCourte(debut)}`,
+        /* Le jour de son premier message, avec l’année quand ce n’est pas celle du dernier */
+        label: `${APPLIS[m.appli]} · ${dateCourte(debut, debut.slice(0, 4) !== fin.slice(0, 4))}`,
         period: periode,
         messageCount: total,
         voiceCount: vocaux,
-        /* Une conv trop longue, coupée : combien de mois BLUSH en lit */
-        ...(m.coupe ? { moisLus: Math.max(1, Math.round((Date.parse(fin) - Date.parse(debut)) / (30.44 * 86400e3))) } : {}),
+        ...medias(m.resume),
+        /* Une conv trop longue, coupée : combien de mois BLUSH en lit, comptés comme la durée du verdict (moisCouverts) */
+        ...(m.coupe ? { moisLus: moisCouverts(joursCouverts(debut, fin)) } : {}),
       };
 }
 
@@ -59,7 +78,7 @@ function sourceDe(id: string, m: MorceauMeta): Source {
  */
 export function storyEtSource(id: string, meta: Meta): { story: Story; source: Source } {
   const { debut, fin, total, vocaux } = meta.resume;
-  const periode = `${dateCourte(debut)} → ${dateCourte(fin)}`;
+  const periode = periodeLisible(debut, fin);
   const jours = joursCouverts(debut, fin);
   const [a, b] = meta.participants;
   /* Le pronom de chacun, une fois « Tu es » rempli : l’utilisateur a le sien, l’autre celui de pronomDeLAutre */
@@ -94,9 +113,9 @@ export function storyEtSource(id: string, meta: Meta): { story: Story; source: S
     sources,
     totalMessages: total,
     voiceCount: vocaux,
+    ...medias(meta.resume),
     period: periode,
     durationLabel: dureeLisible(jours),
-    updatedLabel: "aujourd’hui",
     /* Qui est l’utilisateur : le rapport ouvert depuis le mail (un autre onglet, sans parcours) met les bons avatars */
     ...(meta.moi == null ? {} : { me: meta.moi === 0 ? "p0" : "p1" }),
     ...(meta.moi == null && meta.contact != null ? { other: meta.contact === 0 ? "p0" : "p1" } : {}),
