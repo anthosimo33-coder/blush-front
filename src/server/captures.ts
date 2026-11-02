@@ -76,8 +76,8 @@ export async function imagesDe(fichiers: File[]): Promise<Image[]> {
  * l’envoi (src/server/imports.ts), notée avec le coût de la lecture.
  * Rien de lisible (que des captures hors sujet) : l’erreur « capture », que le front sait afficher.
  */
-export async function lireCaptures(images: Image[], appli: string, envoi: string | null = null): Promise<TexteCaptures> {
-  return enTexte(await lireLot(images, appli, "captures", { envoi }));
+export async function lireCaptures(images: Image[], appli: string, envoi: string | null = null, jour?: string): Promise<TexteCaptures> {
+  return enTexte(await lireLot(images, appli, "captures", { envoi, ...(jour ? { jour } : {}) }), jour);
 }
 
 /**
@@ -118,9 +118,12 @@ export async function lireLot(
   return exigerSortie(a, () => new ErreurImport("fichier"));
 }
 
-/** Une lecture au format « captures » que la lecture de la conv connaît. Rien de lisible : l’erreur « capture ». */
-export function enTexte(c: Captures): TexteCaptures {
-  const t = versTexteCaptures(c, { aujourdhui: aujourdhuiParis().iso });
+/**
+ * Une lecture au format « captures » que la lecture de la conv connaît. `jour` : aujourd’hui sur le téléphone de
+ * l’utilisateur (aujourdhuiDans), le jour d’un bloc sans repère ; Paris à défaut. Rien de lisible : l’erreur « capture ».
+ */
+export function enTexte(c: Captures, jour = aujourdhuiParis().iso): TexteCaptures {
+  const t = versTexteCaptures(c, { aujourdhui: jour });
   if (!t.messages) throw new ErreurCaptures();
   return t;
 }

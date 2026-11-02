@@ -31,8 +31,9 @@ const rendu = rendre(h, lu);
 const lignes = new Map(lignesGardees(etat, rendu.lignes));
 
 /* La suite : les messages d’après le dernier lu, numérotés à la suite, et son profil */
-const nouveaux = messagesDeLExport(`${texte}\n${readFileSync(cheminDonne(fichierSuite), "utf8").trim()}`, h, lu.messages.at(-1)!.t);
-if (typeof nouveaux === "string") throw new Error(nouveaux);
+const suite = messagesDeLExport(`${texte}\n${readFileSync(cheminDonne(fichierSuite), "utf8").trim()}`, h, lu.messages.at(-1)!.t);
+if (typeof suite === "string") throw new Error(suite);
+const { nouveaux } = suite;
 const jour = new Date(Math.max(...nouveaux.map((m) => m.t)) + 86400e3).toISOString().slice(0, 10);
 const ajout = numeroter(nouveaux, profil, h, { debut: lu.messages.length + 1, aujourdhui: jour });
 const avec = new Map([...lignes, ...ajout.lignes.map((l) => [l.slice(0, l.indexOf(" ")), l] as [string, string])]);

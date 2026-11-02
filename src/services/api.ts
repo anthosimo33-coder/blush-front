@@ -56,7 +56,7 @@ import type {
 import { ErreurApi } from "@/types/erreurs-api";
 import { CASE_RENONCIATION } from "@/contenu/consentements";
 import { codeDe, messageErreur, problemeAjout } from "@/lib/messages-erreur";
-import { jourDeParis } from "@/lib/jours";
+import { fuseauDuNavigateur, jourDeParis } from "@/lib/jours";
 import { ENVOI_IMAGES_MAX, ENVOIS_REPRIS_MAX, extensionAudio, LECTEURS_DE_LOTS } from "@/lib/limites";
 import { ENTETE_CAPTCHA } from "@/lib/captcha";
 import { cleDuSiteCaptcha } from "@/lib/publique";
@@ -169,8 +169,11 @@ function retenirLesPrenoms(corps: unknown): void {
  * par `suivi` (sans `suivi.vocal`, on cesse de lire : le serveur finit seul). Une erreur avant que BLUSH écrive :
  * ErreurApi, comme les autres appels. Le réseau qui coupe, ou une erreur après des bulles : CoupureChat.
  */
-async function chat(corps: Routes["POST /api/chat"]["corps"], suivi: SuiviChat = {}): Promise<BlushAnswer> {
+async function chat(envoi: Routes["POST /api/chat"]["corps"], suivi: SuiviChat = {}): Promise<BlushAnswer> {
   const recues: BulleChat[] = [];
+  /* Le fuseau du téléphone part avec chaque message : « aujourd’hui » pour BLUSH est le sien */
+  const fuseau = fuseauDuNavigateur();
+  const corps = envoi instanceof FormData ? (fuseau && !envoi.has("fuseau") && envoi.append("fuseau", fuseau), envoi) : { ...envoi, ...(fuseau ? { fuseau } : {}) };
   let r: Response;
   try {
     r = await requete("POST /api/chat", { corps }, { accept: "application/x-ndjson" });
@@ -223,8 +226,16 @@ async function chat(corps: Routes["POST /api/chat"]["corps"], suivi: SuiviChat =
   });
 }
 
-/** Des captures (réduites dans le navigateur, sous « captures ») ou un export (compressé, sous « export ») dans le formulaire. */
+/** Le fuseau du téléphone dans le formulaire (« America/Martinique ») : le serveur y date « Aujourd’hui » et « Hier » des captures. */
+function avecFuseau(fd: FormData): FormData {
+  const fuseau = fuseauDuNavigateur();
+  if (fuseau) fd.append("fuseau", fuseau);
+  return fd;
+}
+
+/** Des captures (réduites dans le navigateur, sous « captures ») ou un export (compressé, sous « export ») dans le formulaire, avec le fuseau du téléphone. */
 async function avecFichiers(fd: FormData, files: File[]): Promise<FormData> {
+  avecFuseau(fd);
   const images = files.filter((f) => f.type.startsWith("image/"));
   /* Chargé hors du try : un préparateur que le réseau n’a pas apporté n’est pas un fichier illisible */
   const px = images.length ? null : await pExport();
@@ -376,6 +387,7 @@ export async function uploadScreenshots(
   fd.append("mode", opts.mode);
   fd.append("consentement", opts.consentement);
   fd.append("cle", cleEnvoi());
+  avecFuseau(fd);
   await passe;
   return avecReprise(
     () => appel("POST /api/captures", { corps: fd }),
@@ -483,6 +495,7 @@ export async function uploadRecording(
     fd.append("app", app);
     fd.append("consentement", consentement);
     fd.append("cle", cle);
+    avecFuseau(fd);
     const o = ordre(k);
     if (o) fd.append("ordre", o);
     return (await appel("POST /api/captures/lot", { corps: fd, signal: arret.signal })).lot;
@@ -536,6 +549,7 @@ export async function uploadRecording(
             lots: lus.slice(restants),
             cle,
             consentement,
+            ...(fuseauDuNavigateur() ? { fuseau: fuseauDuNavigateur() } : {}),
             ...(repris.size ? { repris: [...repris].slice(0, ENVOIS_REPRIS_MAX) } : {}),
             ...(ajout ? { mode: "ajout" as const } : {}),
             ...(longue && empreinteVideo ? { partiel: { restants, ecrans: images.length, video: empreinteVideo, sensSur, ...(gardes ? { gardes: true as const } : {}) } } : {}),

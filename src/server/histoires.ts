@@ -85,6 +85,11 @@ export type Meta = {
   suiteVideo?: boolean;
   /** Des captures tirées d’un enregistrement d’écran (POST /api/captures/video) : l’écran dit « vidéo », pas « 87 captures ». */
   video?: true;
+  /**
+   * Le fuseau du téléphone à l’import (fuseauSur, src/lib/jours.ts) : son « aujourd’hui » pour la lecture et le chat, et
+   * l’heure de ses exports Instagram, relus dans ce fuseau-là. Absent d’une conv importée avant le 2 novembre 2026 : Paris.
+   */
+  fuseau?: string;
   /** Rempli sur « Qui es-tu ? » : l’index de l’utilisateur dans `participants`, son pronom, sa devinette, son objectif. */
   moi?: 0 | 1;
   pronom?: Pronom;
@@ -217,7 +222,10 @@ function exportLu(recu: ExportLu & { nom: string; coupe?: boolean }) {
  * Une conv courte reste un brouillon : on peut lui ajouter le début (ajouterUnExport, ajouterDesCaptures), et sa lecture
  * ne part qu’assez longue (tropCourte, POST /api/analyse).
  */
-export async function importer(recu: ExportLu & { nom: string; coupe?: boolean }, consentement: Consentement): Promise<{ id: string; meta: Meta; secret: string }> {
+export async function importer(
+  recu: ExportLu & { nom: string; coupe?: boolean; fuseau?: string },
+  consentement: Consentement,
+): Promise<{ id: string; meta: Meta; secret: string }> {
   const { nom, appli, texte, coupe, format, premier, second, contact } = exportLu(recu);
   const personne = ({ nom }: { nom: string }) => ({ prenom: prenomDe(nom), pronom: "il" as const, nomExport: nom });
   const participant = ({ nom, messages }: { nom: string; messages: number }, pronomLu?: Pronom): Participant => ({
@@ -239,6 +247,7 @@ export async function importer(recu: ExportLu & { nom: string; coupe?: boolean }
     participants: [participant(premier, lus.toi), participant(second, lus.autre)],
     resume: resumeDe(lu.messages, format),
     ...(coupe ? { coupe: true } : {}),
+    ...(recu.fuseau ? { fuseau: recu.fuseau } : {}),
     ...(contact === undefined ? {} : { contact: contact === premier.nom ? 0 : 1 }),
   };
   return creerBrouillon(meta, texte, jeton(), consentement);
@@ -255,6 +264,7 @@ export async function importerCaptures({
   consentement,
   suite,
   video = false,
+  fuseau,
 }: {
   appli: Meta["appli"];
   t: TexteCaptures;
@@ -267,6 +277,8 @@ export async function importerCaptures({
   suite?: AvecLeBrouillon;
   /** Tirées d’un enregistrement d’écran (POST /api/captures/video). */
   video?: boolean;
+  /** Le fuseau du téléphone (fuseauSur) : son « aujourd’hui » pour la lecture. */
+  fuseau?: string;
 }): Promise<{ id: string; meta: Meta; secret: string }> {
   const lu = lectureDesCaptures(t);
   /* Courtes, elles restent un brouillon, comme un export : on peut leur ajouter un morceau (tropCourte) */
@@ -276,6 +288,7 @@ export async function importerCaptures({
     format: "captures",
     ...comptesDesCaptures(t, lu.messages, [MOI, prenomDe(t.autre)], video),
     ...(suite ? { suiteVideo: true } : {}),
+    ...(fuseau ? { fuseau } : {}),
     moi: 0,
   };
   return creerBrouillon(meta, t.texte, secret, consentement, suite);
@@ -624,6 +637,9 @@ export const convDe = (ligne: LigneComplete) => (ligne.conv ? coffre.lire("stori
 /** « Qui es-tu ? » est rempli (en base) : la lecture peut partir sans le parcours du navigateur. */
 export const quiRempli = (meta: Meta): meta is Meta & Required<Pick<Meta, "moi" | "pronom" | "devinette" | "objectif">> =>
   meta.moi != null && !!meta.pronom && !!meta.devinette && !!meta.objectif;
+
+/** Le fuseau d’une conv (Meta.fuseau) : celui du téléphone à son import, Paris à défaut. */
+export const fuseauDe = (meta: Pick<Meta, "fuseau">) => meta.fuseau ?? "Europe/Paris";
 
 /**
  * Toi et l’autre, parmi les participants. La règle des écrans (moiEtAutre, src/lib/participants.ts) : toi connu

@@ -11,7 +11,8 @@ import { lecturePayeeRefusee, tournageDuNavigateur } from "@/server/tournage";
 import { utilisateurDeSession } from "@/server/auth";
 import { lireSession } from "@/server/cookies";
 import { avecEcheance, echeancePour } from "@/server/echeance";
-import { aujourdhuiParis } from "@/server/temps";
+import { aujourdhuiDans, aujourdhuiParis } from "@/server/temps";
+import { fuseauSur } from "@/lib/jours";
 
 /* Un lot de six à douze images (ECRANS_PAR_LOT) : une demi-minute de lecture, une minute et demie au pire */
 export const maxDuration = 180;
@@ -54,6 +55,8 @@ async function traiter(req: Request) {
   const app = appli.success ? appli.data : "autre";
   const envoi = envoiDe(cleEnvoi(fd?.get("cle")));
   const ordre = fd?.get("ordre");
+  /* Aujourd’hui sur son téléphone : le jour de « Aujourd’hui », « Hier » et d’un bloc sans repère */
+  const jour = aujourdhuiDans(fuseauSur(fd?.get("fuseau"))).iso;
   /* Le premier lot de l’envoi dit aux autres quand sa réponse commence, ou qu’il a fini (lu, retrouvé, refusé, en échec) */
   const commence = ordre === "premier" && envoi ? premierLot(envoi) : null;
   try {
@@ -67,7 +70,7 @@ async function traiter(req: Request) {
       /* Dès ici, son entrée se paie : la page fermée ne l’arrête plus (le nouvel essai de la page rechargée le retrouvera) */
       partir();
       if (signal.aborted) throw new ErreurLot("abandon");
-      return lireLot(images, app, "captures_video", { envoi, lot: empreinte, signal, ...(surAvance ? { surAvance } : {}), ...(commence ? { auDebut: commence } : {}) });
+      return lireLot(images, app, "captures_video", { envoi, lot: empreinte, signal, jour, ...(surAvance ? { surAvance } : {}), ...(commence ? { auDebut: commence } : {}) });
     });
     return repondre("POST /api/captures/lot", { lot });
   } finally {

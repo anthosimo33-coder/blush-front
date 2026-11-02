@@ -648,9 +648,10 @@ export type FicheUpdate = {
   added: FicheFact[];
   /**
    * Lu, pas encore rangé : ce qu’on lit sur son profil, et le nombre de nouveaux messages. La mémoire se met à jour après
-   * la réponse ; `added` arrive quand la fiche ne dit plus `updating`.
+   * la réponse ; `added` arrive quand la fiche ne dit plus `updating`. `ignored` : de nouveaux messages trop anciens pour
+   * être lus (un export de plus de 400) ; `older` : un échange qu’il remontre, sans nouveau message.
    */
-  pending?: { profile: string[]; messages: number };
+  pending?: { profile: string[]; messages: number; ignored?: number; older?: number };
   /** Rien n’a pu être lu, et pourquoi : des captures illisibles, un fichier qui n’est pas un export, une autre conv, trop d’ajouts aujourd’hui, le budget de l’IA du jour, un refus de l’IA, un bug. */
   problem?: Extract<CodeErreur, "capture" | "fichier" | "autre_conv" | "trop" | "souffle" | "refus"> | "bug";
 };

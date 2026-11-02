@@ -7,6 +7,7 @@ import "client-only";
 import { gzip, gzipSync, inflateSync, strFromU8, strToU8 } from "fflate";
 import { choisirParties, convsInstagram, debutDeMessage, estFichierUtile, resumeConvInstagram, type Partie } from "@prompts/lib/export";
 import { BLOC_HTML } from "@prompts/lib/instagram";
+import { fuseauDuNavigateur } from "@/lib/jours";
 import { ENVOI_EXPORT_MAX, PARTIES_MAX, TEXTE_CONV_MAX, type Paquet } from "@/lib/limites";
 import { tracer } from "@/lib/tracer";
 
@@ -28,7 +29,8 @@ const champ = (nom: keyof Paquet | keyof Paquet["parties"][number]) => JSON.stri
 /**
  * Le paquet en octets : le JSON d’un Paquet, écrit et encodé morceau par morceau, en rendant la main entre deux (15 Mo
  * de texte d’un coup bloquaient l’écran, et doublaient la mémoire le temps d’une grande chaîne).
- * Un émoji coupé entre deux morceaux s’écrit en deux échappements (\ud83d\ude0a), que JSON.parse recolle.
+ * Un émoji coupé entre deux morceaux s’écrit en deux échappements (\ud83d\ude0a), que JSON.parse recolle. Le fuseau du
+ * téléphone part avec : les heures d’un export Instagram se lisent à son heure, pas à celle de Paris.
  */
 async function enOctets({ nom, parties, coupe }: Paquet): Promise<Uint8Array> {
   const morceaux: Uint8Array[] = [];
@@ -42,7 +44,8 @@ async function enOctets({ nom, parties, coupe }: Paquet): Promise<Uint8Array> {
     }
     ecrire('"}');
   }
-  ecrire(`]${coupe ? `,${champ("coupe")}:true` : ""}}`);
+  const fuseau = fuseauDuNavigateur();
+  ecrire(`]${coupe ? `,${champ("coupe")}:true` : ""}${fuseau ? `,${champ("fuseau")}:${JSON.stringify(fuseau.slice(0, 64))}` : ""}}`);
   const octets = new Uint8Array(morceaux.reduce((n, m) => n + m.length, 0));
   let ou = 0;
   for (const m of morceaux) {
@@ -175,9 +178,11 @@ export async function analyserExport(
   if (choix !== "plusieurs") return { type: "un", paquet: await paquet(fichier.name, await contenus(choix)) };
   const convs = convsInstagram(noms);
   const resumes: ConvInstagram[] = [];
+  /* Le jour du dernier message, à l’heure du téléphone : celle de l’import (enOctets) */
+  const fuseau = fuseauDuNavigateur();
   onAvance?.(0);
   for (const [k, c] of convs.entries()) {
-    const r = resumeConvInstagram(await contenus(c.parties));
+    const r = resumeConvInstagram(await contenus(c.parties), { fuseau });
     if (r && r.messages > 0) resumes.push({ id: String(k), ...r });
     onAvance?.((k + 1) / convs.length);
   }

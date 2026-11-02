@@ -3,6 +3,7 @@ import { and, desc, eq, isNotNull, isNull, or, sql } from "drizzle-orm";
 import type { Echange } from "@prompts/lib/memoire";
 import * as coffre from "./coffre";
 import { db, schema } from "./db";
+import type { Transaction } from "./histoires";
 import { memoireEnLot } from "./env";
 import { echangesDepuisLeLot, rapatrier } from "./memoire-en-lot";
 
@@ -59,62 +60,80 @@ const auCalme = () => and(eq(schema.tasks.status, "attente"), isNotNull(schema.t
  * fil : une mise à jour qui ne partait que pour le lot (ni `maintenant`, ni ses ECHANGES_PAR_MAJ échanges à elle) reprend
  * son calme, au lieu de partir en direct pour un ou deux échanges.
  */
-export async function retenir(storyId: string, echange: Echange, { neuf, maintenant }: { neuf: boolean; maintenant: boolean }): Promise<{ id: string | null; part: boolean }> {
+export async function retenir(
+  storyId: string,
+  echange: Echange,
+  { neuf, maintenant, ensuite }: { neuf: boolean; maintenant: boolean; ensuite?: AvecLaConv },
+): Promise<{ id: string | null; part: boolean }> {
   const depuisLeLot = await echangesDepuisLeLot(storyId);
-  const r = await garder(storyId, echange, { neuf, maintenant, depuisLeLot });
+  const r = await garder(storyId, echange, { neuf, maintenant, depuisLeLot, ensuite });
   if (!r.part || !depuisLeLot) return { id: r.id, part: r.part };
   if ((await rapatrier(storyId)) !== "appliquee" || r.urgente) return { id: r.id, part: true };
   if (r.id) await reprendreSonCalme(r.id);
   return { id: r.id, part: false };
 }
 
+/** Ce qui s’écrit avec l’échange, sous le même verrou de la conv : ce qu’un ajout fait lire (noterLAjout, src/server/ajouts.ts). */
+type AvecLaConv = (tx: Transaction) => Promise<void>;
+
 /**
  * L’échange gardé (retenir), sous le verrou de la conv : `depuisLeLot`, les échanges du fil depuis un lot en vol (0 sans
- * lot). `urgente` : elle part pour elle-même, lot ou non.
+ * lot). `urgente` : elle part pour elle-même, lot ou non. `ensuite` s’écrit dans la même transaction, retenu ou non.
  */
-function garder(storyId: string, echange: Echange, { neuf, maintenant, depuisLeLot }: { neuf: boolean; maintenant: boolean; depuisLeLot: number }) {
+function garder(storyId: string, echange: Echange, { neuf, maintenant, depuisLeLot, ensuite }: { neuf: boolean; maintenant: boolean; depuisLeLot: number; ensuite?: AvecLaConv }) {
   return db().transaction(async (tx): Promise<{ id: string | null; part: boolean; urgente: boolean }> => {
     await tx.select({ id: schema.stories.id }).from(schema.stories).where(eq(schema.stories.id, storyId)).for("update");
-    const [attend] = await tx
-      .select({
-        id: schema.tasks.id,
-        input: schema.tasks.input,
-        /* Déjà partie (sans heure : elle attend seulement que la chaîne la prenne), ou son heure passée */
-        partie: sql<boolean>`${schema.tasks.pasAvant} is null`,
-        due: sql<boolean>`${schema.tasks.pasAvant} <= now()`,
-      })
-      .from(schema.tasks)
-      .where(and(eq(schema.tasks.storyId, storyId), eq(schema.tasks.kind, "memoire_maj"), eq(schema.tasks.status, "attente"), eq(schema.tasks.attempts, 0)))
-      .orderBy(desc(schema.tasks.createdAt))
-      .limit(1)
-      .for("update");
-    /* Rien à retenir ; mais avec un lot en vol, l’échange compte (son ECHANGES_PAR_MAJ-ième le rapatrie) */
-    if (!attend && !neuf) return { id: null, part: depuisLeLot >= ECHANGES_PAR_MAJ, urgente: false };
-    const echanges = [...(attend?.input ? coffre.lire("tasks.input", attend.input) : []), echange];
-    /* Une mise à jour déjà partie le reste ; une heure passée la fait partir, sauf si le passage des 5 minutes l’envoie en lot */
-    const enLot = memoireEnLot();
-    const due = !!attend && (attend.partie || (attend.due && !enLot));
-    const urgente = partTout(echanges.length, { maintenant, due });
-    const part = urgente || depuisLeLot >= ECHANGES_PAR_MAJ;
-    /* En lot, une heure passée reste passée : le passage suivant l’envoie, cet échange avec */
-    const garderSonHeure = !part && !!attend?.due && enLot;
-    const valeurs = {
-      input: coffre.ecrire("tasks.input", echanges),
-      ...(part ? { pasAvant: null } : garderSonHeure ? {} : { pasAvant: sql`now() + make_interval(secs => ${CALME_S})` }),
-    };
-    if (attend) {
-      await tx
-        .update(schema.tasks)
-        .set({ ...valeurs, updatedAt: new Date() })
-        .where(eq(schema.tasks.id, attend.id));
-      return { id: attend.id, part, urgente };
-    }
-    const [t] = await tx
-      .insert(schema.tasks)
-      .values({ storyId, kind: "memoire_maj", ...valeurs })
-      .returning({ id: schema.tasks.id });
-    return { id: t?.id ?? null, part, urgente };
+    const r = await garderSousLeVerrou(tx, storyId, echange, { neuf, maintenant, depuisLeLot });
+    await ensuite?.(tx);
+    return r;
   });
+}
+
+async function garderSousLeVerrou(
+  tx: Transaction,
+  storyId: string,
+  echange: Echange,
+  { neuf, maintenant, depuisLeLot }: { neuf: boolean; maintenant: boolean; depuisLeLot: number },
+): Promise<{ id: string | null; part: boolean; urgente: boolean }> {
+  const [attend] = await tx
+    .select({
+      id: schema.tasks.id,
+      input: schema.tasks.input,
+      /* Déjà partie (sans heure : elle attend seulement que la chaîne la prenne), ou son heure passée */
+      partie: sql<boolean>`${schema.tasks.pasAvant} is null`,
+      due: sql<boolean>`${schema.tasks.pasAvant} <= now()`,
+    })
+    .from(schema.tasks)
+    .where(and(eq(schema.tasks.storyId, storyId), eq(schema.tasks.kind, "memoire_maj"), eq(schema.tasks.status, "attente"), eq(schema.tasks.attempts, 0)))
+    .orderBy(desc(schema.tasks.createdAt))
+    .limit(1)
+    .for("update");
+  /* Rien à retenir ; mais avec un lot en vol, l’échange compte (son ECHANGES_PAR_MAJ-ième le rapatrie) */
+  if (!attend && !neuf) return { id: null, part: depuisLeLot >= ECHANGES_PAR_MAJ, urgente: false };
+  const echanges = [...(attend?.input ? coffre.lire("tasks.input", attend.input) : []), echange];
+  /* Une mise à jour déjà partie le reste ; une heure passée la fait partir, sauf si le passage des 5 minutes l’envoie en lot */
+  const enLot = memoireEnLot();
+  const due = !!attend && (attend.partie || (attend.due && !enLot));
+  const urgente = partTout(echanges.length, { maintenant, due });
+  const part = urgente || depuisLeLot >= ECHANGES_PAR_MAJ;
+  /* En lot, une heure passée reste passée : le passage suivant l’envoie, cet échange avec */
+  const garderSonHeure = !part && !!attend?.due && enLot;
+  const valeurs = {
+    input: coffre.ecrire("tasks.input", echanges),
+    ...(part ? { pasAvant: null } : garderSonHeure ? {} : { pasAvant: sql`now() + make_interval(secs => ${CALME_S})` }),
+  };
+  if (attend) {
+    await tx
+      .update(schema.tasks)
+      .set({ ...valeurs, updatedAt: new Date() })
+      .where(eq(schema.tasks.id, attend.id));
+    return { id: attend.id, part, urgente };
+  }
+  const [t] = await tx
+    .insert(schema.tasks)
+    .values({ storyId, kind: "memoire_maj", ...valeurs })
+    .returning({ id: schema.tasks.id });
+  return { id: t?.id ?? null, part, urgente };
 }
 
 /** La mise à jour, partie pour le lot seul (retenir), attend de nouveau que le chat se calme : si personne ne l’a prise. */

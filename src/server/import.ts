@@ -3,6 +3,7 @@ import { gunzipSync } from "node:zlib";
 import { strFromU8, unzipSync } from "fflate";
 import { z } from "zod";
 import { choisirParties, debutDeMessage, estFichierUtile, lireExport, type ExportLu } from "@prompts/lib/export";
+import { fuseauSur } from "@/lib/jours";
 import { CORPS_VERCEL_MAX, PARTIES_MAX, TEXTE_CONV_MAX, type Paquet } from "@/lib/limites";
 import type { CodeErreur } from "@/types/erreurs-api";
 import { ErreurPublique } from "./erreurs";
@@ -126,21 +127,27 @@ const SchemaPaquet: z.ZodType<Paquet> = z.object({
     .min(1)
     .max(PARTIES_MAX),
   coupe: z.boolean().optional(),
+  /* Le fuseau du téléphone (« America/Martinique ») : les heures d’Instagram se lisent à son heure (fuseauSur, Paris à défaut) */
+  fuseau: z.string().max(64).optional(),
 });
 
 /**
  * Le paquet préparé par le navigateur (src/services/preparer-export.ts) : du JSON compressé, relu et vérifié ici.
  * `coupe` : la conv était trop longue pour partir en entier, le navigateur (ou borner, ici) n’a gardé que sa partie la plus récente.
+ * `fuseau` : celui dans lequel lire les heures d’Instagram, imposé par l’appelant (un export ajouté à une conv : le
+ * sien, Meta.fuseau) ; sinon celui du téléphone, que le paquet apporte et que la conv gardera.
  */
-export async function depuisPaquet(paquet: File): Promise<ExportLu & { nom: string; coupe?: boolean }> {
+export async function depuisPaquet(paquet: File, { fuseau }: { fuseau?: string } = {}): Promise<ExportLu & { nom: string; coupe?: boolean; fuseau?: string }> {
   if (paquet.size > CORPS_VERCEL_MAX || paquet.size === 0) throw new ErreurImport("fichier");
   try {
     /* La décompression s’arrête d’elle-même à TEXTE_CONV_MAX, la limite que le navigateur respecte : un paquet piégé ne remplit pas la mémoire du serveur */
     const octets = gunzipSync(Buffer.from(await paquet.arrayBuffer()), { maxOutputLength: TEXTE_CONV_MAX });
     const p = SchemaPaquet.parse(JSON.parse(octets.toString("utf8")));
-    const lu = lireExport(p.parties);
+    /* Le fuseau de la lecture : celui que l’appelant impose (une conv déjà lue : le sien), sinon celui du téléphone */
+    const zone = fuseau ?? fuseauSur(p.fuseau);
+    const lu = lireExport(p.parties, { fuseau: zone });
     if (!lu) throw new ErreurImport("fichier");
-    return borner({ ...lu, nom: p.nom, ...(p.coupe ? { coupe: true } : {}) });
+    return borner({ ...lu, nom: p.nom, ...(p.coupe ? { coupe: true } : {}), ...(p.fuseau || fuseau ? { fuseau: zone } : {}) });
   } catch {
     throw new ErreurImport("fichier");
   }

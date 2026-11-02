@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, ViewTransition } from "react";
 import { cn } from "@/lib/cn";
-import { NBSP } from "@/lib/format";
+import { formatCount, NBSP } from "@/lib/format";
 import { useFilePicker } from "@/lib/hooks";
 import { ACCEPT_EXPORT, ACCEPT_IMAGES, estExport, estImage } from "@/lib/limites";
 import { pagePrecedente, revenirVers } from "@/lib/navigation";
@@ -491,7 +491,9 @@ function Reading({ what, thumbs, file }: { what: string; thumbs: string[]; file:
  */
 function Adding({ what, pending }: { what: string; pending: NonNullable<FicheUpdate["pending"]> }) {
   const n = pending.messages;
-  const rows = [...pending.profile, ...(n > 0 ? [`${n} nouveau${n > 1 ? "x" : ""} message${n > 1 ? "s" : ""}`] : [])];
+  /* Un export de plus de 400 nouveaux messages : BLUSH n’en lit que les plus récents, et le dit */
+  const lus = pending.ignored ? ` (les plus récents sur ${formatCount(n + pending.ignored)})` : "";
+  const rows = [...pending.profile, ...(pending.older ? ["un échange plus ancien"] : []), ...(n > 0 ? [`${n} nouveau${n > 1 ? "x" : ""} message${n > 1 ? "s" : ""}${lus}`] : [])];
   return (
     <section role="status" aria-labelledby="ajout-titre" className="overflow-hidden rounded-[22px] bg-white shadow-card">
       <div className="flex items-center gap-3.5 py-3.5 pl-3 pr-4">
