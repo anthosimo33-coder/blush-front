@@ -143,7 +143,7 @@ export const POST = route("POST /api/captures/video", async (req: Request) => {
         const f = fusionnerLots(lots, app);
         const t = enTexte(f);
         const place = await dansLeBudget(t);
-        const { id, meta } = await ajouterDesCaptures(brouillon, { appli: app, t, cle: c }).catch(async (e: unknown) => {
+        const { id, meta } = await ajouterDesCaptures(brouillon, { appli: app, t, cle: c, video: true }).catch(async (e: unknown) => {
           await place.rendre();
           throw e;
         });
@@ -195,12 +195,17 @@ export const POST = route("POST /api/captures/video", async (req: Request) => {
     const place = await dansLeBudget(t);
     /* Rien n’entre en base (ni la suite : SuiteIncomplete) : sa place revient à tous, l’adresse garde son compte */
     const avec = aGarder;
-    const { id, meta } = await importerCaptures({ appli: app, t, secret, consentement, ...(avec ? { suite: (tx, storyId) => rattacherLaSuite(tx, storyId, avec) } : {}) }).catch(
-      async (err: unknown) => {
-        await place.rendre();
-        throw err;
-      },
-    );
+    const { id, meta } = await importerCaptures({
+      appli: app,
+      t,
+      secret,
+      consentement,
+      video: true,
+      ...(avec ? { suite: (tx, storyId) => rattacherLaSuite(tx, storyId, avec) } : {}),
+    }).catch(async (err: unknown) => {
+      await place.rendre();
+      throw err;
+    });
     /* Une fois par histoire créée : un nouvel essai qui la retrouve ne compte pas l’import deux fois (ni sa mesure) */
     await noterImport({ storyId: id, type: "video", appli: app, ...mesure(f), bras, lotsGardes: avec?.lots ?? 0, contrefactuel: contrefactuel() });
     await compterImportVenuDuPartage();

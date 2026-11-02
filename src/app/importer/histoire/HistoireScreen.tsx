@@ -79,13 +79,14 @@ export function HistoireScreen({ story, ajout }: { story: Story; ajout: boolean 
               title={
                 <span className="flex items-center gap-2">
                   {APP_NAME[s.app]}
-                  <span className="rounded-full bg-plaque px-2 py-0.5 text-[11px] font-black text-grey">{s.mode === "export" ? "export" : "captures"}</span>
+                  <span className="rounded-full bg-plaque px-2 py-0.5 text-[11px] font-black text-grey">{s.mode === "export" ? "export" : s.video ? "vidéo" : "captures"}</span>
                 </span>
               }
               /* data-prive : son prénom et la période, masqués dans l’enregistrement des visites */
               sub={
                 <span data-prive="">
-                  {s.mode === "captures" ? `${s.screenshotCount} capture${(s.screenshotCount ?? 0) > 1 ? "s" : ""} · ` : autre ? `Avec ${autre.name} · ` : ""}
+                  {/* Une vidéo : le nombre d’écrans tirés ne dit rien à qui l’a filmée */}
+                  {s.mode === "captures" ? (s.video ? "" : `${s.screenshotCount} capture${(s.screenshotCount ?? 0) > 1 ? "s" : ""} · `) : autre ? `Avec ${autre.name} · ` : ""}
                   {s.period}
                 </span>
               }

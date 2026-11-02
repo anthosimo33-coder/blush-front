@@ -84,8 +84,8 @@ export function trouvailles(c: Chiffres, h: Pick<Histoire, "autre">, messages: M
   const delai = deux && net ? `${Elle} te répond en ${duree(deux.da)}, toi en ${duree(deux.dt)}` : null;
   const rythme = deux && !net ? `Vous vous répondez en ${duree(Math.max(deux.dt, deux.da))}` : null;
 
-  /* La longueur des messages : nettement plus longs d’un côté */
-  const { toi: lt, autre: la } = c.motsMoyens;
+  /* La longueur des messages : nettement plus longs d’un côté, sur les moyennes exactes (4,4 contre 7,5 : non) */
+  const { toi: lt, autre: la } = c.motsExacts ?? c.motsMoyens;
   const longueur =
     typeof lt === "number" && typeof la === "number" && lt > 0 && la > 0 && Math.max(lt, la) / Math.min(lt, la) >= 1.8
       ? la > lt

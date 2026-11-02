@@ -16,7 +16,8 @@ import { NBSP } from "@/lib/format";
 import type { ConvInstagram } from "@/services/preparer-export";
 
 const MOIS = ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."];
-const quand = (iso: string) => `${+iso.slice(8, 10)}\u00a0${MOIS[+iso.slice(5, 7) - 1]}`;
+/** Le jour du dernier message, avec l’année quand ce n’est pas l’année en cours (« 3 mars 2021 ») : on choisit la bonne conv. */
+const quand = (iso: string) => `${+iso.slice(8, 10)}\u00a0${MOIS[+iso.slice(5, 7) - 1]}${iso.slice(0, 4) === String(new Date().getFullYear()) ? "" : `\u00a0${iso.slice(0, 4)}`}`;
 const sansAccents = (s: string) =>
   s
     .normalize("NFD")
@@ -68,7 +69,11 @@ export function ChoixConv({ open, convs, onChoisir, onClose }: { open: boolean; 
                 </Avatar>
               }
               title={<span className={cn(c.groupe && "text-grey")}>{c.nom}</span>}
-              sub={c.groupe ? "Groupe · BLUSH lit les convs à deux" : `${c.messages.toLocaleString("fr-FR")}\u00a0messages${c.derniere ? ` · jusqu’au ${quand(c.derniere)}` : ""}`}
+              sub={
+                c.groupe
+                  ? "Groupe · BLUSH lit les convs à deux"
+                  : `${c.messages.toLocaleString("fr-FR")}\u00a0${c.messages > 1 ? "messages" : "message"}${c.derniere ? ` · jusqu’au ${quand(c.derniere)}` : ""}`
+              }
               chevron={!c.groupe}
               onClick={c.groupe ? undefined : () => onChoisir(c.id)}
             />

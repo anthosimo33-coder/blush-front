@@ -302,7 +302,7 @@ export async function repondre(
     ...(ajout ? { ajout: blocAjout(ajout.ajout) } : {}),
     vocal: vocalAttendu,
   });
-  const messages = messagesAffiches(lignes, nomsDeToi(meta));
+  const messages = messagesAffiches(lignes, nomsDeToi(meta), { fin: meta.resume.fin });
 
   /*
    * Une preuve introuvable : on rejoue (appelVerifie), sauf après une bulle montrée, qu’un nouvel essai réécrirait autrement

@@ -243,9 +243,10 @@ export async function ficheDe(story: Ligne): Promise<Fiche> {
   const meta = metaDe(story);
   const { moi, autre } = personnesDe(meta);
   const person = { id: "p-autre", name: autre.prenom, initial: initialeDe(autre.prenom), pronoun: pronomDeLAutre(meta, { moi, autre }) };
-  const m = await memoireDe(story.id);
+  const [m, [maj]] = await Promise.all([memoireDe(story.id), db().select({ at: schema.memories.updatedAt }).from(schema.memories).where(eq(schema.memories.storyId, story.id))]);
   if (!m || (m.secours && !m.etat.fiche.faits.length)) return { person, portrait: "", updatedLabel: "pas encore remplie", facts: [], summary: "", summaryShort: "" };
-  return ficheAffichee(person, m.etat, new Map(m.lignes));
+  /* Le jour de sa dernière mise à jour, celui de la mémoire */
+  return ficheAffichee(person, m.etat, new Map(m.lignes), maj ? jourRelatif(maj.at) : undefined, meta.resume.fin);
 }
 
 /** Les 4 idées de questions de la mémoire. */

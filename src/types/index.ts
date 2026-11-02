@@ -288,10 +288,14 @@ export type Source = {
   period: string;
   messageCount: number;
   voiceCount?: number;
+  /** Ses médias que l’export ne nomme pas (« <Médias omis> » d’Android) : l’écran les montre à la place de « 0 vocal » (vocauxOuMedias). */
+  mediaCount?: number;
   /** Un export trop long pour partir en entier : BLUSH n’en lit que les derniers mois (combien). */
   moisLus?: number;
   /** Une longue vidéo lue en partie avant l’achat : BLUSH en a lu la partie la plus récente, le début se lira avec le rapport. */
   suiteVideo?: boolean;
+  /** Des captures tirées d’un enregistrement d’écran : l’écran dit « vidéo », pas le nombre d’écrans tirés. */
+  video?: boolean;
 };
 
 /** Une conv du compte, telle que la liste « Tes convs » la montre : qui, où vous en êtes, quand BLUSH en a parlé pour la dernière fois. */
@@ -314,10 +318,13 @@ export type Story = {
   sources: Source[];
   totalMessages: number;
   voiceCount: number;
-  /** « 14 déc. → 12 mars » */
+  /** Ses médias que l’export ne nomme pas (Source.mediaCount). */
+  mediaCount?: number;
+  /** « 14 déc. → 12 mars », « 3 févr. 2024 → 12 oct. 2025 » */
   period: string;
   durationLabel: string;
-  updatedLabel: string;
+  /** Le jour où BLUSH l’a lue (« aujourd’hui », « lun. », « 12 mars ») : posé par la page du rapport (getLuLe). */
+  updatedLabel?: string;
   /** Qui est l’utilisateur (une fois « Qui es-tu ? » rempli). Sans, l’écran se fie au parcours de l’onglet. */
   me?: Person["id"];
   /**

@@ -1,3 +1,4 @@
+import { REPERE_MEDIA } from "@prompts/lib/conv";
 import { HEURE_INCONNUE, lireLigne } from "@prompts/lib/ligne";
 import { nomAffiche } from "@prompts/lib/noms";
 import type { Message } from "@/types";
@@ -13,22 +14,33 @@ import type { Message } from "@/types";
  */
 
 /**
- * Les messages affichables, par identifiant. Un média seul (« [photo] ») n’a rien à montrer : il est écarté. `toi` : le
- * nom (ou les noms, nomsDeToi) sous lequel tes messages s’écrivent dans les lignes.
+ * Les messages affichables, par identifiant. Un média seul (« [photo] »), ou ce que WhatsApp a écrit à sa place (un
+ * appel, une position : « [Appel vocal 7 s] »), n’a rien à montrer : il est écarté. `toi` : le nom (ou les noms,
+ * nomsDeToi) sous lequel tes messages s’écrivent dans les lignes. Sous la bulle : le jour, avec l’année quand ce n’est
+ * pas celle du dernier message de la conv (deux messages à un an d’écart ne portent pas la même date), et l’heure,
+ * « vers 21:00 » quand elle vient d’un repère de captures.
  */
-export function messagesAffiches(lignes: Map<string, string>, toi: string | readonly string[]): Map<string, Message> {
+export function messagesAffiches(lignes: Map<string, string>, toi: string | readonly string[], { fin = "" }: { fin?: string } = {}): Map<string, Message> {
   const noms = new Set(typeof toi === "string" ? [toi] : toi);
+  const lues = [...lignes].map(([id, ligne]) => [id, lireLigne(ligne)] as const);
+  /*
+   * Le jour du dernier message de la conv (`fin`, resume.fin : les lignes données ne sont parfois que celles citées), ou
+   * d’une ligne plus récente (un message ajouté depuis le chat). Une ligne de son profil est datée du jour de l’ajout :
+   * elle n’en est pas un
+   */
+  const derniere = lues.reduce((a, [, l]) => (l && !l.profil && l.jour > a ? l.jour : a), fin).slice(0, 4);
   const out = new Map<string, Message>();
-  for (const [id, ligne] of lignes) {
-    const l = lireLigne(ligne);
+  for (const [id, l] of lues) {
     /* Son profil (« profil de Sophie ») n’est pas un message : il ne s’affiche pas en bulle */
     if (!l || /^\[[^\]]+\]$/.test(l.texte.trim()) || l.profil) continue;
     const deToi = noms.has(l.nom);
-    const h = l.heure === HEURE_INCONNUE ? "" : ` ${l.heure.replace("~", "")}`;
+    const h = l.heure === HEURE_INCONNUE ? "" : l.heure.startsWith("~") ? ` vers ${l.heure.slice(1)}` : ` ${l.heure}`;
+    const annee = l.jour.slice(0, 4) === derniere ? "" : `/${l.jour.slice(0, 4)}`;
     out.set(id, {
       from: deToi ? "toi" : "elle",
-      text: l.texte.replace(/ ⏎ /g, " "),
-      caption: `${deToi ? "Toi" : nomAffiche(l.nom)} · ${l.jour.slice(8, 10)}/${l.jour.slice(5, 7)}${h}`,
+      /* La légende d’un média : son texte, puis ce qu’il accompagne (« on y va ? · photo ») */
+      text: l.texte.replace(/ ⏎ /g, " ").replace(REPERE_MEDIA, " · $1"),
+      caption: `${deToi ? "Toi" : nomAffiche(l.nom)} · ${l.jour.slice(8, 10)}/${l.jour.slice(5, 7)}${annee}${h}`,
     });
   }
   return out;

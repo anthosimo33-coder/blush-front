@@ -5,7 +5,7 @@ import { cn } from "@/lib/cn";
 import { delai } from "@/lib/motion";
 import { useSonForce } from "@/lib/audio";
 import { play, useSoundsEnabled } from "@/lib/sound";
-import { formatCount } from "@/lib/format";
+import { formatCount, vocauxOuMedias } from "@/lib/format";
 import { nombreDApplis } from "@/lib/morceaux";
 import { FRAIS_DU_RENDU } from "@/lib/query";
 import { useRapport } from "@/lib/requetes";
@@ -493,9 +493,9 @@ export function VerdictReveal({ initial, story, rendu }: { initial: ReportPayloa
 function Numbers({ story, heading, step }: { story: Story; heading: RefObject<HTMLHeadingElement | null>; step: ReactNode }) {
   const shown = useCountUp(story.totalMessages, 1300, 350);
   const apps = nombreDApplis(story);
-  const facts = [story.durationLabel, `${apps} appli${apps > 1 ? "s" : ""}`, story.voiceCount ? `${story.voiceCount} voca${story.voiceCount > 1 ? "ux" : "l"}` : null].filter(
-    Boolean,
-  ) as string[];
+  /* Ses vocaux, ou ses médias quand l’export ne les distingue pas ; rien quand il n’y en a aucun */
+  const vocaux = vocauxOuMedias(story);
+  const facts = [story.durationLabel, `${apps} appli${apps > 1 ? "s" : ""}`, vocaux.nombre ? `${formatCount(vocaux.nombre)} ${vocaux.nom}` : null].filter(Boolean) as string[];
   return (
     <div className="flex flex-col items-center text-center">
       <p data-rise="" className="m-0 text-detail font-black text-white/70">

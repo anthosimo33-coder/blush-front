@@ -64,7 +64,8 @@ export async function enregistrerVocal(story: Ligne, script: Vocal, lignes: Map<
   const dites = scriptQuiTient(script.lignes, COUPE_VOIX.rapport);
   const { texte } = texteDit(dites);
   const { audio, alignement } = await dire(texte, voix, { sobre, storyId: story.id, pour: "rapport" });
-  const messages = messagesAffiches(lignes, nomsDeToi(metaDe(story)));
+  const meta = metaDe(story);
+  const messages = messagesAffiches(lignes, nomsDeToi(meta), { fin: meta.resume.fin });
   const minutees: VocalLigne[] = minuter(dites, alignement).map((l, k) => {
     const preuve = dites[k]?.preuve;
     const recu = preuve ? messages.get(preuve) : undefined;

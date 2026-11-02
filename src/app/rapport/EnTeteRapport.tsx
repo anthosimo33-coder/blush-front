@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { formatCount } from "@/lib/format";
+import { accorde, formatCount, vocauxOuMedias } from "@/lib/format";
 import { nombreDApplis } from "@/lib/morceaux";
 import { titreDuo } from "@/lib/participants";
 import { AvatarPair } from "@/components/ui/Avatar";
@@ -20,10 +20,20 @@ function chiffresDuRapport(story: Story, report: Report, entier: boolean): Chiff
   const messages = formatCount(story.totalMessages);
   const n = nombreDApplis(story);
   const applis = n === 1 ? "appli" : "applis";
-  const vocaux = story.voiceCount === 1 ? "vocal" : "vocaux";
+  /* Ses vocaux, ou ses médias quand l’export ne les distingue pas (Android « sans médias ») */
+  const vocaux = vocauxOuMedias(story);
+  const nomMessages = accorde(story.totalMessages, "message");
   const lecture = entier ? report.readingTime.full : report.readingTime.free;
   return [
-    { valeur: messages, nom: "messages", pastille: <>{messages} messages</> },
+    {
+      valeur: messages,
+      nom: nomMessages,
+      pastille: (
+        <>
+          {messages} {nomMessages}
+        </>
+      ),
+    },
     {
       valeur: String(n),
       nom: applis,
@@ -34,11 +44,11 @@ function chiffresDuRapport(story: Story, report: Report, entier: boolean): Chiff
       ),
     },
     {
-      valeur: String(story.voiceCount),
-      nom: vocaux,
+      valeur: formatCount(vocaux.nombre),
+      nom: vocaux.nom,
       pastille: (
         <>
-          {story.voiceCount} {vocaux}
+          {formatCount(vocaux.nombre)} {vocaux.nom}
         </>
       ),
     },
@@ -69,7 +79,8 @@ export function EnTeteRapport({ story, report, entier, moi, autre }: { story: St
         <h1 className="m-0 text-titre-2 font-black leading-[1.05] tracking-[-0.02em] [text-wrap:balance]">{titreDuo(story)}</h1>
       </div>
       <div className="text-legende font-bold leading-[1.45] text-grey">
-        {story.period} · {story.updatedLabel}
+        {story.period}
+        {story.updatedLabel && ` · ${story.updatedLabel}`}
       </div>
       {/* Mobile : les chiffres rangés en grille ; desktop : les pastilles de la maquette */}
       <dl className="m-0 mt-1 grid grid-cols-4 gap-2 border-t-2 border-sep pt-3.5 lg:hidden">

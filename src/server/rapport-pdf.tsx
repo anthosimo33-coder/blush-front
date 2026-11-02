@@ -5,7 +5,7 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { ReactNode } from "react";
 import { LIGNES_D_ECOUTE } from "@/contenu/aide";
-import { formatCount, NBSP } from "@/lib/format";
+import { formatCount, NBSP, vocauxOuMedias } from "@/lib/format";
 import { nombreDApplis } from "@/lib/morceaux";
 import { moiEtAutre, titreDuo } from "@/lib/participants";
 import { IlOuElle } from "@/lib/pronom";
@@ -574,10 +574,12 @@ function PageDeGarde({ payload, story, moi, le, site, bulle, emoji }: RapportEnP
   const { report, debloque } = payload;
   const { moi: toi, autre } = moiEtAutre(story, moi);
   const [l, h] = [595.28 - 2 * FEUILLE.marge, 841.89 - 2 * FEUILLE.marge];
+  /* Ses vocaux, ou ses médias quand l’export ne les distingue pas */
+  const vocaux = vocauxOuMedias(story);
   const chiffres = [
-    { valeur: formatCount(story.totalMessages), nom: "messages" },
+    { valeur: formatCount(story.totalMessages), nom: story.totalMessages > 1 ? "messages" : "message" },
     { valeur: String(nombreDApplis(story)), nom: nombreDApplis(story) === 1 ? "appli" : "applis" },
-    { valeur: String(story.voiceCount), nom: story.voiceCount === 1 ? "vocal" : "vocaux" },
+    { valeur: formatCount(vocaux.nombre), nom: vocaux.nom },
     { valeur: debloque ? report.readingTime.full : report.readingTime.free, nom: "de lecture" },
   ];
   return (

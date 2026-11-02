@@ -49,7 +49,8 @@ export function signaux(c: Chiffres): SignalDuPaywall[] {
     const net = Math.abs(dt - da) >= S.delaiEcart && Math.max(dt, da) / Math.max(1, Math.min(dt, da)) >= S.delaiFois;
     liste.push({ id: "delai", cote: !net ? "pareil" : dt < da ? "toi" : "elle", toi: dt, elle: da });
   }
-  const { toi: lt, autre: la } = c.motsMoyens;
+  /* Sur les moyennes exactes : 4,4 et 7,5 mots ne font pas « 2 fois plus long » */
+  const { toi: lt, autre: la } = c.motsExacts ?? c.motsMoyens;
   if (typeof lt === "number" && typeof la === "number" && lt > 0 && la > 0) {
     const net = Math.max(lt, la) / Math.min(lt, la) >= S.longueurFois;
     liste.push({ id: "longueur", cote: !net ? "pareil" : lt > la ? "toi" : "elle", toi: lt, elle: la });
@@ -74,8 +75,22 @@ const SEUILS_SANS_HEURES = {
   questionsFois: 2,
 } as const;
 
-/** Un message qui pose une question : un texte (pas un média) avec un point d’interrogation. */
-const questionne = (m: Message) => !m.media && m.texte.includes("?");
+/**
+ * Un message qui pose une question : un texte qu’il a écrit (pas un média, ni un appel ou une position écrits par
+ * WhatsApp) avec un point d’interrogation, hors de ses liens (« …/reel/C9x/?igsh=… » ne demande rien ; « t’as vu
+ * https://vm.tiktok.com/ZMh/? » si : le « ? » qui finit le lien est rendu).
+ */
+const questionne = (m: Message) => !m.media && !m.deWhatsApp && m.texte.replace(/(?:https?:\/\/|www\.)\S*/giu, finDuLien).includes("?");
+/*
+ * Un lien remplacé par la ponctuation qui le finit (« …/ZMh/? », « ?! », « ?😭 ») : pris d’un coup, puis lu à rebours
+ * jusqu’au dernier caractère d’adresse (une expression qui la chercherait lien par lien serait quadratique)
+ */
+const CARACTERE_D_ADRESSE = /[\p{L}\p{N}/=&%#_~+-]/u;
+function finDuLien(lien: string): string {
+  let k = lien.length;
+  while (k > 0 && !CARACTERE_D_ADRESSE.test(lien[k - 1]!)) k--;
+  return ` ${lien.slice(k)}`;
+}
 
 /**
  * Ce qui se compte sans l’heure des messages, sur toute la conv : qui écrit le plus (des messages), qui pose les
