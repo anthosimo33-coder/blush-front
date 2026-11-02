@@ -292,6 +292,31 @@ function titreSansHeures(s: SignalDuPaywall, a: Autre): string {
   }
 }
 
+/**
+ * Ce qui mène le titre « volume » : ses déséquilibres nets sans heures (dans l’ordre de `sansHeures` : des messages, des
+ * questions, la longueur), le premier, qui fait sa première ligne, et le premier d’en face, qui fait la seconde. Sans
+ * aucun déséquilibre net : « Vous vous écrivez autant. »
+ */
+function meneDuVolume(liste: SignalDuPaywall[]): { nets: SignalDuPaywall[]; mene: SignalDuPaywall | undefined; oppose: SignalDuPaywall | undefined } {
+  const nets = liste.filter((s) => s.cote !== "pareil");
+  const mene = nets[0];
+  return { nets, mene, oppose: mene && nets.find((s) => s.cote !== mene.cote) };
+}
+
+/**
+ * La forme du titre « volume » d’une conv (null pour les autres titres) : ce qui change sa phrase, sans ses chiffres. Le
+ * déséquilibre qui le mène et son côté, et celui d’en face s’il y en a un (« messages:toi:longueur » : « Tu lui envoies
+ * 2 fois plus de messages. Lucas, lui, écrit plus long. ») ; « autant » sans aucun. Deux lectures de la même conv qui
+ * donnent deux formes montrent deux titres différents (le contrefactuel de la lecture partielle,
+ * src/server/lecture-partielle.ts) ; « 2 fois » au lieu de « 1,8 fois », ou « toutes les questions » au lieu de
+ * « 3 fois plus », non.
+ */
+export function varianteDuHaut(a: ApercuDuPaywall): string | null {
+  if (genreDuHaut(a) !== "volume") return null;
+  const { mene, oppose } = meneDuVolume(a.sansHeures ?? []);
+  return mene ? [mene.id, mene.cote, ...(oppose ? [oppose.id] : [])].join(":") : "autant";
+}
+
 /** Le haut du paywall d’une conv, d’après ses chiffres : son titre, sa phrase, la bulle de BLUSH, la carte et les cases. */
 export function hautDuPaywall(a: ApercuDuPaywall, autre: Autre, { annee = new Date().getFullYear() }: { annee?: number } = {}): HautDuPaywall {
   const genre = genreDuHaut(a);
@@ -400,8 +425,7 @@ export function hautDuPaywall(a: ApercuDuPaywall, autre: Autre, { annee = new Da
       const questions = liste.find((s) => s.id === "questions");
       const longueur = liste.find((s) => s.id === "longueur");
       const carte = { titre: "Qui écrit le plus", lignes: lignes(liste) };
-      const nets = liste.filter((s) => s.cote !== "pareil");
-      const n1 = nets[0];
+      const { nets, mene: n1, oppose } = meneDuVolume(liste);
       /* Personne n’écrit nettement plus : leurs chiffres, à peu près pareils, et ce qui se joue ailleurs ; le titre nomme l’autre, comme les autres */
       if (!n1) {
         const second = questions && questions.toi + questions.elle > 0 ? questions : longueur;
@@ -416,7 +440,6 @@ export function hautDuPaywall(a: ApercuDuPaywall, autre: Autre, { annee = new Da
         };
       }
       const toi = n1.cote === "toi";
-      const oppose = nets.find((s) => s.cote !== n1.cote);
       /* La seconde case : le déséquilibre d’en face, un autre du même côté, ou le compte des messages (ou des questions) */
       const compteur = n1.id === "messages" ? (questions && questions.toi + questions.elle > 0 ? questions : null) : messages;
       const seconde = oppose ?? nets[1] ?? (compteur && { ...compteur, cote: "pareil" as const });

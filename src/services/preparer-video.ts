@@ -208,14 +208,18 @@ export async function imagesDeLaVideo(fichier: File, onAvance?: (p: number) => v
 }
 
 /**
- * Combien d’écrans par lot, pour `lecteurs` lots lus en même temps : assez pour que tout parte en un seul tour quand
- * c’est possible (chaque lot reprend le dernier écran du précédent : `lecteurs` lots de `t` écrans en couvrent
- * lecteurs × (t − 1) + 1), entre six et douze (ECRANS_PAR_LOT). Un plus grand lot coûte moins (moins d’écrans relus
- * aux jointures, moins de fois le prompt) : à l’essai du 21 octobre (Sonnet 5.5, deux convs de test filmées comme
- * iMessage, scripts/essai-video-modeles.mts), des lots de douze ont lu autant de messages mot pour mot que des lots
- * de six, pour 20 à 25 % de moins. Une longue vidéo finit aussi plus tôt : moins de tours de lecture.
+ * Combien d’écrans par lot : douze (ECRANS_PAR_LOT) dès que la vidéo en a douze, toutes les vidéos ; en dessous, tous ses
+ * écrans, en un seul lot. Un plus grand lot coûte moins (moins d’écrans relus aux jointures, moins de fois le prompt) : à
+ * l’essai du 21 octobre (Sonnet 5.5, deux convs de test filmées comme iMessage, scripts/essai-video-modeles.mts), des lots
+ * de douze ont lu autant de messages mot pour mot que des lots de six, pour 20 à 25 % de moins. Jusqu’au 27 octobre, une
+ * courte vidéo (56 écrans au plus) partait en lots de six à douze, assez petits pour tenir en un seul tour de lecteurs
+ * (LECTEURS_DE_LOTS) : lue plus vite (un lot de six en 15 s environ, un de douze en 25 à 30 s), mais plus cher. Elle prend
+ * maintenant jusqu’à 15 s de plus (5 à 15 s sous 40 écrans), pour 10 à 15 % de moins avant l’achat (estimé le 27 octobre :
+ * la ligne Vidéo de « L’IA avant l’achat », dans /admin, le dira). Le seuil d’une longue vidéo ne bouge pas : cinq lots de
+ * douze couvrent toujours 56 écrans (chaque lot reprend le dernier écran du précédent : `n` lots de douze en couvrent
+ * 11 n + 1).
  */
-export const tailleDesLots = (ecrans: number, lecteurs: number) => Math.min(ECRANS_PAR_LOT.max, Math.max(ECRANS_PAR_LOT.min, Math.ceil((ecrans - 1) / lecteurs) + 1));
+export const tailleDesLots = (ecrans: number) => Math.min(ECRANS_PAR_LOT, Math.max(1, ecrans));
 
 /* ———— Un lot déjà lu ne repart pas ———— */
 
@@ -275,21 +279,28 @@ export function garderLeLot(empreinte: string | null, { lot, cle }: LotLu): void
 }
 
 /**
- * Les lots à lire : une douzaine d’images, chaque lot reprenant la dernière image du précédent (pour recoller les
- * messages). `poids` et `max` : un lot ne dépasse pas non plus ce poids (Vercel refuse un envoi de plus de 4,5 Mo).
+ * Les lots à lire, dans l’ordre de la vidéo (du plus ancien au plus récent) : `taille` images au plus, chaque lot
+ * reprenant la dernière image du précédent (pour recoller les messages : fusionnerLots, src/server/video.ts, n’y compte
+ * l’image partagée qu’une fois). Découpés en partant de la fin : le lot le plus récent est plein, et le reste va dans le
+ * plus ancien. C’est le plus récent que la lecture partielle d’une longue vidéo lit d’abord (src/services/api.ts,
+ * src/server/lecture-partielle.ts) : en partant du début, il n’était que le reste, de deux à douze écrans (trois sur 80,
+ * six sur 160), trop peu pour dire si la conv est dense. Autant de lots qu’en partant du début, autant d’images partagées :
+ * une vidéo lue en entier ne coûte pas plus, et se recolle en la même conv. `poids` et `max` : un lot ne dépasse pas non
+ * plus ce poids (Vercel refuse un envoi de plus de 4,5 Mo) ; il prend toujours au moins une image, aussi lourde soit-elle.
  */
-export function lotsDe<T>(images: T[], taille = 12, poids: (x: T) => number = () => 0, max = Infinity): T[][] {
+export function lotsDe<T>(images: T[], taille = ECRANS_PAR_LOT, poids: (x: T) => number = () => 0, max = Infinity): T[][] {
   const lots: T[][] = [];
-  let i = 0;
-  while (i < images.length) {
-    let j = i;
-    let total = 0;
-    /* j < images.length : l’image existe */
-    while (j < images.length && j - i < taille && (j === i || total + poids(images[j]!) <= max)) total += poids(images[j++]!);
+  /* Le lot en cours va de l’image i (comprise) à l’image j (exclue) : le premier finit sur la dernière image */
+  let j = images.length;
+  while (j > 0) {
+    let i = j - 1;
+    /* i et i − 1 sont dans la vidéo : 0 ≤ i < j ≤ images.length, puis i > 0 */
+    let total = poids(images[i]!);
+    while (i > 0 && j - i < taille && total + poids(images[i - 1]!) <= max) total += poids(images[--i]!);
     lots.push(images.slice(i, j));
-    if (j >= images.length) break;
-    /* Le lot suivant reprend la dernière image de celui-ci (sauf un lot d’une seule image : on avance) */
-    i = j - 1 > i ? j - 1 : j;
+    if (i === 0) break;
+    /* Le lot d’avant finit sur la première image de celui-ci (sauf un lot d’une seule image : on recule sans rien partager) */
+    j = j - i > 1 ? i + 1 : i;
   }
-  return lots;
+  return lots.reverse();
 }

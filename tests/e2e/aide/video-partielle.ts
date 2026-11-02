@@ -27,6 +27,7 @@ function formulaireDuLot(serie: string, j: number, cle: string, champs: Record<s
   fd.append("app", "imessage");
   fd.append("consentement", CASE_IMPORT.version);
   fd.append("cle", cle);
+  fd.append("mode", "import");
   for (const [nom, valeur] of Object.entries(champs)) fd.append(nom, valeur);
   return fd;
 }
@@ -63,7 +64,7 @@ export async function importerUneVideoPartielle(page: Page, testInfo: TestInfo):
     expect(r.status(), `le lot ${j} est lu`).toBe(200);
     lus.unshift(((await r.json()) as { lot: unknown }).lot);
   }
-  const partiel = { restants: LOTS_GARDES, ecrans: ECRANS_DE_LA_VIDEO, video, sensSur: true };
+  const partiel = { restants: LOTS_GARDES, ecrans: ECRANS_DE_LA_VIDEO, video, sensSur: true, decoupe: "fin" };
   const fin = (gardes: boolean) =>
     poster(page, testInfo, "/api/captures/video", { app: "imessage", lots: lus, cle, consentement: CASE_IMPORT.version, partiel: { ...partiel, ...(gardes ? { gardes } : {}) } });
   /* La question : une conv dense, la partie récente suffit au haut du paywall ; ses lots plus anciens sont à garder */

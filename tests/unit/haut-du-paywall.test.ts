@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Chiffres, Message } from "@prompts/lib/conv";
-import { dateDuHaut, genreDuHaut, hautDuPaywall, semaineDeLaCourbe } from "@/contenu/haut-du-paywall";
+import { dateDuHaut, genreDuHaut, hautDuPaywall, semaineDeLaCourbe, varianteDuHaut } from "@/contenu/haut-du-paywall";
 import { signaux, signauxSansHeures } from "@/server/ecrans/haut-du-paywall";
 import { tendance } from "@/server/ecrans/tendance";
 import type { ApercuDuPaywall, SignalDuPaywall } from "@/types";
@@ -294,5 +294,21 @@ describe("les textes du titre « volume »", () => {
     const h = hautDuPaywall(volume([v("messages", "pareil", 30, 28), v("questions", "elle", 0, 5)]), LUCAS);
     expect(h.titre).toEqual(["C’est Lucas qui pose toutes les questions.", "Toi, tu le laisses venir."]);
     expect(h.cases.map((c) => `${c.valeur}${c.unite} ${c.texte}`)).toEqual(["5\u00a0questions de lui, aucune de toi", "30–28 messages envoyés"]);
+  });
+});
+
+describe("la forme du titre « volume » (le contrefactuel de la lecture partielle la compare)", () => {
+  it("ce qui le mène et son côté, puis ce qui est d’en face : une autre forme est une autre phrase ; d’autres chiffres, non", () => {
+    expect(varianteDuHaut(volume([v("messages", "toi", 44, 22), v("questions", "toi", 6, 2), v("longueur", "elle", 6, 13)]))).toBe("messages:toi:longueur");
+    expect(varianteDuHaut(volume([v("messages", "toi", 30, 12), v("questions", "toi", 4, 1), v("longueur", "elle", 5, 11)]))).toBe("messages:toi:longueur");
+    expect(varianteDuHaut(volume([v("messages", "toi", 44, 22), v("questions", "toi", 9, 0)]))).toBe("messages:toi");
+    expect(varianteDuHaut(volume([v("messages", "elle", 20, 46), v("questions", "elle", 0, 7)]))).toBe("messages:elle");
+    expect(varianteDuHaut(volume([v("messages", "pareil", 30, 28), v("questions", "elle", 0, 5)]))).toBe("questions:elle");
+    expect(varianteDuHaut(volume([v("messages", "pareil", 31, 35), v("questions", "pareil", 4, 5)]))).toBe("autant");
+  });
+
+  it("les autres titres n’ont pas de forme à eux", () => {
+    expect(varianteDuHaut(apercu())).toBeNull();
+    expect(varianteDuHaut({ ...volume([]), sansHeures: undefined })).toBeNull();
   });
 });

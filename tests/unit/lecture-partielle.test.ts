@@ -109,15 +109,53 @@ describe("la moitié d’une longue vidéo dans l’A/B", () => {
   });
 });
 
-describe("le contrefactuel d’une longue vidéo lue en entier", () => {
-  it("une vidéo dense : le même titre, et la règle aurait laissé ses lots les plus anciens pour après le paiement", () => {
-    const lots = enLots(jours(0, 8, 4), 8);
-    expect(leContrefactuel(lots, { ecrans: 90, appli: "imessage", jour: "2026-11-01", sensSur: true })).toEqual({ contrefactuel: "pareil", epargnables: 3 });
+describe("le contrefactuel : la règle visée rejouée sur une vidéo lue en entier", () => {
+  /** Une vidéo de `lots`, importée le 1er novembre 2026, au sens sûr : ses écrans, ceux de ses lots sans l’image que deux lots voisins partagent. */
+  const video = (lots: Captures[], o: Partial<Omit<OuEnEst, "restants">> = {}) =>
+    leContrefactuel(lots, { ecrans: lots.reduce((n, l, k) => n + l.captures.length - (k ? 1 : 0), 0), appli: "imessage", jour: "2026-11-01", sensSur: true, ...o });
+
+  it("deux lots, une conv dense : assez dès le premier tour (le lot le plus récent seul), le même titre, le plus ancien épargnable avec ses écrans", () => {
+    /* Le lot le plus ancien n’a que le reste des écrans (onze), le plus récent est plein */
+    const lots = [lot(jours(0, 6, 4), 11), lot(jours(6, 12, 4))];
+    expect(video(lots)).toEqual({ contrefactuel: "pareil", arret: "premier_tour", epargnables: 1, ecransEpargnables: 11 });
   });
 
-  it("au sens douteux : rien d’épargné, le même titre", () => {
-    const lots = enLots(jours(0, 8, 4), 8);
-    expect(leContrefactuel(lots, { ecrans: 90, appli: "imessage", jour: "2026-11-01", sensSur: false })).toEqual({ contrefactuel: "pareil", epargnables: 0 });
+  it("trois lots, le plus récent étalé sur douze jours : un tour de plus (un lot), puis assez ; seul le plus ancien est épargnable", () => {
+    /* Seul, le plus récent laisse croire à une vidéo de plus de 7 semaines ; avec celui d’avant, la conv tient en quelques semaines */
+    const lots = [lot(jours(0, 3, 2)), lot(jours(3, 6, 2)), lot(jours(6, 19, 2))];
+    expect(video(lots)).toEqual({ contrefactuel: "pareil", arret: "plus_loin", epargnables: 1, ecransEpargnables: 12 });
+  });
+
+  it("treize lots : assez au premier tour sur une conv dense (douze lots et leurs écrans épargnables) ; lue jusqu’au bout sur une conv étalée sur des mois, rien d’épargné", () => {
+    const dense = enLots(jours(0, 26, 12), 13);
+    expect(dense).toHaveLength(13);
+    expect(video(dense)).toEqual({ contrefactuel: "pareil", arret: "premier_tour", epargnables: 12, ecransEpargnables: 12 + 11 * 11 });
+    /* Quatre jours tous les dix jours : chaque tour de plus allonge la durée lue, sans jamais atteindre 24 semaines */
+    const etalee = Array.from({ length: 13 }, (_, j) => lot(jours(10 * j, 10 * j + 4, 6)));
+    expect(video(etalee)).toEqual({ contrefactuel: "pareil", arret: "jusqu_au_bout", epargnables: 0, ecransEpargnables: 0 });
+  });
+
+  it("le sens douteux : « tout » d’un coup, rien d’épargné, avec sa raison (le navigateur, ou des dates après le jour de l’import ou qui reculent)", () => {
+    const lots = [lot(jours(0, 6, 4)), lot(jours(6, 12, 4))];
+    expect(video(lots, { sensSur: false })).toEqual({ contrefactuel: "pareil", arret: "tout_sens", epargnables: 0, ecransEpargnables: 0 });
+    expect(video(lots, { jour: jour(3) })).toEqual({ contrefactuel: "pareil", arret: "tout_dates", epargnables: 0, ecransEpargnables: 0 });
+    /* Un tour de plus (le plus récent, étalé) trouve un lot plus ancien daté après lui : la vidéo filmée dans l’autre sens */
+    expect(video([lot(jours(0, 3, 2)), lot(jours(30, 33, 2)), lot(jours(6, 19, 2))])).toMatchObject({ arret: "tout_dates", epargnables: 0 });
+  });
+
+  it("moins de messages lus qu’une conv de captures n’en demande : « tout », rien d’épargné", () => {
+    /* Un de moins que MIN_MESSAGES_CAPTURES dans le lot le plus récent (les siens, plus un de toi) */
+    const lots = [lot(jours(0, 6, 4)), lot([{ k: 6, autre: MIN_MESSAGES_CAPTURES - 2 }])];
+    expect(video(lots)).toEqual({ contrefactuel: "pareil", arret: "tout_court", epargnables: 0, ecransEpargnables: 0 });
+  });
+
+  it("le titre « volume » : une autre forme sur la partie lue compte comme un autre titre ; la même forme avec d’autres chiffres, non", () => {
+    /* Toute la vidéo : elle t’écrit plus (42 contre 24) ; le lot le plus récent seul : toi plus (18 contre 6) */
+    const inverse = [lot(jours(0, 6, 6)), lot(Array.from({ length: 6 }, (_, i) => ({ k: 6 + i, autre: 1, moi: 3 })))];
+    expect(video(inverse)).toEqual({ contrefactuel: "autre_titre", arret: "premier_tour", epargnables: 1, ecransEpargnables: 12 });
+    /* Elle t’écrit plus sur les deux (6 contre 1, puis 4 contre 1) : « 6 fois » ou « 4 fois », le même titre */
+    const pareille = [lot(jours(0, 6, 6)), lot(jours(6, 12, 4))];
+    expect(video(pareille)).toMatchObject({ contrefactuel: "pareil", arret: "premier_tour" });
   });
 
   it("une chute très ancienne, sous 24 semaines plates : la partie récente l’aurait perdue", () => {
@@ -125,6 +163,7 @@ describe("le contrefactuel d’une longue vidéo lue en entier", () => {
     const lots = enLots([...jours(0, 56, 4), ...jours(56, 266, 1)], 20);
     const c = leContrefactuel(lots, { ecrans: 230, appli: "imessage", jour: "2026-11-30", sensSur: true });
     expect(c.contrefactuel).toBe("tendance_perdue");
+    expect(c.arret).toBe("plus_loin");
     expect(c.epargnables).toBeGreaterThan(0);
   });
 });

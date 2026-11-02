@@ -98,10 +98,10 @@ export const Env = z.object({
     .transform((v) => v === "1"),
   /**
    * La lecture partielle des longues vidéos (src/server/lecture-partielle.ts) : « 0 » (le défaut), tout est lu avant
-   * l’achat, comme avant ; « mesure », tout est lu, et /admin compte ce qu’aurait changé la lecture partielle (le
-   * contrefactuel) ; « ab », la moitié des longues vidéos ne lit avant l’achat que sa partie la plus récente, le reste de
-   * ses écrans gardé chiffré et lu après le paiement. Revenir à « 0 » ne laisse aucune suite sans lecture : celles qui
-   * attendent se lisent au paiement.
+   * l’achat, comme avant ; « mesure », tout est lu, et /admin compte ce qu’aurait changé la règle visée sur toute vidéo
+   * de deux lots ou plus (le contrefactuel) ; « ab », la moitié des longues vidéos ne lit avant l’achat que sa partie la
+   * plus récente, le reste de ses écrans gardé chiffré et lu après le paiement. Revenir à « 0 » ne laisse aucune suite
+   * sans lecture : celles qui attendent se lisent au paiement.
    */
   BLUSH_LECTURE_PARTIELLE: z.enum(["0", "mesure", "ab"]).default("0"),
   /** Qui reçoit les alertes (un échec définitif) et le résumé de chaque nuit : un ou des emails, séparés par des virgules. */

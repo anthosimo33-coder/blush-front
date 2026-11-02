@@ -114,7 +114,7 @@ describe("un envoi de captures repris après une coupure", () => {
     expect(b.story.id).toBe(a.story.id);
     const [ligne] = await db().select({ id: schema.stories.id }).from(schema.stories).where(eq(schema.stories.id, a.story.id));
     expect(ligne).toBeTruthy();
-    /* Des lots de six : un long enregistrement en compte plus de vingt, toujours acceptés */
+    /* Des écrans lourds coupent les lots de douze : un long enregistrement peut en compter plus de vingt, toujours acceptés */
     const long = await postVideo(
       requete("/api/captures/video", {
         method: "POST",

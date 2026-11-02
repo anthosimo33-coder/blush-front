@@ -57,7 +57,7 @@ import { ErreurApi } from "@/types/erreurs-api";
 import { CASE_RENONCIATION } from "@/contenu/consentements";
 import { codeDe, messageErreur, problemeAjout } from "@/lib/messages-erreur";
 import { jourDeParis } from "@/lib/jours";
-import { ENVOI_IMAGES_MAX, ENVOIS_REPRIS_MAX, extensionAudio, LECTEURS_DE_LOTS } from "@/lib/limites";
+import { ENVOI_IMAGES_MAX, ENVOIS_REPRIS_MAX, extensionAudio, LECTEURS_DE_LOTS, LOTS_MIN_PARTIELLE } from "@/lib/limites";
 import { ENTETE_CAPTCHA } from "@/lib/captcha";
 import { cleDuSiteCaptcha } from "@/lib/publique";
 import { retenirSecrets } from "@/lib/secrets";
@@ -291,14 +291,13 @@ const enteteCaptcha = (jeton: string | null): HeadersInit => (jeton ? { [ENTETE_
 /**
  * Le laissez-passer du CAPTCHA, avant un import (src/server/captcha.ts) : le jeton du widget de l’écran, échangé contre un
  * cookie. Lancé pendant que le navigateur prépare ses fichiers, attendu juste avant de les envoyer : il ne retarde rien.
- * Un compte connecté le reçoit sans rien prouver. Sans clé publique, il n’y a rien à faire. Rejette avec l’ErreurApi du
- * serveur (« captcha », « trop »).
+ * Un compte connecté le reçoit sans rien prouver. Sans clé publique, il n’y a rien à faire : null, rien de demandé (ni
+ * ce que la réponse dit en plus, `planDesVideos`, pour un enregistrement). Rejette avec l’ErreurApi du serveur
+ * (« captcha », « trop »).
  */
-function laissezPasser(): Promise<void> {
-  if (!cleDuSiteCaptcha()) return Promise.resolve();
-  const demande = (async () => {
-    await appel("POST /api/captcha", { entetes: enteteCaptcha(await jetonCaptcha()) });
-  })();
+function laissezPasser(): Promise<Routes["POST /api/captcha"]["reponse"] | null> {
+  if (!cleDuSiteCaptcha()) return Promise.resolve(null);
+  const demande = (async () => appel("POST /api/captcha", { entetes: enteteCaptcha(await jetonCaptcha()) }))();
   /* Attendu plus tard : un échec avant (le fichier illisible) ne doit pas devenir une promesse rejetée sans personne */
   demande.catch(() => {});
   return demande;
@@ -395,7 +394,9 @@ export async function uploadScreenshots(
  * Une longue vidéo (plus de lots qu’un tour de lecteurs) peut ne se lire qu’en partie avant l’achat
  * (src/server/lecture-partielle.ts, le plan que donne le serveur) : ses lots les plus récents d’abord, un tour à la fois,
  * jusqu’à ce que le serveur dise « assez » ; ses lots plus anciens partent tels quels pendant la lecture, gardés chiffrés
- * et lus après le paiement (POST /api/captures/ecrans). S’ils ne partent pas, ils se lisent avant, comme avant.
+ * et lus après le paiement (POST /api/captures/ecrans). S’ils ne partent pas, ils se lisent avant, comme avant. Toute
+ * vidéo de deux lots ou plus, longue ou non, donne aussi à sa fin de quoi rejouer la règle visée (la mesure, sans rien
+ * changer à sa lecture).
  */
 export async function uploadRecording(
   file: File,
@@ -414,11 +415,13 @@ export async function uploadRecording(
   }
   const { images, sensSur } = video;
   /*
-   * Des lots de six à douze écrans (tailleDesLots : une courte vidéo part en un seul tour de cinq lecteurs, une longue
-   * en lots de douze, moins chers et en moins de tours), et de 4 Mo au plus (des écrans sombres ou des photos pèsent
-   * plus lourd). Avec Sonnet, un lot de douze se lit en 25 à 30 s, un lot de six en 15 s environ (21 octobre).
+   * Des lots de douze écrans (tailleDesLots : toutes les vidéos, les moins chers), découpés en partant de la fin (lotsDe :
+   * le plus récent plein, celui que la lecture partielle lit d’abord ; le reste dans le plus ancien), et de 4 Mo au plus
+   * (des écrans sombres ou des photos pèsent plus lourd). Avec Sonnet, un lot de douze se lit en 25 à 30 s, un lot de six
+   * en 15 s environ (21 octobre) : une courte vidéo, en lots de six à douze jusqu’au 27 octobre, se lit jusqu’à 15 s plus
+   * lentement, pour moins cher.
    */
-  const lots = lotsDe(images, tailleDesLots(images.length, LECTEURS_DE_LOTS), (b) => b.size, ENVOI_IMAGES_MAX);
+  const lots = lotsDe(images, tailleDesLots(images.length), (b) => b.size, ENVOI_IMAGES_MAX);
   /*
    * La clé de l’envoi, la même pour ses lots et pour leur fin : le serveur y range leur coût (la mesure des imports), y
    * reconnaît le premier lot et l’abandon, et un nouvel essai de la fin après une coupure retrouve l’histoire déjà créée
@@ -437,18 +440,24 @@ export async function uploadRecording(
     lus[k] = deja.lot;
     if (deja.cle !== cle) repris.add(deja.cle);
   });
-  /* Le même laissez-passer pour tous les lots, puis pour les rassembler */
-  await passe;
+  /* Le même laissez-passer pour tous les lots, puis pour les rassembler ; il dit aussi si une longue vidéo demande son plan */
+  const passeur = await passe;
   /*
-   * Une longue vidéo d’un premier import : le serveur dit comment la lire avant l’achat (en entier, ou d’abord sa partie
-   * la plus récente), d’après l’empreinte de son lot le plus récent. Sans le jour (« ab » à sa place) : la même vidéo
-   * renvoyée le lendemain tombe dans la même moitié de l’A/B. Sans réponse (le réseau), en entier, comme avant
+   * Une vidéo de deux lots ou plus d’un premier import : l’empreinte de son lot le plus récent, sans le jour (« ab » à sa
+   * place : la même vidéo renvoyée le lendemain tombe dans la même moitié de l’A/B), que sa fin envoie au serveur
+   * (`partiel`) avec ce qu’il faut pour rejouer la règle d’arrêt sur ses lots (en « mesure », le contrefactuel de toute
+   * vidéo de deux lots ou plus : src/server/lecture-partielle.ts). Seule une longue vidéo demande d’abord comment la lire
+   * avant l’achat (en entier, ou d’abord sa partie la plus récente : l’A/B), et sa lecture attend la réponse ; une plus
+   * courte n’est jamais dans l’A/B, elle se lit en entier sans rien demander. Hors de l’A/B (le laissez-passer le dit :
+   * `planDesVideos` faux), la réponse serait toujours « en entier » : rien n’est demandé, la lecture n’attend pas. Sans
+   * laissez-passer (pas de CAPTCHA, ou un serveur d’avant qui ne le dit pas), on demande, comme avant. Sans réponse (le
+   * réseau), en entier, comme avant
    */
   const recent = lots.at(-1);
-  const empreinteVideo = !ajout && lots.length > LECTEURS_DE_LOTS && recent ? await empreinteDuLot(recent, app, "ab") : null;
-  const longue = !!empreinteVideo;
+  const empreinteVideo = !ajout && lots.length >= LOTS_MIN_PARTIELLE && recent ? await empreinteDuLot(recent, app, "ab") : null;
+  const planADemander = !!empreinteVideo && lots.length > LECTEURS_DE_LOTS && passeur?.planDesVideos !== false;
   const partielle =
-    longue &&
+    planADemander &&
     (await appel("POST /api/captures/video/plan", { corps: { lots: lots.length, video: empreinteVideo, sensSur, cle, consentement } }).then(
       (r) => r.lecture === "partielle",
       () => false,
@@ -485,6 +494,11 @@ export async function uploadRecording(
     fd.append("cle", cle);
     const o = ordre(k);
     if (o) fd.append("ordre", o);
+    /*
+     * Un premier import ou un morceau ajouté : seul le refus de lecture d’un premier import se compte (la mesure des
+     * refus, /admin). Le JS d’avant ne disait rien : le serveur ne compte pas son refus
+     */
+    fd.append("mode", ajout ? "ajout" : "import");
     return (await appel("POST /api/captures/lot", { corps: fd, signal: arret.signal })).lot;
   };
   /* La première lecture rendue (ses images parties, et sans doute celles des lots partis avec elle) : les lots à garder peuvent partir */
@@ -524,8 +538,10 @@ export async function uploadRecording(
     await Promise.all(Array.from({ length: Math.min(LECTEURS_DE_LOTS, aLire.length) }, lecteur));
   };
   /*
-   * La fin : les lots lus (à partir de `restants`, ceux d’avant n’étant pas lus), rassemblés par le serveur. Une longue
-   * vidéo dit ce qu’il en reste : le serveur répond alors quoi en faire (SuiteDeLaVideo), ou crée la conv
+   * La fin : les lots lus (à partir de `restants`, ceux d’avant n’étant pas lus), rassemblés par le serveur. Une vidéo de
+   * deux lots ou plus dit ce qu’il en reste (rien, lue en entier) : pour une longue lue en partie, le serveur répond
+   * alors quoi en faire (SuiteDeLaVideo), ou crée la conv. Elle dit aussi ses lots découpés en partant de la fin
+   * (`decoupe`), sans quoi le serveur ne mesure pas la règle visée (le JS d’avant découpait depuis le début)
    */
   const fin = (restants: number, gardes = false) =>
     avecReprise(
@@ -538,7 +554,9 @@ export async function uploadRecording(
             consentement,
             ...(repris.size ? { repris: [...repris].slice(0, ENVOIS_REPRIS_MAX) } : {}),
             ...(ajout ? { mode: "ajout" as const } : {}),
-            ...(longue && empreinteVideo ? { partiel: { restants, ecrans: images.length, video: empreinteVideo, sensSur, ...(gardes ? { gardes: true as const } : {}) } } : {}),
+            ...(empreinteVideo
+              ? { partiel: { restants, ecrans: images.length, video: empreinteVideo, sensSur, decoupe: "fin" as const, ...(gardes ? { gardes: true as const } : {}) } }
+              : {}),
           },
         }),
       () => onAvance?.({ etape: "reprise" }),

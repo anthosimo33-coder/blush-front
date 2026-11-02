@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import { afterAll, describe, expect, it, vi } from "vitest";
 import type { Captures } from "@prompts/lib/schemas";
+import { ECRANS_PAR_LOT, LECTEURS_DE_LOTS, LOTS_MAX } from "@/lib/limites";
 import { enTexte } from "@/server/captures";
 import { db, schema } from "@/server/db";
 import { storyAffichee } from "@/server/conv-affichee";
@@ -14,6 +15,40 @@ import { accordDeTest } from "./aide/fixtures";
 /** Un lot lu d’un enregistrement iMessage : ses blocs, sur `images` captures. */
 const lot = (blocs: Captures["blocs"], images: number, autre: string | null = "Inès"): Captures =>
   captures({ appli: "imessage", autre, captures: Array.from({ length: images }, (_, k) => ({ numero: k + 1, place: k + 1, hors_sujet: false })), blocs });
+
+/*
+ * Une vidéo et le modèle qui la lit, simulés : l’écran e montre les messages PAS × e à PAS × e + VUS − 1 (deux écrans
+ * voisins en partagent la moitié, comme une vidéo qui garde un écran tous les 55 % de défilement), un repère de date tous
+ * les dix messages. Le modèle lit un lot comme le vrai lit des écrans qui se recouvrent : chaque message une fois, dans
+ * l’ordre, en blocs qui commencent à leur repère.
+ */
+const PAS = 3;
+const VUS = 6;
+const repereDu = (k: number) => (k % 10 ? null : { date: new Date(Date.UTC(2026, 6, 1 + k / 10)).toISOString().slice(0, 10), heure: "21:00" });
+/** La lecture des écrans d’un lot (ou de toute la vidéo d’un coup), par le modèle simulé. */
+function lireLeLot(ecrans: number[]): Captures {
+  const blocs: Captures["blocs"] = [];
+  for (let k = PAS * ecrans[0]!; k < PAS * ecrans.at(-1)! + VUS; k++) {
+    const repere = repereDu(k);
+    if (repere || !blocs.length) blocs.push({ repere, messages: [] });
+    blocs.at(-1)!.messages.push(msg(k % 2 ? "moi" : "autre", `message ${k} : on se voit samedi soir ?`));
+  }
+  return lot(blocs, ecrans.length);
+}
+
+/** La taille des lots jusqu’au 27 octobre : de six à douze écrans, assez pour tout lire en un tour de cinq lecteurs. */
+const tailleDAvant = (ecrans: number) => Math.min(12, Math.max(6, Math.ceil((ecrans - 1) / LECTEURS_DE_LOTS) + 1));
+/** La découpe jusqu’au 27 octobre, en partant du début (le reste dans le plus récent), sans borne de poids : pour comparer. */
+function lotsDAvant<T>(images: T[], taille: number): T[][] {
+  const lots: T[][] = [];
+  for (let i = 0; i < images.length;) {
+    const j = Math.min(images.length, i + taille);
+    lots.push(images.slice(i, j));
+    if (j === images.length) break;
+    i = j - 1;
+  }
+  return lots;
+}
 
 describe("les lots d’un enregistrement, rassemblés", () => {
   it("recolle deux lots sans doublon, et garde le message entier plutôt que le bout coupé", () => {
@@ -80,53 +115,102 @@ describe("les lots d’un enregistrement, rassemblés", () => {
 });
 
 describe("l’enregistrement, découpé et mesuré dans le navigateur", () => {
-  it("découpe en lots qui reprennent chacun la dernière image du précédent", () => {
-    const images = Array.from({ length: 25 }, (_, k) => k);
-    const lots = lotsDe(images);
-    expect(lots.map((l) => [l[0], l.at(-1)])).toEqual([
-      [0, 11],
-      [11, 22],
-      [22, 24],
+  it("découpe en partant de la fin : le lot le plus récent plein, chacun reprenant la dernière image du précédent, le reste dans le plus ancien", () => {
+    /* Les premier et dernier écrans de chaque lot, du plus ancien au plus récent */
+    const bornes = (n: number) => lotsDe(Array.from({ length: n }, (_, k) => k)).map((l) => [l[0], l.at(-1)]);
+    expect(bornes(0)).toEqual([]);
+    /* Moins de douze : un seul lot, de tous les écrans */
+    expect([1, 5, 11].map(bornes)).toEqual([[[0, 0]], [[0, 4]], [[0, 10]]]);
+    expect(bornes(12)).toEqual([[0, 11]]);
+    expect(bornes(13)).toEqual([
+      [0, 1],
+      [1, 12],
     ]);
-    expect(lotsDe(Array.from({ length: 12 }, (_, k) => k))).toHaveLength(1);
-  });
-
-  it("des lots de six (une courte vidéo) : l’ordre et le recouvrement tiennent, et même un long enregistrement en lots de six reste sous la borne du serveur", () => {
-    const lots = lotsDe(
-      Array.from({ length: 26 }, (_, k) => k),
-      6,
-    );
-    expect(lots.map((l) => [l[0], l.at(-1)])).toEqual([
+    expect(bornes(24)).toEqual([
+      [0, 1],
+      [1, 12],
+      [12, 23],
+    ]);
+    expect(bornes(26)).toEqual([
+      [0, 3],
+      [3, 14],
+      [14, 25],
+    ]);
+    expect(bornes(40)).toEqual([
+      [0, 6],
+      [6, 17],
+      [17, 28],
+      [28, 39],
+    ]);
+    /* 160 (IMAGES_MAX) : quinze lots, sous les 40 que /api/captures/video accepte ; le plus ancien en a six, le plus récent douze */
+    const long = bornes(IMAGES_MAX);
+    expect(long).toHaveLength(15);
+    expect(long.length).toBeLessThanOrEqual(LOTS_MAX);
+    expect([long[0], long[1], long.at(-1)]).toEqual([
       [0, 5],
-      [5, 10],
-      [10, 15],
-      [15, 20],
-      [20, 25],
+      [5, 16],
+      [148, 159],
     ]);
-    /* Des lots de six : trente-deux pour IMAGES_MAX (160), sous les 40 que /api/captures/video accepte */
-    expect(
-      lotsDe(
-        Array.from({ length: IMAGES_MAX }, (_, k) => k),
-        6,
-      ),
-    ).toHaveLength(32);
   });
 
-  it("la taille des lots (ce que l’import envoie, lus cinq à la fois) : six pour une courte vidéo, en un seul tour ; jusqu’à douze pour une longue", () => {
-    expect([11, 26, 40, 160].map((n) => tailleDesLots(n, 5))).toEqual([6, 6, 9, 12]);
-    /* 40 écrans : cinq lots de neuf, un seul tour ; 160 : quinze lots de douze, sous les 40 que /api/captures/video accepte */
-    expect(
-      lotsDe(
-        Array.from({ length: 40 }, (_, k) => k),
-        tailleDesLots(40, 5),
-      ),
-    ).toHaveLength(5);
-    expect(
-      lotsDe(
-        Array.from({ length: IMAGES_MAX }, (_, k) => k),
-        tailleDesLots(IMAGES_MAX, 5),
-      ),
-    ).toHaveLength(15);
+  it("pour toute longueur : le plus récent toujours plein, autant de lots et d’images envoyées qu’en partant du début, jamais plus qu’avant le 27 octobre, et le même seuil d’une longue vidéo", () => {
+    for (let n = 1; n <= IMAGES_MAX; n++) {
+      const images = Array.from({ length: n }, (_, k) => k);
+      const lots = lotsDe(images, tailleDesLots(n));
+      /* Tous pleins (douze, ou tous les écrans sous douze), sauf le plus ancien : le reste, une image partagée et au moins une à lui */
+      expect(lots.at(-1), `${n} écrans`).toHaveLength(Math.min(n, ECRANS_PAR_LOT));
+      expect(lots.slice(1).every((l) => l.length === ECRANS_PAR_LOT)).toBe(true);
+      if (lots.length > 1) expect(lots[0]!.length).toBeGreaterThanOrEqual(2);
+      /* Chaque lot reprend la dernière image du précédent ; sans elle, ils redonnent la vidéo, dans l’ordre */
+      expect(lots.slice(1).every((l, k) => l[0] === lots[k]!.at(-1))).toBe(true);
+      expect(lots.flatMap((l, k) => (k ? l.slice(1) : l))).toEqual(images);
+      /* Le prix : les lots (une fois le prompt chacun) et les images envoyées (les partagées deux fois) */
+      const envoyees = (d: number[][]) => d.reduce((t, l) => t + l.length, 0);
+      const duDebut = lotsDAvant(images, ECRANS_PAR_LOT);
+      expect([lots.length, envoyees(lots)]).toEqual([duDebut.length, envoyees(duDebut)]);
+      const avant = lotsDAvant(images, tailleDAvant(n));
+      expect(lots.length).toBeLessThanOrEqual(avant.length);
+      expect(envoyees(lots)).toBeLessThanOrEqual(envoyees(avant));
+      /* Une longue vidéo (plus d’un tour de lecteurs) : plus de 56 écrans, avant comme après */
+      expect(lots.length > LECTEURS_DE_LOTS).toBe(avant.length > LECTEURS_DE_LOTS);
+      expect(lots.length > LECTEURS_DE_LOTS).toBe(n > 56);
+    }
+    expect([1, 11, 12, 13, 26, 40, 160].map(tailleDesLots)).toEqual([1, 11, 12, 12, 12, 12, 12]);
+  });
+
+  it("des écrans lourds : le plus récent aussi plein que le poids le permet, les lots toujours recollés, et pas de boucle sur une image trop lourde", () => {
+    /* Vingt écrans, les quatre plus récents lourds (des photos) : le lot le plus récent s’arrête au poids, pas avant */
+    const poids = [...Array.from({ length: 16 }, () => 1), 3, 3, 3, 3];
+    const lots = lotsDe(
+      poids.map((_, k) => k),
+      12,
+      (k) => poids[k]!,
+      14,
+    );
+    /* Le plus récent : ses quatre lourds et deux légers (14, la borne), le suivant ses douze, le plus ancien le reste */
+    expect(lots.map((l) => [l[0], l.at(-1)])).toEqual([
+      [0, 3],
+      [3, 14],
+      [14, 19],
+    ]);
+    expect(lots.every((l) => l.reduce((t, k) => t + poids[k]!, 0) <= 14)).toBe(true);
+    expect(lots.slice(1).every((l, k) => l[0] === lots[k]!.at(-1))).toBe(true);
+    /* Chaque image plus lourde que la borne : un lot à elle seule, sans image partagée, et la découpe finit */
+    expect(lotsDe([10, 10, 10], 12, (x) => x, 5)).toEqual([[10], [10], [10]]);
+  });
+
+  it("une vidéo lue en entier se recolle en la même conv, découpée en partant de la fin, en partant du début ou d’un seul bloc", () => {
+    for (const n of [5, 12, 13, 24, 26, 40, 57, 80, IMAGES_MAX]) {
+      const ecrans = Array.from({ length: n }, (_, k) => k);
+      const recollee = (lots: number[][]) => fusionnerLots(lots.map(lireLeLot), "imessage");
+      const apres = recollee(lotsDe(ecrans, tailleDesLots(n)));
+      const entiere = lireLeLot(ecrans);
+      expect(apres.blocs, `${n} écrans`).toEqual(entiere.blocs);
+      expect(apres.captures).toEqual(entiere.captures);
+      expect(recollee(lotsDAvant(ecrans, tailleDAvant(n)))).toEqual(apres);
+      /* Tous les messages que montrent les écrans, une fois chacun */
+      expect(enTexte(apres).messages).toBe(PAS * (n - 1) + VUS);
+    }
   });
 
   it("un enregistrement trop long : la partie la plus récente de la conv, plutôt qu’un refus", () => {

@@ -77,9 +77,9 @@ describe("petits cas de lecture", () => {
 });
 
 describe("l’enregistrement d’écran", () => {
-  it("coupe un lot trop lourd (en gardant l’image de recouvrement), et ne boucle pas sur une image énorme", () => {
+  it("coupe un lot trop lourd (en gardant l’image de recouvrement, le reste dans le plus ancien), et ne boucle pas sur une image énorme", () => {
     const lourdes = Array.from({ length: 12 }, () => 1);
-    expect(lotsDe(lourdes, 12, (x) => x, 5).map((l) => l.length)).toEqual([5, 5, 4]);
+    expect(lotsDe(lourdes, 12, (x) => x, 5).map((l) => l.length)).toEqual([4, 5, 5]);
     expect(lotsDe([10, 10, 10], 12, (x) => x, 5)).toHaveLength(3);
   });
 });

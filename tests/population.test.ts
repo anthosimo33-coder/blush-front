@@ -534,7 +534,8 @@ describe("le tableau de bord : l’IA du produit et celle des tests à part, la 
     for (const q of prises) await estimer(q, execute, false);
     /*
      * Puis les mêmes requêtes avec des tables pleines dans la période (il y a un jour : des convs jamais lues, des
-     * lectures, des achats et leurs bulles), dans une transaction annulée : les autres fichiers, qui comptent leurs écarts
+     * lectures, des achats et leurs bulles, et autant d’achats qui débloquent ces convs, chacune avec la tâche de son
+     * verdict), dans une transaction annulée : les autres fichiers, qui comptent leurs écarts
      * en même temps, n’en voient rien. Les statistiques des colonnes (pg_statistic) reviennent avec elle ; les tailles des
      * tables (pg_class), réécrites sur place, restent, sans rien changer aux résultats. Des comptes aussi (10 000), pour
      * l’ensemble des comptes des tests : un passage sur users, l’email canonique une fois par compte
@@ -551,10 +552,34 @@ describe("le tableau de bord : l’IA du produit et celle des tests à part, la 
         await tx.execute(
           sql`insert into achats (user_id, offre, centimes, bulles, fournisseur, statut, paye_le, cree_le, population) select ${u.id}, 'rapport', 990, 3, 'factice', 'paye', ${pres}, ${pres}, 'client' from generate_series(1, 3000)`,
         );
+        /* Et autant qui débloquent ces convs, arrivées au paywall (la tâche du verdict) : « Par longueur » les lit une à une */
+        await tx.execute(
+          sql`insert into achats (user_id, story_id, offre, centimes, bulles, fournisseur, statut, paye_le, cree_le, population) select ${u.id}, id, 'premium', 1990, 25, 'factice', 'paye', ${pres}, ${pres}, 'client' from stories where id in ${recentes}`,
+        );
+        await tx.execute(sql`insert into tasks (story_id, kind, status, created_at) select id, 'verdict', 'paiement', ${pres} from stories where id in ${recentes}`);
+        /*
+         * Et les imports des convs d’il y a 100 jours, la table pleine et ses statistiques prises : « Par longueur » les
+         * cherche achat par achat. Sans eux, le plan dépendait de ce que l’autovacuum avait déjà vu d’imports (une base
+         * neuve, celle de la CI, n’en a aucune statistique)
+         */
+        await tx.execute(
+          sql`insert into imports (story_id, envoi, type, appli, cree_le) select id, 'jit-' || id::text, 'video', 'whatsapp', ${loin} from stories where id in ${ids} and created_at < now() - interval '2 days'`,
+        );
+        /*
+         * Et ceux des convs d’hier, dans la période, avec le plan de leur vidéo : « L’IA avant l’achat » et la lecture
+         * partielle cherchaient l’achat de chacun (un `exists` lié, rejoué import par import) et passaient le seuil dès
+         * 3 000 imports récents ; datés d’il y a 100 jours, ils n’entraient dans aucune période et ne le montraient pas
+         */
+        await tx.execute(
+          sql`insert into imports (story_id, envoi, type, appli, cree_le) select id, 'jit-' || id::text, 'video', 'whatsapp', ${pres} from stories where id in ${recentes}`,
+        );
+        await tx.execute(
+          sql`insert into plans_video (envoi, video, bras, cree_le) select envoi, 'jit-video-' || envoi, case when random() < 0.5 then 'entiere' else 'partielle' end, ${pres} from imports where story_id in ${recentes}`,
+        );
         await tx.execute(
           sql`insert into mouvements_bulles (user_id, delta, raison, ref, cree_le) select ${u.id}, 3, 'achat', id::text, ${pres} from achats where user_id = ${u.id} and paye_le > now() - interval '2 days'`,
         );
-        await tx.execute(sql`analyze users, stories, ai_usage, achats, mouvements_bulles`);
+        await tx.execute(sql`analyze users, stories, ai_usage, achats, tasks, mouvements_bulles, imports, plans_video`);
         for (const q of prises) await estimer(q, (x) => tx.execute(x), true);
         tx.rollback();
       })
@@ -567,6 +592,8 @@ describe("le tableau de bord : l’IA du produit et celle des tests à part, la 
       expect(couts.filter((c) => c.cout >= SEUIL_DU_JIT)).toEqual([]);
     } finally {
       await db().delete(schema.achats).where(eq(schema.achats.userId, u.id));
+      /* Les lectures de ces convs d’abord : effacées avec elles, elles resteraient sans conv, 6 000 de plus à chaque lancement */
+      await db().delete(schema.aiUsage).where(inArray(schema.aiUsage.storyId, convs));
       await db().delete(schema.stories).where(inArray(schema.stories.id, convs));
       await db().delete(schema.aiUsage).where(eq(schema.aiUsage.task, ETIQUETTE));
     }

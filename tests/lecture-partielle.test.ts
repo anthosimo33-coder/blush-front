@@ -204,7 +204,7 @@ async function importEntier(serie: string, video = videoDe("entiere")): Promise<
   expect(await plan(video, { cle })).toBe("entiere");
   const lots: Captures[] = [];
   for (let j = 0; j < LOTS; j++) lots.push(await lireLeLot(serie, cle, j));
-  return { id: nee(await fin({ lots, cle, partiel: { restants: 0, ecrans: ECRANS, video, sensSur: true } })), cle };
+  return { id: nee(await fin({ lots, cle, partiel: { restants: 0, ecrans: ECRANS, video, sensSur: true, decoupe: "fin" } })), cle };
 }
 
 /**
@@ -225,6 +225,19 @@ async function importPartiel(serie: string): Promise<{ id: string; cle: string; 
   expect(creee.source?.suiteVideo).toBe(true);
   const id = nee(creee);
   return { id, cle, secret: etat.cookies.get("blush-brouillon")!, recents, video };
+}
+
+/**
+ * Une courte vidéo de deux lots (23 écrans), lue en entier comme le navigateur : sans plan, ses deux lots, puis sa fin,
+ * qui dit l’empreinte de son lot le plus récent (`partiel`, rien de restant) et sa découpe (en partant de la fin) pour la
+ * mesure de la règle visée. `avant` : ce qui se passe entre la lecture des lots et leur fin (leur coût noté, comme par le
+ * vrai modèle). `decoupe: null` : la fin d’un onglet resté sur le JS d’avant, qui ne dit pas sa découpe.
+ */
+async function importCourt(serie: string, avant?: (cle: string) => Promise<void>, { decoupe = "fin" }: { decoupe?: "fin" | null } = {}): Promise<{ id: string; cle: string }> {
+  const cle = randomUUID();
+  const lots = [await lireLeLot(serie, cle, 0), await lireLeLot(serie, cle, 1)];
+  await avant?.(cle);
+  return { id: nee(await fin({ lots, cle, partiel: { restants: 0, ecrans: 2 * 11 + 1, video: randomUUID(), sensSur: true, ...(decoupe ? { decoupe } : {}) } })), cle };
 }
 
 /** La conv brute d’une histoire, déchiffrée (une conv d’un seul morceau : son texte). */
@@ -638,12 +651,207 @@ describe("l’A/B et son interrupteur", () => {
     expect(await lireLaSuite(enAttente.id)).toBe("lue");
   });
 
-  it("en mesure : tout se lit, et la conv note ce que la lecture partielle aurait changé (le contrefactuel)", async () => {
+  it("en mesure : tout se lit, et la conv note ce que la règle visée aurait changé (le contrefactuel : assez dès son lot le plus récent, sept lots épargnables)", async () => {
     etat.mode = "mesure";
     const video = videoDe("partielle");
     expect(await plan(video)).toBe("entiere");
     const { id } = await importEntier(randomUUID(), video);
-    expect(await mesureDe(id)).toMatchObject({ bras: null, lots: LOTS, lotsGardes: 0, contrefactuel: "pareil", lotsEpargnables: 3 });
+    /* Les sept lots les plus anciens : douze écrans, puis onze chacun (l’image partagée avec le lot d’avant comptée une fois) */
+    expect(await mesureDe(id)).toMatchObject({
+      bras: null,
+      lots: LOTS,
+      lotsGardes: 0,
+      contrefactuel: "pareil",
+      arret: "premier_tour",
+      lotsEpargnables: LOTS - 1,
+      ecransEpargnables: 12 + 11 * (LOTS - 2),
+    });
+  });
+
+  it("en mesure, une courte vidéo de deux lots : lue en entier sans plan, rien de plus lu ni gardé, l’écran inchangé ; la règle visée se note, et /admin compte ses dollars épargnables au prorata des écrans", async () => {
+    etat.mode = "mesure";
+    const avant = (await statsAdmin(1)).pilotage.lecturePartielle.contrefactuel;
+    const serie = randomUUID();
+    let envoi = "";
+    lus.length = 0;
+    try {
+      const { id, cle } = await importCourt(serie, async (c) => {
+        /* Ce que ses deux lots ont coûté, sous l’empreinte de l’envoi (le modèle factice n’en note pas) : 0,10 $ chacun */
+        envoi = envoiDe(c)!;
+        await db()
+          .insert(schema.aiUsage)
+          .values([0, 1].map(() => ({ task: "captures_video", model: "factice", costMicros: 100_000, envoi, population: "prospect" as const })));
+      });
+      /* Ses deux lots, lus une fois chacun : rien de plus */
+      expect([...lus].sort((a, b) => a - b)).toEqual([0, 11]);
+      const conv = await ligneEnBase(id);
+      expect(metaDe(conv).suiteVideo).toBeUndefined();
+      expect(await mesureDe(id)).toMatchObject({
+        type: "video",
+        bras: null,
+        lots: 2,
+        ecrans: 23,
+        lotsGardes: 0,
+        suite: null,
+        contrefactuel: "pareil",
+        arret: "premier_tour",
+        lotsEpargnables: 1,
+        ecransEpargnables: 12,
+      });
+      /* Rien de gardé, ni de planifié ; un lot envoyé pour être gardé est refusé */
+      expect(await ecransGardes(id)).toEqual([]);
+      expect(await suiteDe(id)).toBeNull();
+      expect(await db().select().from(schema.plansVideo).where(eq(schema.plansVideo.envoi, envoi))).toEqual([]);
+      expect(await garderLeLot(serie, cle, 0)).toBe(422);
+      const apres = (await statsAdmin(1)).pilotage.lecturePartielle.contrefactuel;
+      expect([apres.videos - avant.videos, apres.mesurees - avant.mesurees, apres.arrets.premier_tour - avant.arrets.premier_tour]).toEqual([1, 1, 1]);
+      expect(apres.lotsEpargnables - avant.lotsEpargnables).toBe(1);
+      expect(apres.dollars - avant.dollars).toBeCloseTo(0.2, 6);
+      /* Les douze écrans du lot le plus ancien, sur les 23 de la vidéo */
+      expect(apres.dollarsEpargnables - avant.dollarsEpargnables).toBeCloseTo((0.2 * 12) / 23, 6);
+    } finally {
+      if (envoi) await db().delete(schema.aiUsage).where(eq(schema.aiUsage.envoi, envoi));
+    }
+  });
+
+  it("en mesure, une vidéo mesurée puis un morceau vidéo ajouté : ses lots, ses écrans et ses dollars restent ceux de la vidéo mesurée (la règle ne lit pas les morceaux)", async () => {
+    etat.mode = "mesure";
+    const avant = (await statsAdmin(1)).pilotage.lecturePartielle.contrefactuel;
+    const serie = randomUUID();
+    const envois: string[] = [];
+    /* Ce que deux lots ont coûté, sous l’empreinte de leur envoi (le modèle factice n’en note pas) : 0,10 $ chacun */
+    const payer = async (cle: string) => {
+      const envoi = envoiDe(cle)!;
+      envois.push(envoi);
+      await db()
+        .insert(schema.aiUsage)
+        .values([0, 1].map(() => ({ task: "captures_video", model: "factice", costMicros: 100_000, envoi, population: "prospect" as const })));
+    };
+    try {
+      const { id } = await importCourt(serie, payer);
+      /* Le morceau : deux autres lots de la même conv (les écrans 33 à 55), lus après l’import, sous une autre clé */
+      const cle = randomUUID();
+      const lots = [await lireLeLot(serie, cle, 3), await lireLeLot(serie, cle, 4)];
+      await payer(cle);
+      expect((await fin({ lots, cle, mode: "ajout" })).story?.id).toBe(id);
+      /* L’import a grossi du morceau (ses lectures passent sous son empreinte), pas la vidéo mesurée */
+      expect(await mesureDe(id)).toMatchObject({ ecrans: 46, lots: 4, ecransMesures: 23, lotsMesures: 2, lotsEpargnables: 1, ecransEpargnables: 12 });
+      const apres = (await statsAdmin(1)).pilotage.lecturePartielle.contrefactuel;
+      expect([apres.videos - avant.videos, apres.lots - avant.lots, apres.lotsEpargnables - avant.lotsEpargnables]).toEqual([1, 2, 1]);
+      /* Les deux lots de la vidéo seule (0,20 $), et ses douze écrans épargnables sur ses 23 : comme sans le morceau */
+      expect(apres.dollars - avant.dollars).toBeCloseTo(0.2, 6);
+      expect(apres.dollarsEpargnables - avant.dollarsEpargnables).toBeCloseTo((0.2 * 12) / 23, 6);
+    } finally {
+      if (envois.length) await db().delete(schema.aiUsage).where(inArray(schema.aiUsage.envoi, envois));
+    }
+  });
+
+  it("en mesure, une vidéo B lue puis sa fin ratée, une vidéo A mesurée, puis B ajoutée à A en reprenant ses lots : les dollars de A restent les siens (figés à son import)", async () => {
+    etat.mode = "mesure";
+    const avant = (await statsAdmin(1)).pilotage.lecturePartielle.contrefactuel;
+    const serie = randomUUID();
+    const envois: string[] = [];
+    /* Ce que deux lots ont coûté, sous l’empreinte de leur envoi (le modèle factice n’en note pas) : `micros` chacun */
+    const payer = async (cle: string, micros: number) => {
+      const envoi = envoiDe(cle)!;
+      envois.push(envoi);
+      await db()
+        .insert(schema.aiUsage)
+        .values([0, 1].map(() => ({ task: "captures_video", model: "factice", costMicros: micros, envoi, population: "prospect" as const })));
+    };
+    try {
+      /* B : deux lots de la même conv (les écrans 33 à 55), lus et payés (0,30 $ chacun) avant l’import de A, puis sa fin ratée (aucune conv) */
+      const cleB = randomUUID();
+      const lotsB = [await lireLeLot(serie, cleB, 3), await lireLeLot(serie, cleB, 4)];
+      await payer(cleB, 300_000);
+      /* A : la vidéo mesurée, ses deux lots à 0,10 $ */
+      const { id } = await importCourt(serie, (c) => payer(c, 100_000));
+      expect(await mesureDe(id)).toMatchObject({ lotsMesures: 2, ecransMesures: 23, microsMesures: 200_000 });
+      /* B renvoyée en morceau ajouté : l’onglet reprend ses lots déjà lus (`repris`), leur coût passe sous l’empreinte de A */
+      const cle = randomUUID();
+      expect((await fin({ lots: lotsB, cle, mode: "ajout", repris: [cleB] })).story?.id).toBe(id);
+      const sousA = await db().select({ micros: schema.aiUsage.costMicros }).from(schema.aiUsage).where(eq(schema.aiUsage.storyId, id));
+      expect(sousA.reduce((t, l) => t + l.micros, 0)).toBe(800_000);
+      expect(await mesureDe(id)).toMatchObject({ lots: 4, lotsMesures: 2, microsMesures: 200_000 });
+      const apres = (await statsAdmin(1)).pilotage.lecturePartielle.contrefactuel;
+      /* Les deux lots de A seuls (0,20 $), lus avant son import comme ceux de B : pas 0,80 $ */
+      expect(apres.dollars - avant.dollars).toBeCloseTo(0.2, 6);
+      expect(apres.dollarsEpargnables - avant.dollarsEpargnables).toBeCloseTo((0.2 * 12) / 23, 6);
+    } finally {
+      if (envois.length) await db().delete(schema.aiUsage).where(inArray(schema.aiUsage.envoi, envois));
+    }
+  });
+
+  it("en mesure, une panne de la base juste après la mesure (ses lectures pas rangées sous la conv) : la vidéo mesurée garde le coût de ses lots, pas 0 $", async () => {
+    etat.mode = "mesure";
+    const avant = (await statsAdmin(1)).pilotage.lecturePartielle.contrefactuel;
+    /* La panne, pendant sa fin : ranger ses lectures sous la conv échoue (une erreur passagère de la base) */
+    const base = db();
+    const update = base.update.bind(base);
+    let enPanne = false;
+    const espion = vi.spyOn(base, "update").mockImplementation(((t: Parameters<typeof base.update>[0]) => {
+      if (enPanne && t === schema.aiUsage) throw new Error("panne passagère de la base");
+      return update(t);
+    }) as typeof base.update);
+    let envoi: string | null = null;
+    try {
+      const { id } = await importCourt(randomUUID(), async (cle) => {
+        /* Ce que ses deux lots ont coûté, sous l’empreinte de son envoi (le modèle factice n’en note pas) : 0,10 $ chacun */
+        const e = envoiDe(cle)!;
+        envoi = e;
+        await db()
+          .insert(schema.aiUsage)
+          .values([0, 1].map(() => ({ task: "captures_video", model: "factice", costMicros: 100_000, envoi: e, population: "prospect" as const })));
+        enPanne = true;
+      });
+      enPanne = false;
+      /* La panne a bien eu lieu (rien sous la conv), et la mesure tient : son arrêt et le coût de ses lots, écrits ensemble */
+      expect(await db().select().from(schema.aiUsage).where(eq(schema.aiUsage.storyId, id))).toEqual([]);
+      expect(await mesureDe(id)).toMatchObject({ arret: "premier_tour", lotsMesures: 2, microsMesures: 200_000 });
+      const apres = (await statsAdmin(1)).pilotage.lecturePartielle.contrefactuel;
+      expect(apres.mesurees - avant.mesurees).toBe(1);
+      expect(apres.dollars - avant.dollars).toBeCloseTo(0.2, 6);
+    } finally {
+      espion.mockRestore();
+      if (envoi) await db().delete(schema.aiUsage).where(eq(schema.aiUsage.envoi, envoi));
+    }
+  });
+
+  it("en mesure, la fin d’un onglet resté sur le JS d’avant (sans `decoupe` : son lot le plus récent n’était que le reste) : importée comme avant, pas mesurée ; une longue vidéo de la moitié entière non plus", async () => {
+    etat.mode = "mesure";
+    const avant = (await statsAdmin(1)).pilotage.lecturePartielle.contrefactuel;
+    const { id } = await importCourt(randomUUID(), undefined, { decoupe: null });
+    expect(await mesureDe(id)).toMatchObject({ type: "video", lots: 2, ecrans: 23, contrefactuel: null, arret: null, lotsEpargnables: null, ecransEpargnables: null });
+    /* La même vidéo, de la moitié entière d’une longue vidéo en « ab » : lue en entier, rien de noté */
+    etat.mode = "ab";
+    const cle = randomUUID();
+    const video = videoDe("entiere");
+    expect(await plan(video, { cle })).toBe("entiere");
+    const serie = randomUUID();
+    const lots: Captures[] = [];
+    for (let j = 0; j < LOTS; j++) lots.push(await lireLeLot(serie, cle, j));
+    const longue = nee(await fin({ lots, cle, partiel: { restants: 0, ecrans: ECRANS, video, sensSur: true } }));
+    expect(await mesureDe(longue)).toMatchObject({ bras: "entiere", lots: LOTS, contrefactuel: null, arret: null, lotsEpargnables: null });
+    const apres = (await statsAdmin(1)).pilotage.lecturePartielle.contrefactuel;
+    expect([apres.videos - avant.videos, apres.mesurees - avant.mesurees]).toEqual([0, 0]);
+  });
+
+  it("une courte vidéo de deux lots, éteinte (« 0 ») ou en A/B (« ab », hors de l’A/B) : lue en entier, rien de noté, comme avant", async () => {
+    for (const mode of ["0", "ab"] as const) {
+      etat.mode = mode;
+      const { id } = await importCourt(randomUUID());
+      expect(await mesureDe(id), mode).toMatchObject({
+        bras: null,
+        lots: 2,
+        lotsGardes: 0,
+        suite: null,
+        contrefactuel: null,
+        arret: null,
+        lotsEpargnables: null,
+        ecransEpargnables: null,
+      });
+      expect(await ecransGardes(id)).toEqual([]);
+    }
   });
 });
 
@@ -721,8 +929,10 @@ describe("/admin compare les deux moitiés", () => {
       expect(apres.bras.map((b) => b.bras)).toEqual(["entiere", "partielle"]);
       expect(ecart("entiere")).toEqual({ videos: 1, importees: 1, paywall: 0, payes: 0, payesTard: 0, lots: LOTS, ecrans: ECRANS, gardes: 0, coupees: 0, lues: 0 });
       expect(ecart("partielle")).toEqual({ videos: 2, importees: 1, paywall: 1, payes: 1, payesTard: 1, lots: 5, ecrans: 56, gardes: 3, coupees: 1, lues: 1 });
+      /* La moitié entière note le contrefactuel de la règle visée (assez dès son lot le plus récent), pas celui du premier tour de cinq lots */
       expect(apres.contrefactuel.videos - avant.contrefactuel.videos).toBe(1);
-      expect(apres.contrefactuel.lotsEpargnables - avant.contrefactuel.lotsEpargnables).toBe(3);
+      expect(apres.contrefactuel.arrets.premier_tour - avant.contrefactuel.arrets.premier_tour).toBe(1);
+      expect(apres.contrefactuel.lotsEpargnables - avant.contrefactuel.lotsEpargnables).toBe(LOTS - 1);
       /* Le temps jusqu’au paywall ne se compte qu’avec une première lecture notée (le modèle factice n’en note pas) */
       expect(apres.bras.every((b) => b.secondesAuPaywall === null || b.secondesAuPaywall >= 0)).toBe(true);
       /* Rien d’autre que des nombres : ni conv, ni identifiant, ni empreinte de vidéo */

@@ -153,13 +153,13 @@ export const LIMITES = {
   /** Les images « Partager en image » (une réponse du chat, la chute d’un chapitre) et le rapport en PDF, dessinés à la demande. */
   imageParCompte: { max: 60, fenetreS: 86400 },
   /**
-   * Les lots d’images d’un enregistrement d’écran (et leurs abandons), chacun lu par le modèle : des lots de six à douze
-   * écrans selon la longueur (depuis le 21 octobre ; six le 20, douze avant), jusqu’à quinze pour un long enregistrement
-   * (trente-deux le 20 octobre, seize avant). Ramené de 1 200 à 600 par heure le 26 octobre (l’audit des coûts, 1.25) :
-   * quarante longs enregistrements par heure et par adresse, leurs nouveaux essais compris, bien assez pour un Wi-Fi
-   * partagé ou le NAT d’un opérateur ; une rafale de 1 200 lots coûtait jusqu’à 470 $. Jamais sous 150 : les Wi-Fi
-   * partagés et les clients seraient touchés. Un lot déjà lu (src/server/lots.ts) passe aussi par elle, comme la
-   * question du plan d’une longue vidéo (POST /api/captures/video/plan, une par enregistrement).
+   * Les lots d’images d’un enregistrement d’écran (et leurs abandons), chacun lu par le modèle : des lots de douze écrans
+   * (depuis le 27 octobre ; de six à douze selon la longueur depuis le 21, six le 20, douze avant), jusqu’à quinze pour
+   * un long enregistrement (trente-deux le 20 octobre, seize avant). Ramené de 1 200 à 600 par heure le 26 octobre
+   * (l’audit des coûts, 1.25) : quarante longs enregistrements par heure et par adresse, leurs nouveaux essais compris,
+   * bien assez pour un Wi-Fi partagé ou le NAT d’un opérateur ; une rafale de 1 200 lots coûtait jusqu’à 470 $. Jamais
+   * sous 150 : les Wi-Fi partagés et les clients seraient touchés. Un lot déjà lu (src/server/lots.ts) passe aussi par
+   * elle, comme la question du plan d’une longue vidéo (POST /api/captures/video/plan, une par enregistrement).
    */
   lotParIp: { max: 600, fenetreS: 3600 },
   /*

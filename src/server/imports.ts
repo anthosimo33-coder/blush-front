@@ -1,11 +1,15 @@
 import "server-only";
-import { and, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, type SQL, sql } from "drizzle-orm";
 import type { GenreDuHaut } from "@/contenu/haut-du-paywall";
-import type { AppKind, BrasDeLaLecture, Contrefactuel, IssueDeLaSuite, TypeDImport } from "@/types";
+import type { AppKind, BrasDeLaLecture, IssueDeLaSuite, TypeDImport } from "@/types";
 import { empreinte, jeton } from "./chiffrement";
+import { CLES, compter } from "./compteurs";
 import { db, schema } from "./db";
 import { estEquipe } from "./droits";
 import { auMieux } from "./journal";
+import type { MesureDeLaRegle } from "./lecture-partielle";
+import { compter as compterUnPassage } from "./limites";
+import { duProduitMaintenant } from "./population";
 
 /*
  * La mesure des imports (/admin, « L’IA avant l’achat ») : ce que coûte une conv avant que la personne paie, selon
@@ -46,9 +50,10 @@ export const envoiOuNouveau = (cle: string | null): string => empreinte(`mesure:
 /**
  * Un import à noter : sa conv, comment elle est arrivée, ce que le modèle en a lu, l’empreinte de son envoi (null : un
  * export, ou sans clé), et celles des envois d’avant dont l’onglet a repris des lots déjà lus (`repris`). Une longue
- * vidéo (src/server/lecture-partielle.ts) : sa moitié de l’A/B, les lots gardés pour après le paiement, et le
- * contrefactuel d’une vidéo lue en entier (le titre qu’aurait montré sa partie récente, et les lots qu’elle aurait
- * épargnés).
+ * vidéo (src/server/lecture-partielle.ts) : sa moitié de l’A/B, les lots gardés pour après le paiement ; une vidéo lue
+ * en entier quand la règle visée se mesure : son contrefactuel (le titre qu’aurait montré sa partie récente, où la règle
+ * se serait arrêtée, et les lots et les écrans qu’elle aurait épargnés, face à ses `ecrans`, ses `lots` et leur coût,
+ * gardés à part).
  */
 type Import = {
   storyId: string;
@@ -60,7 +65,7 @@ type Import = {
   repris?: string[];
   bras?: BrasDeLaLecture | null;
   lotsGardes?: number;
-  contrefactuel?: { contrefactuel: Contrefactuel; epargnables: number } | null;
+  contrefactuel?: MesureDeLaRegle | null;
 };
 
 /**
@@ -72,6 +77,7 @@ export async function noterImport({ storyId, type, appli, ecrans, lots, envoi, r
   await auMieux(
     async () => {
       const e = envoi ?? envoiOuNouveau(null);
+      const de = [...(envoi ? [envoi] : []), ...repris];
       await db()
         .insert(schema.imports)
         .values({
@@ -85,14 +91,38 @@ export async function noterImport({ storyId, type, appli, ecrans, lots, envoi, r
           lotsGardes,
           suite: lotsGardes ? "attente" : null,
           contrefactuel: contrefactuel?.contrefactuel ?? null,
+          arret: contrefactuel?.arret ?? null,
           lotsEpargnables: contrefactuel?.epargnables ?? null,
+          ecransEpargnables: contrefactuel?.ecransEpargnables ?? null,
+          /*
+           * Ce qu’était la vidéo mesurée : ses écrans, ses lots et ce qu’ils ont coûté, que les morceaux ajoutés ensuite ne
+           * changent pas (noterAjout : un morceau vidéo range ses lots sous la même empreinte, ceux qu’il reprend d’un envoi
+           * lu avant l’import compris, et une date ne les distinguerait pas). Le coût, dans la même écriture que l’arrêt :
+           * une panne en route (relier, juste après) ne laisse jamais une vidéo mesurée sans lui
+           */
+          ecransMesures: contrefactuel ? ecrans : null,
+          lotsMesures: contrefactuel ? lots : null,
+          microsMesures: contrefactuel ? coutDesLots(de) : null,
         })
         .onConflictDoNothing();
-      await relier([...(envoi ? [envoi] : []), ...repris], { storyId, envoi: e });
+      await relier(de, { storyId, envoi: e });
     },
     "import non mesuré",
     { type },
   );
+}
+
+/**
+ * Ce qu’ont coûté les lots d’enregistrement des envois `de` qu’aucune conv n’a encore pris (les lignes « captures_video »
+ * que relier range sous l’import : les siens, ceux que le serveur a repris sous son empreinte, ceux des envois que
+ * l’onglet a repris), en micro-dollars : une sous-requête, lue dans l’écriture qui l’emploie. 0 sans envoi.
+ */
+function coutDesLots(de: string[]): SQL {
+  if (!de.length) return sql`0`;
+  return sql`(select coalesce(sum(u.cost_micros), 0) from ai_usage u where u.envoi in (${sql.join(
+    de.map((d) => sql`${d}`),
+    sql`, `,
+  )}) and u.story_id is null and u.task = 'captures_video')`;
 }
 
 /**
@@ -136,8 +166,9 @@ export async function noterLaSuite(storyId: string, suite: IssueDeLaSuite): Prom
 
 /**
  * Un morceau ajouté à une conv (avant « Qui es-tu ? ») : ses écrans et ses lots s’ajoutent aux siens, et ses lectures
- * (celles des envois repris aussi) passent sous l’empreinte de la conv. Une conv sans mesure (importée avant elle) ne
- * relie que ses lectures. Ne lève jamais.
+ * (celles des envois repris aussi) passent sous l’empreinte de la conv. Ceux de la vidéo mesurée (ecrans_mesures,
+ * lots_mesures, et le coût de ses lots, micros_mesures) ne bougent pas : la règle visée ne lit pas les morceaux. Une conv
+ * sans mesure (importée avant elle) ne relie que ses lectures. Ne lève jamais.
  */
 export async function noterAjout(storyId: string, { ecrans, lots, envoi, repris = [] }: Pick<Import, "ecrans" | "lots" | "envoi" | "repris">): Promise<void> {
   await auMieux(async () => {
@@ -177,4 +208,24 @@ export async function reprendreLeLot(lot: string, envoi: string): Promise<void> 
         .where(and(eq(schema.aiUsage.lot, lot), isNull(schema.aiUsage.storyId))),
     "lot repris non mesuré",
   );
+}
+
+/* Le temps où un refus d’un envoi se reconnaît (rate_limits) : celui d’un enregistrement, ses lots et sa fin (comme src/server/lots.ts) */
+const FENETRE_DU_REFUS = { fenetreS: 15 * 60 };
+
+/**
+ * Un import de vidéo arrêté par un refus de lecture (POST /api/captures/lot : le modèle refuse un lot malgré son repli,
+ * et le navigateur arrête tout l’enregistrement, src/services/api.ts) : compté pour /admin (CLES.videoRefusee), une fois
+ * par envoi (deux lots refusés en même temps n’arrêtent qu’un import ; un nouvel essai de la même vidéo, sous une autre
+ * clé, compte encore ; un morceau ajouté, que la route reconnaît à son `mode`, jamais), et seulement pour le produit, la
+ * règle « qui est qui » jugée maintenant sur le compte de la session (`compte`), sinon sur l’envoi (un prospect sans
+ * compte) : l’équipe qui essaie un refus n’y entre pas. Un refus ne se voyait jusque-là que dans les logs (« route /api
+ * en échec », son code) : il ne laisse ni import ni conv, et sa lecture se range parmi le lu pour rien, avec les
+ * abandons. Ne lève jamais.
+ */
+export async function noterLeRefusDUneVideo(envoi: string, compte: { id: string } | null): Promise<void> {
+  await auMieux(async () => {
+    if ((await compterUnPassage(`imports:refus:${envoi}`, FENETRE_DU_REFUS)) > 1) return;
+    if (await duProduitMaintenant({ compte, envoi })) await compter(CLES.videoRefusee);
+  }, "refus de la vidéo non compté");
 }
