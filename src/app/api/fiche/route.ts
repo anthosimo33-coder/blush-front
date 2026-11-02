@@ -8,6 +8,8 @@ import { erreur, lireCorps, repondre, reponseErreur, route } from "@/server/http
 import { garde, lecture, sousLaLimiteDuCompte } from "@/server/requete";
 import { avecEcheance, echeancePour } from "@/server/echeance";
 import { ROUTES } from "@/types/api";
+import { fuseauSur } from "@/lib/jours";
+import { fuseauDe, metaDe } from "@/server/histoires";
 
 /* Lire les captures (jusqu’à une minute), puis, après la réponse, mettre la mémoire à jour (20 à 60 s) */
 export const maxDuration = 800;
@@ -63,7 +65,9 @@ async function traiter(req: Request) {
   const memoire = await memoireAssuree(story);
   if (!memoire) return erreur("pas_pret");
   try {
-    const ajout = captures.length ? await depuisCaptures(story, memoire, await imagesDe(captures)) : await depuisExport(story, memoire, await depuisPaquet(paquet as File));
+    const ajout = captures.length
+      ? await depuisCaptures(story, memoire, await imagesDe(captures), { fuseau: fuseauSur(fd?.get("fuseau")) })
+      : await depuisExport(story, memoire, await depuisPaquet(paquet as File, { fuseau: fuseauDe(metaDe(story)) }));
     return repondre("POST /api/fiche", await ajouterALaFiche(story, ajout));
   } catch (e) {
     /* Le code interne part à l’équipe ; le navigateur n’apprend que le refus ou la panne */

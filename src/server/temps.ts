@@ -1,11 +1,33 @@
 import "server-only";
 import { sql } from "drizzle-orm";
-import { jourDeParis } from "@/lib/jours";
+import { jourDans, jourDeParis } from "@/lib/jours";
 
 /** Le jour à Paris (AAAA-MM-JJ), et le même jour à minuit UTC : la date du jour que reçoit le modèle. */
 export function aujourdhuiParis(maintenant = new Date()): { iso: string; t: number } {
   const iso = jourDeParis(maintenant);
   return { iso, t: Date.parse(`${iso}T00:00:00Z`) };
+}
+
+/** Le jour du téléphone de l’utilisateur (son fuseau, fuseauSur), et le même jour à minuit UTC : ce que lit le modèle de ses captures (« Aujourd’hui », « Hier »). */
+export function aujourdhuiDans(fuseau: string, maintenant = new Date()): { iso: string; t: number } {
+  const iso = jourDans(fuseau, maintenant);
+  return { iso, t: Date.parse(`${iso}T00:00:00Z`) };
+}
+
+/** L’heure « naïve » d’un instant dans `fuseau` : celle des messages d’une conv, sans fuseau, comme le téléphone l’écrit. */
+export function heureNaiveDans(fuseau: string, instant: Date): number {
+  const format = new Intl.DateTimeFormat("en-US", {
+    timeZone: fuseau,
+    hourCycle: "h23",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+  const p = Object.fromEntries(format.formatToParts(instant).map((x) => [x.type, Number(x.value)]));
+  return Date.UTC(p.year!, p.month! - 1, p.day!, p.hour!, p.minute!, p.second!);
 }
 
 /**

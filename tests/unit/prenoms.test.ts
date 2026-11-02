@@ -206,8 +206,8 @@ describe("un nouvel export après le rapport (messagesDeLExport)", () => {
   });
 
   it("le même prénom, sans les mêmes accents ou avec un trait d’union : la même conv", () => {
-    expect(messagesDeLExport(exportIos("Hugo", "Lea"), h("Léa", "Léa"), 0)).toEqual(expect.any(Array));
-    expect(messagesDeLExport(exportIos("Hugo", "Anne Sophie"), h("Anne-Sophie"), 0)).toEqual(expect.any(Array));
+    expect(messagesDeLExport(exportIos("Hugo", "Lea"), h("Léa", "Léa"), 0)).toMatchObject({ nouveaux: expect.any(Array) });
+    expect(messagesDeLExport(exportIos("Hugo", "Anne Sophie"), h("Anne-Sophie"), 0)).toMatchObject({ nouveaux: expect.any(Array) });
   });
 
   it("un autre numéro, ou un autre prénom : une autre conv", () => {
@@ -216,7 +216,7 @@ describe("un nouvel export après le rapport (messagesDeLExport)", () => {
   });
 
   it("un contact renommé sur « Qui es-tu ? » se retrouve par son nom d’export, même quand ses emojis changent", () => {
-    expect(messagesDeLExport(exportIos("Hugo", "Bébé 💕"), h("Léa", "Bébé ❤️"), 0)).toEqual(expect.any(Array));
+    expect(messagesDeLExport(exportIos("Hugo", "Bébé 💕"), h("Léa", "Bébé ❤️"), 0)).toMatchObject({ nouveaux: expect.any(Array) });
   });
 
   it("deux surnoms différents, deux noms d’emojis : une autre conv", () => {
@@ -230,8 +230,8 @@ describe("un nouvel export après le rapport (messagesDeLExport)", () => {
       autre: { prenom: "Marie-Lou", pronom: "elle" as const, nomExport: "Marie-Lou 🌸" },
     };
     const lus = messagesDeLExport(exportIos("Marie Dupont", "Marie-Lou Martin"), marie, 0);
-    if (!Array.isArray(lus)) throw new Error(lus);
-    expect([...new Set(lus.filter((m) => m.role === "autre").map((m) => m.nom))]).toEqual(["Marie-Lou Martin"]);
+    if (typeof lus === "string") throw new Error(lus);
+    expect([...new Set(lus.nouveaux.filter((m) => m.role === "autre").map((m) => m.nom))]).toEqual(["Marie-Lou Martin"]);
   });
 
   it("un prénom composé écrit avec une espace (« Anne Sophie ») ne retrouve pas Anne-Laure", () => {
@@ -252,8 +252,8 @@ describe("un nouvel export après le rapport (messagesDeLExport)", () => {
       autre: { prenom: "Léa D.", pronom: "elle" as const, nomExport: "Léa Dubois" },
     };
     const autresDe = (lus: ReturnType<typeof messagesDeLExport>) => {
-      if (!Array.isArray(lus)) throw new Error(lus);
-      return [...new Set(lus.filter((m) => m.role === "autre").map((m) => m.nom))];
+      if (typeof lus === "string") throw new Error(lus);
+      return [...new Set(lus.nouveaux.filter((m) => m.role === "autre").map((m) => m.nom))];
     };
     expect(autresDe(messagesDeLExport(exportIos("Léa Martin", "Léa D 🌸"), deux, 0))).toEqual(["Léa D 🌸"]);
     expect(autresDe(messagesDeLExport(exportIos("Léa M", "Léa Dubois 🌸"), deux, 0))).toEqual(["Léa Dubois 🌸"]);

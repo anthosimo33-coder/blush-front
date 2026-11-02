@@ -15,6 +15,8 @@ import { utilisateurDeSession } from "@/server/auth";
 import { lireSession } from "@/server/cookies";
 import { avecEcheance, echeancePour } from "@/server/echeance";
 import { noterAuFil } from "@/server/visites";
+import { fuseauSur } from "@/lib/jours";
+import { aujourdhuiDans } from "@/server/temps";
 
 /* La lecture de 20 captures prend jusqu’à une minute */
 export const maxDuration = 180;
@@ -61,6 +63,9 @@ async function traiter(req: Request) {
   /* Son lien arrêté (ou une créatrice sans son lien) : le modèle ne lit rien, qu’elle rouvre le nouveau */
   if (!tournage && (await lecturePayeeRefusee(await utilisateurDeSession(await lireSession())))) return erreur("tournage");
   const cle = cleEnvoi(fd?.get("cle"));
+  /* Aujourd’hui sur son téléphone : le jour de « Aujourd’hui », « Hier » et d’un bloc sans repère */
+  const fuseau = fuseauSur(fd?.get("fuseau"));
+  const jour = aujourdhuiDans(fuseau).iso;
   /* La mesure des imports (src/server/imports.ts) : l’empreinte de l’envoi range le coût de sa lecture, puis la conv qui en naît */
   const envoi = envoiOuNouveau(cle);
   if (brouillon) {
@@ -72,7 +77,7 @@ async function traiter(req: Request) {
       async () => {
         const permis = await lecturePermise("captures");
         if (permis !== "ok") throw new LectureRefusee(permis);
-        const t = await lireCaptures(images, app, envoi);
+        const t = await lireCaptures(images, app, envoi, jour);
         const ajoute = await ajouterDesCaptures(brouillon, { appli: app, t, cle });
         await noterAjout(ajoute.id, { ecrans: images.length, lots: 1, envoi });
         return { ...ajoute, secret: brouillon, messages: t.messages };
@@ -87,8 +92,8 @@ async function traiter(req: Request) {
     /* Le modèle va lire : la bêta et les plafonds d’abord (après la vérification de l’envoi, qu’un envoi invalide ne compte pas) */
     const permis = await lecturePermise("captures");
     if (permis !== "ok") throw new LectureRefusee(permis);
-    const t = await lireCaptures(images, app, envoi);
-    const { id, meta } = await importerCaptures({ appli: app, t, secret, consentement });
+    const t = await lireCaptures(images, app, envoi, jour);
+    const { id, meta } = await importerCaptures({ appli: app, t, secret, consentement, fuseau });
     /* Ici, une fois par lecture : un nouvel essai qui la reprend ne compte pas l’import deux fois (ni sa mesure) */
     await noterImport({ storyId: id, type: "captures", appli: app, ecrans: images.length, lots: 1, envoi });
     await compterImportVenuDuPartage();

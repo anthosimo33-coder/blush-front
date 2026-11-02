@@ -103,9 +103,9 @@ async function jouer(mode: Mode) {
     let ajout: Ajout | null = null;
     if (pas.suite) {
       exportTexte = `${exportTexte.trimEnd()}\n${pas.suite.join("\n")}`;
-      const nouveaux = messagesDeLExport(exportTexte, h, curseur);
-      if (typeof nouveaux === "string") throw new Error(nouveaux);
-      ajout = numeroter(nouveaux, [], h, { debut: prochain, aujourdhui: pas.jour });
+      const suite = messagesDeLExport(exportTexte, h, curseur);
+      if (typeof suite === "string") throw new Error(suite);
+      ajout = numeroter(suite.nouveaux, [], h, { debut: prochain, aujourdhui: pas.jour });
       prochain += ajout.lignes.length;
       curseur = ajout.dernier ?? curseur;
     }

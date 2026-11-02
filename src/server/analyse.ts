@@ -1,5 +1,6 @@
 import "server-only";
 import { eq, sql } from "drizzle-orm";
+import { heureDuMessage } from "@prompts/lib/ajouts";
 import { chiffrer as chiffresDe, lire, rendre } from "@prompts/lib/conv";
 import { DEMANDE_PLAN, demandeMoitie, requeteMemoireCreation, requeteMemoireMaj, requeteRapport, requeteVerdict, requeteVocal } from "@prompts/lib/contextes";
 import { alerteRetenue, appliquerMaj, aTrancher, estFaite, rapportCourt, rendreNouveaux, reunirLesAlertes, type Echange } from "@prompts/lib/memoire";
@@ -17,13 +18,13 @@ import { donneesMemoire, donneesVerdict, ligneRapport, modifierMemoire } from ".
 import { compterLeHaut } from "./compteurs";
 import { dureeDeLaSuite, garderJusquALAchat, garderJusquALaLecture } from "./ecrans-gardes";
 import { noterLeTitre, noterLeTitreEntier } from "./imports";
-import { contexteDe, convDe, histoireDe, metaDe, nomsDeToi, provenancesDe, type Ligne, type LigneComplete } from "./histoires";
+import { contexteDe, convDe, fuseauDe, histoireDe, metaDe, nomsDeToi, provenancesDe, type Ligne, type LigneComplete } from "./histoires";
 import { messagesAffiches } from "./ecrans/messages";
 import { apercuDuPaywall } from "./ecrans/haut-du-paywall";
 import { chapitresAffiches, lectureDe, scores, sobreAffiche } from "./ecrans/rapport";
 import { trouvailles } from "./ecrans/trouvailles";
 import { ErreurTache } from "./erreurs";
-import { aujourdhuiParis } from "./temps";
+import { aujourdhuiDans } from "./temps";
 import { consigneDuMontage, type Avance } from "./ia/claude";
 import { appelVerifie } from "./ia/appel-verifie";
 import { envoyerMail } from "./email";
@@ -41,6 +42,7 @@ import { editionsBornees, lignesGardees, type Contexte, type DonneesMemoire, typ
 import { attendreLePaiement, entreeDe, etatDesTaches, planifier, type Tache } from "./taches";
 import { ErreurVoix, voixBloquee, voixDisponible } from "./ia/voix";
 import { enregistrerVocal, vocalAJour } from "./vocal";
+import { cleSecrete, ecrireLus, LUS_MAX } from "./ajouts";
 
 /*
  * Les étapes de la chaîne : le travail de chaque tâche (le verdict, le plan et les chapitres du rapport, le vocal, la
@@ -55,11 +57,11 @@ function relire(story: LigneComplete) {
   if (!conv) throw new ErreurTache("conv_effacee");
   const meta = metaDe(story);
   /*
-   * « Aujourd’hui », pour la lecture : le jour de l’import (à Paris), celui où la conv a été prise. Sans lui, la lecture
+   * « Aujourd’hui », pour la lecture : le jour de l’import (sur son téléphone, Meta.fuseau), celui où la conv a été prise. Sans lui, la lecture
    * se croirait au lendemain du dernier message : un silence de plusieurs jours deviendrait « hier ». Le même jour
    * d’un essai à l’autre, et pour le verdict, le rapport et la mémoire.
    */
-  const h = { ...histoireDe(meta), aujourdhui: aujourdhuiParis(story.createdAt).iso };
+  const h = { ...histoireDe(meta), aujourdhui: aujourdhuiDans(fuseauDe(meta), story.createdAt).iso };
   /*
    * Comme à l’import : un message collé d’un autre reste du texte. Plusieurs morceaux : réunis, « Moi » des captures
    * étant celui qui importe (src/server/morceaux.ts), et le modèle lit d’où vient chacun (provenancesDe)
@@ -104,6 +106,11 @@ function contexteDuCode(story: LigneComplete) {
     style: profil(h, lu.messages).bloc,
     fin: rendu.fin,
     dernier: lu.messages.at(-1)!.t,
+    /*
+     * Ses derniers messages, leur empreinte et leur heure (src/server/ajouts.ts) : une capture ou un export qui les
+     * reprend ne les relit pas, même quand leur heure n’était que celle d’un repère (une conv de captures)
+     */
+    lus: ecrireLus(lu.messages.slice(-LUS_MAX).map((m) => ({ cle: cleSecrete(m), t: m.t, heure: heureDuMessage(m) }))),
     trouvailles: trouvailles(chiffres, h, lu.messages),
     accroche: genreDuHaut(apercuDuPaywall(chiffres, lu.messages)),
   };
@@ -490,7 +497,7 @@ async function vocal(
   /* Dans le montage partagé, son système est le socle seul, relu dans le cache du verdict (consigneDuMontage) */
   const req = requeteVocal({
     h: histoireDe(metaDe(story)),
-    aujourdhui: aujourdhuiParis().t,
+    aujourdhui: aujourdhuiDans(fuseauDe(metaDe(story))).t,
     verdict,
     rapport,
     messages: [...lignes.values()],
@@ -595,7 +602,7 @@ export async function garderUneMemoireDeSecours(storyId: string): Promise<Donnee
   const rapport = ligne?.data ? coffre.lire("reports.data", ligne.data).sortie : null;
   if (!rapport && !(await rapportOuvertEnBase(storyId))) return null;
   const { lignes, suivant } = banqueDuSecours(story);
-  const secours = memoireDeSecours({ verdict: v.sortie, rapport, lignes, suivant, jour: aujourdhuiParis().iso });
+  const secours = memoireDeSecours({ verdict: v.sortie, rapport, lignes, suivant, jour: aujourdhuiDans(fuseauDe(metaDe(story))).iso });
   const [ecrite] = await db()
     .insert(schema.memories)
     .values({ storyId, data: coffre.ecrire("memories.data", secours) })
@@ -638,7 +645,7 @@ export function preparerLaMaj(story: Ligne, lue: DonneesMemoire, echanges: Echan
   const lignes = new Map([...lue.lignes, ...nouveau.lignes]);
   /* La ligne de l’alerte et la décision suivent les mêmes échanges que la mémoire lue */
   const trancher = aTrancher(lue.etat, echanges);
-  const req = requeteMemoireMaj(h, aujourdhuiParis().t, lue.etat, lignes, nouveau.blocs, editionsBornees(lue.editions), { trancher });
+  const req = requeteMemoireMaj(h, aujourdhuiDans(fuseauDe(metaDe(story))).t, lue.etat, lignes, nouveau.blocs, editionsBornees(lue.editions), { trancher });
   return { req, lignes, suivant: nouveau.suivant };
 }
 

@@ -26,12 +26,24 @@ export type DonneesRapport = { sortie: Rapport; chapitres: Chapter[]; sobre: Sob
 export type DonneesMemoire = { etat: MemoireFaite; lignes: [string, string][]; suivant: number; editions?: EditionsFiche; secours?: true };
 
 /**
- * Ce qu’on garde de la conv une fois effacée. `dernier` : l’heure du dernier message lu (celle de l’export, sans
- * fuseau), d’où repartent les messages ajoutés ensuite. `trouvailles` : ce que la lecture montre (ecrans/trouvailles.ts).
- * `accroche` : le titre du haut de son paywall (src/contenu/haut-du-paywall.ts), compté avec son achat dans /admin ;
- * absent avant le 17 octobre.
+ * Ce qu’on garde de la conv une fois effacée (contexteDuCode, src/server/analyse.ts), et ce qu’elle a déjà lu après le
+ * rapport (src/server/ajouts.ts). `dernier` : le dernier message d’un export (le curseur, à l’heure de l’export, sans
+ * fuseau), d’où repartent les messages d’un export ajouté ; `vuJusqua` : le dernier instant lu tout compris (des
+ * captures aussi) ; `lus` : ses derniers messages lus, leur empreinte (cleSecrete : jamais leur texte, la conv brute
+ * effacée) et leur heure à la minute (ecrireLus, src/server/ajouts.ts). Ces deux-là manquent à une conv lue avant le 2 novembre 2026. `trouvailles` : ce que
+ * la lecture montre (ecrans/trouvailles.ts). `accroche` : le titre du haut de son paywall (src/contenu/haut-du-paywall.ts),
+ * compté avec son achat dans /admin ; absent avant le 17 octobre.
  */
-export type Contexte = { chiffres: string; style: string; fin: string; dernier: number; trouvailles: string[]; accroche?: GenreDuHaut };
+export type Contexte = {
+  chiffres: string;
+  style: string;
+  fin: string;
+  dernier: number;
+  vuJusqua?: number;
+  lus?: string;
+  trouvailles: string[];
+  accroche?: GenreDuHaut;
+};
 
 /** Le script du vocal du rapport, minuté d’après l’audio. `version` : celle du script (VERSION_VOCAL, src/server/vocal.ts). */
 export type DonneesVocal = { sobre: boolean; lignes: VocalLigne[]; version: number };

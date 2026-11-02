@@ -18,7 +18,8 @@ import { consentementImport } from "@/server/juridique";
 import { brasDeLaVideo, decider, estLongue, leContrefactuel, modeDeLaLecture, planDeLecture } from "@/server/lecture-partielle";
 import { LIMITES } from "@/server/limites";
 import { garde, octetsDansLeBudget, sousLaLimiteDeLIp } from "@/server/requete";
-import { aujourdhuiParis } from "@/server/temps";
+import { aujourdhuiDans } from "@/server/temps";
+import { fuseauSur } from "@/lib/jours";
 import { brouillonDeTournage, tournageDuNavigateur } from "@/server/tournage";
 import { fusionnerLots } from "@/server/video";
 import { noterAuFil } from "@/server/visites";
@@ -93,7 +94,9 @@ export const POST = route("POST /api/captures/video", async (req: Request) => {
    * à faire de ses lots plus anciens. Hors de la moitié partielle (l’interrupteur coupé entre-temps, le mode tournage),
    * ils se lisent tous, comme avant.
    */
-  const jour = aujourdhuiParis().iso;
+  /* Aujourd’hui sur son téléphone (le fuseau envoyé avec les lots, Paris à défaut) */
+  const fuseau = fuseauSur(envoi.fuseau);
+  const jour = aujourdhuiDans(fuseau).iso;
   const e = envoiDe(cleEnvoi(cle));
   const video = partiel ? { lots: lots.length + partiel.restants, video: partiel.video, sensSur: partiel.sensSur, ajout: false, tournage: !!tournage } : null;
   const bras = video ? brasDeLaVideo(video) : null;
@@ -141,7 +144,7 @@ export const POST = route("POST /api/captures/video", async (req: Request) => {
       brouillon,
       async () => {
         const f = fusionnerLots(lots, app);
-        const t = enTexte(f);
+        const t = enTexte(f, jour);
         const place = await dansLeBudget(t);
         const { id, meta } = await ajouterDesCaptures(brouillon, { appli: app, t, cle: c, video: true }).catch(async (e: unknown) => {
           await place.rendre();
@@ -191,7 +194,7 @@ export const POST = route("POST /api/captures/video", async (req: Request) => {
   const creer = uneSeuleLecture(cleEnvoi(cle), async (secret) => {
     if (tournage) return brouillonDeTournage(tournage, { appli: app, captures: lots.length, secret, consentement });
     const f = fusionnerLots(lots, app);
-    const t = enTexte(f);
+    const t = enTexte(f, jour);
     const place = await dansLeBudget(t);
     /* Rien n’entre en base (ni la suite : SuiteIncomplete) : sa place revient à tous, l’adresse garde son compte */
     const avec = aGarder;
@@ -199,6 +202,7 @@ export const POST = route("POST /api/captures/video", async (req: Request) => {
       appli: app,
       t,
       secret,
+      fuseau,
       consentement,
       video: true,
       ...(avec ? { suite: (tx, storyId) => rattacherLaSuite(tx, storyId, avec) } : {}),

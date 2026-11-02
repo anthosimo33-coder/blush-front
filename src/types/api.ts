@@ -575,6 +575,8 @@ export const ROUTES = {
       consentement: z.string().max(40).optional(),
       mode: z.literal("ajout").optional(),
       repris: z.array(z.string().max(64)).max(ENVOIS_REPRIS_MAX).optional(),
+      /* Le fuseau du téléphone (« America/Martinique ») : le jour de « Aujourd’hui » et d’un bloc sans repère (fuseauSur) */
+      fuseau: z.string().max(64).optional(),
       /* Une longue vidéo : ce qui permet de n’en lire avant l’achat que la partie la plus récente (src/server/lecture-partielle.ts) */
       partiel: LongueVideo.optional(),
     }),
@@ -603,7 +605,11 @@ export const ROUTES = {
    * (« Ta question »), en texte seulement : une réponse du chat comme une autre
    */
   /* `cle` : la clé de l’envoi, prise une fois par message par le navigateur et renvoyée telle quelle par « Réessayer » */
-  "POST /api/chat": { corps: z.object({ texte: z.string(), question: z.literal(true).optional(), cle: z.string().uuid().optional() }), formulaire: true },
+  /* `fuseau` : celui du téléphone (« America/Martinique »), le jour de son « aujourd’hui » (fuseauSur, Paris à défaut) */
+  "POST /api/chat": {
+    corps: z.object({ texte: z.string(), question: z.literal(true).optional(), cle: z.string().uuid().optional(), fuseau: z.string().max(64).optional() }),
+    formulaire: true,
+  },
   "POST /api/chat/vocal": { corps: z.object({ actif: z.boolean() }) },
   /* La réponse verrouillée à lire : son message (BlushAnswer.verrouillee) */
   "POST /api/chat/debloquer": { corps: z.object({ message: z.number().int().positive() }) },

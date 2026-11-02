@@ -2,7 +2,7 @@ import "server-only";
 import { partialParse } from "@anthropic-ai/sdk/_vendor/partial-json-parser/parser";
 import { desc, eq } from "drizzle-orm";
 import type { QueryResult } from "pg";
-import { blocAjout, type Ajout } from "@prompts/lib/ajouts";
+import { blocAjout } from "@prompts/lib/ajouts";
 import { requeteChat, type Fil } from "@prompts/lib/contextes";
 import { parIdentifiant } from "@prompts/lib/ligne";
 import { noterAlerteDuChat, type Echange } from "@prompts/lib/memoire";
@@ -19,7 +19,7 @@ import * as coffre from "./coffre";
 import { CLES, compter } from "./compteurs";
 import { db, schema, uneLigne } from "./db";
 import { modifierMemoire } from "./depot";
-import { contexteDe, histoireDe, metaDe, nomsDeToi, personnesDe, type Ligne } from "./histoires";
+import { contexteDe, fuseauDe, histoireDe, metaDe, nomsDeToi, personnesDe, type Ligne, type Transaction } from "./histoires";
 import { reponseMasquee } from "./historique";
 import { editionsBornees, type DonneesMemoire } from "./stockage/types";
 import { env } from "./env";
@@ -28,8 +28,9 @@ import { textesSysteme, type Avance } from "./ia/claude";
 import { recopieLesPrompts, REFUS_FUITE } from "./ia/garde";
 import { dire, voixDisponible, voixPour } from "./ia/voix";
 import { auMieux, journal, journalErreur } from "./journal";
+import { noterLAjout, pourLaMemoireDe, type AjoutLu } from "./ajouts";
 import { retenir } from "./memoire-groupee";
-import { aujourdhuiParis } from "./temps";
+import { aujourdhuiDans } from "./temps";
 import { venteDuChat } from "./vente";
 
 /* Le chat du quotidien : la mémoire à la place de la conv, les derniers échanges, ce qu’il vient d’écrire. */
@@ -104,6 +105,9 @@ async function noterLAlerte(storyId: string, alerte: ReponseChat["alerte"], repo
 
 /** Ce qu’il écrit quand il envoie des messages sans un mot : la demande qu’on a testée sur les évals. */
 const DEMANDE_PAR_DEFAUT = "ça veut dire quoi ? je lui réponds quoi ?";
+
+/** Ce qu’il écrit quand il remontre sans un mot un échange plus ancien, sans rien de neuf : il n’y a rien à répondre. */
+const DEMANDE_SUR_UN_RAPPEL = "ça veut dire quoi ?";
 
 /** BLUSH répondra-t-il en vocal ? Il a envoyé un vocal, ou le chat est en vocal, et la voix est là. Ce que coûte la réponse en dépend. */
 export const repondEnVocal = (story: Pick<Ligne, "chatVocal">, parVocal: boolean) => (parVocal || story.chatVocal) && voixDisponible();
@@ -253,7 +257,7 @@ export async function repondre(
   story: Ligne,
   memoire: DonneesMemoire,
   ditBrut: string,
-  ajout?: { ajout: Ajout; affiche: string },
+  ajout?: { ajout: AjoutLu; affiche: string },
   {
     parVocal = false,
     surEvenement,
@@ -261,6 +265,7 @@ export async function repondre(
     reglement,
     cle,
     vendre = false,
+    fuseau,
   }: {
     parVocal?: boolean;
     surEvenement?: (e: EvenementChat) => void;
@@ -268,6 +273,8 @@ export async function repondre(
     reglement?: Reglement;
     cle?: string;
     vendre?: boolean;
+    /** Le fuseau du téléphone (fuseauSur) : le jour de son « aujourd’hui » ; sans lui, celui de la conv (Meta.fuseau). */
+    fuseau?: string;
   } = {},
 ): Promise<{ reponse: BlushAnswer; majMemoire: boolean }> {
   const meta = metaDe(story);
@@ -282,8 +289,8 @@ export async function repondre(
    * pas encore passée). Sans elles, une citation d’un envoi précédent serait introuvable : appel rejoué, citation perdue
    */
   const lignes = new Map([...parIdentifiant(leFil.flatMap((x) => x.lignes ?? [])), ...memoire.lignes, ...parIdentifiant(nouvelles)]);
-  const dit = ditBrut || (ajout?.ajout.messages ? DEMANDE_PAR_DEFAUT : "(il t’envoie une capture de son profil)");
-  const jour = aujourdhuiParis();
+  const dit = ditBrut || (ajout?.ajout.messages ? DEMANDE_PAR_DEFAUT : ajout?.ajout.rappel ? DEMANDE_SUR_UN_RAPPEL : "(il t’envoie une capture de son profil)");
+  const jour = aujourdhuiDans(fuseau ?? fuseauDe(meta));
   /* Une réponse sans voix (verrouillée, ou le solde ne couvrait pas un vocal) s’écrit : le modèle ne prépare pas de texte dit */
   const sansVoix = !!reglement?.ecrit;
   const verrouAttendu = !!reglement?.verrouillee;
@@ -441,16 +448,31 @@ export async function repondre(
    * rien de la réponse ne doit ressortir ailleurs (sa fiche) avant d’être payé. Celle du garde-fou ne lui apprend rien.
    * En alerte, l’échange dit laquelle cette réponse a levée (`levee`) : la mise à jour qui le relit la tranche
    */
+  /* Ce que la mémoire lit de l’ajout : sans un échange déjà lu qu’il remontre (pourLaMemoireDe) */
+  const pourElle = ajout ? pourLaMemoireDe(ajout.ajout) : {};
+  const aRelire = pourElle.lignes?.length ?? 0;
   const echange: Echange = {
     date: jour.iso,
     dit,
     reponse: verrouillee ? [] : sortie.lecture.map((b) => b.texte).concat(sortie.a_envoyer ?? []),
-    ...(nouvelles.length ? { lignes: nouvelles } : {}),
+    ...pourElle,
     ...(alerte && sortie.alerte ? { levee: { alerte: sortie.alerte, reponse: blushId } } : {}),
   };
   /* L’alerte, notée dans sa mémoire avant l’échange suivant (verrouillée comme payée : rien de ce qui se paie n’y passe), sur la mémoire relue */
   if (alerte) await noterLAlerte(story.id, sortie.alerte, blushId);
-  const majMemoire = !fuite && (await retenir(story.id, echange, pourLaMemoire(sortie, nouvelles.length))).part;
+  /*
+   * Celle du garde-fou ne lui apprend rien de la réponse, mais les messages qu’il a envoyés restent les siens : sans eux,
+   * le curseur avancerait sur des messages que la mémoire n’a jamais reçus. L’ajout est noté avec l’échange, sous le
+   * même verrou (`ensuite`) : le curseur d’un export avance, ses messages deviennent reconnaissables (H2 : jamais avant)
+   */
+  const ensuite = ajout ? (tx: Transaction) => noterLAjout(story.id, ajout.ajout, tx) : undefined;
+  const retenu = !fuite
+    ? await retenir(story.id, echange, { ...pourLaMemoire(sortie, aRelire), ensuite })
+    : aRelire
+      ? await retenir(story.id, { date: jour.iso, dit, reponse: [], ...pourElle }, { neuf: true, maintenant: aRelire > LIGNES_DANS_LE_FIL, ensuite })
+      : null;
+  const majMemoire = !!retenu?.part;
+  if (ensuite && !retenu) await noterLAjout(story.id, ajout!.ajout);
 
   /* Le vocal, fait après la réponse : l’échange enregistré le reprend (l’historique le réécoute), puis il part */
   const vocal = (voix ? await voix : null) ?? null;

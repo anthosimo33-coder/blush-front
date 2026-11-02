@@ -9,7 +9,7 @@ import { repondre as blushRepond } from "@/server/chat";
 import { payer, type EnvoiDejaFait, type Paiement } from "@/server/paiement-chat";
 import { estEquipe } from "@/server/droits";
 import { historique, reponseDeLEnvoi } from "@/server/historique";
-import { UUID } from "@/server/histoires";
+import { fuseauDe, metaDe, UUID } from "@/server/histoires";
 import { depuisPaquet } from "@/server/import";
 import { codeDErreur, erreur, lireCorps, repondre, reponseErreur, route, signalerErreur } from "@/server/http";
 import { lireVocal, signatureDuVocal, transcrire } from "@/server/ia/transcription";
@@ -21,6 +21,7 @@ import type { Utilisateur } from "@/server/auth";
 import type { EvenementChat } from "@/types";
 import { ROUTES } from "@/types/api";
 import { codePublic } from "@/types/erreurs-api";
+import { fuseauSur } from "@/lib/jours";
 
 /*
  * La réponse prend 10 à 20 secondes (une minute avec des captures à lire) : elle part en flux, bulle par bulle, et son
@@ -39,9 +40,10 @@ type OptionsDeReponse = NonNullable<Parameters<typeof blushRepond>[4]>;
 
 /**
  * Ce qu’il envoie. `question` : la question du rapport (« Ta question »), toujours en texte (ROUTES). `cle` : la clé de
- * l’envoi (un uuid pris par le navigateur une fois par message, la même pour « Réessayer »), ou null.
+ * l’envoi (un uuid pris par le navigateur une fois par message, la même pour « Réessayer »), ou null. `fuseau` : celui
+ * du téléphone (fuseauSur), qui date « Aujourd’hui » sur ses captures et dans la réponse.
  */
-type Envoi = { texte: string; question: boolean; captures: File[]; export: File | null; vocal: File | null; cle: string | null };
+type Envoi = { texte: string; question: boolean; captures: File[]; export: File | null; vocal: File | null; cle: string | null; fuseau?: string };
 
 /**
  * Un vocal que le serveur ne sait pas lire (lireVocal) : un navigateur qui enregistre dans un format qu’on ne connaît
@@ -64,7 +66,17 @@ async function signalerVocalIllisible(vocal: File): Promise<void> {
 async function lireEnvoi(req: Request): Promise<Envoi | null> {
   if (!req.headers.get("content-type")?.startsWith("multipart/form-data")) {
     const lu = await lireCorps(req, ROUTES["POST /api/chat"].corps);
-    return lu ? { texte: lu.texte.trim(), question: lu.question === true, captures: [], export: null, vocal: null, cle: lu.cle?.toLowerCase() ?? null } : null;
+    return lu
+      ? {
+          texte: lu.texte.trim(),
+          question: lu.question === true,
+          captures: [],
+          export: null,
+          vocal: null,
+          cle: lu.cle?.toLowerCase() ?? null,
+          ...(lu.fuseau ? { fuseau: fuseauSur(lu.fuseau) } : {}),
+        }
+      : null;
   }
   const fd = await req.formData().catch(() => null);
   if (!fd) return null;
@@ -81,6 +93,7 @@ async function lireEnvoi(req: Request): Promise<Envoi | null> {
     export: fichier("export"),
     vocal: fichier("vocal"),
     cle: typeof cle === "string" && UUID.test(cle) ? cle.toLowerCase() : null,
+    ...(fd.get("fuseau") ? { fuseau: fuseauSur(fd.get("fuseau")) } : {}),
   };
 }
 
@@ -251,10 +264,12 @@ async function repondreA(
       }
       dit = `(vocal) ${t}`.slice(0, LONGUEUR_MAX);
     } else if (envoi.captures.length) {
-      const lu = await depuisCaptures(story, memoire, await imagesDe(envoi.captures));
+      /* Avec une question, une capture déjà lue part quand même : il remontre cet échange pour en parler */
+      const lu = await depuisCaptures(story, memoire, await imagesDe(envoi.captures), { question: !!envoi.texte.trim(), ...(envoi.fuseau ? { fuseau: envoi.fuseau } : {}) });
       ajout = { ajout: lu, affiche: resumeAjout(lu, "captures", envoi.captures.length) };
     } else if (envoi.export) {
-      const lu = await depuisExport(story, memoire, await depuisPaquet(envoi.export));
+      /* Un export ajouté se lit dans le fuseau de la conv, celui de son import : le curseur est dans les mêmes heures */
+      const lu = await depuisExport(story, memoire, await depuisPaquet(envoi.export, { fuseau: fuseauDe(metaDe(story)) }));
       ajout = { ajout: lu, affiche: resumeAjout(lu, "export", 1) };
     }
     /* La réponse de BLUSH, payée */
@@ -265,6 +280,7 @@ async function repondreA(
         /* La carte d’achat sous la réponse : le chat de l’accueil, pas la question du rapport */
         vendre: !envoi.question,
         ...(envoi.cle ? { cle: envoi.cle } : {}),
+        ...(envoi.fuseau ? { fuseau: envoi.fuseau } : {}),
         ...suite,
       });
     /* Une page chargée avant le flux (pendant une mise en ligne) attend la réponse d’un bloc, vocal compris */

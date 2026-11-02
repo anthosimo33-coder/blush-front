@@ -83,7 +83,10 @@ describe("les lignes de la conv, à l’octet", () => {
   it("les messages ajoutés, son profil, et le bloc <nouveau> du chat", () => {
     const messages: Message[] = lire(texte, h, { autresEnTexte: true }).messages.slice(390);
     const a = numeroter(messages, ["24 ans\nétudiante", "aime le libanais"], h, { debut: 1077, aujourdhui: "2024-02-20" });
-    expect(empreinte(a)).toBe("bdf5947e744b9e8a");
+    /* Les champs d’avant, à l’octet ; puis ceux du lot H (rien de rappelé, rien d’ignoré, rien à noter sans `aNoter`) */
+    const { lignes, cibles, messages: n, profil, dernier } = a;
+    expect(empreinte({ lignes, cibles, messages: n, profil, dernier })).toBe("bdf5947e744b9e8a");
+    expect([a.rappel, a.ignores, a.lus]).toEqual([0, 0, []]);
     expect(empreinte(blocAjout(a))).toBe("ed2e3e53c26b3907");
     expect(empreinte(blocAjout(a, 3))).toBe("6c503677cafdb12e");
   });
