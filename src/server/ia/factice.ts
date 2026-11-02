@@ -286,10 +286,12 @@ export function fournisseurFactice(req: RequeteFactice): SortieFactice {
 }
 
 /**
- * En flux, le chat factice écrit comme le vrai : son texte arrive par morceaux, à un rythme qu’on voit (ses bulles
- * arrivent une à une en dev). Les autres tâches suivies (la jauge de la lecture) restent d’un bloc.
+ * En flux, le chat factice écrit comme le vrai : il réfléchit d’abord (la réflexion résumée arrive avant le premier
+ * mot), puis son texte arrive par morceaux, à un rythme qu’on voit (ses bulles arrivent une à une en dev). Les autres
+ * tâches suivies (la jauge de la lecture) restent d’un bloc.
  */
 async function ecrireParMorceaux(texte: string, ecoute: Ecoute) {
+  ecoute.reflexion("Je relis la conv avant de répondre.");
   for (let n = 0; n < texte.length; n += 16) {
     await new Promise((ok) => setTimeout(ok, 8));
     ecoute.texte(texte.slice(n, n + 16));

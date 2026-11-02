@@ -217,6 +217,8 @@ function bullesAuFil(lignes: Map<string, string>, messages: Map<string, Message>
     if (arret) return;
     if (ecrit.length < lu) return void (arret = true);
     lu = ecrit.length;
+    /* Rien d’écrit encore (le modèle réfléchit avant le premier mot) : le lecteur lèverait sur un texte vide */
+    if (!ecrit.trim()) return;
     /* Le lecteur ne rend une chaîne qu’une fois finie : `alerte` est là quand elle est lue en entier */
     const p = partialParse(ecrit) as { alerte?: unknown; lecture?: unknown; a_envoyer?: unknown } | null;
     if (!p || typeof p !== "object" || !("alerte" in p)) return;
