@@ -123,6 +123,7 @@ beforeEach(async () => {
 
 describe("POST /api/chat en flux", () => {
   it("les bulles arrivent une à une, avant la réponse validée, qui porte son échange", async () => {
+    const erreur = vi.spyOn(console, "error").mockImplementation(() => {});
     const r = await envoyer("on s’est vus hier, c’était trop bien");
     expect(r.headers.get("content-type")).toContain("application/x-ndjson");
     const lus = await lectures(r);
@@ -144,6 +145,8 @@ describe("POST /api/chat en flux", () => {
     /* L’échange est enregistré avant que la réponse parte ; la mise à jour de la mémoire tourne après */
     expect(fin.reponse.echange).toBe((await historique(id)).echanges.at(-1)?.id);
     await lancerApres();
+    /* Le modèle réfléchit avant le premier mot : les bulles attendent son texte, sans erreur au journal */
+    expect(erreur.mock.calls.map((c) => String(c[0]))).toEqual([]);
   });
 
   it("en vocal : rien à lire en route, la réponse écrite part sans attendre la voix, le vocal arrive ensuite (et reste dans l’historique)", async () => {
