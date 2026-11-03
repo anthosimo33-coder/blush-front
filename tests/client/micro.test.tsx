@@ -45,11 +45,10 @@ class FauxEnregistreur {
   start() {
     this.state = "recording";
   }
-  requestData() {
-    this.ondataavailable?.({ data: new Blob(["son"], { type: this.mimeType }) });
-  }
+  /* Comme un vrai enregistreur : l’arrêt livre le son qui reste, puis « stop » */
   stop() {
     this.state = "inactive";
+    this.ondataavailable?.({ data: new Blob(["son"], { type: this.mimeType }) });
     this.onstop?.();
   }
 }
