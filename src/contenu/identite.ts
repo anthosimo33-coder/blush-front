@@ -5,5 +5,4 @@
  */
 
 /** Ce que fait BLUSH, en une phrase. */
-export const PHRASE_D_IDENTITE =
-  "BLUSH lit une conv que tu importes (captures, enregistrement d’écran, export Instagram ou WhatsApp) et te dit ce qui se passe vraiment entre vous.";
+export const PHRASE_D_IDENTITE = "BLUSH lit une conv que tu importes (captures d’écran, export Instagram ou WhatsApp) et te dit ce qui se passe vraiment entre vous.";

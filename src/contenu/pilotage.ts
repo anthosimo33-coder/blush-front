@@ -1,4 +1,4 @@
-import type { EtapeVisite, GenreVendu, OffreId, Population, SourceVisite, TypeDImport } from "@/types";
+import type { AppKind, EtapeVisite, GenreVendu, OffreId, Population, SourceVisite, TypeDImport } from "@/types";
 import { CATALOGUE, prixDe } from "./offres";
 
 /*
@@ -80,6 +80,16 @@ export const NOMS_DES_POPULATIONS: Record<Population, string> = {
 
 /** Le nom de chaque type d’import (src/server/imports.ts), dans /admin « L’IA avant l’achat » et le serveur MCP. */
 export const NOMS_DES_TYPES_D_IMPORT: Record<TypeDImport, string> = { export: "Export", captures: "Captures", video: "Vidéo" };
+
+/**
+ * Le jour où l’enregistrement d’écran a quitté l’import (VIDEO_A_L_IMPORT, src/lib/limites.ts), au format AAAA-MM-JJ.
+ * /admin et le serveur MCP l’écrivent sous la vidéo de « L’IA avant l’achat » et sous les applis qu’il a changées
+ * (APPLIS_SANS_VIDEO) : l’avant et l’après se lisent sans A/B.
+ */
+export const VIDEO_RETIREE_LE = "2026-11-03";
+
+/** Les applis de l’import que le retrait de la vidéo a changées : iMessage (filmé jusque-là) et la tuile des captures (« Captures ou vidéo »). */
+export const APPLIS_SANS_VIDEO: readonly AppKind[] = ["imessage", "autre"];
 
 /** Le nom de chaque carte d’achat du chat (src/server/vente.ts), dans /admin. */
 export const NOMS_DES_VENTES: Record<GenreVendu, string> = {

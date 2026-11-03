@@ -29,7 +29,7 @@ export function Hero({ retour, children }: { retour: Retour; children?: ReactNod
          * vraiment entre vous », comme le titre de la page. Pas plus longue : à 320 × 568, le bouton reste dans le premier écran
          */}
         <p className="m-0 mt-6 max-w-[600px] text-carte font-extrabold leading-[1.5] text-soft [text-wrap:balance] lg:mt-8 lg:text-[21px]">
-          Captures, enregistrement d’écran, export Instagram ou WhatsApp{NBSP}: BLUSH te dit ce qui se passe vraiment entre vous, et quoi répondre.
+          Captures d’écran, export Instagram ou WhatsApp{NBSP}: BLUSH te dit ce qui se passe vraiment entre vous, et quoi répondre.
         </p>
         <CtaButton retour={retour} className="mt-8 lg:mt-10" />
         <SousLeBouton retour={retour} />

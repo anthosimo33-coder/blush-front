@@ -12,6 +12,15 @@ const MO = 1024 * 1024;
 export const CAPTURES_MAX = 20;
 
 /**
+ * L’enregistrement d’écran se propose-t-il à l’import (une première conv comme un morceau ajouté) ? Retiré le 3 novembre
+ * 2026 (VIDEO_RETIREE_LE, src/contenu/pilotage.ts) : il coûtait l’IA la plus chère avant l’achat (la plupart lue pour
+ * rien, des vidéos qui n’arrivaient jamais au bout) sans faire vendre. Éteint, l’écran des captures ne propose plus
+ * que des captures, iMessage compris, et ses tests de bout en bout se sautent. Le code de la vidéo reste (sa lecture par
+ * lots, la lecture partielle, les routes pour un onglet ouvert avant) : rallumé, tout revient.
+ */
+export const VIDEO_A_L_IMPORT = false;
+
+/**
  * Les écrans d’un lot d’enregistrement d’écran (tailleDesLots, src/services/preparer-video.ts) : six pour une courte
  * vidéo, lue en un seul tour, jusqu’à douze pour une longue. /api/captures/video borne les messages d’un lot en
  * conséquence, et /api/captures/lot les images d’un envoi (CAPTURES_MAX).

@@ -215,7 +215,7 @@ export const PERSONNES_D_UN_TAUX = 30;
 /** Le passage d’une étape à la suivante (`vers` sur `depuis`), ou null avec moins de PERSONNES_D_UN_TAUX à l’étape d’avant. */
 export const tauxLisible = (vers: number, depuis: number): number | null => (depuis >= PERSONNES_D_UN_TAUX ? rapport(vers, depuis) : null);
 
-/** Le nom d’une appli dans le pilotage : celui de sa tuile au choix de l’appli (« Captures ou vidéo »), sinon le sien (« Hinge »). */
+/** Le nom d’une appli dans le pilotage : celui de sa tuile au choix de l’appli (« Captures d’écran »), sinon le sien (« Hinge »). */
 export const nomDeLAppli = (appli: AppKind): string => TUILES_IMPORT.find((t) => t.app === appli)?.title ?? APPLIS[appli];
 
 /**

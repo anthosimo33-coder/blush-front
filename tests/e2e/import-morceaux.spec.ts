@@ -48,7 +48,7 @@ test("un export court, des captures, un autre export : une seule conv, sans doub
     const tuiles = feuille.getByRole("navigation", { name: "Ce que tu ajoutes" }).getByRole("link");
     await expect(tuiles).toHaveCount(4);
     await expect(feuille.getByRole("link", { name: "WhatsApp Un autre export" })).toHaveAttribute("href", "/importer/export?app=whatsapp&mode=ajout");
-    await feuille.getByRole("link", { name: "Captures ou vidéo Hinge, Tinder… toutes les applis" }).click();
+    await feuille.getByRole("link", { name: "Captures d’écran Hinge, Tinder… toutes les applis" }).click();
     await expect(page).toHaveURL(/\/importer\/captures\?app=autre&mode=ajout$/);
   });
 

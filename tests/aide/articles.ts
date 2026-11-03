@@ -185,7 +185,7 @@ export function fautesDeLArticle(a: Article, { exemple = false }: { exemple?: bo
   const seule = textes.find(convWhatsappSeule);
   if (seule)
     fautes.push(
-      `${ici} : « ta conv WhatsApp » seul : BLUSH lit aussi les captures et les enregistrements d’écran, écris « captures, enregistrement d’écran, export Instagram ou WhatsApp ». Dans : « ${seule} »`,
+      `${ici} : « ta conv WhatsApp » seul : BLUSH lit aussi les captures d’écran et l’export Instagram, écris « captures d’écran, export Instagram ou WhatsApp ». Dans : « ${seule} »`,
     );
 
   /* BLUSH parle en minuscules, sans point final */

@@ -197,7 +197,7 @@ test("Instagram : une conv trop courte choisie dans l’export complet est gard�
   await expect(page.getByRole("heading", { level: 1, name: "C’est bon, on a votre conv." })).toBeVisible();
   await expect(page.getByText(/C’est encore court pour une lecture juste\s:\sil faut au moins 50 messages/)).toBeVisible();
   await page.getByRole("button", { name: "Ajouter un morceau" }).click();
-  await page.getByRole("dialog", { name: "Ajoute un morceau" }).getByRole("link", { name: "Captures ou vidéo Hinge, Tinder… toutes les applis" }).click();
+  await page.getByRole("dialog", { name: "Ajoute un morceau" }).getByRole("link", { name: "Captures d’écran Hinge, Tinder… toutes les applis" }).click();
   await expect(page).toHaveURL(/\/importer\/captures\?app=autre&mode=ajout$/);
   await expect(page.getByRole("heading", { level: 1, name: "Choisis tes captures." })).toBeVisible();
 });
