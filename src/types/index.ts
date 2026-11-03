@@ -480,7 +480,7 @@ type ChiffreDeConv = { valeur: string; texte: string; cote: "toi" | "elle" | "pa
 /** Landing et paywall : un vrai avis, publié avec l’accord de la personne. */
 export type Testimonial = {
   name: string;
-  /** Sa situation (« Situationship »). */
+  /** Sa situation, en quelques mots (« Son crush », « Ils se fréquentent »). */
   label: string;
   /** La teinte de sa situation : son rond et son étiquette (rose : un crush, vert : en couple, violet : c’est flou). */
   teinte: "elle" | "vrai" | "flou";
