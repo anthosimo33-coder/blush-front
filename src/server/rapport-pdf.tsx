@@ -4,7 +4,7 @@ import { ImageResponse } from "next/og";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { ReactNode } from "react";
-import { LIGNES_D_ECOUTE } from "@/contenu/aide";
+import { LIGNES_D_ECOUTE, LIGNES_PAR_SITUATION } from "@/contenu/aide";
 import { formatCount, NBSP, vocauxOuMedias } from "@/lib/format";
 import { nombreDApplis } from "@/lib/morceaux";
 import { moiEtAutre, titreDuo } from "@/lib/participants";
@@ -710,12 +710,20 @@ function PagesSobres({ sobre, vocal, le, site }: { sobre: SoberReport; vocal: bo
         <Libelle>{sobre.draftLabel}</Libelle>
         <Text style={{ fontSize: T.corps, lineHeight: 1.45 }}>{sobre.draft}</Text>
       </View>
+      {/* L’aide, ensemble sur une page : les lignes d’écoute, puis les lignes par situation, chacune avec sa situation (src/contenu/aide.ts) */}
       <View wrap={false} style={{ gap: 7.5 }}>
         <Text style={{ fontSize: T.carte, fontWeight: 900 }}>{sobre.helpLabel}</Text>
         {LIGNES_D_ECOUTE.map((h) => (
           <View key={h.name} style={{ ...carte, padding: 10.5, gap: 1.5 }}>
             <Text style={{ fontSize: T.corps, fontWeight: 900 }}>{`${h.name} · ${h.label}`}</Text>
             <Text style={{ fontSize: T.legende, color: GRIS }}>{h.detail}</Text>
+          </View>
+        ))}
+        {LIGNES_PAR_SITUATION.map((s) => (
+          <View key={s.name} style={{ ...carte, padding: 10.5, gap: 1.5 }}>
+            <Text style={{ fontSize: T.corps, fontWeight: 900 }}>{`${s.name} · ${s.label}`}</Text>
+            <Text style={{ fontSize: T.legende, lineHeight: 1.35 }}>{s.pour}</Text>
+            <Text style={{ fontSize: T.legende, lineHeight: 1.35, color: GRIS }}>{s.detail}</Text>
           </View>
         ))}
       </View>

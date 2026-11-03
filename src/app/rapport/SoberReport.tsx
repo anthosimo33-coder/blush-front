@@ -3,7 +3,7 @@
 import type { Route } from "next";
 import Link from "next/link";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { LIGNES_D_ECOUTE } from "@/contenu/aide";
+import { LIGNES_D_ECOUTE, LIGNES_PAR_SITUATION } from "@/contenu/aide";
 import { LIBELLES_RAPPORT } from "@/contenu/rapport";
 import { Icon } from "@/components/ui/icons";
 import { Sheet } from "@/components/ui/surfaces";
@@ -20,6 +20,8 @@ const QUIT_HREF: Route = "/commencer";
 
 /* Les lignes d’écoute, absentes des maquettes (validées) : src/contenu/aide.ts, la même source que le chat sans bulles */
 const HELP = LIGNES_D_ECOUTE;
+/* Une ligne de la feuille : la carte blanche, toute entière à toucher */
+const LIGNE = "flex flex-col gap-0.5 rounded-[20px] bg-white p-4 text-ink no-underline shadow-[inset_0_0_0_1.5px_var(--color-track)]";
 
 function SoberButton({ children, onClick, href }: { children: string; onClick?: () => void; href?: Route }) {
   const cls = "flex h-[58px] w-full items-center justify-center rounded-[29px] bg-ink text-accent font-extrabold text-white no-underline";
@@ -60,21 +62,40 @@ function EnTeteSobre({ back }: { back: () => void }) {
   );
 }
 
-/** « Besoin d’en parler à quelqu’un ? » : les lignes d’écoute, à appeler d’un toucher. */
+/**
+ * « Besoin d’en parler à quelqu’un ? » : les lignes d’écoute, à appeler d’un toucher, puis les lignes par situation (le
+ * 114 par SMS, le 119, le 3919, le 3018, le tchat de commentonsaime.fr : LIGNES_PAR_SITUATION, src/contenu/aide.ts),
+ * chacune avec sa situation lisible (« Si tu… ») entre son nom et ce qu’elle promet. Un appel ou un SMS part du téléphone ; une
+ * page (le tchat de commentonsaime.fr) s’ouvre dans un nouvel onglet, le rapport doux reste ouvert derrière.
+ * Sur ordinateur, la feuille commence à 120 px du haut : sa hauteur s’arrête 40 px avant le bas de l’écran, et elle défile
+ * au-delà (92dvh, ou 96dvh sur un écran court, la faisaient déborder, « Fermer » hors de l’écran : d’où le « ! », qui passe
+ * devant la règle des écrans courts de Sheet).
+ */
 function FeuilleAide({ open, onClose, titre }: { open: boolean; onClose: () => void; titre: string }) {
   return (
-    <Sheet open={open} onClose={onClose} labelledBy="help-title" belowHeader={false}>
+    <Sheet open={open} onClose={onClose} labelledBy="help-title" belowHeader={false} className="lg:!max-h-[calc(100dvh-160px)]">
       <h2 id="help-title" className="m-0 text-titre-3 font-black leading-[1.1] tracking-[-0.02em]">
         {titre}
       </h2>
       <ul className="m-0 flex list-none flex-col gap-2.5 p-0">
         {HELP.map((h) => (
           <li key={h.name}>
-            <a href={`tel:${h.tel}`} className="flex flex-col gap-0.5 rounded-[20px] bg-white p-4 text-ink no-underline shadow-[inset_0_0_0_1.5px_var(--color-track)]">
+            <a href={`tel:${h.tel}`} className={LIGNE}>
               <span className="text-corps font-black">
                 {h.name} · {h.label}
               </span>
               <span className="text-legende font-extrabold text-grey">{h.detail}</span>
+            </a>
+          </li>
+        ))}
+        {LIGNES_PAR_SITUATION.map((s) => (
+          <li key={s.name}>
+            <a href={s.lien} target={s.lien.startsWith("https:") ? "_blank" : undefined} rel="noreferrer" className={LIGNE}>
+              <span className="text-corps font-black">
+                {s.name} · {s.label}
+              </span>
+              <span className="text-legende font-extrabold leading-[1.35] text-ink">{s.pour}</span>
+              <span className="text-legende font-extrabold leading-[1.35] text-grey">{s.detail}</span>
             </a>
           </li>
         ))}
