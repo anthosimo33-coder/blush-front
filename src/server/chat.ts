@@ -30,7 +30,7 @@ import { dire, voixDisponible, voixPour } from "./ia/voix";
 import { auMieux, journal, journalErreur } from "./journal";
 import { noterLAjout, pourLaMemoireDe, type AjoutLu } from "./ajouts";
 import { retenir } from "./memoire-groupee";
-import { aujourdhuiDans } from "./temps";
+import { aujourdhuiDans, heureNaiveDans } from "./temps";
 import { venteDuChat } from "./vente";
 
 /* Le chat du quotidien : la mémoire à la place de la conv, les derniers échanges, ce qu’il vient d’écrire. */
@@ -275,7 +275,7 @@ export async function repondre(
     reglement?: Reglement;
     cle?: string;
     vendre?: boolean;
-    /** Le fuseau du téléphone (fuseauSur) : le jour de son « aujourd’hui » ; sans lui, celui de la conv (Meta.fuseau). */
+    /** Le fuseau du téléphone (fuseauSur) : le jour de son « aujourd’hui » et l’heure qu’il y est ; sans lui, celui de la conv (Meta.fuseau). */
     fuseau?: string;
   } = {},
 ): Promise<{ reponse: BlushAnswer; majMemoire: boolean }> {
@@ -292,7 +292,10 @@ export async function repondre(
    */
   const lignes = new Map([...parIdentifiant(leFil.flatMap((x) => x.lignes ?? [])), ...memoire.lignes, ...parIdentifiant(nouvelles)]);
   const dit = ditBrut || (ajout?.ajout.messages ? DEMANDE_PAR_DEFAUT : ajout?.ajout.rappel ? DEMANDE_SUR_UN_RAPPEL : "(il t’envoie une capture de son profil)");
-  const jour = aujourdhuiDans(fuseau ?? fuseauDe(meta));
+  /* Le jour et l’heure de son téléphone, au même instant : « ce soir » ne se dit pas à 10 h du matin */
+  const maintenant = new Date();
+  const ici = fuseau ?? fuseauDe(meta);
+  const jour = aujourdhuiDans(ici, maintenant);
   /* Une réponse sans voix (verrouillée, ou le solde ne couvrait pas un vocal) s’écrit : le modèle ne prépare pas de texte dit */
   const sansVoix = !!reglement?.ecrit;
   const verrouAttendu = !!reglement?.verrouillee;
@@ -300,6 +303,7 @@ export async function repondre(
   const req = requeteChat({
     h,
     aujourdhui: jour.t,
+    heure: heureNaiveDans(ici, maintenant),
     chiffres: ctx.chiffres,
     fin: ctx.fin,
     etat: memoire.etat,

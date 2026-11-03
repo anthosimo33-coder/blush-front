@@ -19,6 +19,7 @@ import { db, schema } from "@/server/db";
 import { and, eq } from "drizzle-orm";
 import { TETE_DU_RAPPEL } from "@prompts/lib/ligne";
 import { jourDans } from "@/lib/jours";
+import { heureNaiveDans } from "@/server/temps";
 import { fournisseurFactice, refusFactice } from "@/server/ia/factice";
 import { FACTICE } from "@/server/ia/factice-valeurs";
 import { reponseErreur } from "@/server/http";
@@ -468,5 +469,29 @@ describe("le curseur des ajouts", () => {
     expect([jourDans(fuseau, avant), jourDans(fuseau, apres)]).toContain(jour);
     /* Sauf s’il a passé minuit à Paris pendant l’appel : le jour de Paris a pu rejoindre celui du téléphone */
     if (jourDans("Europe/Paris", avant) === jourDans("Europe/Paris", apres)) expect(jour).not.toBe(jourDans("Europe/Paris", avant));
+  });
+
+  it("l’heure du téléphone : le chat la reçoit dans son fuseau, celui de la conv à défaut, après son bloc en cache", async () => {
+    const id = await convLue();
+    /* L’heure qu’affiche un téléphone dans ce fuseau entre deux instants : une ou deux, si la minute a tourné pendant l’appel */
+    const heures = (fuseau: string, avant: Date, apres: Date) => [avant, apres].map((t) => new Date(heureNaiveDans(fuseau, t)).toISOString().slice(11, 16));
+    const heureLue = async (fuseau?: string) => {
+      const requetes: Requete[] = [];
+      const avant = new Date();
+      await avecFactice(
+        (req) => (requetes.push(req), fournisseurFactice(req)),
+        async () => repondre(await ligneEnBase(id), (await memoireDe(id))!, "salut", undefined, fuseau ? { fuseau } : {}),
+      );
+      const blocs = requetes.filter((r) => r.tache === "10-chat").at(-1)!.blocs;
+      expect(blocs.filter((b) => "texte" in b && /<heure>/.test(b.texte)).map((b) => "cache" in b && !!b.cache)).toEqual([false]);
+      return { lue: /<heure>(\d\d:\d\d)\b/.exec(blocs.flatMap((b) => ("texte" in b ? [b.texte] : [])).join("\n"))?.[1], avant, apres: new Date() };
+    };
+    /* Kiritimati (UTC+14) n’a jamais l’heure de Paris : le chat lit celle du téléphone */
+    const loin = await heureLue("Pacific/Kiritimati");
+    expect(heures("Pacific/Kiritimati", loin.avant, loin.apres)).toContain(loin.lue);
+    expect(heures("Europe/Paris", loin.avant, loin.apres)).not.toContain(loin.lue);
+    /* Sans fuseau envoyé : celui de la conv, Paris pour une conv importée sans */
+    const ici = await heureLue();
+    expect(heures(fuseauDe(metaDe(await ligneEnBase(id))), ici.avant, ici.apres)).toContain(ici.lue);
   });
 });
