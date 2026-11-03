@@ -48,7 +48,9 @@ function exporter(
     if (k < systeme) lignes.push(format === "ios" ? `${e} Tom: \u200eLe code de sécurité de Tom a changé.` : `${e} Le code de sécurité de Tom a changé.`);
     else if (k % 25 === 0) {
       const joint =
-        format === "ios" ? `\u200e<pièce jointe : ${String(k).padStart(8, "0")}-PHOTO-2026-01-01-10-00-00.jpg>` : `IMG-20260101-WA${String(k).padStart(4, "0")}.jpg (fichier joint)`;
+        format === "ios"
+          ? `\u200e<pièce jointe : ${String(k).padStart(8, "0")}-PHOTO-2026-01-01-10-00-00.jpg>`
+          : `IMG-20260101-WA${String(k).padStart(4, "0")}.jpg (fichier joint)`;
       lignes.push(`${e} ${qui}: ${medias ? joint : format === "ios" ? "\u200eimage absente" : "<Médias omis>"}`);
     } else {
       lignes.push(`${e} ${qui}: message ${k} mdr`);
