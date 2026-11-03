@@ -23,8 +23,8 @@ export type AideDuPilotage = {
 /**
  * Le jour où « Autres moteurs », « Assistants IA », « Mail » et les pages d’arrivée commencent à se compter, dit dans les
  * « ? » des sources et des pages d’arrivée (et par l’outil MCP definitions).
- * TODO(produit): c’est le jour de la PR « mesure » ; à caler sur sa vraie mise en ligne, avec la « Dernière mise à jour »
- * de la page de confidentialité (src/app/confidentialite/ConfidentialiteScreen.tsx).
+ * C’est le jour de sa mise en ligne, le même que la « Dernière mise à jour » de la page de confidentialité
+ * (CONFIDENTIALITE_MISE_A_JOUR, src/contenu/confidentialite.ts).
  */
 const DEBUT_DE_LA_MESURE = "3\u00a0novembre 2026";
 

@@ -26,10 +26,10 @@ import { derniereMiseAJour, NBSP } from "@/lib/format";
  * demande d’accord) : sa phrase dans « Les visites, sans cookie » et la ligne de PostHog, à relire, puis le PDF de Whop.
  * Le 20 octobre, l’interface s’y lit (tout masqué ne servait à rien) ; la conv, les prénoms, l’email, les saisies et les
  * images restent masqués (src/lib/secrets.ts) : la phrase le dit, à relire.
- * TODO(produit): la page d’arrivée (visites.arrivee, users.arrivee : le chemin de la première page, sans requête ni
- * identifiant, src/lib/chemins.ts) ajoutée le 3 novembre 2026 à « Les visites, sans cookie » (« et par quelle page »,
- * « et ta page d’arrivée »), avec la date de mise à jour : à valider, puis à reporter dans le PDF de Whop. La date est
- * celle de la PR : à caler sur sa vraie mise en ligne, comme DEBUT_DE_LA_MESURE (src/contenu/aide-pilotage.ts).
+ * Le 3 novembre 2026, la page d’arrivée (visites.arrivee, users.arrivee : le chemin de la première page, sans requête
+ * ni identifiant, src/lib/chemins.ts) entre dans « Les visites, sans cookie » (« et par quelle page », « et ta page
+ * d’arrivée ») : phrase validée par l’utilisateur ce jour-là, date de la page dans CONFIDENTIALITE_MISE_A_JOUR.
+ * TODO(produit): reporter cette phrase dans le PDF de confidentialité de Whop.
  */
 
 function Ligne({ icone, ton, titre, children }: { icone: Parameters<typeof RowIcon>[0]["icon"]; ton?: Parameters<typeof RowIcon>[0]["tone"]; titre: string; children: ReactNode }) {
@@ -168,11 +168,7 @@ export function ConfidentialiteScreen() {
         </Ligne>
       </InsetGroup>
 
-<<<<<<< HEAD
       <InsetGroup title="Nos prestataires" id="prestataires" className="mt-6" footer={`BLUSH est ouvert dès 15 ans. ${derniereMiseAJour(CONFIDENTIALITE_MISE_A_JOUR)}`}>
-=======
-      <InsetGroup title="Nos prestataires" id="prestataires" className="mt-6" footer={`BLUSH est ouvert dès 15 ans. Dernière mise à jour\u00a0: 3 novembre 2026.`}>
->>>>>>> 04f55ed2 (Mesure : moteurs, assistants IA et mail à part, liens des mails marqués, page d’arrivée des visites)
         <InsetRow title="Vercel" sub="L’hébergement du site, à Francfort" />
         <InsetRow title="Neon" sub="La base de données, à Francfort" />
         <InsetRow title="Le prestataire qui fait tourner BLUSH" sub="Il lit ta conv pour BLUSH, aux États-Unis" />
