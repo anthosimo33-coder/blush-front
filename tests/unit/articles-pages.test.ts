@@ -2,7 +2,7 @@ import { createElement, type ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { ctaDe } from "@/components/landing/cta";
-import { LIGNES_D_ECOUTE, URGENCES } from "@/contenu/aide";
+import { LIGNES_D_ECOUTE, LIGNES_PAR_SITUATION, URGENCES } from "@/contenu/aide";
 import { ARTICLES, liesDe } from "@/contenu/articles";
 import type { Article } from "@/contenu/articles/types";
 import { PHRASE_D_IDENTITE } from "@/contenu/identite";
@@ -171,6 +171,12 @@ describe("les guides et le lexique, avec des articles", () => {
     expect(t).toContain("Besoin d’en parler\u00a0?");
     expect(t).toContain(URGENCES);
     for (const l of LIGNES_D_ECOUTE) expect(html).toContain(`href="tel:${l.tel}"`);
+    /* Les cinq lignes par situation, chacune à son lien (le 3018 aussi à son tchat), et ce qu’elles disent tel quel */
+    for (const s of LIGNES_PAR_SITUATION) {
+      expect(html).toContain(`href="${s.lien}"`);
+      expect(t).toContain(s.pour);
+      if ("tchat" in s) expect(html).toContain(`href="${s.tchat}"`);
+    }
     expect(t.indexOf(URGENCES)).toBeLessThan(t.indexOf(ctaDe(null).label));
     expect(graphe(html).find((n) => n["@type"] === "BreadcrumbList")).toMatchObject({ itemListElement: [{}, { name: "Lexique" }, { name: ENTREE.titre }] });
   });

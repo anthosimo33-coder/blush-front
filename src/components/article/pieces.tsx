@@ -6,7 +6,7 @@ import { Icon } from "@/components/ui/icons";
 import { LiensJuridiques } from "@/components/juridique/pages";
 import { CtaButton } from "@/components/landing/CtaButton";
 import { ctaDe } from "@/components/landing/cta";
-import { LIGNES_D_ECOUTE, URGENCES } from "@/contenu/aide";
+import { LIGNES_D_ECOUTE, LIGNES_PAR_SITUATION, URGENCES } from "@/contenu/aide";
 import type { Jour, Zone } from "@/contenu/articles/types";
 import { PHRASE_D_IDENTITE } from "@/contenu/identite";
 import { prixDe } from "@/contenu/offres";
@@ -55,9 +55,10 @@ export function FilDAriane({ etapes }: { etapes: readonly { nom: string; href?: 
 }
 
 /**
- * Le bloc d’aide d’une page orange ou rouge : les numéros d’urgence et les lignes d’écoute de src/contenu/aide.ts, tels
- * qu’ils sont (un numéro changé là change ici), chacun à un toucher. `niveau` : celui de son titre, h3 dans une section,
- * h2 en tête de page (la zone rouge), pour que les titres se suivent sans sauter de marche.
+ * Le bloc d’aide d’une page orange ou rouge : les numéros d’urgence, les lignes d’écoute et les lignes par situation de
+ * src/contenu/aide.ts, tels qu’ils sont (un numéro changé là change ici), chacun à un toucher ; le 3018 a aussi son
+ * tchat, comme sur la feuille du rapport doux. `niveau` : celui de son titre, h3 dans une section, h2 en tête de page
+ * (la zone rouge), pour que les titres se suivent sans sauter de marche.
  */
 export function BlocAide({ niveau = 3 }: { niveau?: 2 | 3 }) {
   const titre = useId();
@@ -78,6 +79,23 @@ export function BlocAide({ niveau = 3 }: { niveau?: 2 | 3 }) {
             <span className="text-legende font-extrabold text-grey">{l.detail}</span>
           </li>
         ))}
+        {LIGNES_PAR_SITUATION.map((s) => {
+          const nouvelOnglet = s.lien.startsWith("https:") ? { target: "_blank", rel: "noreferrer" } : {};
+          return (
+            <li key={s.label} className="flex flex-col">
+              <a href={s.lien} {...nouvelOnglet} className="text-detail font-black text-toi-ink no-underline hover:underline">
+                {s.name} · {s.label}
+              </a>
+              <span className="text-legende font-extrabold text-ink">{s.pour}</span>
+              <span className="text-legende font-extrabold text-grey">{s.detail}</span>
+              {"tchat" in s && (
+                <a href={s.tchat} target="_blank" rel="noreferrer" aria-label={`Écrire en tchat au ${s.label}`} className="text-legende font-black text-toi-ink">
+                  Écrire en tchat
+                </a>
+              )}
+            </li>
+          );
+        })}
       </ul>
     </aside>
   );
