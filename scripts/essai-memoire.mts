@@ -39,6 +39,7 @@ for (const ech of (JSON.parse(readFileSync(cheminDonne(fichierEchanges), "utf8")
   if (m && !m.rien_de_neuf) {
     console.log(`  où on en est : ${m.ou_on_en_est ?? "(inchangé)"}`);
     console.log(`  moments : ${m.moments_ajoutes.map((x) => `${x.quand} ${x.quoi}`).join(" | ") || "—"}`);
+    console.log(`  sa vie : ${m.sa_vie ? m.sa_vie.map((x) => x.texte).join(" | ") || "(vide)" : "(inchangée)"}`);
     console.log(`  conseils : ${m.conseils ? m.conseils.map((c) => `${c.conseil} → ${c.suite}`).join(" | ") : "(inchangés)"}`);
     console.log(`  à venir : ${m.a_venir ? m.a_venir.map((x) => `${x.date} ${x.quoi}`).join(" | ") || "(vide)" : "(inchangé)"}`);
     console.log(`  fiche : +${m.faits_ajoutes.map((f) => f.texte).join(", +") || "—"} · −${m.faits_retires.join(", −") || "—"} · phrase : ${m.phrase ?? "(inchangée)"}`);

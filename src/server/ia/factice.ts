@@ -194,6 +194,7 @@ export function fournisseurFactice(req: RequeteFactice): SortieFactice {
       moments_ajoutes: [{ quand: "2026-03-14", quoi: "D’après lui, ils se sont vus et c’était trop bien.", preuves: [] }],
       son_mode: null,
       ton_mode: null,
+      sa_vie: null,
       conseils: null,
       a_venir: null,
       faits_ajoutes: [
@@ -270,6 +271,7 @@ export function fournisseurFactice(req: RequeteFactice): SortieFactice {
         moments: [{ quand: "2026-02-01", quoi: "Premier verre.", preuves: [preuve(1)] }],
         son_mode: [{ texte: "Vanne après un mot doux.", preuves: [preuve(2)] }],
         ton_mode: [{ texte: "Esquive.", preuves: [preuve(3)] }],
+        sa_vie: [],
         conseils: [{ quand: "2026-03-01", conseil: "Lui répondre en face.", suite: "en_attente", resultat: null }],
         a_venir: [],
       },

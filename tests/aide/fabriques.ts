@@ -29,7 +29,7 @@ export const lotVideo = (autre = "Léa", k0 = 0) =>
     blocs: [{ repere: { date: "2026-09-08", heure: "21:40" }, messages: Array.from({ length: 15 }, (_, k) => msg(k % 2 ? "moi" : "autre", `message ${k0 + k}`)) }],
   });
 
-const MEMOIRE: NonNullable<Memoire["memoire"]> = { ou_on_en_est: "Vus deux fois.", moments: [], son_mode: [], ton_mode: [], conseils: [], a_venir: [] };
+const MEMOIRE: NonNullable<Memoire["memoire"]> = { ou_on_en_est: "Vus deux fois.", moments: [], son_mode: [], ton_mode: [], sa_vie: [], conseils: [], a_venir: [] };
 const FICHE: NonNullable<Memoire["fiche"]> = { portrait: "la Taquine", phrase: "Son exam est jeudi", phrase_courte: "Son exam jeudi", faits: [] };
 
 /** Une mémoire faite (prompt 07) : `memoire` et `fiche` complètent une mémoire et une fiche vides, le reste la remplace. */
@@ -53,6 +53,7 @@ export const maj = (m: Partial<Maj> = {}): Maj =>
     moments_ajoutes: [],
     son_mode: null,
     ton_mode: null,
+    sa_vie: null,
     conseils: null,
     a_venir: null,
     faits_ajoutes: [],

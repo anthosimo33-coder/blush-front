@@ -428,13 +428,13 @@ describe("le chat d’une mémoire de secours : l’alerte du verdict est dans c
 
   /*
    * Sans alerte, la mémoire que lisent le chat et sa mise à jour reste celle d’avant la ligne de l’alerte, à l’octet :
-   * ces empreintes ont été prises sur main (8345105) avant elle.
+   * ces empreintes ont été prises sur main (8345105) avant elle, puis reprises le 3 novembre 2026 avec la ligne « sa vie ».
    */
   it("sans alerte : la mémoire que lisent le chat et sa mise à jour ne change pas d’un octet", () => {
     const sans = sansAlerte(cas.danger);
-    expect(empreinte(memoireDe(enChat(sans)).join("\n"))).toBe("6790117e23af6ae3");
-    expect(empreinte(memoireDe(enMaj(sans)).join("\n"))).toBe("ff45b1bb742a0f39");
-    expect(empreinte(memoireDe(enChat(sansAlerte(cas.mineur))).join("\n"))).toBe("5ecf96e36380c1f1");
+    expect(empreinte(memoireDe(enChat(sans)).join("\n"))).toBe("60225deeabec635b");
+    expect(empreinte(memoireDe(enMaj(sans)).join("\n"))).toBe("9b6e517a1cfe4df4");
+    expect(empreinte(memoireDe(enChat(sansAlerte(cas.mineur))).join("\n"))).toBe("498b5bcb118c2c8b");
   });
 });
 
