@@ -18,7 +18,7 @@ import { MENTIONS } from "@/contenu/mentions-legales";
  * du site donne aux moteurs. À changer avec un texte de la landing changé (une phrase, un avis, une question), jamais
  * pour un style ou un bouton déplacé : une date qui bouge sans raison, les moteurs cessent de la croire.
  */
-const LANDING_MISE_A_JOUR: Jour = "2026-10-22";
+const LANDING_MISE_A_JOUR: Jour = "2026-11-03";
 
 /**
  * Les pages fixes à indexer : leur chemin, leur nom (/llms.txt), leur poids dans le plan du site, et le jour de leur
