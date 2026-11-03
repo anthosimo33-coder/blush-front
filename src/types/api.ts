@@ -677,7 +677,8 @@ export const ROUTES = {
   "POST /api/rapport": {},
   /*
    * Le signe d’un onglet ouvert (src/lib/presence.ts) : son identifiant (tiré au hasard à l’ouverture de la page, jamais
-   * gardé), l’écran, et à son premier signe d’où il vient (utm_source, le site d’avant)
+   * gardé), l’écran, d’où il vient (utm_source, le site d’avant ou le paquet d’une appli Android), et à son premier signe
+   * la page d’arrivée (son chemin nettoyé, que le serveur renettoie : src/lib/chemins.ts)
    */
   "POST /api/presence": {
     corps: z.strictObject({
@@ -686,6 +687,7 @@ export const ROUTES = {
       premier: z.boolean(),
       utm: z.string().max(80).optional(),
       referent: z.string().max(200).optional(),
+      arrivee: z.string().max(200).optional(),
     }),
   },
   /**

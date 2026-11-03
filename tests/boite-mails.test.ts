@@ -59,6 +59,23 @@ describe("la boîte à mails des tests de bout en bout", () => {
     expect(mails.find((m) => !m.code)).toMatchObject({ pour: "noe@e2e.blush.test", sujet: "Un sujet", texte: "Un texte", html: "<p>Un texte</p>" });
   });
 
+  it("ce qui y arrive est ce qui partirait : les liens vers le site marqués utm_source=email et le genre du mail (marquerLesLiens)", async () => {
+    const { env, envoyerCodeParEmail, envoyerMail } = await charger();
+    const site = env().BLUSH_URL;
+    await envoyerCodeParEmail("noe@e2e.blush.test", "042917");
+    await envoyerMail(
+      "noe@e2e.blush.test",
+      { sujet: "Un sujet", texte: `Lire : ${site}/ouvrir/c1?m=s1_haut`, html: `<a href="${site}/ouvrir/c1?m=s1_haut">Lire</a>` },
+      { sorte: "relance", suivi: "sequence-s1_haut" },
+    );
+    const mails = mailsDeLaBoite();
+    expect(mails.find((m) => m.code)!.html).toContain(`href="${site}/?utm_source=email&amp;utm_campaign=code"`);
+    expect(mails.find((m) => !m.code)).toMatchObject({
+      texte: `Lire : ${site}/ouvrir/c1?m=s1_haut&utm_source=email&utm_campaign=s1_haut`,
+      html: `<a href="${site}/ouvrir/c1?m=s1_haut&amp;utm_source=email&amp;utm_campaign=s1_haut">Lire</a>`,
+    });
+  });
+
   it("un mail à plusieurs destinataires (les alertes de l’équipe) : un fichier pour chacun ; à personne, rien", async () => {
     const { envoyerMail } = await charger();
     await envoyerMail(["equipe@e2e.blush.test", "nuit@e2e.blush.test"], { sujet: "BLUSH · une alerte", texte: "Tâche t1" });

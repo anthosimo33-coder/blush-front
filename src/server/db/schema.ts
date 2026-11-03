@@ -120,6 +120,12 @@ export const users = pgTable("users", {
    */
   source: text("source", { enum: SOURCES_VISITE }),
   /**
+   * Sa page d’arrivée : celle de la visite d’où vient `source`, notée avec elle (visites.arrivee : un chemin nettoyé, ni
+   * requête ni identifiant). null : un compte d’avant qu’on la note (le 3 novembre 2026), ou sa visite pas retrouvée. Le
+   * tableau de bord en tire les ventes par page d’arrivée.
+   */
+  arrivee: text("arrivee"),
+  /**
    * « Quitter le mode tournage » touché, connecté à ce compte : l’heure. Ses prises d’avant ne font plus de lui le compte
    * d’une créatrice, à qui une vraie lecture est refusée (src/server/tournage.ts, estCreatrice) ; une nouvelle prise, si.
    */
@@ -882,8 +888,9 @@ export const actionsEquipe = pgTable(
 
 /**
  * Les visiteurs, un par jour (de Paris) : l’empreinte anonyme de sa connexion (src/server/visites.ts : son adresse IP et
- * son navigateur, mêlés au sel du jour, qui s’efface le surlendemain ; jamais l’adresse elle-même), et d’où il est venu
- * ce jour-là. Sans cookie : la même personne revenue un autre jour compte une fois de plus. Gardés VISITES_GARDEES_JOURS.
+ * son navigateur, mêlés au sel du jour, qui s’efface le surlendemain ; jamais l’adresse elle-même), d’où il est venu
+ * ce jour-là, et sa page d’arrivée. Sans cookie : la même personne revenue un autre jour compte une fois de plus.
+ * Gardés VISITES_GARDEES_JOURS.
  */
 export const visites = pgTable(
   "visites",
@@ -891,6 +898,11 @@ export const visites = pgTable(
     jour: date("jour").notNull(),
     empreinte: text("empreinte").notNull(),
     source: text("source", { enum: SOURCES_VISITE }).notNull(),
+    /**
+     * Le chemin de sa première page, nettoyé (src/lib/chemins.ts, arriveeDe) : ni requête, ni fragment, ni identifiant
+     * (« /v/:id »). null : une visite d’avant qu’on la note (le 3 novembre 2026).
+     */
+    arrivee: text("arrivee"),
     arriveLe: quand("arrive_le").notNull().defaultNow(),
   },
   (t) => [primaryKey({ columns: [t.jour, t.empreinte] }), index("visites_arrive_idx").on(t.arriveLe)],

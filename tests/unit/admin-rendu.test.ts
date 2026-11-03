@@ -56,8 +56,13 @@ describe("le pilotage, rendu", () => {
     for (const titre of ["Qui importe", "Des filles", "Des garçons", "Pas encore dit", "Et sur qui", "Une fille sur un garçon", "Deux garçons"]) expect(t, titre).toContain(titre);
     expect(t).toMatch(/L’autre\u00a0: [\d\u202f]+\u00a0garçons, [\d\u202f]+\u00a0filles, dont [\d\u202f]+\u00a0devinés/);
     if (jours === 1) expect(t).toContain("«\u00a0—\u00a0»\u00a0: moins de 30\u00a0convs, trop peu pour un taux.");
-    for (const titre of ["D’où ils viennent", "Ce qui se vend", "Les coups de pouce", "Ce que coûte l’IA", "Santé", "Outils", "Bêta", "Les derniers gestes"])
+    for (const titre of ["D’où ils viennent", "Pages d’arrivée", "Ce qui se vend", "Les coups de pouce", "Ce que coûte l’IA", "Santé", "Outils", "Bêta", "Les derniers gestes"])
       expect(t, titre).toContain(titre);
+    /* Les pages d’arrivée : chaque groupe dans son ordre, même vide (le parrainage), avec ses visiteurs, son taux et son payé */
+    expect(t).toMatch(
+      /Landing [\d\u202f]+ [\d,]+\u00a0% [\d\u202f]+\u00a0€ Guides et lexique [\d\u202f]+ [\d,]+\u00a0% [\d\u202f]+\u00a0€ Verdicts partagés .* Parrainage 0 — 0\u00a0€ Pages légales .* Autres /,
+    );
+    for (const source of ["Assistants IA", "Autres moteurs", "Mail"]) expect(t, source).toContain(source);
     expect(t).toContain("Que des nombres\u00a0: aucune conv, aucun message, aucun email ne sort d’ici.");
     /* Un « ? » par carte et par chiffre clé, chacun nommé */
     for (const cle of [
@@ -72,6 +77,7 @@ describe("le pilotage, rendu", () => {
       "paywall",
       "quiImporte",
       "sources",
+      "arrivees",
       "mix",
       "coups",
       "couts",
@@ -134,6 +140,7 @@ describe("le pilotage, rendu", () => {
       dollars: zero,
       tunnel: { visiteurs: 0, imports: 0, paywall: 0, acheteurs: 0, racheteurs: 0 },
       sources: [],
+      arrivees: s.pilotage.arrivees.filter((a) => a.groupe !== null).map((a) => ({ ...a, visiteurs: 0, acheteurs: 0, centimes: 0, chemins: [] })),
       quiImporte: { importees: personne, payees: personne },
       mix: s.pilotage.mix.map((m) => ({ ...m, n: 0, centimes: 0 })),
       iaDuJour: { dollars: 0, budget: 30, sansCompte: { dollars: 0, budget: 50 } },
@@ -154,6 +161,7 @@ describe("le pilotage, rendu", () => {
     const t = texte(renderToStaticMarkup(createElement(Pilotage, { s, direct: vide, base: "/admin", sonder: false })));
     expect(t).not.toMatch(SALE);
     expect(t).toContain("Ni visite ni vente sur la période.");
+    expect(t).toContain("Aucune visite sur la période.");
     expect(t).toContain("Aucune conv importée sur la période.");
     expect(t).toContain("Aucun appel au modèle sur la période.");
     expect(t).toContain("Pas encore de fuite à comparer");

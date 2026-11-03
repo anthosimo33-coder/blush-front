@@ -258,6 +258,9 @@ function arrivee(source: SourceVisite): string {
   if (source === "direct") return "arrive en direct";
   if (source === "partage") return "arrive d’un verdict partagé";
   if (source === "autre") return "arrive d’un autre site";
+  if (source === "moteurs") return "arrive d’un autre moteur";
+  if (source === "assistants") return "arrive d’un assistant IA";
+  if (source === "mail") return "arrive d’un mail";
   const nom = NOMS_DES_SOURCES[source];
   return `arrive ${/^[aeiouyhéè]/i.test(nom) ? "d’" : "de "}${nom}`;
 }

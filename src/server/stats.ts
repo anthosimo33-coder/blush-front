@@ -3,7 +3,7 @@ import { sql, type SQL } from "drizzle-orm";
 import type { Pronom } from "@prompts/lib/conv";
 import { GENRES_DU_HAUT, type GenreDuHaut } from "@/contenu/haut-du-paywall";
 import { CATALOGUE, RAPPORT_D_AVANCE } from "@/contenu/offres";
-import { GROUPE_DE_L_OFFRE, GROUPES_D_OFFRES, PAIRES, type GroupeDOffres, type Paire } from "@/contenu/pilotage";
+import { GROUPE_DE_L_OFFRE, GROUPES_D_ARRIVEE, GROUPES_D_OFFRES, PAIRES, groupeDArrivee, type GroupeDArrivee, type GroupeDOffres, type Paire } from "@/contenu/pilotage";
 import {
   CLES_DES_APPLIS,
   GENRES_VENDUS,
@@ -216,6 +216,20 @@ export type Pilotage = {
    * (users.source). `source` null : les acheteurs dont le compte date d’avant le suivi des visites. Classées par payé.
    */
   sources: { source: SourceVisite | null; visiteurs: number; acheteurs: number; centimes: number }[];
+  /**
+   * Les pages d’arrivée, par groupe (GROUPES_D_ARRIVEE, groupeDArrivee) : leurs visiteurs (visites.arrivee), et les vrais
+   * clients qui ont acheté (et leur payé) d’après la page d’arrivée de leur compte (users.arrivee), comme les sources.
+   * Tous les groupes dans leur ordre, même vides, puis `groupe` null s’il a quelque chose : les visites et les acheteurs
+   * d’avant qu’on note la page (le 3 novembre 2026). `chemins` : les pages de ce groupe qui ont du monde, la plus vue
+   * d’abord (CHEMINS_PAR_GROUPE au plus), pour rattacher une vente à un guide précis.
+   */
+  arrivees: {
+    groupe: GroupeDArrivee | null;
+    visiteurs: number;
+    acheteurs: number;
+    centimes: number;
+    chemins: { chemin: string; visiteurs: number; acheteurs: number; centimes: number }[];
+  }[];
   /**
    * Qui importe : les convs importées sur la période (sans les prises du tournage), et celles d’entre elles payées depuis
    * (PAYEE_S), par genre. Leur meta est chiffrée : chacune se déchiffre à chaque calcul, sur toutes les convs de la
@@ -658,6 +672,36 @@ export async function statsAdmin(jours: Periode): Promise<StatsAdmin> {
 const fenetre = (col: string, jours: Periode, k = 0) =>
   sql.raw(`${col} >= now() - make_interval(days => ${(k + 1) * jours}) and ${col} < now() - make_interval(days => ${k * jours})`);
 
+/** Au plus, les pages d’un groupe d’arrivée que le pilotage détaille. */
+const CHEMINS_PAR_GROUPE = 10;
+
+/**
+ * Les pages d’arrivée de la période, réunies par groupe (Pilotage["arrivees"]) : les visiteurs par page (visites.arrivee)
+ * et les acheteurs par page de leur compte (users.arrivee), une ligne par page, rangés sous leur groupe.
+ */
+function arriveesDe(visiteurs: { arrivee: string | null; n: string }[], acheteurs: { arrivee: string | null; acheteurs: string; centimes: string }[]): Pilotage["arrivees"] {
+  type Ligne = { visiteurs: number; acheteurs: number; centimes: number };
+  const vide = (): Ligne => ({ visiteurs: 0, acheteurs: 0, centimes: 0 });
+  const parChemin = new Map<string | null, Ligne>();
+  const ligneDe = (chemin: string | null) => parChemin.get(chemin) ?? parChemin.set(chemin, vide()).get(chemin)!;
+  for (const v of visiteurs) ligneDe(v.arrivee).visiteurs += n(v.n);
+  for (const a of acheteurs) Object.assign(ligneDe(a.arrivee), { acheteurs: n(a.acheteurs), centimes: n(a.centimes) });
+  const groupes = new Map<GroupeDArrivee | null, Pilotage["arrivees"][number]>([...GROUPES_D_ARRIVEE, null].map((groupe) => [groupe, { groupe, ...vide(), chemins: [] }]));
+  for (const [chemin, l] of parChemin) {
+    const g = groupes.get(chemin === null ? null : groupeDArrivee(chemin))!;
+    g.visiteurs += l.visiteurs;
+    g.acheteurs += l.acheteurs;
+    g.centimes += l.centimes;
+    if (chemin !== null) g.chemins.push({ chemin, ...l });
+  }
+  return [...groupes.values()]
+    .filter((g) => g.groupe !== null || g.visiteurs || g.acheteurs)
+    .map((g) => ({
+      ...g,
+      chemins: g.chemins.sort((a, b) => b.visiteurs - a.visiteurs || b.centimes - a.centimes || a.chemin.localeCompare(b.chemin)).slice(0, CHEMINS_PAR_GROUPE),
+    }));
+}
+
 /**
  * Le pilotage de la période : l’argent, les visiteurs, le tunnel, les sources, ce qui se vend, l’IA et ce qui coince.
  * Les chiffres suivent la fenêtre glissante des autres (`jours` jusqu’à maintenant) ; les cases des graphiques, elles,
@@ -686,6 +730,8 @@ async function pilotageDe(jours: Periode): Promise<Pilotage> {
     parAppli,
     visiteursParSource,
     achatsParSource,
+    visiteursParArrivee,
+    achatsParArrivee,
     parOffre,
     iaDuJour,
     sante,
@@ -759,6 +805,11 @@ async function pilotageDe(jours: Periode): Promise<Pilotage> {
     lignes<{ source: SourceVisite | null; acheteurs: string; centimes: string }>(
       sql`select u.source, count(distinct a0.user_id) as acheteurs, sum(a0.centimes) as centimes
           from achats a0 left join users u on u.id = a0.user_id where ${W("a0.paye_le")} and ${ACHAT_DU_PRODUIT} group by u.source`,
+    ),
+    lignes<{ arrivee: string | null; n: string }>(sql`select arrivee, count(*) as n from visites where ${W("arrive_le")} group by arrivee`),
+    lignes<{ arrivee: string | null; acheteurs: string; centimes: string }>(
+      sql`select u.arrivee, count(distinct a0.user_id) as acheteurs, sum(a0.centimes) as centimes
+          from achats a0 left join users u on u.id = a0.user_id where ${W("a0.paye_le")} and ${ACHAT_DU_PRODUIT} group by u.arrivee`,
     ),
     lignes<{ offre: OffreId; n: string; centimes: string }>(
       sql`select a0.offre, count(*) as n, sum(a0.centimes) as centimes from achats a0 where ${W("a0.paye_le")} and ${ACHAT_DU_PRODUIT} group by a0.offre`,
@@ -945,6 +996,7 @@ async function pilotageDe(jours: Periode): Promise<Pilotage> {
     sources: [...parSource]
       .map(([source, l]) => ({ source, ...l }))
       .sort((a, b) => b.centimes - a.centimes || b.visiteurs - a.visiteurs || (a.source === null ? 1 : b.source === null ? -1 : 0)),
+    arrivees: arriveesDe(visiteursParArrivee, achatsParArrivee),
     quiImporte: { importees: genresDe(convs.map((c) => c.meta)), payees: genresDe(convs.filter((c) => c.payee).map((c) => c.meta)) },
     mix: GROUPES_D_OFFRES.map((groupe) => ({ groupe, ...groupes.get(groupe)! })),
     hauts: GENRES_DU_HAUT.map((genre) => ({
