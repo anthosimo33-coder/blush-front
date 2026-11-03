@@ -1414,12 +1414,14 @@ describe("le contexte du chat garde l’heure lue (Contexte.lus, heureLue)", () 
  * La borne suit la machine (comme tests/unit/import-bornes.test.ts) : chaque réunion se mesure à celle de l’export seul,
  * chronométrée dans le même fichier. Mesuré le 3 novembre : l’export et la vidéo, 1,9 fois l’export seul (1,3 à 1,6 sans
  * date) ; la conv de rituels, dont chaque rituel de la vidéo sans date cherche ses places dans toute la conv, 5,4 à 6,6
- * fois (7,7 sous la couverture) ; l’envoi forgé, arrêté par COMPARAISONS_MAX, 4,7 à 5 fois (6,7 sous la couverture). Un
- * appariement quadratique en coûterait des centaines de fois.
+ * fois (7,7 sous la couverture) ; l’envoi forgé, arrêté par COMPARAISONS_MAX, 4,7 à 5 fois (6,7 sous la couverture). Sur la
+ * petite machine de la CI, où les projets unit et client tournent en même temps, ces deux cas forgés ont pris 16 et 17 fois
+ * l’export seul (2 s pour 122 ms, le 3 novembre) : leur borne laisse cette marge. Un appariement quadratique en coûterait
+ * des centaines de fois.
  */
 describe("le temps", { timeout: 30_000 }, () => {
   const FOIS = 4;
-  const FOIS_FORGE = 15;
+  const FOIS_FORGE = 40;
   const t0 = Date.UTC(2025, 8, 1, 8, 0);
   const date = (k: number) => {
     const x = new Date(t0 + k * 13 * 60e3);
