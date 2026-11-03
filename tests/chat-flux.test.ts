@@ -119,6 +119,8 @@ beforeEach(async () => {
   chat = null;
   etat.alertes.length = 0;
   await vocalEnBase(false);
+  /* Un chat vide à chaque test : ce que les réponses d’un autre test ont cité ne se remontrerait pas (src/server/chat.ts, REPONSES_SANS_REDITE) */
+  await db().delete(schema.chatMessages).where(eq(schema.chatMessages.storyId, id));
 });
 
 describe("POST /api/chat en flux", () => {
