@@ -260,6 +260,8 @@ describe("les appels lus sur l’écran", () => {
       [null, "Appel vocal · Rappeler", "Appel vocal manqué", "appel manqué", false],
       [null, "Appel vidéo manqué", "Appel vidéo manqué", "appel manqué", false],
       [null, "Appel vocal manqué 21:05", "Appel vocal manqué", "appel manqué", false],
+      /* L’heure de la bulle à deux chiffres collée à « h » : un mot d’appel quand le libellé dit un manque (« facetime 21h » reste un rendez-vous) */
+      [null, "Appel vocal manqué · 21h05", "Appel vocal manqué", "appel manqué", false],
       [null, "Missed video call", "Appel vidéo manqué", "appel manqué", false],
       [null, "Missed voice call · Tap to call back", "Appel vocal manqué", "appel manqué", false],
       /* Sans media non plus, l’heure de la bulle n’est pas une durée ; une durée entière se lit (« hr », « mins ») */

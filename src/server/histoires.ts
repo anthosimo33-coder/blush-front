@@ -80,8 +80,10 @@ export type Meta = {
    * le jour de l’import, que les écrans ne montrent pas ; absent d’une conv importée avant la PR 5 (datée du jour de l’import).
    * `finSansDate` : des messages datés, mais pas le dernier (des captures sans date qui suivent ceux qu’elles reprennent) :
    * `fin` est le dernier jour daté ; le modèle le lit dans la ligne des morceaux (provenancesDe, Provenance.finSansDate).
+   * `debutSansDate` : des messages datés, mais pas le premier (des captures sans date rangées avant le premier message
+   * qu’elles reprennent) : `debut` est le premier jour daté, de même. Absents d’une conv importée avant la PR 5.
    */
-  resume: { debut: string; fin: string; total: number; vocaux: number; medias?: number; sansDate?: true; finSansDate?: true };
+  resume: { debut: string; fin: string; total: number; vocaux: number; medias?: number; sansDate?: true; debutSansDate?: true; finSansDate?: true };
   /** Des captures : combien. L’utilisateur y est « Moi » (à droite), son prénom vient de « Qui es-tu ? ». */
   captures?: number;
   /** L’export était trop long pour partir en entier : seule sa partie la plus récente a été gardée (de `resume.debut` à la fin). */
@@ -144,7 +146,7 @@ export type LigneEcran = Ligne & { aConv: boolean };
  * n’écrit que « <Médias omis> », légendés compris. Un export qui nomme ses médias (une photo, un vocal), Instagram et ses
  * partages, des captures : rien, l’écran garde ses vocaux. Son premier et son dernier jour sont ceux de ses messages
  * datés (jourConnu) ; sans aucun, ceux écrits au-dessus d’eux, dits `sansDate` ; un dernier message sans date, après
- * des messages datés, se dit `finSansDate`.
+ * des messages datés, se dit `finSansDate`, et un premier, avant eux, `debutSansDate`.
  */
 export function resumeDe(messages: Message[], format?: Format): Meta["resume"] {
   const [premier] = messages;
@@ -160,6 +162,7 @@ export function resumeDe(messages: Message[], format?: Format): Meta["resume"] {
     total: messages.length,
     vocaux: messages.filter((m) => m.media === "vocal").length,
     ...(dates.length ? {} : { sansDate: true as const }),
+    ...(dates.length && !jourConnu(premier) ? { debutSansDate: true as const } : {}),
     ...(dates.length && !jourConnu(dernier) ? { finSansDate: true as const } : {}),
     ...(format === "whatsapp-android" ? mediasSansNom(messages) : {}),
   };
@@ -714,9 +717,9 @@ export function nomsDeToi(meta: Meta): string[] {
 
 /**
  * D’où vient chaque morceau d’une conv réunie (son appli, un export ou des captures, ses dates, s’il est coupé (son
- * début n’a pas été importé), s’il n’a aucune date ou finit sans date), pour la ligne qui ouvre la conv que lit le
- * modèle (rendre, prompts/lib/conv.ts) : le trou entre deux morceaux n’y est plus lu comme un silence. Aucun pour une
- * conv d’un seul morceau.
+ * début n’a pas été importé), s’il n’a aucune date, commence ou finit sans date), pour la ligne qui ouvre la conv que
+ * lit le modèle (rendre, prompts/lib/conv.ts) : le trou entre deux morceaux n’y est plus lu comme un silence. Aucun
+ * pour une conv d’un seul morceau.
  */
 export const provenancesDe = (meta: Pick<Meta, "morceaux">): Provenance[] =>
   (meta.morceaux ?? []).map((m) => ({
@@ -726,6 +729,7 @@ export const provenancesDe = (meta: Pick<Meta, "morceaux">): Provenance[] =>
     fin: m.resume.fin,
     ...(m.coupe ? { coupe: true as const } : {}),
     ...(m.resume.sansDate ? { sansDate: true as const } : {}),
+    ...(m.resume.debutSansDate ? { debutSansDate: true as const } : {}),
     ...(m.resume.finSansDate ? { finSansDate: true as const } : {}),
   }));
 

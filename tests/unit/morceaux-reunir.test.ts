@@ -1042,6 +1042,44 @@ describe("ce que le modèle et l’écran lisent d’une conv réunie avec des c
     expect(provenancesDe({ morceaux: metas })[1]).toMatchObject({ debut: "2026-10-20", fin: "2026-10-20" });
   });
 
+  it("rangées avant le premier message qu’elles reprennent : la ligne des morceaux dit « sans date, puis le 2026-10-20 », même dans une conv coupée par le banc", () => {
+    /* Le même export du 20 au 29 octobre : six messages par soir, « on reparle du concert numéro k » à 20:k */
+    const lignes = Array.from({ length: 60 }, (_, k): Ligne => [
+      `${p2(20 + Math.floor(k / 6))}/10/2026 20:${p2(k)}:00`,
+      k % 2 ? "Léa" : "Hugo",
+      `on reparle du concert numéro ${k} ce week-end`,
+    ]);
+    const anciens = Array.from({ length: 18 }, (_, k): [de: "moi" | "autre", t: string] => [k % 2 ? "autre" : "moi", `vieux souvenir de vacances numéro ${k}`]);
+    const repris = (ks: number[]) => ks.map((k): [de: "moi" | "autre", t: string] => [k % 2 ? "autre" : "moi", `on reparle du concert numéro ${k} ce week-end`]);
+    /* Des captures sans date : 18 messages plus anciens, puis les 3 premiers de l’export */
+    const r = reunir([exporte(lignes), capturees([bloc([...anciens, ...repris([0, 1, 2])], null)], "2026-10-31")]);
+    const { metas, conv } = lue(r, [EXPORT, CAPTURES], "2026-10-31");
+    expect(metas[1]!.resume).toMatchObject({ debut: "2026-10-20", fin: "2026-10-20", debutSansDate: true });
+    expect(metas[1]!.resume.finSansDate).toBeUndefined();
+    /* L’export est daté de bout en bout : sa période ne change pas */
+    expect(metas[0]!.resume.debutSansDate).toBeUndefined();
+    expect(conv[2]).toContain("morceaux importés à part : WhatsApp (captures) sans date, puis le 2026-10-20, WhatsApp (export) du 2026-10-20 au 2026-10-29. ");
+    /* Les mêmes, qui reprennent les messages 4 à 7 (le 20 et le 21) puis en ajoutent deux : sans date des deux côtés */
+    const neufs: [de: "moi" | "autre", t: string][] = [
+      ["autre", "et après le concert on va boire un verre"],
+      ["moi", "carrément je réserve une table au bar"],
+    ];
+    const r2 = reunir([exporte(lignes), capturees([bloc([...anciens, ...repris([4, 5, 6, 7]), ...neufs], null)], "2026-10-31")]);
+    expect(r2).toMatchObject({ doublons: 4, gardes: [60, 20] });
+    const deux = lue(r2, [EXPORT, CAPTURES], "2026-10-31");
+    expect(deux.metas[1]!.resume).toMatchObject({ debut: "2026-10-20", fin: "2026-10-21", debutSansDate: true, finSansDate: true });
+    expect(deux.conv[2]).toContain("WhatsApp (captures) sans date, puis du 2026-10-20 au 2026-10-21, puis sans date, WhatsApp (export) du 2026-10-20 au 2026-10-29. ");
+    /* Le banc coupe la conv au dernier message de l’export du 20 : les deux morceaux finissent ce jour-là (dans leur ordre d’import), son début reste sans date */
+    const h: Histoire = { utilisateur: HUGO, autre: LEA, devinette: "parle", objectif: "comprendre", appli: "whatsapp", format: "captures", aujourdhui: "2026-10-31" };
+    const jusqua = r2.messages.findIndex((m) => m.texte === "on reparle du concert numéro 5 ce week-end" && m.morceau === 0);
+    const coupee = rendre(
+      h,
+      { messages: r2.messages, problemes: [], participants: ["Hugo", "Léa"], captures: null, inconnues: { lignes: 0, forme: null } },
+      { morceaux: provenancesDe({ morceaux: deux.metas }), jusqua },
+    ).conversation;
+    expect(coupee).toContain("morceaux importés à part : WhatsApp (export) le 2026-10-20, WhatsApp (captures) sans date, puis le 2026-10-20. ");
+  });
+
   it("un export qui commence la nuit, repris par des captures sans date avec un message neuf en tête : un seul jour avec des messages, comme l’export seul", () => {
     const nuit = exporte(suite("08/09/2026 01:10", 12, { texte: (k) => `on parle encore du film numéro ${k}` }));
     const r = reunir([
@@ -1110,6 +1148,31 @@ describe("ce que le modèle et l’écran lisent d’une conv réunie avec des c
     );
     expect(conv[2]).toContain("WhatsApp (export) du 2026-09-01 au 2026-09-15, WhatsApp (captures) le 2026-09-15, puis sans date. ");
     expect(rendu.finSansDate).toBe(true);
+  });
+
+  it("la suite sans date de captures sous la pastille « Aujourd’hui », ajoutée le même jour : rangée à minuit, après ce qu’elle reprend, et dite après lui", () => {
+    const anciens: [de: "moi" | "autre", t: string][] = [
+      ...Array.from({ length: 14 }, (_, k): [de: "moi" | "autre", t: string] => [k % 2 ? "autre" : "moi", `on parle encore du film numéro ${k} de la semaine`]),
+      ["moi", "trop bien on remet ça samedi prochain alors"],
+      ["autre", "carrément je demande aux autres ce qu’ils en pensent"],
+      ["moi", "super et toi tu es bien rentrée chez toi"],
+    ];
+    const neufs: [de: "moi" | "autre", t: string][] = [
+      ["autre", "bon alors ils sont tous partants pour samedi"],
+      ["moi", "génial je réserve une table au resto italien"],
+      ["autre", "parfait à samedi alors bisous"],
+    ];
+    /* Des captures sous la pastille sans heure du 31 octobre, importées ce jour-là ; puis, le même jour, des captures sans date qui reprennent leurs 3 derniers messages */
+    for (const ajout of ["2026-10-31", "2026-11-01"]) {
+      const r = reunir([capturees([bloc(anciens, "2026-10-31")], "2026-10-31"), capturees([bloc([...anciens.slice(-3), ...neufs], null)], ajout)]);
+      expect(r).toMatchObject({ doublons: 3, gardes: [17, 3] });
+      /* Ancrés sur le dernier repris, à minuit le 31 : leur heure ne bouge pas (le même jour) ou recule (le lendemain), lue dans tLu */
+      expect(r.messages.slice(-3).map(quand), ajout).toEqual(Array(3).fill(`2026-10-31 --:-- lu ${ajout} 00:00 inconnu`));
+      const { conv } = lue(r, [CAPTURES, CAPTURES], ajout);
+      expect(conv[1], ajout).toBe(
+        "[Les 3 derniers messages viennent de captures qui ne montrent aucune date (« ????-??-?? ») : ils sont après le 2026-10-31, peut-être bien après. Ne dis ni quand ils ont été écrits, ni depuis quand l’un n’a pas écrit à l’autre.]",
+      );
+    }
   });
 
   it("« le début manque » : l’écran et le modèle disent la même chose pour un export coupé et des captures de son premier jour, dans les deux ordres", () => {

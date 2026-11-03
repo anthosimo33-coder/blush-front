@@ -1079,4 +1079,32 @@ describe("les messages lus depuis la PR 4 (en ligne le 2 novembre 2026) : un app
     });
     expect(textes(r.nouveaux)).toEqual(["trop belle cette photo 😍 [réponse à une story]", "merci toi"]);
   });
+
+  it("un appel décroché ou une réponse à une story neufs en tête d’une capture, après une photo d’elle lue le même jour : jamais pris pour elle", () => {
+    /* La fin de ce qui est lu le 2 novembre, une photo d’elle : par un export (à la minute, 21:10), ou par des captures sous la pastille « Aujourd’hui » (le jour seul) */
+    const parExport = [lu("toi", "regarde ce que je t’envoie", "2026-11-02 21:09:00"), lu("autre", "", "2026-11-02 21:10:00", "exacte", "photo")];
+    const parCaptures = [lu("toi", "regarde ce que je t’envoie", "2026-11-02 00:00:00", "jour"), lu("autre", "", "2026-11-02 00:00:00", "jour", "photo")];
+    const tetes = [msg("autre", "Appel vocal · 12 min", { media: "appel" }), msg("autre", "trop belle ta story de ce soir 😍", { media: "story" })];
+    for (const [quoi, lus] of [
+      ["un export", parExport],
+      ["des captures", parCaptures],
+    ] as const)
+      for (const tete of tetes) {
+        /* Plus tard le même soir, sous la pastille « Aujourd’hui » (sans heure) : lui en tête, puis deux messages neufs */
+        const c = captures({
+          autre: "Léa",
+          blocs: [{ repere: { date: "2026-11-02", heure: null }, messages: [tete, msg("autre", "c’était trop bien de t’entendre ce soir"), msg("moi", "pareil, à demain alors")] }],
+        });
+        const r = messagesDesCaptures(c, H, { aujourdhui: "2026-11-02", apres: lus[1]!.t, lus });
+        expect(
+          r.nouveaux.map((m) => m.texte.replace(/^\u200e/, "")),
+          `${quoi} · ${tete.texte}`,
+        ).toEqual([
+          tete.media === "appel" ? "Appel vocal, 12\u00a0min" : "trop belle ta story de ce soir 😍 [réponse à une story]",
+          "c’était trop bien de t’entendre ce soir",
+          "pareil, à demain alors",
+        ]);
+        expect(r.ancre, `${quoi} · ${tete.texte}`).toBeNull();
+      }
+  });
 });

@@ -343,10 +343,11 @@ function apparier(C: Message[], K: Garde[], r: number, parMorceau: Message[][]):
  * sans doublon, un message sans heure du jour où finit un export passe après sa fin (règle C). Un jour deviné
  * (Message.jourDevine) se range de même, quel que soit le jour de ses doublons, mais ne prend leur jour qu’entre deux
  * doublons du même jour ; avant le premier, il a été écrit ce jour-là au plus tard ; après le dernier (ou entre deux
- * jours), il reste inconnu. Son heure lue reste dans `tLu`. Puis tout se range par date (et, à heure égale, par rang de
- * réunion et par place), et se renumérote ; chaque message garde le rang de son morceau (`morceau`), dont le premier
- * message ne compte pas dans les chiffres (chiffrer, prompts/lib/conv.ts). Rend aussi les messages de chaque morceau
- * datés comme dans la conv réunie (`parMorceau` : un doublon prend la date de son jumeau).
+ * jours), il reste inconnu. Son heure lue reste dans `tLu` (celle d’un jour deviné rangé sur une ancre, même inchangée :
+ * elle dit qu’il suit ce qu’il reprend). Puis tout se range par date (et, à heure égale, par rang de réunion et par
+ * place), et se renumérote ; chaque message garde le rang de son morceau (`morceau`), dont le premier message ne compte
+ * pas dans les chiffres (chiffrer, prompts/lib/conv.ts). Rend aussi les messages de chaque morceau datés comme dans la
+ * conv réunie (`parMorceau` : un doublon prend la date de son jumeau).
  */
 export function reunir(lus: MorceauLu[]): { messages: Message[]; doublons: number; gardes: number[]; parMorceau: Message[][] } {
   const rang = (l: MorceauLu) => (l.exact ? 0 : sansDate(l) ? 2 : 1);
@@ -436,7 +437,12 @@ export function reunir(lus: MorceauLu[]): { messages: Message[]; doublons: numbe
         const fin = fins.get(numeroDuJour(x.t));
         if (x.approx === "jour" && fin !== undefined) t = Math.max(x.t, fin);
       }
-      const garde: Message = { ...reste, t, ...(t !== x.t ? { tLu: x.t } : {}), ...(jour ? { jourDevine: jour } : {}) };
+      /*
+       * L’heure lue (tLu), dès qu’elle change, et pour un jour deviné rangé sur une ancre (règle A ou B) même quand elle ne
+       * change pas : la suite sans date de captures sous la pastille « Aujourd’hui », ajoutée le même jour, reste à minuit,
+       * mais suit ce qu’elle reprend (rendre le dit : « après le 2026-10-31 », pas « ni avant ni après »)
+       */
+      const garde: Message = { ...reste, t, ...(t !== x.t || (jourDevine && (a || b)) ? { tLu: x.t } : {}), ...(jour ? { jourDevine: jour } : {}) };
       parMorceau[k]![i] = garde;
       tous.push({ m: garde, k, i, r: rangDeTri, place });
       gardes[k]!++;
