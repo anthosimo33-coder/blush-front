@@ -20,8 +20,11 @@ const QUIT_HREF: Route = "/commencer";
 
 /* Les lignes d’écoute, absentes des maquettes (validées) : src/contenu/aide.ts, la même source que le chat sans bulles */
 const HELP = LIGNES_D_ECOUTE;
-/* Une ligne de la feuille : la carte blanche, toute entière à toucher */
+/* Une ligne de la feuille : la carte blanche, toute entière à toucher (ou, pour une ligne à deux gestes, ses deux boutons) */
 const LIGNE = "flex flex-col gap-0.5 rounded-[20px] bg-white p-4 text-ink no-underline shadow-[inset_0_0_0_1.5px_var(--color-track)]";
+/* Un des deux gestes d’une ligne qui s’appelle ou s’écrit (le 3018) : un bouton de 44 px de haut au moins, côte à côte avec l’autre */
+const GESTE =
+  "flex min-h-11 flex-1 items-center justify-center rounded-[22px] bg-paper px-3 text-legende font-black text-ink no-underline shadow-[inset_0_0_0_1.5px_var(--color-track)]";
 
 function SoberButton({ children, onClick, href }: { children: string; onClick?: () => void; href?: Route }) {
   const cls = "flex h-[58px] w-full items-center justify-center rounded-[29px] bg-ink text-accent font-extrabold text-white no-underline";
@@ -66,7 +69,9 @@ function EnTeteSobre({ back }: { back: () => void }) {
  * « Besoin d’en parler à quelqu’un ? » : les lignes d’écoute, à appeler d’un toucher, puis les lignes par situation (le
  * 114 par SMS, le 119, le 3919, le 3018, le tchat de commentonsaime.fr : LIGNES_PAR_SITUATION, src/contenu/aide.ts),
  * chacune avec sa situation lisible (« Si tu… ») entre son nom et ce qu’elle promet. Un appel ou un SMS part du téléphone ; une
- * page (le tchat de commentonsaime.fr) s’ouvre dans un nouvel onglet, le rapport doux reste ouvert derrière.
+ * page (le tchat de commentonsaime.fr) s’ouvre dans un nouvel onglet, le rapport doux reste ouvert derrière. Une ligne
+ * qui s’appelle ou s’écrit (le 3018, dont le tchat répond mieux que le téléphone) n’est pas un lien entier : sa carte
+ * porte deux boutons, « Appeler » et « Écrire en tchat », un lien ne pouvant en contenir un autre.
  * Sur ordinateur, la feuille commence à 120 px du haut : sa hauteur s’arrête 40 px avant le bas de l’écran, et elle défile
  * au-delà (92dvh, ou 96dvh sur un écran court, la faisaient déborder, « Fermer » hors de l’écran : d’où le « ! », qui passe
  * devant la règle des écrans courts de Sheet).
@@ -88,17 +93,38 @@ function FeuilleAide({ open, onClose, titre }: { open: boolean; onClose: () => v
             </a>
           </li>
         ))}
-        {LIGNES_PAR_SITUATION.map((s) => (
-          <li key={s.name}>
-            <a href={s.lien} target={s.lien.startsWith("https:") ? "_blank" : undefined} rel="noreferrer" className={LIGNE}>
+        {LIGNES_PAR_SITUATION.map((s) => {
+          const textes = (
+            <>
               <span className="text-corps font-black">
                 {s.name} · {s.label}
               </span>
               <span className="text-legende font-extrabold leading-[1.35] text-ink">{s.pour}</span>
               <span className="text-legende font-extrabold leading-[1.35] text-grey">{s.detail}</span>
-            </a>
-          </li>
-        ))}
+            </>
+          );
+          return (
+            <li key={s.name}>
+              {"tchat" in s ? (
+                <div className={LIGNE}>
+                  {textes}
+                  <span className="mt-2 flex gap-2">
+                    <a href={s.lien} aria-label={`Appeler le ${s.label}`} className={GESTE}>
+                      Appeler
+                    </a>
+                    <a href={s.tchat} target="_blank" rel="noreferrer" aria-label={`Écrire en tchat au ${s.label}`} className={GESTE}>
+                      Écrire en tchat
+                    </a>
+                  </span>
+                </div>
+              ) : (
+                <a href={s.lien} target={s.lien.startsWith("https:") ? "_blank" : undefined} rel="noreferrer" className={LIGNE}>
+                  {textes}
+                </a>
+              )}
+            </li>
+          );
+        })}
       </ul>
       <SoberButton onClick={onClose}>Fermer</SoberButton>
     </Sheet>

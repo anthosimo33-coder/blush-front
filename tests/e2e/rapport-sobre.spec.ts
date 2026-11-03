@@ -52,28 +52,38 @@ test("une alerte : le rapport doux, offert à un compte gratuit, sans jeu ni pai
     await expect(page.getByRole("link", { name: /Parler à BLUSH|Parle à BLUSH/ })).toHaveCount(0);
   });
 
-  await test.step("« Besoin d’en parler à quelqu’un ? » : deux lignes d’écoute, puis cinq lignes par situation, chacune à un toucher", async () => {
+  await test.step("« Besoin d’en parler à quelqu’un ? » : deux lignes d’écoute, puis cinq lignes par situation, chacune à un toucher (le 3018, deux)", async () => {
     await ecran.getByRole("button", { name: "Besoin d’en parler à quelqu’un ?" }).click();
     const aide = page.getByRole("dialog", { name: "Besoin d’en parler à quelqu’un ?" });
     await expect(aide).toBeVisible();
     await expect(aide.getByRole("link", { name: /^Fil Santé Jeunes/ })).toHaveAttribute("href", "tel:0800235236");
     await expect(aide.getByRole("link", { name: /^SOS Amitié/ })).toHaveAttribute("href", "tel:0972394050");
     /* Les sept, dans l’ordre : les lignes d’écoute, puis du plus urgent au moins urgent (src/contenu/aide.ts) */
-    const lignes = aide.getByRole("link");
-    await expect(lignes).toHaveText([
+    await expect(aide.getByRole("listitem")).toHaveText([
       "Fil Santé Jeunes · 0 800 235 236Anonyme et gratuit, tous les jours de 9 h à 23 h",
       "SOS Amitié · 09 72 39 40 50À l’écoute 24 h sur 24",
-      "Urgence par SMS · 114Si tu es en danger et ne peux pas parler à voix hauteGratuit, 24 h sur 24 : écris ton nom, ton adresse précise et ce qui se passe",
+      "Urgence par SMS · 114Si tu es en danger maintenant et ne peux pas parler à voix hauteGratuit, 24 h sur 24 : écris ton nom, ton adresse précise et ce qui se passe ; sans réponse au bout d’une minute, renvoie ton SMS",
       "Enfance en danger · 119Si tu as moins de 18 ans et que tu es en danger, ou qu’un enfant l’estAppel gratuit et confidentiel, 24 h sur 24, invisible sur la facture",
       "Violences Femmes Info · 3919Si tu es une femme victime de violences, dans ton couple ou ailleursAppel gratuit et anonyme, 24 h sur 24, invisible sur la facture",
-      "Harcèlement en ligne · 3018Si on diffuse tes photos intimes ou qu’on te fait chanter en ligneMoins de 25 ans, gratuit et confidentiel, tous les jours de 9 h à 23 h, ou en tchat sur 3018.fr",
-      "Comment on s’aime · commentonsaime.frSi ta relation te fait du mal et que tu préfères écrireTchat anonyme et gratuit, du lundi au jeudi de 10 h à minuit, vendredi et samedi de 10 h à 21 h",
+      "Harcèlement en ligne · 3018Si on diffuse tes photos intimes ou qu’on te fait chanter en ligneMoins de 25 ans, gratuit et confidentiel, tous les jours de 9 h à 23 h, ou en tchat sur 3018.frAppelerÉcrire en tchat",
+      "Comment on s’aime · commentonsaime.frSi ta relation te fait du mal et que tu préfères écrireTchat gratuit, sous un prénom ou un pseudo, du lundi au jeudi de 10 h à minuit, vendredi et samedi de 10 h à 21 h",
     ]);
-    /* Le 114 se joint par SMS (jamais par un appel), les numéros par un appel, le tchat dans un nouvel onglet */
+    /* Huit gestes : une carte entière par ligne, sauf le 3018, qui s’appelle ou s’écrit */
+    await expect(aide.getByRole("link")).toHaveCount(8);
+    /* Le 114 se joint par SMS (jamais par un appel), les numéros par un appel, les tchats dans un nouvel onglet */
     await expect(aide.getByRole("link", { name: /^Urgence par SMS · 114/ })).toHaveAttribute("href", "sms:114");
     await expect(aide.getByRole("link", { name: /^Enfance en danger · 119/ })).toHaveAttribute("href", "tel:119");
     await expect(aide.getByRole("link", { name: /^Violences Femmes Info · 3919/ })).toHaveAttribute("href", "tel:3919");
-    await expect(aide.getByRole("link", { name: /^Harcèlement en ligne · 3018/ })).toHaveAttribute("href", "tel:3018");
+    /* Le 3018 : son tchat (tous les tchats ont eu leur réponse en 2025, le téléphone 36 % des sollicitations) vaut l’appel, deux boutons de 44 px au moins */
+    const appeler3018 = aide.getByRole("link", { name: "Appeler le 3018" });
+    const ecrire3018 = aide.getByRole("link", { name: "Écrire en tchat au 3018" });
+    await expect(appeler3018).toHaveAttribute("href", "tel:3018");
+    await expect(ecrire3018).toHaveAttribute("href", "https://e-enfance.org/besoin-daide/");
+    await expect(ecrire3018).toHaveAttribute("target", "_blank");
+    for (const geste of [appeler3018, ecrire3018]) {
+      await geste.scrollIntoViewIfNeeded();
+      expect((await geste.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+    }
     const tchat = aide.getByRole("link", { name: /^Comment on s’aime · commentonsaime\.fr/ });
     await expect(tchat).toHaveAttribute("href", "https://commentonsaime.fr/besoin-daide/le-tchat-pour-discuter/");
     await expect(tchat).toHaveAttribute("target", "_blank");

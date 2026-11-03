@@ -1020,7 +1020,7 @@ export const STATES = [
     sheet: true,
     note: "Ressources d’aide à valider.",
     changement:
-      "Nouveau (3 novembre 2026)\u00a0: sous les lignes d’écoute, les cinq lignes par situation (le 114 par SMS, le 119, le 3919, le 3018, le tchat de commentonsaime.fr), chacune avec sa situation\u00a0; sur ordinateur, la feuille s’arrête avant le bas de l’écran et défile.",
+      "Nouveau (3 novembre 2026)\u00a0: sous les lignes d’écoute, les cinq lignes par situation (le 114 par SMS, le 119, le 3919, le 3018, le tchat de commentonsaime.fr), chacune avec sa situation, et le 3018 en deux gestes («\u00a0Appeler\u00a0», «\u00a0Écrire en tchat\u00a0»)\u00a0; sur ordinateur, la feuille s’arrête avant le bas de l’écran et défile.",
   },
 
   /* ———— Au quotidien ———— */
