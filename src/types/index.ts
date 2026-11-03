@@ -462,7 +462,7 @@ export type LandingConv = {
   id: string;
   /** Le nom tel qu’il est enregistré dans le téléphone. */
   name: string;
-  /** Ce que la personne est pour toi (« Ton crush »). */
+  /** Ce que la personne est pour toi (« Ton crush »). Court : à 320 px, « {label} · {appli} » tient en haut de sa feuille sans « … ». */
   label: string;
   app: AppKind;
   /** La pastille : l’icône de l’appli, ou l’initiale (rose : l’autre personne). */
@@ -485,7 +485,10 @@ type ChiffreDeConv = { valeur: string; texte: string; cote: "toi" | "elle" | "pa
 /** Landing et paywall : un vrai avis, publié avec l’accord de la personne. */
 export type Testimonial = {
   name: string;
-  /** Sa situation (« Situationship »). */
+  /**
+   * Sa situation, en quelques mots (« Son crush », « Ils se voient »). Court : son étiquette ne rétrécit pas, elle
+   * mordrait sur le prénom d’une carte à 320 px (CarteTemoignage).
+   */
   label: string;
   /** La teinte de sa situation : son rond et son étiquette (rose : un crush, vert : en couple, violet : c’est flou). */
   teinte: "elle" | "vrai" | "flou";

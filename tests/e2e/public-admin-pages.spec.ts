@@ -24,7 +24,10 @@ test("la landing : la promesse, les boutons vers le parcours, les faits, sans fa
     const titre = main.getByRole("heading", { level: 1 });
     await expect(titre).toContainText("en dit plus");
     await expect(titre).toContainText("que tu crois");
-    await expect(main.getByText("Importe-la. BLUSH te dit ce qui se passe vraiment entre vous, messages à l’appui, et quoi répondre.")).toBeVisible();
+    /* Sous le titre, ce que BLUSH lit, en toutes lettres (la seule phrase visible qui le dit en entier), et les mots du titre de la page */
+    await expect(
+      main.getByText(`Captures, enregistrement d’écran, export Instagram ou WhatsApp${NB}: BLUSH te dit ce qui se passe vraiment entre vous, et quoi répondre.`),
+    ).toBeVisible();
     await expect(main.getByRole("link", { name: "Analyser ma conv" })).toHaveAttribute("href", "/commencer");
     await expect(main.getByText("Paiement unique · Ta conv reste confidentielle")).toBeVisible();
     /* Le pied de page fait le dernier appel : son titre géant, le bouton blanc et la même ligne, puis ses liens */
