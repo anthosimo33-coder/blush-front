@@ -40,7 +40,7 @@ describe("les lignes par situation", () => {
     expect(new Set(noms).size).toBe(noms.length);
     /*
      * Le 17, le 112 et le 3114 sont dans URGENCES (les conditions, le chat en alerte, la réponse 402) : aucune des cinq ne
-     * les redit. Les montrer aussi sur la feuille d’aide est une décision à prendre (TODO(produit), src/contenu/aide.ts).
+     * les redit. La feuille d’aide ne les montre pas : décidé le 3 novembre 2026 (src/contenu/aide.ts).
      */
     for (const numero of URGENCES.match(/\d+/g)!) expect(LIGNES_PAR_SITUATION.map((l) => l.label)).not.toContain(numero);
   });

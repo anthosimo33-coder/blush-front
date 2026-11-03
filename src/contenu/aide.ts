@@ -40,11 +40,10 @@ export const LIGNES_D_ECOUTE = [
  * TODO(produit): les textes des cinq lignes et leur place sous les lignes d’écoute, sans maquette, à valider. L’ordre
  * aussi : le 119, la ligne des mineurs, vient en 4e, sous Fil Santé Jeunes, SOS Amitié et le 114 (hors du premier écran
  * à 320 × 568) ; le mettre en tête de la feuille ?
- * TODO(produit): ni le 17 ni le 112 sur la feuille et dans le PDF, alors que la phrase vérifiée du 3919 finit par « En
- * danger : appelle le 17 (ou le 112) », que ni le 3919 ni le tchat ne traitent les urgences, et que le 114 ne sert qu’à
- * qui ne peut pas parler. Une ligne « Police secours · 17 » en tête (tel:17, « Si tu es en danger maintenant : police
- * ou gendarmerie, jour et nuit », le 112 en complément), ou URGENCES en haut de la feuille comme dans le chat en
- * alerte ? Jamais dans la carte du 3919, qui appelle le 3919 d’un toucher.
+ * Ni le 17 ni le 112 sur la feuille et dans le PDF : décidé par l’utilisateur le 3 novembre 2026 (la feuille reste
+ * telle quelle), alors que la phrase vérifiée du 3919 finit par « En danger : appelle le 17 (ou le 112) » et que ni le
+ * 3919 ni le tchat ne traitent les urgences. Si on y revient : une ligne « Police secours · 17 » en tête, ou URGENCES en
+ * haut de la feuille comme dans le chat en alerte ; jamais dans la carte du 3919, qui appelle le 3919 d’un toucher.
  * TODO(produit): dans l’appli, les cinq ne se voient que sur la feuille du rapport doux et dans son PDF (et sur les
  * guides, dans le bloc d’aide). Le chat en alerte ne montre que URGENCES (src/server/historique.ts, décidé le 3 novembre
  * 2026 : on n’y ajoute rien), le rapport complet d’une alerte « danger » ou « détresse » aucune ligne, et le modèle a sa
