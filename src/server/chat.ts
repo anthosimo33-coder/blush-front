@@ -13,7 +13,7 @@ import { ondeDe, texteDit } from "@/lib/vocal";
 import type { BlushAnswer, EvenementChat, Message } from "@/types";
 import { coutDe, garderVerrouillee, soldeDe } from "./bulles";
 import { ErreurInvariant, ErreurPublique, ErreurTache } from "./erreurs";
-import { bulleAffichee, bullesAffichees } from "./ecrans/chat";
+import { bulleAffichee, bullesAffichees, citationsMontrees } from "./ecrans/chat";
 import { messagesAffiches } from "./ecrans/messages";
 import * as coffre from "./coffre";
 import { CLES, compter } from "./compteurs";
@@ -39,25 +39,40 @@ import { venteDuChat } from "./vente";
 const ECHANGES_DANS_LE_FIL = 6;
 /** Des messages envoyés avec un échange, le fil garde les derniers : au-delà, la mémoire se met à jour sans attendre. */
 const LIGNES_DANS_LE_FIL = 15;
+/**
+ * Les dernières réponses de BLUSH dont les citations ne se remontrent pas : un message qu’elles ont déjà cité revient
+ * sans sa citation (le même message pouvait reparaître sous une réponse sur deux, une soirée entière).
+ */
+const REPONSES_SANS_REDITE = 20;
 
-async function fil(storyId: string): Promise<Fil> {
+/**
+ * Les derniers échanges : le fil que le chat relit, et les citations que les dernières réponses ont montrées
+ * (REPONSES_SANS_REDITE), à ne pas remontrer.
+ */
+async function fil(storyId: string): Promise<{ fil: Fil; citees: Set<string> }> {
   const lignes = (
     await db()
       .select()
       .from(schema.chatMessages)
       .where(eq(schema.chatMessages.storyId, storyId))
       .orderBy(desc(schema.chatMessages.id))
-      .limit(ECHANGES_DANS_LE_FIL * 2)
+      .limit(Math.max(ECHANGES_DANS_LE_FIL, REPONSES_SANS_REDITE) * 2)
   ).reverse();
   /*
    * Une réponse verrouillée (pas encore payée) n’entre pas dans le fil : BLUSH pourrait la redire dans une réponse
-   * suivante, payée moins cher qu’elle (une réponse à des captures coûte 3). Son message à lui y reste
+   * suivante, payée moins cher qu’elle (une réponse à des captures coûte 3). Son message à lui y reste. Elle n’a rien
+   * montré non plus : ses citations peuvent venir sous une autre
    */
-  return lignes.flatMap((l): Fil => {
-    if (l.role !== "toi") return l.verrouillee ? [] : [{ de: "blush", texte: coffre.lire("chat_messages.data:blush", l.data).resume }];
+  const blush = new Map(lignes.flatMap((l) => (l.role === "toi" || l.verrouillee ? [] : [[l.id, coffre.lire("chat_messages.data:blush", l.data)] as const])));
+  const echanges = lignes.slice(-ECHANGES_DANS_LE_FIL * 2).flatMap((l): Fil => {
+    if (l.role !== "toi") {
+      const reponse = blush.get(l.id);
+      return reponse ? [{ de: "blush", texte: reponse.resume }] : [];
+    }
     const toi = coffre.lire("chat_messages.data:toi", l.data);
     return [{ de: "toi", texte: toi.texte, ...(toi.lignes?.length ? { lignes: toi.lignes } : {}) }];
   });
+  return { fil: echanges, citees: citationsMontrees([...blush.values()].map((d) => d.reponse)) };
 }
 
 const resume = (r: ReponseChat) => [...r.lecture.map((b) => b.texte), ...(r.a_envoyer ?? []), r.question ?? "", r.reaction ?? ""].filter(Boolean).join(" / ");
@@ -206,9 +221,11 @@ async function direReponse(story: Ligne, r: ReponseChat): Promise<BlushAnswer["v
  * montré jusque-là ne recopie pas les prompts. La première qui ne passe pas arrête l’envoi : la suite vient avec la
  * réponse validée. Un repli sur un autre modèle réécrit tout depuis le début : ce qui est montré ne lui correspond plus,
  * l’envoi s’arrête aussi. `vocal` : la réponse doit partir en vocal, ses bulles ne s’affichent pas, sauf avec une
- * alerte (elle reste écrite).
+ * alerte (elle reste écrite). `citees` : les citations des dernières réponses, que les bulles ne remontrent pas.
  */
-function bullesAuFil(lignes: Map<string, string>, messages: Map<string, Message>, vocal: boolean, emettre: (e: EvenementChat) => void) {
+function bullesAuFil(lignes: Map<string, string>, messages: Map<string, Message>, citees: ReadonlySet<string>, vocal: boolean, emettre: (e: EvenementChat) => void) {
+  /* Celles des bulles déjà parties s’y ajoutent, dans l’ordre où la réponse gardée les lira (bullesAffichees) */
+  const vues = new Set(citees);
   let montrees = 0;
   let arret = false;
   let lu = 0;
@@ -233,7 +250,7 @@ function bullesAuFil(lignes: Map<string, string>, messages: Map<string, Message>
       if (typeof t !== "string" || !Array.isArray(preuves) || introuvables(ids, lignes).length || recopieLesPrompts(`${texte} ${t}`, textesSysteme)) return void (arret = true);
       texte += ` ${t}`;
       /* La bulle telle que la réponse la montrera */
-      emettre({ bulle: bulleAffichee({ texte: t, preuves: ids }, messages) });
+      emettre({ bulle: bulleAffichee({ texte: t, preuves: ids }, messages, vues) });
     }
   };
   return { surAvance, montrees: () => montrees };
@@ -284,7 +301,7 @@ export async function repondre(
   const ctx = contexteDe(story);
   if (!ctx) throw new ErreurTache("contexte_absent");
   const nouvelles = ajout?.ajout.lignes ?? [];
-  const leFil = await fil(story.id);
+  const { fil: leFil, citees } = await fil(story.id);
   /*
    * Ce qu’il peut citer : les lignes de la mémoire, celles qu’il vient d’envoyer, et celles des envois précédents que le
    * fil lui remontre avec leurs identifiants (la mémoire ne garde que celles qu’elle cite, et sa mise à jour n’est peut-être
@@ -327,7 +344,7 @@ export async function repondre(
     ...(surEvenement && !verrouAttendu
       ? {
           parEssai: () => {
-            const auFil = bullesAuFil(lignes, messages, vocalAttendu, surEvenement);
+            const auFil = bullesAuFil(lignes, messages, citees, vocalAttendu, surEvenement);
             return { surAvance: auFil.surAvance, rejouable: () => auFil.montrees() === 0 };
           },
         }
@@ -368,7 +385,7 @@ export async function repondre(
   const reponse: BlushAnswer = fuite
     ? { kind: "bubbles", bubbles: REFUS_FUITE.map((text) => ({ text })), modeVocal }
     : {
-        ...bullesAffichees(sortie, messages),
+        ...bullesAffichees(sortie, messages, citees),
         ...(sortie.niveau_atteint && sortie.niveau_atteint !== avant ? { levelUp: sortie.niveau_atteint } : {}),
         modeVocal,
       };

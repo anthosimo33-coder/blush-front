@@ -133,6 +133,8 @@ describe("de l’import à la mémoire", () => {
   });
 
   it("le chat, sur la mémoire : des bulles avec leurs preuves, l’échange gardé, la mémoire mise à jour s’il y a du neuf, quand le chat se calme", async () => {
+    /* Un chat vide : ce que les tests du chat en vocal ont déjà cité ne se remontrerait pas (src/server/chat.ts, REPONSES_SANS_REDITE) */
+    await db().delete(schema.chatMessages).where(eq(schema.chatMessages.storyId, imp.id));
     const echanges = (await historique(imp.id)).echanges.length;
     const { reponse, majMemoire } = await repondre(await relire(), await memoire(), "on s’est vus hier, c’était trop bien");
     expect(reponse.kind).toBe("bubbles");
