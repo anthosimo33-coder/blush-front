@@ -235,12 +235,11 @@ export function useVoiceRecorder({ onError, onLimit }: { onError: (e: VoiceError
       };
       if (s.recorder.state === "inactive") return done();
       s.recorder.onstop = done;
-      try {
-        s.recorder.requestData();
-      } catch (e) {
-        /* Rien à demander : l’arrêt livrera le reste */
-        tracer("vocal:donnees", e);
-      }
+      /*
+       * L’arrêt seul livre le reste, jusqu’au dernier mot. Un requestData() juste avant le faisait perdre au moteur de
+       * Safari : la tranche en cours (jusqu’à 250 ms) et ce que l’encodeur gardait, environ 0,3 s mesurées, et ses
+       * vocaux finissaient au milieu d’un mot (tests/e2e/chat-vocal.spec.ts, « la fin d’un vocal »)
+       */
       s.recorder.stop();
     });
 
