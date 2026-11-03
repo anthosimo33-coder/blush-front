@@ -21,6 +21,9 @@ const OUTILS = [
   "/apercu/instagram",
   "/apercu/carte",
   "/apercu/mail",
+  /* Le gabarit des guides et du lexique, sur des articles d’exemple */
+  "/apercu/guide",
+  "/apercu/lexique",
   "/apercu/demander",
   "/styleguide",
   /* Le faux Whop : sa page de paiement, et ses boutons */

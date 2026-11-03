@@ -1,3 +1,4 @@
+import { derniereMiseAJour } from "@/lib/format";
 import { URGENCES } from "./aide";
 import { texteRenonciation } from "./consentements";
 import { droitApplicable, EDITEUR, type Editeur } from "./mentions-legales";
@@ -39,11 +40,15 @@ export type Bloc = string | readonly string[];
 /** Une section de la page : son ancre, son titre, ses paragraphes. */
 export type Section = { id: string; titre: string; blocs: readonly Bloc[] };
 
-/** L’en-tête de la page, et sa dernière ligne. */
+/** Le jour de cette version des conditions : la page le dit (`maj`), le plan du site aussi (src/lib/referencement.ts). */
+const MIS_A_JOUR_LE = "2026-10-26";
+
+/** L’en-tête de la page, le jour de sa version, et sa dernière ligne. */
 export const CONDITIONS = {
   titre: "Conditions",
   sous: "Les règles entre toi et BLUSH, sans jargon\u00a0: ce que fait BLUSH, ce que tu peux acheter, et ce qui se passe si ça coince.",
-  maj: "Dernière mise à jour\u00a0: 26 octobre 2026.",
+  misAJourLe: MIS_A_JOUR_LE,
+  maj: derniereMiseAJour(MIS_A_JOUR_LE),
 } as const;
 
 /** Utiliser BLUSH : les conditions d’utilisation. */
