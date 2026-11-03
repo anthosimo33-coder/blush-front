@@ -282,8 +282,11 @@ export function texteDuGeste(g: GesteDuFil): { ville: string; quoi: string; prix
   }
 }
 
-/** Les écrans où sont les personnes en ligne : ceux qui ont du monde, au plus `max` (les plus peuplés), dans l’ordre du parcours. */
-export function etapesPeuplees(etapes: Direct["etapes"], max = 9): { etape: EtapeVisite; n: number }[] {
+/**
+ * Les écrans où sont les personnes en ligne : ceux qui ont du monde, au plus `max` (les plus peuplés ; sans `max`, tous),
+ * dans l’ordre du parcours.
+ */
+export function etapesPeuplees(etapes: Direct["etapes"], max: number = ETAPES_VISITE.length): { etape: EtapeVisite; n: number }[] {
   const gardees = new Set(
     etapes
       .filter((e) => e.n > 0)

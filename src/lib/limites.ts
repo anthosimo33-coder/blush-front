@@ -43,6 +43,12 @@ export const INVITATIONS_PAR_LOT = 50;
 /** Le nom d’une conv de tournage (/admin, POST /api/admin : sa campagne), en caractères (src/server/tournage.ts). */
 export const NOM_TOURNAGE_MAX = 80;
 
+/**
+ * La page d’arrivée d’une visite, en caractères : arriveeDe (src/lib/chemins.ts) n’en donne jamais plus, et POST
+ * /api/presence refuse au-delà (un corps forgé) ; sinon le premier signe d’un vrai onglet serait refusé, sa visite perdue.
+ */
+export const ARRIVEE_MAX = 200;
+
 /** Ce que propose le sélecteur de captures (l’import, le chat, la fiche) : des images, que le navigateur réduit avant l’envoi. */
 export const ACCEPT_IMAGES = "image/*";
 /** Une image choisie ou déposée : une capture. */

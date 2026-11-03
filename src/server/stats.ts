@@ -221,7 +221,8 @@ export type Pilotage = {
    * clients qui ont acheté (et leur payé) d’après la page d’arrivée de leur compte (users.arrivee), comme les sources.
    * Tous les groupes dans leur ordre, même vides, puis `groupe` null s’il a quelque chose : les visites et les acheteurs
    * d’avant qu’on note la page (le 3 novembre 2026). `chemins` : les pages de ce groupe qui ont du monde, la plus vue
-   * d’abord (CHEMINS_PAR_GROUPE au plus), pour rattacher une vente à un guide précis.
+   * d’abord : les CHEMINS_PAR_GROUPE plus vues, et toutes celles qui ont vendu, même peu vues, pour rattacher chaque
+   * vente à un guide précis.
    */
   arrivees: {
     groupe: GroupeDArrivee | null;
@@ -672,12 +673,13 @@ export async function statsAdmin(jours: Periode): Promise<StatsAdmin> {
 const fenetre = (col: string, jours: Periode, k = 0) =>
   sql.raw(`${col} >= now() - make_interval(days => ${(k + 1) * jours}) and ${col} < now() - make_interval(days => ${k * jours})`);
 
-/** Au plus, les pages d’un groupe d’arrivée que le pilotage détaille. */
+/** Les pages les plus vues d’un groupe d’arrivée que le pilotage détaille, en plus de celles qui ont vendu. */
 const CHEMINS_PAR_GROUPE = 10;
 
 /**
  * Les pages d’arrivée de la période, réunies par groupe (Pilotage["arrivees"]) : les visiteurs par page (visites.arrivee)
- * et les acheteurs par page de leur compte (users.arrivee), une ligne par page, rangés sous leur groupe.
+ * et les acheteurs par page de leur compte (users.arrivee), une ligne par page, rangés sous leur groupe. Une page qui a
+ * vendu reste, même loin derrière les plus vues : sinon le payé du groupe aurait un acheteur sans page.
  */
 function arriveesDe(visiteurs: { arrivee: string | null; n: string }[], acheteurs: { arrivee: string | null; acheteurs: string; centimes: string }[]): Pilotage["arrivees"] {
   type Ligne = { visiteurs: number; acheteurs: number; centimes: number };
@@ -698,7 +700,9 @@ function arriveesDe(visiteurs: { arrivee: string | null; n: string }[], acheteur
     .filter((g) => g.groupe !== null || g.visiteurs || g.acheteurs)
     .map((g) => ({
       ...g,
-      chemins: g.chemins.sort((a, b) => b.visiteurs - a.visiteurs || b.centimes - a.centimes || a.chemin.localeCompare(b.chemin)).slice(0, CHEMINS_PAR_GROUPE),
+      chemins: g.chemins
+        .sort((a, b) => b.visiteurs - a.visiteurs || b.centimes - a.centimes || a.chemin.localeCompare(b.chemin))
+        .filter((c, k) => k < CHEMINS_PAR_GROUPE || c.acheteurs > 0),
     }));
 }
 

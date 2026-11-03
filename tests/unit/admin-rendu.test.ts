@@ -103,6 +103,13 @@ describe("le pilotage, rendu", () => {
     expect(calme).toContain("Aujourd’hui\u00a0: 0\u00a0panne du serveur.");
   });
 
+  it("les pages d’arrivée : « Avant le suivi » dit ses visites et son payé, jamais un taux (deux populations sans rapport)", () => {
+    const s = statsDExemple(7);
+    s.pilotage.arrivees = [...s.pilotage.arrivees.filter((a) => a.groupe !== null), { groupe: null, visiteurs: 40, acheteurs: 3, centimes: 5970, chemins: [] }];
+    const t = texte(renderToStaticMarkup(createElement(Pilotage, { s, direct: null, base: "/apercu/admin", sonder: false })));
+    expect(t).toMatch(/Avant le suivi 40 — 60\u00a0€/);
+  });
+
   it("sans visites comptées : « — » à la place de ce qui en dépend, et la carte qui le dit", () => {
     const t = texte(renderToStaticMarkup(createElement(Pilotage, { s: statsDExemple(7, { suivi: false, calme: true }), direct: null, base: "/apercu/admin", sonder: false })));
     expect(t).not.toMatch(SALE);

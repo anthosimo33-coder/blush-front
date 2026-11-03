@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { groupeDArrivee, margeApresIA } from "@/contenu/pilotage";
 import { arriveeDe } from "@/lib/chemins";
+import { ARRIVEE_MAX } from "@/lib/limites";
 import { etapeDe, referentDe } from "@/lib/presence";
 import { lieuDe, sourceDe } from "@/server/visites";
 
@@ -151,6 +152,14 @@ describe("la page d’arrivée d’une visite (src/lib/chemins.ts)", () => {
     expect(arriveeDe("/guides/un truc")).toBe("/guides/:id");
     expect(arriveeDe("/a/b/c/d/e/f")).toBe("/a/b/c/d");
     expect(arriveeDe(`/guides/${"x".repeat(200)}`)).toBe("/guides/:id");
+  });
+
+  it("jamais plus long que ce que POST /api/presence accepte : les derniers morceaux tombent, le premier reste", () => {
+    const morceau = (c: string) => c.repeat(80);
+    expect(arriveeDe(`/${["a", "b", "c", "d"].map(morceau).join("/")}`)).toBe(`/${morceau("a")}/${morceau("b")}`);
+    expect(arriveeDe(`/guides/${morceau("b")}/${morceau("c")}/${morceau("d")}`)).toBe(`/guides/${morceau("b")}/${morceau("c")}`);
+    for (const adresse of [`/${morceau("a")}`, `/${["a", "b", "c", "d"].map(morceau).join("/")}`, `/${"%/".repeat(300)}`, `/guides/${"x-".repeat(500)}`])
+      expect(arriveeDe(adresse)!.length, adresse.slice(0, 30)).toBeLessThanOrEqual(ARRIVEE_MAX);
   });
 
   it("pas un chemin : rien", () => {

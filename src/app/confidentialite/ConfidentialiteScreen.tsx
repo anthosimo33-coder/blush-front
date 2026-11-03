@@ -28,7 +28,8 @@ import { derniereMiseAJour, NBSP } from "@/lib/format";
  * images restent masqués (src/lib/secrets.ts) : la phrase le dit, à relire.
  * TODO(produit): la page d’arrivée (visites.arrivee, users.arrivee : le chemin de la première page, sans requête ni
  * identifiant, src/lib/chemins.ts) ajoutée le 3 novembre 2026 à « Les visites, sans cookie » (« et par quelle page »,
- * « et ta page d’arrivée »), avec la date de mise à jour : à valider, puis à reporter dans le PDF de Whop.
+ * « et ta page d’arrivée »), avec la date de mise à jour : à valider, puis à reporter dans le PDF de Whop. La date est
+ * celle de la PR : à caler sur sa vraie mise en ligne, comme DEBUT_DE_LA_MESURE (src/contenu/aide-pilotage.ts).
  */
 
 function Ligne({ icone, ton, titre, children }: { icone: Parameters<typeof RowIcon>[0]["icon"]; ton?: Parameters<typeof RowIcon>[0]["tone"]; titre: string; children: ReactNode }) {

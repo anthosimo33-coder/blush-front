@@ -200,7 +200,7 @@ function pilotage(s: StatsAdmin) {
       : null,
     quiImporte: quiImporte(p.quiImporte),
     sources: p.sources.map((x) => ({ source: nomDeLaSource(x.source), visiteurs: x.visiteurs, acheteurs: x.acheteurs, payeEuros: euros(x.centimes) })),
-    /* Les pages d’arrivée par groupe, et leurs pages les plus vues : rattacher une vente à un guide précis */
+    /* Les pages d’arrivée par groupe, leurs pages les plus vues et toutes celles qui ont vendu : rattacher chaque vente à un guide précis */
     pagesDArrivee: p.arrivees.map((a) => ({
       groupe: a.groupe === null ? SOURCE_INCONNUE : NOMS_DES_ARRIVEES[a.groupe],
       visiteurs: a.visiteurs,

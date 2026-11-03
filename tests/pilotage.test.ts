@@ -307,6 +307,28 @@ describe("la page d’arrivée et les nouvelles sources", () => {
     expect(apres.p.arrivees.map((a) => a.groupe).filter((g) => g !== null)).toEqual(["landing", "guides", "partage", "parrainage", "legales", "autres"]);
     expect(apres.p.arrivees.findIndex((a) => a.groupe === null)).not.toBe(0);
   });
+
+  it("au-delà des dix pages les plus vues d’un groupe, le pilotage garde chaque page qui a vendu, même vue une seule fois", async () => {
+    const essai = `/guides/essai-${randomUUID().slice(0, 8)}`;
+    /* Onze guides plus vus (deux visiteurs chacun), sans vente */
+    for (let k = 0; k < 11; k++)
+      for (const ip of [ipNeuve(), ipNeuve()]) await noterSigne(requete(ip, SAFARI), { onglet: randomUUID(), etape: "guides", premier: true, arrivee: `${essai}-${k}` });
+    /* Un guide vu une seule fois, qui vend */
+    const vendu = `${essai}-vendu`;
+    const ip = ipNeuve();
+    await noterSigne(requete(ip, SAFARI), { onglet: randomUUID(), etape: "guides", premier: true, arrivee: vendu });
+    const u = await compteDeTest("pilotage-arrivee-vendue");
+    await noterLaSourceDuCompte(requete(ip, SAFARI), u.id);
+    await db().insert(schema.achats).values({ userId: u.id, offre: "rapport", centimes: 990, bulles: 0, fournisseur: "factice", statut: "paye", payeLe: new Date() });
+    const guides = (await statsAdmin(7)).pilotage.arrivees.find((a) => a.groupe === "guides")!;
+
+    const rang = guides.chemins.findIndex((c) => c.chemin === vendu);
+    expect(guides.chemins[rang]).toEqual({ chemin: vendu, visiteurs: 1, acheteurs: 1, centimes: 990 });
+    /* Onze pages plus vues que lui : sans sa vente, il serait coupé ; avec, il vient après les dix plus vues (CHEMINS_PAR_GROUPE) */
+    expect(rang).toBeGreaterThanOrEqual(10);
+    /* Après les dix plus vues, ne restent que celles qui ont vendu */
+    expect(guides.chemins.slice(10).filter((c) => c.acheteurs === 0)).toEqual([]);
+  });
 });
 
 describe("la purge garde peu", () => {

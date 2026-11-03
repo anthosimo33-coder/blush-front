@@ -23,6 +23,7 @@ import {
   texteDeLaFuite,
   texteDuGeste,
 } from "@/app/admin/calculs";
+import { ETAPES_VISITE } from "@/types";
 import type { GesteDuFil } from "@/types/api";
 
 /*
@@ -247,5 +248,7 @@ describe("le direct", () => {
     ]);
     expect(etapesPeuplees([...etapes], 2).map((e) => e.etape)).toEqual(["accueil", "import"]);
     expect(etapesPeuplees([])).toEqual([]);
+    /* Sans borne (l’écran du direct) : tous les écrans, même quand chacun a du monde */
+    expect(etapesPeuplees(ETAPES_VISITE.map((etape, k) => ({ etape, n: k + 1 }))).map((e) => e.etape)).toEqual([...ETAPES_VISITE]);
   });
 });

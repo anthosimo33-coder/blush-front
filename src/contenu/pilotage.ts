@@ -114,6 +114,9 @@ export const SOURCE_INCONNUE = "Avant le suivi";
  * guides et le lexique, les verdicts partagés, le parrainage, les pages légales, et tout le reste (le parcours, le
  * compte, une page qui n’existe pas). /p/<code> mène à la landing (src/app/p/[code]/route.ts) : ses visites y arrivent,
  * et ses clics se comptent à part (le compteur des liens de parrainage) ; le groupe attend une page qui resterait sur /p/.
+ * TODO(produit): « Parrainage » reste à 0 tant que /p/<code> mène à « / » ; soit le lien garde une adresse à lui (une
+ * marque lue par la page d’arrivée, tests/parrainage.test.ts et tests/e2e/parrainage.spec.ts à revoir), soit la ligne
+ * part et le compteur des liens de parrainage suffit.
  */
 export const GROUPES_D_ARRIVEE = ["landing", "guides", "partage", "parrainage", "legales", "autres"] as const;
 export type GroupeDArrivee = (typeof GROUPES_D_ARRIVEE)[number];

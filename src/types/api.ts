@@ -6,7 +6,7 @@
  * ici : tests/unit/contrat.test.ts compare la table aux routes de src/app/api, et vérifie ces imports.
  */
 import { z } from "zod";
-import { ENVOIS_REPRIS_MAX, INVITATIONS_PAR_LOT, LOTS_MAX, NOM_TOURNAGE_MAX, PRENOM_MAX } from "@/lib/limites";
+import { ARRIVEE_MAX, ENVOIS_REPRIS_MAX, INVITATIONS_PAR_LOT, LOTS_MAX, NOM_TOURNAGE_MAX, PRENOM_MAX } from "@/lib/limites";
 import {
   CLES_DES_APPLIS,
   DESINSCRIPTIONS,
@@ -687,7 +687,7 @@ export const ROUTES = {
       premier: z.boolean(),
       utm: z.string().max(80).optional(),
       referent: z.string().max(200).optional(),
-      arrivee: z.string().max(200).optional(),
+      arrivee: z.string().max(ARRIVEE_MAX).optional(),
     }),
   },
   /**

@@ -1224,7 +1224,11 @@ function PagesDArrivee({ p }: { p: Chiffres }) {
           </thead>
           <tbody>
             {p.arrivees.map((a) => {
-              const taux = rapport(a.acheteurs, a.visiteurs);
+              /*
+               * « Avant le suivi » n’a pas de taux : ses visites (d’avant qu’on note la page) et ses acheteurs (des comptes
+               * d’avant, qui achètent encore) ne sont pas les mêmes personnes
+               */
+              const taux = a.groupe === null ? null : rapport(a.acheteurs, a.visiteurs);
               return (
                 <tr key={a.groupe ?? "inconnue"} className="border-t border-sep text-detail font-extrabold">
                   <th scope="row" className="py-3 pr-3 text-left font-extrabold">

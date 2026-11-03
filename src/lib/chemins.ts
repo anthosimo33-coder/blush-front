@@ -1,3 +1,5 @@
+import { ARRIVEE_MAX } from "./limites";
+
 /*
  * Les chemins de l’appli sans ce qui pourrait dire qui l’on est : pour PostHog (src/lib/analytique.ts), et pour la page
  * d’arrivée d’une visite (src/lib/presence.ts, que le serveur renettoie : src/server/visites.ts). Ni « use client » ni
@@ -25,8 +27,9 @@ const MORCEAUX_MAX = 4;
 /**
  * La page d’arrivée d’une visite, telle qu’elle se garde (visites.arrivee) : le chemin seul (ni requête, ni fragment),
  * sans ses identifiants (cheminSur), sans barre finale, et chaque morceau qui ne ressemble pas à un nom de page (un
- * email, un nombre, un texte encodé tapé dans l’adresse d’une page qui n’existe pas) remplacé par « :id ». null : pas
- * un chemin.
+ * email, un nombre, un texte encodé tapé dans l’adresse d’une page qui n’existe pas) remplacé par « :id ». Jamais
+ * plus de ARRIVEE_MAX caractères, que POST /api/presence refuserait : les derniers morceaux tombent, le premier (le
+ * groupe de la page) reste. null : pas un chemin.
  */
 export function arriveeDe(adresse: string): string | null {
   const chemin = adresse.split(/[?#]/)[0]!;
@@ -36,5 +39,6 @@ export function arriveeDe(adresse: string): string | null {
     .filter(Boolean)
     .slice(0, MORCEAUX_MAX)
     .map((m) => (m === ":id" || (MORCEAU_LISIBLE.test(m) && !LONG_NOMBRE.test(m)) ? m : ":id"));
+  while (morceaux.length > 1 && `/${morceaux.join("/")}`.length > ARRIVEE_MAX) morceaux.pop();
   return `/${morceaux.join("/")}`;
 }
