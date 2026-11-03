@@ -173,6 +173,33 @@ describe("une réponse à une story", () => {
     expect(cleDuMessage(lu.messages[0]!)).toBe("autre|#tropbelle");
     expect(cleDuMessage(insta.messages[0]!)).toBe(cleDuMessage(lu.messages[0]!));
   });
+
+  it("une réaction recopiée avec son emoji : le libellé de l’appli ne compte pas, seuls ses emojis restent en légende", () => {
+    const formes: ["moi" | "autre", string, string][] = [
+      ["autre", "A réagi 😍 à votre story", "Léa: 😍 <réponse à une story>"],
+      ["autre", "A réagi à votre story 😍", "Léa: 😍 <réponse à une story>"],
+      ["autre", "A réagi à votre story : 😍", "Léa: 😍 <réponse à une story>"],
+      ["autre", "Reacted 😂 to your story", "Léa: 😂 <réponse à une story>"],
+      ["autre", "A réagi avec 👍🏽 à votre story", "Léa: 👍🏽 <réponse à une story>"],
+      ["moi", "Vous avez réagi 🔥 à sa story", "Moi: 🔥 <réponse à une story>"],
+      /* Sans emoji, ou de vrais mots : comme avant */
+      ["autre", "A réagi à votre story", "Léa: A répondu à ta story"],
+      ["autre", "trop belle 😍", "Léa: trop belle 😍 <réponse à une story>"],
+    ];
+    const { t, lu } = lues(captures({ blocs: [{ repere: A_21H05, messages: formes.map(([de, texte]) => msg(de, texte, { media: "story" })) }] }));
+    expect(t.texte.split("\n").slice(2)).toEqual(formes.map((f) => f[2]));
+    /* Ni distinctive, ni la même clé pour toutes : la réaction est son emoji */
+    expect(cleDuMessage(lu.messages[0]!)).toBe("autre|#😍");
+    /* Six soirs de réactions : ni « réagi », ni « votre », ni « story » ne sont ses mots */
+    const soir = (k: number) => ({
+      repere: { date: `2026-09-0${k + 1}`, heure: "21:00" },
+      messages: [msg("autre", "A réagi à votre story 😍", { media: "story" }), msg("moi", "merci toi"), msg("autre", "tu fais quoi ce soir"), msg("moi", "rien de spécial")],
+    });
+    const six = lues(captures({ blocs: Array.from({ length: 6 }, (_, k) => soir(k)) })).lu;
+    const c = chiffrer(h(), six.messages);
+    for (const w of ["réagi", "votre", "story"]) expect(c.recurrents.map(([x]) => x)).not.toContain(w);
+    expect(trouvailles(c, h(), six.messages).join(" ")).not.toMatch(/réagi|story/);
+  });
 });
 
 describe("les appels lus sur l’écran", () => {
@@ -208,6 +235,22 @@ describe("les appels lus sur l’écran", () => {
       ["appel", "Rappeler", "Appel vocal manqué", "appel manqué", false],
       ["appel", "21:05", "Appel vocal manqué", "appel manqué", false],
       ["appel", "ok", "Appel vocal manqué", "appel manqué", false],
+      /* L’heure de la bulle écrite sans espace, même à un chiffre, n’est jamais une durée ; « 1 h 05 », avec ses espaces, en est une */
+      ["appel", "Appel vocal · 9h05", "Appel vocal manqué", "appel manqué", false],
+      ["appel", "Appel vocal · 2h14", "Appel vocal manqué", "appel manqué", false],
+      ["appel", "Appel vidéo · 8h30", "Appel vidéo manqué", "appel manqué", false],
+      ["appel", "9h05", "Appel vocal manqué", "appel manqué", false],
+      ["appel", "Appel vocal · 23 min · 9h05", "\u200eAppel vocal, 23\u00a0min", "Appel vocal, 23\u00a0min", true],
+      ["appel", "Appel vocal · 1 h 05", "\u200eAppel vocal, 1\u00a0h\u00a005", "Appel vocal, 1\u00a0h\u00a005", true],
+      /* Une durée entière, telle que l’appli l’écrit : l’heure et ses minutes, « hr », « mins », « heure » ; « 21 h 05 » reste l’heure de la bulle */
+      ["appel", "Appel vocal · 1 h 5 min", "\u200eAppel vocal, 1\u00a0h\u00a05\u00a0min", "Appel vocal, 1\u00a0h\u00a05\u00a0min", true],
+      ["appel", "Voice call · 1 hr, 2 min", "\u200eAppel vocal, 1\u00a0hr,\u00a02\u00a0min", "Appel vocal, 1\u00a0hr,\u00a02\u00a0min", true],
+      ["appel", "Appel vidéo · 10 h 2 min", "\u200eAppel vidéo, 10\u00a0h\u00a02\u00a0min", "Appel vidéo, 10\u00a0h\u00a02\u00a0min", true],
+      ["appel", "Voice call · 2 mins", "\u200eAppel vocal, 2\u00a0mins", "Appel vocal, 2\u00a0mins", true],
+      ["appel", "Voice call · 1 hr", "\u200eAppel vocal, 1\u00a0hr", "Appel vocal, 1\u00a0hr", true],
+      ["appel", "Appel vocal · 1 heure", "\u200eAppel vocal, 1\u00a0heure", "Appel vocal, 1\u00a0heure", true],
+      ["appel", "Voice call · 45 secs", "\u200eAppel vocal, 45\u00a0secs", "Appel vocal, 45\u00a0secs", true],
+      ["appel", "Appel vocal · 21 h 05", "Appel vocal manqué", "appel manqué", false],
       /* Sans media : tout le texte est un libellé d’appel, décroché sauf un mot de manque ou un bouton sans durée */
       [null, "Appel vocal · 12 min", "\u200eAppel vocal, 12\u00a0min", "Appel vocal, 12\u00a0min", true],
       [null, "Voice call, 3 min", "\u200eAppel vocal, 3\u00a0min", "Appel vocal, 3\u00a0min", true],
@@ -219,12 +262,26 @@ describe("les appels lus sur l’écran", () => {
       [null, "Appel vocal manqué 21:05", "Appel vocal manqué", "appel manqué", false],
       [null, "Missed video call", "Appel vidéo manqué", "appel manqué", false],
       [null, "Missed voice call · Tap to call back", "Appel vocal manqué", "appel manqué", false],
+      /* Sans media non plus, l’heure de la bulle n’est pas une durée ; une durée entière se lit (« hr », « mins ») */
+      [null, "Appel vocal · 9h05", "\u200eAppel vocal", "Appel vocal", true],
+      [null, "Appel vocal · 1h05", "\u200eAppel vocal", "Appel vocal", true],
+      [null, "Appel vidéo 21:05", "\u200eAppel vidéo", "Appel vidéo", true],
+      [null, "Voice call · 1 hr, 2 min", "\u200eAppel vocal, 1\u00a0hr,\u00a02\u00a0min", "Appel vocal, 1\u00a0hr,\u00a02\u00a0min", true],
+      [null, "Voice call · 2 mins", "\u200eAppel vocal, 2\u00a0mins", "Appel vocal, 2\u00a0mins", true],
       /* Des messages tapés qui parlent d’appel restent des messages */
       [null, "appel vidéo ce soir ?", "appel vidéo ce soir ?", "appel vidéo ce soir ?", false],
       [null, "Appel moi quand tu peux", "Appel moi quand tu peux", "Appel moi quand tu peux", false],
       [null, "un appel vocal ça te va", "un appel vocal ça te va", "un appel vocal ça te va", false],
       [null, "Appel vidéo à 21:05", "Appel vidéo à 21:05", "Appel vidéo à 21:05", false],
       [null, "Appel", "Appel", "Appel", false],
+      /* Un mot d’appel et une heure, sans genre, issue ni durée : un rendez-vous tapé (« 21h », « 22h30 » ne sont pas des mots d’appel) */
+      [null, "facetime 21h", "facetime 21h", "facetime 21h", false],
+      [null, "Facetime 22h30", "Facetime 22h30", "Facetime 22h30", false],
+      [null, "appel 21h", "appel 21h", "appel 21h", false],
+      [null, "Appel 20:30", "Appel 20:30", "Appel 20:30", false],
+      [null, "call 9:30", "call 9:30", "call 9:30", false],
+      [null, "appel vidéo 22h30", "appel vidéo 22h30", "appel vidéo 22h30", false],
+      [null, "appel 2", "appel 2", "appel 2", false],
       [null, "Vidéo chat", "Vidéo chat", "Vidéo chat", false],
       [null, "Vidéo · 0:45", "Vidéo · 0:45", "Vidéo · 0:45", false],
       /* Les marques de sens d’écriture du modèle sont retirées : seul un appel décroché en porte une */

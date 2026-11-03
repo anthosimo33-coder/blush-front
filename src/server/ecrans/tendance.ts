@@ -12,7 +12,9 @@ import type { TendanceDuPaywall } from "@/types";
  * pris, pas combien elle écrit) ; ni un message dont le jour est deviné (Message.jourDevine : le haut de captures sans
  * repère, des captures sans aucune date), ni un message que la réunion des morceaux a changé de jour (le jour d’une
  * ancre n’est pas un repère). D’une conv en morceaux (src/server/morceaux.ts), seulement les jours qu’un morceau couvre,
- * de son premier à son dernier message compté : un trou entre deux morceaux n’est pas un silence.
+ * de son premier à son dernier message compté, doublons compris (son étendue : deux morceaux qui se recouvrent, un
+ * export court puis entier, une vidéo qui reprend la fin d’un export, couvrent le silence de leur jointure) : un trou
+ * entre deux morceaux n’est pas un silence.
  */
 
 const H = 3600e3;
@@ -58,6 +60,15 @@ export type MorceauxContinus = readonly boolean[];
 /** Une conv d’un seul morceau qui suit la conv : un export, ou une vidéo (la lecture partielle, src/server/lecture-partielle.ts). */
 export const UN_MORCEAU_CONTINU: MorceauxContinus = [true];
 
+/**
+ * L’étendue d’un morceau : son premier et son dernier jour comptés (messagesDates), en jours depuis 1970, doublons
+ * compris (ses messages tels que la réunion les date, `parMorceau` de lectureReunie, src/server/morceaux.ts). null sans
+ * aucun jour compté. Une conv en morceaux en a une par morceau, dans l’ordre de sa conv brute (Etendues).
+ */
+export type Etendue = { de: number; a: number };
+/** Les étendues des morceaux d’une conv (etendue), dans l’ordre de sa conv brute ; aucune pour une conv d’un seul morceau. */
+export type Etendues = readonly (Etendue | null)[];
+
 /** Un jour AAAA-MM-JJ en jours depuis 1970 : relu, il tombe à minuit UTC (un nombre entier, y compris avant 1970). */
 const numero = (j: string) => Date.parse(j) / J;
 /** Le jour d’un message (jourCompte, prompts/lib/conv.ts), en jours depuis 1970. */
@@ -80,6 +91,16 @@ export function messagesDates(messages: Message[], continus: MorceauxContinus = 
   return dates;
 }
 
+/**
+ * L’étendue des messages d’un morceau (Etendue) : le plus petit et le plus grand de leurs jours comptés (messagesDates :
+ * ni un jour deviné, ni un jour que la réunion a changé). Ses messages n’ont pas de `morceau` (parMorceau) : tous comptent.
+ */
+export function etendue(messages: Message[]): Etendue | null {
+  let e: Etendue | null = null;
+  for (const { j } of messagesDates(messages)) e = e ? { de: Math.min(e.de, j), a: Math.max(e.a, j) } : { de: j, a: j };
+  return e;
+}
+
 function mediane(xs: number[]): number {
   const s = [...xs].sort((a, b) => a - b);
   const m = Math.floor(s.length / 2);
@@ -93,9 +114,11 @@ const arrondi = (x: number) => (x < 10 ? Math.round(x * 10) / 10 : Math.round(x)
  * La chute de ses messages, s’il y en a une : la semaine où la baisse est la plus forte, parmi celles qui gardent assez
  * d’histoire de chaque côté, qui tombe à 60 % d’avant au plus et n’en remonte pas. null : pas de chute nette (ou une
  * conv trop courte, des captures photo, ou des captures dont on ne lit aucun jour). `continus` : les morceaux qu’elle
- * compte ; par défaut, une conv d’un seul morceau qui suit la conv (un export).
+ * compte ; par défaut, une conv d’un seul morceau qui suit la conv (un export). `etendues` : ce que chaque morceau couvre,
+ * doublons compris (etendue, une conv en morceaux) ; sans elles, de son premier à son dernier message gardé.
  */
-export const tendance = (messages: Message[], continus: MorceauxContinus = UN_MORCEAU_CONTINU): TendanceDuPaywall | null => chuteDe(messages, continus)?.tendance ?? null;
+export const tendance = (messages: Message[], continus: MorceauxContinus = UN_MORCEAU_CONTINU, etendues?: Etendues): TendanceDuPaywall | null =>
+  chuteDe(messages, continus, etendues)?.tendance ?? null;
 
 /**
  * Combien de semaines la conv a avant sa chute (celle de tendance), ou null sans chute. Moins que les semaines de
@@ -110,7 +133,7 @@ export function semainesAvantLaChute(messages: Message[]): number | null {
 /** Les semaines de référence de « avant » : la lecture partielle les veut toutes avant de s’arrêter sur une chute. */
 export const SEMAINES_DE_REFERENCE = SEUILS_TENDANCE.semainesDeReference;
 
-function chuteDe(messages: Message[], continus: MorceauxContinus): { tendance: TendanceDuPaywall; k: number } | null {
+function chuteDe(messages: Message[], continus: MorceauxContinus, etendues: Etendues = []): { tendance: TendanceDuPaywall; k: number } | null {
   const S = SEUILS_TENDANCE;
   const dates = messagesDates(messages, continus);
   const siens = dates.filter((d) => d.m.role === "autre");
@@ -137,6 +160,16 @@ function chuteDe(messages: Message[], continus: MorceauxContinus): { tendance: T
   const nbJours = dernier - premier + 1;
   const couvert = Array<boolean>(nbJours).fill(false);
   for (const p of plages.values()) couvert.fill(true, p.de - premier, p.a - premier + 1);
+  /*
+   * Chaque morceau continu couvre toute son étendue, doublons compris : ses messages repris d’un autre morceau ne sont
+   * plus dans la conv réunie, mais il montre bien les deux bords du silence qui les suit. Entre le premier et le dernier
+   * jour comptés, sans couvrir un jour qui a un message de captures photo (ce qu’elles comptent ne dit rien du rythme)
+   */
+  const photo = new Set(messages.filter((m) => continus[m.morceau ?? 0] !== true).map(jourDe));
+  etendues.forEach((e, k) => {
+    if (!e || continus[k] !== true) return;
+    for (let j = Math.max(e.de, premier); j <= Math.min(e.a, dernier); j++) if (!photo.has(j)) couvert[j - premier] = true;
+  });
   /* Ses messages, par semaine de sept jours depuis le premier */
   const parSemaine = Array<number>(Math.ceil(nbJours / 7)).fill(0);
   for (const { j } of siens) parSemaine[Math.floor((j - premier) / 7)]!++;

@@ -523,6 +523,21 @@ describe("le jour où compte un message (jourCompte)", () => {
     expect(jours([bloc(4, "x", { date: "2026-10-19", heure: "10:00" }), bloc(4, "y", { date: "2026-10-20", heure: null })])).toBe(2);
     /* Le haut sans repère compte le jour qu’il emprunte (au plus tard ce jour-là) : un seul jour */
     expect(jours([bloc(4, "x", null), bloc(4, "y", { date: "2024-02-21", heure: "09:05" })])).toBe(1);
+    /*
+     * Ce jour emprunté est celui du message daté qui le suit, déjà compté : un premier repère de la nuit (compté la
+     * veille) n’en fait pas deux pour une nuit, ni la ligne impossible « du 2026-09-08 au 2026-09-08, 2 jours »
+     */
+    for (const heure of ["01:30", "04:59", "05:00", "14:00", null])
+      expect(jours([bloc(2, "x", null), bloc(22, "y", { date: "2026-09-08", heure })]), heure ?? "sans heure").toBe(1);
+    const deNuit = lire(
+      versTexteCaptures(captures({ blocs: [bloc(2, "x", null), bloc(22, "y", { date: "2026-09-08", heure: "01:30" })] }), { aujourdhui: "2026-10-31" }).texte,
+      h,
+    ).messages;
+    expect(blocChiffres(chiffrer(h, deNuit), deNuit.length, recentsDe({ ...h, aujourdhui: "2026-10-31" }, deNuit))).toContain(
+      "sur toute la conv : 24 messages, du 2026-09-08 au 2026-09-08, 1 jours avec des messages",
+    );
+    /* Seulement des jours empruntés (un repère dont aucun message n’est lisible) : ils comptent, plutôt que zéro jour */
+    expect(chiffrer(h, deNuit.slice(0, 2)).joursActifs).toBe(1);
     /* Aucune date sur les captures : aucun jour connu */
     expect(jours([bloc(4, "x", null)])).toBe(0);
     /* Un export à 1 h 30 le 20 compte la nuit du 19 ; une capture sous la pastille du 20 compte le 20 */

@@ -1,4 +1,5 @@
 import "server-only";
+import { debutManquant } from "@prompts/lib/conv";
 import { nomsDistincts, prenomDe, seConfondent } from "@prompts/lib/noms";
 import { formatCount } from "@/lib/format";
 import { doutePrenom } from "@/lib/participants";
@@ -87,10 +88,10 @@ export function storyEtSource(id: string, meta: Meta): { story: Story; source: S
   const ordre = morceaux.map((m, k) => ({ m, k })).sort((x, y) => x.m.resume.debut.localeCompare(y.m.resume.debut) || x.k - y.k);
   const sources = ordre.map(({ m }, i) => sourceDe(`s${i + 1}`, m));
   /*
-   * Le début de la conv n’a pas été importé : elle est coupée, ou le plus ancien de ses morceaux datés l’est (rendre,
-   * prompts/lib/conv.ts : la même règle)
+   * Le début de la conv n’a pas été importé : elle est coupée, ou un de ses morceaux datés qui commencent le plus tôt
+   * l’est (debutManquant, prompts/lib/conv.ts : la règle que lit le modèle, deux morceaux du même premier jour compris)
    */
-  const debutManque = meta.morceaux ? !!ordre.find(({ m }) => !m.resume.sansDate)?.m.coupe : !!meta.coupe;
+  const debutManque = meta.morceaux ? debutManquant(meta.morceaux.map((m) => ({ debut: m.resume.debut, coupe: m.coupe, sansDate: m.resume.sansDate }))) : !!meta.coupe;
   /*
    * Leurs noms, distincts quand ils ont le même prénom (comme ceux que lit le modèle, histoireDe, mais jamais « Léa
    * (l’autre) », qui ne se lit pas à l’écran : « Léa & Léa ») : sur « Qui es-tu ? », chacun

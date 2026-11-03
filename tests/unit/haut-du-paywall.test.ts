@@ -3,7 +3,7 @@ import { versTexteCaptures } from "@prompts/lib/captures";
 import { lire, type Chiffres, type Message } from "@prompts/lib/conv";
 import { dateDuHaut, genreDuHaut, hautDuPaywall, semaineDeLaCourbe } from "@/contenu/haut-du-paywall";
 import { signaux, signauxSansHeures } from "@/server/ecrans/haut-du-paywall";
-import { tendance } from "@/server/ecrans/tendance";
+import { etendue, tendance } from "@/server/ecrans/tendance";
 import { morceauxContinus } from "@/server/histoires";
 import { reunir } from "@/server/morceaux";
 import type { ApercuDuPaywall, SignalDuPaywall, TendanceDuPaywall } from "@/types";
@@ -368,6 +368,98 @@ describe("une vidéo sans date réunie à un export (src/server/morceaux.ts, reu
     // eslint-disable-next-line @typescript-eslint/no-unused-vars -- écartés : ce qui les écarte de la tendance
     const auJourDeLAncre = r.messages.map(({ jourDevine, tLu, ...m }) => m);
     expect(tendance(auJourDeLAncre, [true, true])).toMatchObject({ depuis: "2026-03-30" });
+  });
+});
+
+/** Une vidéo datée (un enregistrement d’écran : ses repères à l’heure), lue comme à l’import, Tom en « Moi ». */
+function videoDatee(blocs: { jour: number; heure: string; messages: ReturnType<typeof msg>[] }[]): Message[] {
+  const iso = (d: number) => new Date(JOUR_0 + d * J).toISOString().slice(0, 10);
+  const t = versTexteCaptures(captures({ appli: "whatsapp", autre: "Léa", blocs: blocs.map((b) => ({ repere: { date: iso(b.jour), heure: b.heure }, messages: b.messages })) }), {
+    aujourdhui: "2026-07-01",
+  });
+  return lire(t.texte, { utilisateur: { prenom: "Tom", pronom: "il", nomExport: "Moi" }, autre: { prenom: "Léa", pronom: "elle", nomExport: "Léa" }, format: "captures" }).messages;
+}
+/** Les jours d’un export de Tom et Léa repris par une vidéo, ses six premiers échanges de chacun, sous un repère de 9 h. */
+const joursRepris = (jours: number[]) =>
+  jours.map((d) => ({
+    jour: d,
+    heure: "09:00",
+    messages: Array.from({ length: 6 }, (_, i) => [msg("moi", `tu fais quoi ce soir numéro ${d} ${i}`), msg("autre", `je regarde une série numéro ${d} ${i}`)]).flat(),
+  }));
+/** La suite d’une vidéo : `n` jours depuis le jour `de`, `parJour` échanges neufs chaque soir. */
+const soirs = (de: number, n: number, parJour: number) =>
+  Array.from({ length: n }, (_, k) => ({
+    jour: de + k,
+    heure: "20:00",
+    messages: Array.from({ length: parJour }, (_, i) => [msg("moi", `tu es là ce week-end ${k} ${i}`), msg("autre", `je sais pas encore ${k} ${i}`)]).flat(),
+  }));
+/** La même conv d’un seul tenant : ses messages réunis, comme s’ils venaient d’un seul morceau. */
+const unSeulTenant = (ms: Message[]) => ms.map((m) => ({ ...m, morceau: undefined }));
+
+describe("deux morceaux continus qui se recouvrent : chacun couvre toute son étendue, doublons compris (relecture de la PR 5)", () => {
+  it("un export court, puis le même en entier : la chute de l’export entier, quel que soit l’ordre", () => {
+    const entier = exportTomLea(112, (d) => (d < 56 ? 6 : d < 70 ? 0 : 1));
+    const court = entier.filter((m) => m.t >= JOUR_0 + 70 * J);
+    for (const ordre of [
+      [court, entier],
+      [entier, court],
+    ]) {
+      const r = reunir(ordre.map((messages) => ({ messages, exact: true })));
+      expect(tendance(r.messages, [true, true], r.parMorceau.map(etendue))).toEqual(tendance(entier));
+    }
+    expect(tendance(entier)).toMatchObject({ depuis: "2026-04-27" });
+    /* Sans les étendues, le court importé d’abord : le silence de la jointure n’était qu’un trou, la chute datée deux semaines trop tard */
+    const r = reunir([
+      { messages: court, exact: true },
+      { messages: entier, exact: true },
+    ]);
+    expect(tendance(r.messages, [true, true])).toMatchObject({ depuis: "2026-05-11" });
+  });
+
+  it("un export, puis une vidéo qui reprend ses derniers jours après un silence : la chute datée au début du silence, ou retrouvée", () => {
+    const exp = exportTomLea(60, () => 6);
+    const avec = (video: Message[]) => {
+      const r = reunir([
+        { messages: exp, exact: true },
+        { messages: video, exact: false },
+      ]);
+      expect(r.doublons).toBe(36);
+      return { r, juste: tendance(r.messages, [true, true], r.parMorceau.map(etendue)), sans: tendance(r.messages, [true, true]) };
+    };
+    /* Deux semaines de silence (du 1er au 14 mai), puis un échange par soir : comme la conv d’un seul tenant */
+    const silence = avec(videoDatee([...joursRepris([57, 58, 59]), ...soirs(74, 38, 1)]));
+    expect(silence.juste).toEqual(tendance(unSeulTenant(silence.r.messages)));
+    expect(silence.juste).toMatchObject({ depuis: "2026-05-04" });
+    expect(silence.sans).toMatchObject({ depuis: "2026-05-15" });
+    /* Trois semaines de silence, puis quatre échanges par soir : la chute que le trou faisait perdre */
+    const perdue = avec(videoDatee([...joursRepris([57, 58, 59]), ...soirs(81, 28, 4)]));
+    expect(perdue.juste).toEqual(tendance(unSeulTenant(perdue.r.messages)));
+    expect(perdue.juste).toMatchObject({ depuis: "2026-04-27", avant: 6 });
+    expect(perdue.sans).toBeNull();
+  });
+
+  it("sans recouvrement, un vrai trou reste un trou ; une vidéo qui reprend des captures photo ne couvre pas leurs jours", () => {
+    const deux = reunir([
+      { messages: exportTomLea(56, () => 6), exact: true },
+      { messages: exportTomLea(105, () => 4).filter((m) => m.t >= JOUR_0 + 84 * J), exact: true },
+    ]);
+    expect(tendance(deux.messages, [true, true], deux.parMorceau.map(etendue))).toBeNull();
+    /*
+     * Un export de 8 semaines, puis cinq semaines de captures photo (du 27 avril au 31 mai), dont une vidéo refilme les
+     * trois dernières avant de continuer, un échange par soir : son étendue commence sur des jours de photos, qui ne
+     * comptent pas. Couvertes, ces trois semaines sans aucun message compté feraient la chute dès le 11 mai
+     */
+    const jours = (de: number, a: number) => Array.from({ length: a - de + 1 }, (_, k) => de + k);
+    const r = reunir([
+      { messages: exportTomLea(56, () => 6), exact: true },
+      { messages: videoDatee(joursRepris(jours(56, 90))), exact: false },
+      { messages: videoDatee([...joursRepris(jours(70, 90)), ...soirs(91, 21, 1)]), exact: false },
+    ]);
+    expect(r.gardes[2]).toBe(42);
+    expect(etendue(r.parMorceau[2]!)).toEqual({ de: (JOUR_0 + 70 * J) / J, a: (JOUR_0 + 111 * J) / J });
+    const juste = tendance(r.messages, [true, false, true], r.parMorceau.map(etendue));
+    expect(juste).toEqual(tendance(r.messages, [true, false, true]));
+    expect(juste).toMatchObject({ depuis: "2026-06-01", avant: 6, apres: 1 });
   });
 });
 

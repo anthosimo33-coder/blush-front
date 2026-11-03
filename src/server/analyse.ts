@@ -1,7 +1,7 @@
 import "server-only";
 import { eq, sql } from "drizzle-orm";
 import { heureLue } from "@prompts/lib/reconnaitre";
-import { chiffrer as chiffresDe, jourConnu, lire, rendre } from "@prompts/lib/conv";
+import { chiffrer as chiffresDe, jourConnu, lire, rendre, type Lecture } from "@prompts/lib/conv";
 import { DEMANDE_PLAN, demandeMoitie, requeteMemoireCreation, requeteMemoireMaj, requeteRapport, requeteVerdict, requeteVocal } from "@prompts/lib/contextes";
 import { alerteRetenue, appliquerMaj, aTrancher, estFaite, rapportCourt, rendreNouveaux, reunirLesAlertes, type Echange } from "@prompts/lib/memoire";
 import { introuvables, preuvesChapitres, preuvesMaj, preuvesMemoire, preuvesPlan, preuvesRapport, preuvesVerdict, preuvesVocal } from "@prompts/lib/preuves";
@@ -21,6 +21,7 @@ import { noterLeTitre, noterLeTitreEntier } from "./imports";
 import { contexteDe, convDe, fuseauDe, histoireDe, metaDe, morceauxContinus, nomsDeToi, provenancesDe, type Ligne, type LigneComplete } from "./histoires";
 import { messagesAffiches } from "./ecrans/messages";
 import { apercuDuPaywall } from "./ecrans/haut-du-paywall";
+import { etendue } from "./ecrans/tendance";
 import { chapitresAffiches, lectureDe, scores, sobreAffiche } from "./ecrans/rapport";
 import { trouvailles } from "./ecrans/trouvailles";
 import { ErreurTache } from "./erreurs";
@@ -68,7 +69,8 @@ function relire(story: LigneComplete) {
    * seul morceau dont le début n’a pas été importé (Meta.coupe) : le modèle le lit (rendre, `coupe`) ; en morceaux,
    * provenancesDe dit lequel est coupé
    */
-  const lu = typeof conv === "string" ? lire(conv, h, { autresEnTexte: true }) : lectureReunie(conv, h, { k: meta.moi ?? 0, connu: true });
+  const lu: Lecture & { parMorceau?: Lecture["messages"][] } =
+    typeof conv === "string" ? lire(conv, h, { autresEnTexte: true }) : lectureReunie(conv, h, { k: meta.moi ?? 0, connu: true });
   return {
     meta,
     h,
@@ -76,6 +78,8 @@ function relire(story: LigneComplete) {
     rendu: rendre(h, lu, { morceaux: provenancesDe(meta), ...(meta.morceaux ? {} : { coupe: !!meta.coupe }) }),
     /* Les morceaux que la tendance du haut du paywall compte : ses exports et ses vidéos, pas ses captures photo (morceauxContinus) */
     continus: morceauxContinus(meta),
+    /* Et ce que chacun couvre, doublons compris (etendue : ses messages datés comme dans la conv réunie) ; aucune pour une conv d’un seul morceau */
+    etendues: lu.parMorceau?.map(etendue),
   };
 }
 
@@ -108,7 +112,7 @@ const suivreAvance = (tacheId: string, calcul: (a: Avance) => number) => {
 
 /** Ce que le code sait d’une conv, sans le modèle : ses chiffres, son style, ses trouvailles (le contexte de la conv). */
 function contexteDuCode(story: LigneComplete) {
-  const { h, lu, rendu, continus } = relire(story);
+  const { h, lu, rendu, continus, etendues } = relire(story);
   const chiffres = chiffresDe(h, lu.messages);
   const contexte: Contexte = {
     chiffres: rendu.chiffres,
@@ -128,9 +132,9 @@ function contexteDuCode(story: LigneComplete) {
      */
     lus: ecrireLus(lu.messages.slice(-LUS_MAX).map((m) => ({ cle: cleSecrete(m), ...heureLue(m) }))),
     trouvailles: trouvailles(chiffres, h, lu.messages),
-    accroche: genreDuHaut(apercuDuPaywall(chiffres, lu.messages, continus)),
+    accroche: genreDuHaut(apercuDuPaywall(chiffres, lu.messages, continus, undefined, etendues)),
   };
-  return { h, rendu, chiffres, contexte, messages: lu.messages, continus };
+  return { h, rendu, chiffres, contexte, messages: lu.messages, continus, etendues };
 }
 
 /**
@@ -177,8 +181,8 @@ export async function poserLeVerdict(storyId: string): Promise<"paiement" | "par
 export async function apercuAvantPaiement(storyId: string): Promise<ApercuDuPaywall | null> {
   const [[story], { verdict }] = await Promise.all([db().select().from(schema.stories).where(eq(schema.stories.id, storyId)), etatDesTaches(storyId, ["verdict"])]);
   if (!story?.conv || verdict?.status !== "paiement") return null;
-  const { h, chiffres, messages, continus } = contexteDuCode(story);
-  return apercuDuPaywall(chiffres, messages, continus, h);
+  const { h, chiffres, messages, continus, etendues } = contexteDuCode(story);
+  return apercuDuPaywall(chiffres, messages, continus, h, etendues);
 }
 
 /**

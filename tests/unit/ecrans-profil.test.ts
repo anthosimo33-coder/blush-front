@@ -386,7 +386,15 @@ describe("une conv sans date, une conv coupée (PR 5)", () => {
       ...(jourDevine ? { jourDevine } : {}),
       ligne: k,
     });
-    expect(resumeDe([m(1, "2026-09-01"), m(2, "2026-09-03"), m(3, "2026-10-31", "inconnu")])).toEqual({ debut: "2026-09-01", fin: "2026-09-03", total: 3, vocaux: 0 });
+    /* Un dernier message sans date : la fin est le dernier jour daté, et le résumé le dit (la ligne des morceaux : « puis sans date ») */
+    expect(resumeDe([m(1, "2026-09-01"), m(2, "2026-09-03"), m(3, "2026-10-31", "inconnu")])).toEqual({
+      debut: "2026-09-01",
+      fin: "2026-09-03",
+      total: 3,
+      vocaux: 0,
+      finSansDate: true,
+    });
+    expect(resumeDe([m(1, "2026-09-01"), m(3, "2026-10-31", "inconnu"), m(2, "2026-09-03")])).toEqual({ debut: "2026-09-01", fin: "2026-09-03", total: 3, vocaux: 0 });
     expect(resumeDe([m(1, "2026-10-31", "inconnu"), m(2, "2026-10-31", "inconnu"), m(3, "2026-10-31", "inconnu")])).toEqual({
       debut: "2026-10-31",
       fin: "2026-10-31",
@@ -394,7 +402,11 @@ describe("une conv sans date, une conv coupée (PR 5)", () => {
       vocaux: 0,
       sansDate: true,
     });
-    /* Un jour emprunté (« au plus tard ») est une borne juste : il compte */
+    /* Un jour emprunté (« au plus tard ») est une borne juste : il compte ; pas celui que la réunion a recalé d’un autre jour (tLu) */
     expect(resumeDe([m(1, "2026-09-01", "auPlusTard"), m(2, "2026-09-01")]).sansDate).toBeUndefined();
+    expect(resumeDe([{ ...m(1, "2026-09-01", "auPlusTard"), tLu: Date.parse("2026-10-31T00:00:00Z") }, m(2, "2026-09-02")])).toMatchObject({
+      debut: "2026-09-02",
+      fin: "2026-09-02",
+    });
   });
 });

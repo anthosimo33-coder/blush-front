@@ -1,8 +1,10 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { messagesDesCaptures } from "@prompts/lib/ajouts";
 import { versTexteCaptures } from "@prompts/lib/captures";
-import { blocChiffres, chiffrer, heure as hhmm, jour as jourIso, lire, recents, RECENT_J, type Message } from "@prompts/lib/conv";
+import { blocChiffres, chiffrer, heure as hhmm, jour as jourIso, lire, recents, RECENT_J, rendre, type Histoire, type Message } from "@prompts/lib/conv";
 import { cleDuMessage, heureLue } from "@prompts/lib/reconnaitre";
+import { storyAffichee } from "@/server/conv-affichee";
+import { provenancesDe, resumeDe, type Meta, type MorceauMeta } from "@/server/histoires";
 import { relier, reunir, type ConvEnMorceaux, type MorceauRecu } from "@/server/morceaux";
 import { fusionnerLots } from "@/server/video";
 import { captures, msg } from "../aide/fabriques";
@@ -995,6 +997,170 @@ describe("des captures où l’on ne voit aucune date (G1b)", () => {
       "carrément 2026-09-05 ~21:00",
     ]);
     expect(heureLue(r.messages[1]!)).toEqual({ t: Date.UTC(2026, 8, 5), heure: "auPlusTard" });
+  });
+});
+
+describe("ce que le modèle et l’écran lisent d’une conv réunie avec des captures sans date (relecture de la PR 5)", () => {
+  /** La conv que lit le modèle, importée le `aujourdhui` : ses morceaux (l’appli de chacun, son résumé d’après la réunion, comme resumesReunis), coupés ou non. */
+  const lue = (r: ReturnType<typeof reunir>, morceaux: Omit<MorceauMeta, "resume">[], aujourdhui: string) => {
+    const h: Histoire = { utilisateur: HUGO, autre: LEA, devinette: "parle", objectif: "comprendre", appli: "whatsapp", format: "captures", aujourdhui };
+    const metas: MorceauMeta[] = morceaux.map((m, k) => ({ ...m, resume: resumeDe(r.parMorceau[k]!) }));
+    const rendu = rendre(
+      h,
+      { messages: r.messages, problemes: [], participants: ["Hugo", "Léa"], captures: null, inconnues: { lignes: 0, forme: null } },
+      { morceaux: provenancesDe({ morceaux: metas }) },
+    );
+    return { h, metas, rendu, conv: rendu.conversation.split("\n") };
+  };
+  const EXPORT: Omit<MorceauMeta, "resume"> = { appli: "whatsapp", fichier: "Discussion WhatsApp avec Léa.txt" };
+  const CAPTURES: Omit<MorceauMeta, "resume"> = { appli: "whatsapp", fichier: "2 captures", captures: 2 };
+
+  it("rangées avant le premier message qu’elles reprennent : pas datées (« au plus tard » d’un autre jour), hors des 21 derniers jours", () => {
+    /* Un export du 20 au 29 octobre (60 messages), puis des captures sans date : 18 messages plus anciens, puis ses 3 premiers */
+    const lignes = Array.from({ length: 60 }, (_, k): Ligne => [
+      `${p2(20 + Math.floor(k / 6))}/10/2026 20:${p2(k)}:00`,
+      k % 2 ? "Léa" : "Hugo",
+      `on reparle du concert numéro ${k} ce week-end`,
+    ]);
+    const anciens = Array.from({ length: 18 }, (_, k): [de: "moi" | "autre", t: string] => [k % 2 ? "autre" : "moi", `vieux souvenir de vacances numéro ${k}`]);
+    const repris = [0, 1, 2].map((k): [de: "moi" | "autre", t: string] => [k % 2 ? "autre" : "moi", `on reparle du concert numéro ${k} ce week-end`]);
+    const r = reunir([exporte(lignes), capturees([bloc([...anciens, ...repris], null)], "2026-10-31")]);
+    expect(r).toMatchObject({ doublons: 3, gardes: [60, 18] });
+    expect(r.messages.slice(0, 18).map(quand)).toEqual(Array(18).fill("2026-10-20 --:-- lu 2026-10-31 00:00 auPlusTard"));
+    const { h, metas, rendu, conv } = lue(r, [EXPORT, CAPTURES], "2026-10-31");
+    /* Ils ont pu être écrits bien avant le 10 octobre : les 21 derniers jours ne comptent que l’export */
+    expect(recents(h, r.messages).n).toBe(60);
+    expect(rendu.chiffres).toContain("sur les 21 derniers jours (du 2026-10-10 au 2026-10-31) : 60 messages");
+    expect(rendu.chiffres).toContain("sur toute la conv : 78 messages, du 2026-10-20 au 2026-10-29, 10 jours avec des messages");
+    /* Le modèle les lit au jour inconnu, et sait que leur place n’est pas sûre */
+    expect(conv[1]).toBe(
+      "[18 messages viennent de captures qui ne montrent aucune date (« ????-??-?? ») : leur place parmi les messages datés n’est pas sûre. Ne dis ni quand ils ont été écrits, ni ce qui s’est passé juste avant ou après eux, ni depuis quand l’un n’a pas écrit à l’autre.]",
+    );
+    expect(conv[3]).toBe("# date inconnue");
+    expect([...rendu.lignes.values()].slice(0, 18).every((l) => l.includes(" ????-??-?? "))).toBe(true);
+    /* Leur morceau commence au jour lu de ses messages repris, pas au jour qu’ils empruntent */
+    expect(provenancesDe({ morceaux: metas })[1]).toMatchObject({ debut: "2026-10-20", fin: "2026-10-20" });
+  });
+
+  it("un export qui commence la nuit, repris par des captures sans date avec un message neuf en tête : un seul jour avec des messages, comme l’export seul", () => {
+    const nuit = exporte(suite("08/09/2026 01:10", 12, { texte: (k) => `on parle encore du film numéro ${k}` }));
+    const r = reunir([
+      nuit,
+      capturees(
+        [bloc([["moi", "je t’ajoute ici"], ...[0, 1, 2].map((k): [de: "moi" | "autre", t: string] => [k % 2 ? "autre" : "moi", `on parle encore du film numéro ${k}`])], null)],
+        "2026-10-31",
+      ),
+    ]);
+    expect(r).toMatchObject({ doublons: 3, gardes: [12, 1] });
+    const h = { utilisateur: HUGO, autre: LEA };
+    expect(chiffrer(h, r.messages).joursActifs).toBe(chiffrer(h, nuit.messages).joursActifs);
+    expect(chiffrer(h, r.messages).joursActifs).toBe(1);
+  });
+
+  it("des captures sans date sans rien en commun, au milieu d’un export qui dépasse le jour de l’import : une ligne dit que leur place n’est pas sûre", () => {
+    const sansRien = (aujourdhui: string) =>
+      capturees(
+        [
+          bloc(
+            [
+              ["autre", "attends t’as vu mon message de ce matin sur la soirée"],
+              ["moi", "t’es là ? je t’attends devant le cinéma"],
+              ["moi", "réponds stp ça fait longtemps"],
+            ],
+            null,
+          ),
+        ],
+        aujourdhui,
+        "instagram",
+      );
+    /* L’export a des messages le jour de l’import : les captures, à minuit ce jour-là, tombent entre ses messages */
+    const exp = exporte([
+      ...suite("01/10/2026 21:00", 30, { texte: (k) => `on parle du film numéro ${k} ce soir` }),
+      ...suite("31/10/2026 08:00", 6, { pas: 120, texte: (k) => `journée numéro ${k}` }),
+    ]);
+    const r = reunir([exp, sansRien("2026-10-31")]);
+    expect(r).toMatchObject({ doublons: 0, gardes: [36, 3] });
+    const { conv } = lue(r, [EXPORT, { appli: "instagram", fichier: "1 capture", captures: 1 }], "2026-10-31");
+    expect(conv[1]).toMatch(/^\[3 messages viennent de captures qui ne montrent aucune date \(« \?{4}-\?{2}-\?{2} »\) : leur place parmi les messages datés n’est pas sûre\. /);
+    expect(conv.filter((l) => l.startsWith("[Les ") || l.startsWith("[Le dernier"))).toEqual([]);
+    const inconnu = conv.indexOf("# date inconnue");
+    expect(conv.findIndex((l) => l.startsWith("# jeu. 2026-10-01"))).toBeLessThan(inconnu);
+    expect(conv.findIndex((l) => l.startsWith("# sam. 2026-10-31"))).toBeGreaterThan(inconnu);
+    /* L’export finit la veille : elles tombent à la fin, sans rien en commun avec lui : ni avant ni après ne se dit */
+    const veille = reunir([exporte(suite("01/10/2026 21:00", 30, { texte: (k) => `on parle du film numéro ${k} ce soir` })), sansRien("2026-10-31")]);
+    expect(lue(veille, [EXPORT, { appli: "instagram", fichier: "1 capture", captures: 1 }], "2026-10-31").conv[1]).toBe(
+      "[Les 3 derniers messages viennent de captures qui ne montrent aucune date (« ????-??-?? ») et n’ont rien en commun avec le reste : on ne sait pas s’ils sont avant ou après lui. Ne dis ni quand ils ont été écrits, ni depuis quand l’un n’a pas écrit à l’autre.]",
+    );
+  });
+
+  it("la suite d’un export sur des captures sans date : après son dernier jour, et la ligne des morceaux dit « puis sans date »", () => {
+    const neufs: [de: "moi" | "autre", t: string][] = [
+      ["autre", "attends t’as vu mon message de ce matin"],
+      ["moi", "lequel"],
+      ["autre", "celui sur le week-end à la mer"],
+      ["moi", "ah oui carrément partant"],
+    ];
+    const r = reunir([exportDuMois(), capturees([bloc([["autre", "bon je vais dormir"], ["moi", "bonne nuit"], ...neufs], null)], "2026-10-31")]);
+    expect(r).toMatchObject({ doublons: 2, gardes: [27, 4] });
+    const { metas, rendu, conv } = lue(r, [EXPORT, CAPTURES], "2026-10-31");
+    expect(metas[1]!.resume).toMatchObject({ debut: "2026-09-15", fin: "2026-09-15", finSansDate: true });
+    expect(metas[0]!.resume.finSansDate).toBeUndefined();
+    expect(conv[1]).toMatch(
+      /^\[Les 4 derniers messages viennent de captures qui ne montrent aucune date \(« \?{4}-\?{2}-\?{2} »\) : ils sont après le 2026-09-15, peut-être bien après\. /,
+    );
+    expect(conv[2]).toContain("WhatsApp (export) du 2026-09-01 au 2026-09-15, WhatsApp (captures) le 2026-09-15, puis sans date. ");
+    expect(rendu.finSansDate).toBe(true);
+  });
+
+  it("« le début manque » : l’écran et le modèle disent la même chose pour un export coupé et des captures de son premier jour, dans les deux ordres", () => {
+    /* L’export, coupé en plein jour : il commence le 2 mars à 14:00, puis un message toutes les 12 h jusqu’au 1er mai */
+    const exp = exporte([
+      ["02/03/2026 14:00:00", "Hugo", "tu as pu regarder le film dont je te parlais hier soir"],
+      ["02/03/2026 14:05:00", "Léa", "oui je l’ai fini cette nuit c’était vraiment trop bien"],
+      ["02/03/2026 14:06:00", "Hugo", "trop content que ça t’ait plu franchement"],
+      ...suite("02/03/2026 20:00", 120, { pas: 12 * 60, texte: (k) => `on parle encore du sujet numéro ${k}` }),
+    ]);
+    /* Des captures du 2 mars, sous une pastille sans heure : deux messages d’avant la coupe, puis les trois premiers de l’export */
+    const cap = capturees(
+      [
+        bloc(
+          [
+            ["autre", "coucou tu fais quoi ce matin"],
+            ["moi", "je bosse un peu et toi"],
+            ["moi", "tu as pu regarder le film dont je te parlais hier soir"],
+            ["autre", "oui je l’ai fini cette nuit c’était vraiment trop bien"],
+            ["moi", "trop content que ça t’ait plu franchement"],
+          ],
+          "2026-03-02",
+        ),
+      ],
+      "2026-05-02",
+    );
+    const exportCoupe: Omit<MorceauMeta, "resume"> = { ...EXPORT, coupe: true };
+    for (const ordre of [[exp, cap] as const, [cap, exp] as const]) {
+      const r = reunir([...ordre]);
+      const morceaux = ordre[0] === exp ? [exportCoupe, CAPTURES] : [CAPTURES, exportCoupe];
+      const { metas, rendu, conv } = lue(r, morceaux, "2026-05-02");
+      /* Les deux morceaux commencent le même jour : le coupé compte, quel que soit l’ordre de l’import */
+      expect(metas.map((m) => m.resume.debut)).toEqual(["2026-03-02", "2026-03-02"]);
+      const meta: Meta = {
+        appli: "whatsapp",
+        format: "captures",
+        fichier: EXPORT.fichier,
+        participants: [
+          { nom: "Hugo", prenom: "Hugo", messages: 64 },
+          { nom: "Léa", prenom: "Léa", messages: 63 },
+        ],
+        resume: resumeDe(r.messages),
+        morceaux: metas,
+        doublons: r.doublons,
+      };
+      expect(storyAffichee("c", meta).startMissing).toBe(true);
+      expect(conv[1]).toBe(
+        `[La conv commence avant le 2026-03-02 : ses messages plus anciens n’ont pas été importés. Le premier message ci-dessous n’est pas le début de leur histoire : ni qui a écrit en premier, ni depuis quand ils se parlent ne se lisent ici.]`,
+      );
+      expect(rendu.chiffres).toContain("sur la partie importée : ");
+    }
   });
 });
 

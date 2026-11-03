@@ -1000,4 +1000,83 @@ describe("le jour deviné et les appels décrochés (PR 5)", () => {
     expect(textes(r.nouveaux)).toEqual(["Appel vocal, 12\u00a0min", "trop bien de t’entendre", "pareil", "Appel vocal, 5\u00a0min"]);
     expect(numeroter(r.nouveaux, [], H, { debut: 501, aujourdhui: "2026-10-31" }).cibles).toEqual(["m0503"]);
   });
+  it("une proposition tapée (« facetime 21h ») reste un message, et la cible de la réponse", () => {
+    const hier = lu("toi", "t’es dispo ce soir ?", "2026-10-31 18:00:00", "repere");
+    const c = captures({ autre: "Léa", blocs: [{ repere: { date: "2026-10-31", heure: "18:00" }, messages: [msg("moi", "t’es dispo ce soir ?"), msg("autre", "facetime 21h")] }] });
+    const r = messagesDesCaptures(c, H, { aujourdhui: "2026-10-31", apres: hier.t, lus: [hier] });
+    expect(textes(r.nouveaux)).toEqual(["facetime 21h"]);
+    expect(numeroter(r.nouveaux, [], H, { debut: 501, aujourdhui: "2026-10-31" }).cibles).toEqual(["m0501"]);
+  });
+});
+
+describe("les messages lus depuis la PR 4 (en ligne le 2 novembre 2026) : un appel décroché et une réponse à une story, lus alors comme un média", () => {
+  /* Le soir du 2 novembre, sous le repère de 21:00 : ce que la conv a noté à l’import, avant la PR 5 */
+  const A_21H = Date.parse("2026-11-02T21:00:00Z");
+  /* La clé du serveur (cleSecrete, src/server/ajouts.ts) : une empreinte de cleDuMessage ; ici, une clé qui ne la laisse pas lire */
+  const secrete = (m: Message) => `secret:${[...cleDuMessage(m)].reverse().join("")}`;
+  /** Les lus d’une conv importée avant la PR 5 : ses messages sous le repère de 21:00, l’appel et la réponse à une story en média. */
+  const commeAvant = (cle: (m: Message) => string, messages: [role: "toi" | "autre", texte: string, media?: Message["media"]][]): Lu[] =>
+    messages.map(([role, texte, media]) => ({
+      cle: cle({ id: "", t: A_21H, nom: "", role, texte, approx: "heure", ligne: 0, ...(media ? { media } : {}) }),
+      t: A_21H,
+      heure: "repere",
+    }));
+  const renvoi = (messages: ReturnType<typeof msg>[], heure = "21:00") => captures({ autre: "Léa", blocs: [{ repere: { date: "2026-11-02", heure }, messages }] });
+
+  it("une capture qui commence par l’appel décroché, puis deux messages lus et deux neufs : deux nouveaux, même avec la clé du serveur", () => {
+    for (const cle of [cleDuMessage, secrete]) {
+      /* Avant la PR 5, l’appel s’écrivait « Appel vocal manqué » : un média, la clé « role|# » */
+      const lus = commeAvant(cle, [
+        ["toi", "on s’appelle ce soir ?"],
+        ["autre", "", "appel manqué"],
+        ["toi", "trop bien de t’entendre"],
+        ["autre", "pareil à demain alors"],
+      ]);
+      const c = renvoi([
+        msg("autre", "Appel vocal · 23 min", { media: "appel" }),
+        msg("moi", "trop bien de t’entendre"),
+        msg("autre", "pareil à demain alors"),
+        msg("moi", "tu fais quoi demain soir"),
+        msg("autre", "rien de prévu et toi"),
+      ]);
+      const r = messagesDesCaptures(c, H, { aujourdhui: "2026-11-03", apres: A_21H, lus, cle });
+      expect(textes(r.nouveaux)).toEqual(["tu fais quoi demain soir", "rien de prévu et toi"]);
+      /* Ce que la conv note : leur clé d’aujourd’hui */
+      expect(r.aNoter.map((e) => e.cle)).toEqual(r.nouveaux.map(cle));
+    }
+  });
+
+  it("une capture qui commence par la réponse à une story, ou par une réaction : la même chose", () => {
+    for (const reponse of ["trop belle cette photo 😍", "A réagi 😍 à votre story"]) {
+      /* Avant la PR 5, toute réponse à une story s’écrivait « A répondu à ta story » : un média */
+      const lus = commeAvant(cleDuMessage, [
+        ["toi", "regarde ma story"],
+        ["autre", "", "réponse à ta story"],
+        ["toi", "merci t’es mignonne toi"],
+        ["autre", "on se voit quand alors"],
+      ]);
+      const c = renvoi([
+        msg("autre", reponse, { media: "story" }),
+        msg("moi", "merci t’es mignonne toi"),
+        msg("autre", "on se voit quand alors"),
+        msg("moi", "samedi soir ça te va"),
+        msg("autre", "parfait à samedi"),
+      ]);
+      const r = messagesDesCaptures(c, H, { aujourdhui: "2026-11-03", apres: A_21H, lus });
+      expect(textes(r.nouveaux), reponse).toEqual(["samedi soir ça te va", "parfait à samedi"]);
+    }
+  });
+
+  it("reconnue par sa clé d’avant, une réponse à une story n’est pas distinctive : une neuve, sous un autre repère, ne passe pas pour sa photo déjà lue", () => {
+    const lus = commeAvant(cleDuMessage, [
+      ["toi", "je t’envoie la photo du resto"],
+      ["autre", "", "photo"],
+    ]);
+    const r = messagesDesCaptures(renvoi([msg("autre", "trop belle cette photo 😍", { media: "story" }), msg("moi", "merci toi")], "22:30"), H, {
+      aujourdhui: "2026-11-03",
+      apres: A_21H,
+      lus,
+    });
+    expect(textes(r.nouveaux)).toEqual(["trop belle cette photo 😍 [réponse à une story]", "merci toi"]);
+  });
 });
