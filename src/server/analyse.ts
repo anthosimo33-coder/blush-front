@@ -18,7 +18,7 @@ import { donneesMemoire, donneesVerdict, ligneRapport, modifierMemoire } from ".
 import { compterLeHaut } from "./compteurs";
 import { dureeDeLaSuite, garderJusquALAchat, garderJusquALaLecture } from "./ecrans-gardes";
 import { noterLeTitre, noterLeTitreEntier } from "./imports";
-import { contexteDe, convDe, fuseauDe, histoireDe, metaDe, nomsDeToi, provenancesDe, type Ligne, type LigneComplete } from "./histoires";
+import { contexteDe, convDe, fuseauDe, histoireDe, metaDe, morceauxContinus, nomsDeToi, provenancesDe, type Ligne, type LigneComplete } from "./histoires";
 import { messagesAffiches } from "./ecrans/messages";
 import { apercuDuPaywall } from "./ecrans/haut-du-paywall";
 import { chapitresAffiches, lectureDe, scores, sobreAffiche } from "./ecrans/rapport";
@@ -69,7 +69,14 @@ function relire(story: LigneComplete) {
    * provenancesDe dit lequel est coupé
    */
   const lu = typeof conv === "string" ? lire(conv, h, { autresEnTexte: true }) : lectureReunie(conv, h, { k: meta.moi ?? 0, connu: true });
-  return { meta, h, lu, rendu: rendre(h, lu, { morceaux: provenancesDe(meta), ...(meta.morceaux ? {} : { coupe: !!meta.coupe }) }) };
+  return {
+    meta,
+    h,
+    lu,
+    rendu: rendre(h, lu, { morceaux: provenancesDe(meta), ...(meta.morceaux ? {} : { coupe: !!meta.coupe }) }),
+    /* Les morceaux que la tendance du haut du paywall compte : ses exports et ses vidéos, pas ses captures photo (morceauxContinus) */
+    continus: morceauxContinus(meta),
+  };
 }
 
 /* ———— Les étapes ———— */
@@ -101,7 +108,7 @@ const suivreAvance = (tacheId: string, calcul: (a: Avance) => number) => {
 
 /** Ce que le code sait d’une conv, sans le modèle : ses chiffres, son style, ses trouvailles (le contexte de la conv). */
 function contexteDuCode(story: LigneComplete) {
-  const { h, lu, rendu } = relire(story);
+  const { h, lu, rendu, continus } = relire(story);
   const chiffres = chiffresDe(h, lu.messages);
   const contexte: Contexte = {
     chiffres: rendu.chiffres,
@@ -121,9 +128,9 @@ function contexteDuCode(story: LigneComplete) {
      */
     lus: ecrireLus(lu.messages.slice(-LUS_MAX).map((m) => ({ cle: cleSecrete(m), ...heureLue(m) }))),
     trouvailles: trouvailles(chiffres, h, lu.messages),
-    accroche: genreDuHaut(apercuDuPaywall(chiffres, lu.messages)),
+    accroche: genreDuHaut(apercuDuPaywall(chiffres, lu.messages, continus)),
   };
-  return { h, rendu, chiffres, contexte, messages: lu.messages };
+  return { h, rendu, chiffres, contexte, messages: lu.messages, continus };
 }
 
 /**
@@ -164,14 +171,14 @@ export async function poserLeVerdict(storyId: string): Promise<"paiement" | "par
 
 /**
  * Ce que le haut du paywall montre d’une conv qui attend son paiement, calculé par le code sans aucun appel au modèle :
- * qui ouvre la journée, reprend, relance, répond vite, écrit long, et la chute de ses messages s’il y en a une
- * (src/server/ecrans/haut-du-paywall.ts). null : elle n’attend pas son paiement.
+ * qui ouvre la journée, reprend, relance, répond vite, écrit long, et la chute de ses messages s’il y en a une, sur ses
+ * exports et ses vidéos (src/server/ecrans/haut-du-paywall.ts). null : elle n’attend pas son paiement.
  */
 export async function apercuAvantPaiement(storyId: string): Promise<ApercuDuPaywall | null> {
   const [[story], { verdict }] = await Promise.all([db().select().from(schema.stories).where(eq(schema.stories.id, storyId)), etatDesTaches(storyId, ["verdict"])]);
   if (!story?.conv || verdict?.status !== "paiement") return null;
-  const { h, chiffres, messages } = contexteDuCode(story);
-  return apercuDuPaywall(chiffres, messages, h);
+  const { h, chiffres, messages, continus } = contexteDuCode(story);
+  return apercuDuPaywall(chiffres, messages, continus, h);
 }
 
 /**

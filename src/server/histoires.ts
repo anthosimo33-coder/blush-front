@@ -21,6 +21,7 @@ import {
 import { nomsDistincts, prenomDe, prenomEcrit } from "@prompts/lib/noms";
 import type { Appli, ExportLu } from "@prompts/lib/export";
 import type { TexteCaptures } from "@prompts/lib/captures";
+import { CAPTURES_MAX } from "@/lib/limites";
 import { doutePrenom, nomLu } from "@/lib/participants";
 import { pronomDeLAutre, pronomsLus } from "./accords";
 import { empreinte, jeton } from "./chiffrement";
@@ -45,6 +46,7 @@ import {
   type MorceauRecu,
   type QuiLit,
 } from "./morceaux";
+import type { MorceauxContinus } from "./ecrans/tendance";
 
 /*
  * Les histoires en base : le brouillon d’un import, la conv ouverte, « Qui es-tu ? », l’effacement. L’import d’un export
@@ -720,6 +722,23 @@ export const provenancesDe = (meta: Pick<Meta, "morceaux">): Provenance[] =>
     ...(m.coupe ? { coupe: true as const } : {}),
     ...(m.resume.sansDate ? { sansDate: true as const } : {}),
   }));
+
+/**
+ * Des captures tirées d’un enregistrement d’écran (une conv, ou l’un de ses morceaux) : leur meta le dit (`video`,
+ * depuis le 2 novembre 2026) ; avant, plus de captures qu’un envoi de photos n’en permet (CAPTURES_MAX), ou une suite de
+ * longue vidéo qui attend le paiement (`suiteVideo`). Une vidéo de 20 écrans au plus, importée avant, passe pour des photos.
+ */
+const estUneVideo = (m: Pick<MorceauMeta, "captures" | "suiteVideo" | "video">) => !!m.video || !!m.suiteVideo || (m.captures ?? 0) > CAPTURES_MAX;
+
+/**
+ * Les morceaux d’une conv que la tendance du haut du paywall compte (MorceauxContinus, src/server/ecrans/tendance.ts),
+ * dans l’ordre de sa conv brute : un export (sans `captures`) ou un enregistrement d’écran suit la conv jour après jour,
+ * des captures photo non. Une conv d’un seul morceau : le sien, lu dans sa meta. Le contexte de la conv, l’écran du
+ * paywall et sa relance (s1_haut) le lisent tous par contexteDuCode (src/server/analyse.ts).
+ */
+export const morceauxContinus = (
+  meta: Pick<MorceauMeta, "captures" | "suiteVideo" | "video"> & { morceaux?: Pick<MorceauMeta, "captures" | "suiteVideo" | "video">[] },
+): MorceauxContinus => (meta.morceaux ?? [meta]).map((m) => !m.captures || estUneVideo(m));
 
 export async function definirQui(
   id: string,

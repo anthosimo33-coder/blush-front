@@ -1,6 +1,6 @@
 import type { Chiffres, Histoire, Message } from "@prompts/lib/conv";
 import type { ApercuDuPaywall, SignalDuPaywall } from "@/types";
-import { tendance } from "./tendance";
+import { tendance, type MorceauxContinus } from "./tendance";
 
 /*
  * Le haut du paywall : ce que le code a compté entre vous deux, sans le modèle (le paywall passe avant toute lecture).
@@ -115,13 +115,15 @@ export function signauxSansHeures(c: Chiffres, messages: Message[]): SignalDuPay
 }
 
 /**
- * Le haut du paywall d’une conv : ses déséquilibres, et la chute de ses messages s’il y en a une ; avec `h` (une
- * proposition du 22 octobre 2026), ce que tu veux savoir, sur « Qui es-tu ? » (le 1er chapitre du paywall le dit). Et ce
- * qui se compte sans l’heure des messages (une proposition du 27 octobre 2026), quand il y a assez de messages.
+ * Le haut du paywall d’une conv : ses déséquilibres, et la chute de ses messages s’il y en a une, comptée sur ses
+ * morceaux continus (`continus` : ses exports et ses vidéos, pas ses captures photo, morceauxContinus,
+ * src/server/histoires.ts) ; avec `h` (une proposition du 22 octobre 2026), ce que tu veux savoir, sur « Qui es-tu ? »
+ * (le 1er chapitre du paywall le dit). Et ce qui se compte sans l’heure des messages (une proposition du 27 octobre
+ * 2026), quand il y a assez de messages.
  */
-export function apercuDuPaywall(c: Chiffres, messages: Message[], h?: Pick<Histoire, "objectif">): ApercuDuPaywall {
+export function apercuDuPaywall(c: Chiffres, messages: Message[], continus: MorceauxContinus, h?: Pick<Histoire, "objectif">): ApercuDuPaywall {
   const sansHeures = signauxSansHeures(c, messages);
-  const base = { signaux: signaux(c), tendance: tendance(messages), ...(sansHeures && { sansHeures }) };
+  const base = { signaux: signaux(c), tendance: tendance(messages, continus), ...(sansHeures && { sansHeures }) };
   if (!h) return base;
   return { ...base, objectif: h.objectif };
 }

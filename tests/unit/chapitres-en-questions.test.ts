@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Message } from "@prompts/lib/conv";
 import { PAYWALL } from "@/contenu/paiement";
 import { apercuDuPaywall } from "@/server/ecrans/haut-du-paywall";
+import { UN_MORCEAU_CONTINU } from "@/server/ecrans/tendance";
 
 /*
  * Les chapitres du paywall dits en questions (une proposition du 22 octobre 2026), le 1er d’après ce que tu veux savoir
@@ -44,8 +45,8 @@ describe("les chapitres en questions, sur le paywall", () => {
       recurrents: [],
       approx: 0,
     };
-    expect(apercuDuPaywall(chiffres, conv, { objectif: "reciproque" }).objectif).toBe("reciproque");
-    expect(apercuDuPaywall(chiffres, conv)).not.toHaveProperty("objectif");
+    expect(apercuDuPaywall(chiffres, conv, UN_MORCEAU_CONTINU, { objectif: "reciproque" }).objectif).toBe("reciproque");
+    expect(apercuDuPaywall(chiffres, conv, UN_MORCEAU_CONTINU)).not.toHaveProperty("objectif");
   });
 
   it("le 1er chapitre dit ce que tu veux savoir (sinon : est-il intéressé ?), le 5e son prénom", () => {

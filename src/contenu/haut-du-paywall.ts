@@ -93,8 +93,12 @@ export function dateDuHaut(iso: string, { annee, court = false }: { annee?: numb
   return annee !== undefined && a !== annee ? `${jour} ${a}` : jour;
 }
 
-/** Le premier jour de la semaine `i` de la courbe (AAAA-MM-JJ) : la semaine de la chute commence à `depuis`. */
-export const semaineDeLaCourbe = (t: TendanceDuPaywall, i: number) => new Date(Date.parse(t.depuis) + (i - t.coupure) * 7 * 24 * H).toISOString().slice(0, 10);
+/**
+ * Le premier jour de la semaine `i` de la courbe (AAAA-MM-JJ) : celui que la tendance donne (`debuts` : une conv en
+ * morceaux saute le trou entre deux d’entre eux) ; sans lui, la semaine de la chute commence à `depuis`, les autres de
+ * 7 en 7 jours.
+ */
+export const semaineDeLaCourbe = (t: TendanceDuPaywall, i: number) => t.debuts?.[i] ?? new Date(Date.parse(t.depuis) + (i - t.coupure) * 7 * 24 * H).toISOString().slice(0, 10);
 
 /** Les autres textes du haut du paywall. */
 export const TEXTES_DU_HAUT = {
