@@ -46,6 +46,7 @@ const chat = await appeler(
     aujourdhui: Date.parse(`${jour}T00:00:00Z`),
     chiffres: rendu.chiffres,
     fin: rendu.fin,
+    dates: rendu,
     etat,
     lignes: avec,
     style: style(h, lu.messages).bloc,

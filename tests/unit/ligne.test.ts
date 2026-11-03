@@ -3,7 +3,24 @@ import { describe, expect, it } from "vitest";
 import { blocAjout, numeroter } from "@prompts/lib/ajouts";
 import { versTexteCaptures } from "@prompts/lib/captures";
 import { lire, rendre, type Histoire, type Message } from "@prompts/lib/conv";
-import { estLigneMessage, estLigneProfil, idDeLigne, idMessage, ligneMessage, ligneProfil, lireLigne, parIdentifiant, rangDe } from "@prompts/lib/ligne";
+import {
+  deplier,
+  estLigneMessage,
+  estLigneProfil,
+  HEURE_INCONNUE,
+  idDeLigne,
+  idMessage,
+  JOUR_INCONNU,
+  JOURS,
+  jourDeLaSemaine,
+  ligneCompacte,
+  ligneMessage,
+  ligneProfil,
+  lireLigne,
+  parIdentifiant,
+  rangDe,
+  repereDuJour,
+} from "@prompts/lib/ligne";
 import { rendreMemoire, rendreNouveau, rendreNouveaux, type Echange } from "@prompts/lib/memoire";
 import { faitsAffiches } from "@/server/ecrans/fiche";
 import { messagesAffiches } from "@/server/ecrans/messages";
@@ -217,6 +234,24 @@ describe("lib/ligne.ts : écrire une ligne, la relire", () => {
     for (let i = 0; i < 20; i++) expect(lireLigne(l)?.nom).toBe("Léa");
     /* En temps quadratique, ces 20 lectures prenaient des secondes */
     expect(performance.now() - t0).toBeLessThan(500);
+  });
+
+  it("le jour inconnu : sa ligne se relit telle quelle, sans profil ni jour de la semaine inventé ; son repère se déplie", () => {
+    const parties = { id: "m0002", jour: JOUR_INCONNU, heure: HEURE_INCONNUE, nom: "Léa", texte: "on se voit quand ? : demain" };
+    const l = ligneMessage(parties);
+    expect(lireLigne(l)).toEqual({ ...parties, profil: false });
+    expect(estLigneProfil(l)).toBe(false);
+    expect(estLigneMessage(l)).toBe(true);
+    /* Ni un vrai jour de la semaine, ni rien (deux espaces de suite, que LIGNE ne relirait pas) */
+    expect(jourDeLaSemaine(JOUR_INCONNU)).not.toBe("");
+    expect(JOURS).not.toContain(jourDeLaSemaine(JOUR_INCONNU));
+    expect(repereDuJour(JOUR_INCONNU)).not.toMatch(/\d/);
+    const salut = { id: "m0002", heure: HEURE_INCONNUE, nom: "Léa", texte: "salut" };
+    expect(deplier([repereDuJour(JOUR_INCONNU), ligneCompacte(salut)])).toEqual([ligneMessage({ ...salut, jour: JOUR_INCONNU })]);
+    /* Un jour connu après lui reprend sa date */
+    expect(deplier([repereDuJour(JOUR_INCONNU), ligneCompacte(salut), repereDuJour("2026-03-02"), ligneCompacte({ ...salut, id: "m0003" })])[1]).toBe(
+      ligneMessage({ ...salut, id: "m0003", jour: "2026-03-02" }),
+    );
   });
 
   it("idDeLigne et parIdentifiant : la banque des preuves", () => {

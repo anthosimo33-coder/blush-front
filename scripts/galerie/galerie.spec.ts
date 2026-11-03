@@ -46,6 +46,7 @@ import {
   verdictDAvantLesTitres,
 } from "../../tests/e2e/aide";
 import { CASE_IMPORT } from "../../src/contenu/consentements";
+import { FACTICE } from "../../src/server/ia/factice-valeurs";
 import { STATES } from "./screens.mjs";
 
 /*
@@ -110,6 +111,40 @@ async function brouillonEnMorceaux(page: Page, testInfo: TestInfo): Promise<stri
   return histoire;
 }
 
+/** Des captures où l’on ne voit aucune date (une image qui porte FACTICE.sansDate : le modèle factice n’y lit aucun repère), importées sans compte. */
+async function brouillonDeCapturesSansDate(page: Page, testInfo: TestInfo): Promise<string> {
+  await prouverHumain(page.request, testInfo);
+  const envoi = await page.request.post("/api/captures", {
+    headers: origine(testInfo),
+    multipart: {
+      captures: { name: "capture-1.png", mimeType: "image/png", buffer: readFileSync(capturesPng(testInfo, 1, { marque: FACTICE.sansDate })[0]!) },
+      app: "instagram",
+      consentement: CASE_IMPORT.version,
+    },
+    timeout: RESEAU,
+  });
+  expect(envoi.status(), "les captures sans date sont importées").toBe(200);
+  return ((await envoi.json()) as { story: { id: string } }).story.id;
+}
+
+/** La meta de la dernière histoire du compte, retouchée dans la base : une conv coupée (son début pas importé), sans importer 40 000 messages. */
+async function couperLaConv(email: string): Promise<void> {
+  const [s] = await sql()<{ meta: Uint8Array }[]>`select meta from stories where id = ${derniereHistoire(email)}`;
+  if (!s) throw new Error(`aucune histoire pour ${email}`);
+  await sql()`update stories set meta = ${chiffrer({ ...dechiffrer<Record<string, unknown>>(s.meta), coupe: true })} where id = ${derniereHistoire(email)}`;
+}
+
+/**
+ * La lecture de la dernière histoire du compte figée à mi-chemin : le modèle factice lit en un instant, la tâche du
+ * verdict est remise « en cours », comme pendant la réflexion du modèle. Son battement de cœur dans une heure : personne
+ * ne la croit abandonnée, rien ne la relance.
+ */
+async function figerLaLecture(email: string): Promise<void> {
+  await sql()`
+    update tasks set status = 'en_cours', progress = 50, heartbeat_at = now() + interval '1 hour', updated_at = now() - interval '10 minutes'
+    where kind = 'verdict' and story_id = ${derniereHistoire(email)}`;
+}
+
 /**
  * Les rapports écrits du compte, aux chapitres 1 et 2 tels que les écrit le vrai modèle (rapportCommeLeVraiModele) : la
  * révélation du verdict d’un compte payant montre alors la confiance, ce que veulent dire les chiffres, et ses cartes
@@ -166,6 +201,8 @@ async function preparer(etat: Etat, page: Page, testInfo: TestInfo, ecran: "m" |
       return { ...sans, histoire: (await importerUneVideoPartielle(page, testInfo)).histoire };
     case "morceaux":
       return { ...sans, histoire: await brouillonEnMorceaux(page, testInfo) };
+    case "captures-sans-date":
+      return { ...sans, histoire: await brouillonDeCapturesSansDate(page, testInfo) };
     case "code": {
       /* L’email du parcours, puis « Recevoir mon code » : un vrai code, dans la boîte à mails des tests */
       const email = emailDuParcours(etat.id, ecran);
@@ -179,6 +216,16 @@ async function preparer(etat: Etat, page: Page, testInfo: TestInfo, ecran: "m" |
     }
     case "gratuit":
       return { ...sans, histoire: await lectureFaite(page, testInfo, emailLibre(testInfo, "galerie")) };
+    case "gratuit-sans-date":
+      /* Une vraie lecture de captures sans date : ses lignes, ses preuves et ses trouvailles le sont aussi */
+      return { ...sans, histoire: await lectureFaite(page, testInfo, emailLibre(testInfo, "galerie-sans-date"), { captures: { marque: FACTICE.sansDate } }) };
+    case "gratuit-coupee": {
+      /* Seule la meta dit la conv coupée : le modèle factice lit pareil, l’écran du verdict le dit */
+      const email = emailLibre(testInfo, "galerie-coupee");
+      const histoire = await lectureFaite(page, testInfo, email);
+      await couperLaConv(email);
+      return { ...sans, histoire };
+    }
     case "gratuit-sans-titres": {
       /* Le verdict sans les titres des chapitres fermés, comme ceux gardés avant le 13 octobre */
       const email = emailLibre(testInfo, "galerie-sans-titres");
@@ -192,13 +239,14 @@ async function preparer(etat: Etat, page: Page, testInfo: TestInfo, ecran: "m" |
     case "lecture-en-cours": {
       const email = emailLibre(testInfo, "galerie-lecture");
       const histoire = await lectureFaite(page, testInfo, email);
-      /*
-       * Le modèle factice lit en un instant : la tâche du verdict remise « en cours », à mi-chemin, comme pendant la
-       * réflexion du modèle. Son battement de cœur dans une heure : personne ne la croit abandonnée, rien ne la relance.
-       */
-      await sql()`
-        update tasks set status = 'en_cours', progress = 50, heartbeat_at = now() + interval '1 hour', updated_at = now() - interval '10 minutes'
-        where kind = 'verdict' and story_id = ${derniereHistoire(email)}`;
+      await figerLaLecture(email);
+      return { ...sans, histoire };
+    }
+    case "lecture-sans-date": {
+      /* La même, sur des captures sans date : la trouvaille du volume, sans durée */
+      const email = emailLibre(testInfo, "galerie-lecture-sans-date");
+      const histoire = await lectureFaite(page, testInfo, email, { captures: { marque: FACTICE.sansDate } });
+      await figerLaLecture(email);
       return { ...sans, histoire };
     }
     case "rapport":

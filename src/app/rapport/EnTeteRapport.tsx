@@ -79,8 +79,8 @@ export function EnTeteRapport({ story, report, entier, moi, autre }: { story: St
         <h1 className="m-0 text-titre-2 font-black leading-[1.05] tracking-[-0.02em] [text-wrap:balance]">{titreDuo(story)}</h1>
       </div>
       <div className="text-legende font-bold leading-[1.45] text-grey">
-        {story.period}
-        {story.updatedLabel && ` · ${story.updatedLabel}`}
+        {/* Aucune date sur ses captures : le jour de la lecture seul */}
+        {[story.period, story.updatedLabel].filter(Boolean).join(" · ")}
       </div>
       {/* Mobile : les chiffres rangés en grille ; desktop : les pastilles de la maquette */}
       <dl className="m-0 mt-1 grid grid-cols-4 gap-2 border-t-2 border-sep pt-3.5 lg:hidden">

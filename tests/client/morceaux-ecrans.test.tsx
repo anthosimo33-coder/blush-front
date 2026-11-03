@@ -50,6 +50,13 @@ describe("la conv reçue", () => {
     expect(screen.getByRole("button", { name: /Il manque un bout de votre histoire/ })).toBeTruthy();
   });
 
+  it("des captures sans date : pas de période sous le nom du lot", () => {
+    const source: Source = { ...captures, id: "s1", period: undefined };
+    const { container } = render(<ConvOkScreen story={{ ...HISTOIRE, participants, sources: [source], totalMessages: 24, me: undefined }} source={source} ajout />);
+    const fichier = container.querySelector("[data-prive]")!;
+    expect(fichier.children).toHaveLength(1);
+  });
+
   it("sans ajout possible (le mode tournage) : ni la ligne, ni la feuille", () => {
     const source = exportDe("s1", 64, "4 sept. → 7 sept.");
     render(<ConvOkScreen story={{ ...HISTOIRE, participants, sources: [source], totalMessages: 64 }} source={source} ajout={false} />);
@@ -95,6 +102,13 @@ describe("l’histoire réunie", () => {
       "/importer/export?app=instagram&mode=ajout",
       "/importer/captures?app=autre&mode=ajout",
     ]);
+  });
+
+  it("des morceaux sans date : ni durée ni période, et pas de « · » qui traîne", () => {
+    const sansDate = (id: string): Source => ({ ...captures, id, period: undefined });
+    render(<HistoireScreen story={{ ...story, sources: [sansDate("s1"), sansDate("s2")], period: undefined, durationLabel: undefined, duplicatesRemoved: 0 }} ajout />);
+    expect(screen.getByText(/^messages · 2 morceaux$/)).toBeTruthy();
+    expect(screen.getAllByText(/^2 captures$/)).toHaveLength(2);
   });
 
   it("cinq morceaux (ou le mode tournage) : plus de ligne pour en ajouter", () => {

@@ -12,10 +12,14 @@
  * - video-partielle : une longue vidéo de la moitié partielle (src/server/lecture-partielle.ts), sa partie récente lue,
  *   ses lots plus anciens gardés pour après le paiement, sans compte ;
  * - morceaux : une conv en trois morceaux (un export court, des captures, le même export en entier), sans compte ;
+ * - captures-sans-date : des captures où l’on ne voit aucune date (une image qui porte FACTICE.sansDate), importées sans compte ;
  * - code : un brouillon, et un code de connexion demandé pour l’email du parcours ;
  * - gratuit : un compte gratuit, sa conv lue (le verdict offert, comme avant le paywall du 16 octobre) ;
  * - gratuit-sans-titres : le même, son verdict gardé comme avant le 13 octobre, sans les titres des chapitres fermés ;
+ * - gratuit-coupee : le même, sa meta retouchée en conv coupée (son début pas importé) ;
+ * - gratuit-sans-date : un compte gratuit, sa conv lue sur des captures sans aucune date (FACTICE.sansDate) ;
  * - lecture-en-cours : un compte gratuit dont la lecture est figée à mi-chemin ;
+ * - lecture-sans-date : le même, sur des captures sans aucune date ;
  * - rapport : le rapport complet acheté une fois (le plan « rapport »), tout écrit ;
  * - equipe : un compte de l’équipe (tout ouvert, bulles illimitées), toute la suite écrite (le rapport, le vocal, la mémoire) ;
  * - sobre : un compte gratuit dont la conv lève une alerte (le mode sobre) ;
@@ -25,7 +29,7 @@
  * - tournage : un compte de BLUSH_ADMINS en mode tournage (le lien de sa conv de tournage ouvert ici), une prise commencée
  *   par l’export sans fichier ; tournage-lu : la même, sa lecture rejouée ;
  * - tournage-creatrice : le même lien, ouvert par une créatrice (un compte ordinaire), sans prise.
- * @typedef {"brouillon" | "brouillon-court" | "video-partielle" | "morceaux" | "code" | "gratuit" | "gratuit-sans-titres" | "lecture-en-cours" | "paywall" | "rapport" | "equipe" | "sobre" | "plusieurs" | "couple" | "tournage" | "tournage-lu" | "tournage-creatrice"} Compte
+ * @typedef {"brouillon" | "brouillon-court" | "video-partielle" | "morceaux" | "captures-sans-date" | "code" | "gratuit" | "gratuit-sans-titres" | "gratuit-coupee" | "gratuit-sans-date" | "lecture-en-cours" | "lecture-sans-date" | "paywall" | "rapport" | "equipe" | "sobre" | "plusieurs" | "couple" | "tournage" | "tournage-lu" | "tournage-creatrice"} Compte
  */
 
 /**
@@ -411,6 +415,17 @@ export const STATES = [
     note: "La moitié partielle de l’A/B (BLUSH_LECTURE_PARTIELLE)\u00a0: les nombres sont ceux de la partie récente lue, l’encart dit que le début se lira avec le rapport. Texte absent de la maquette, à valider (26 octobre).",
   },
   {
+    id: "04e",
+    section: "parcours",
+    title: "Ta conv est ajoutée",
+    state: "Captures sans date",
+    route: "/importer/ok",
+    compte: "captures-sans-date",
+    journey: { app: "instagram" },
+    note: "Des captures où l’on ne voit aucune date\u00a0: ni période sous le nom du lot, ni durée (décision du 3 novembre). Le modèle factice n’y lit aucun repère (FACTICE.sansDate).",
+    changement: "Nouveau (PR 5, lot C)\u00a0: des captures sans date.",
+  },
+  {
     id: "04c",
     section: "parcours",
     title: "Ajoute un morceau",
@@ -508,6 +523,18 @@ export const STATES = [
     wait: 2200,
     ref: "08-lecture",
     note: "À la fin, la gerbe remplace la fenêtre de lecture (écart à la maquette).",
+  },
+  {
+    id: "08s",
+    section: "parcours",
+    title: "Analyse",
+    state: "Captures sans date",
+    route: "/lecture",
+    compte: "lecture-sans-date",
+    motion: true,
+    wait: 2200,
+    note: "Une vraie lecture de captures où l’on ne voit aucune date (FACTICE.sansDate), figée à mi-chemin\u00a0: la trouvaille du volume dit «\u00a024\u00a0messages\u00a0», sans durée (décision du 3 novembre), quand elle est parmi les trois.",
+    changement: "Nouveau (PR 5, lot C)\u00a0: des captures sans date.",
   },
 
   /* ———— Le paywall direct (16 octobre), en version prime (la roue des cadeaux, les maquettes G1 à G4 validées le 16 octobre) ———— */
@@ -644,6 +671,28 @@ export const STATES = [
     note: "Juste après l’analyse, «\u00a0Voir mon rapport\u00a0» ouvre une scène sombre, une carte à la fois, comme des stories. Toucher à droite ou glisser pour avancer, «\u00a0Passer\u00a0» pour aller droit au rapport. Un compte gratuit voit 4 cartes, tirées du chapitre offert. Ici\u00a0: le nombre de messages défile jusqu’au vrai total. Textes à valider.",
   },
   {
+    id: "V1b",
+    section: "rapport",
+    title: "Révélation du verdict",
+    state: "Les chiffres, conv coupée",
+    route: "/rapport/verdict",
+    compte: "gratuit-coupee",
+    sheet: true,
+    note: "Une conv dont le début n’a pas été importé (trop longue, ou arrêtée par WhatsApp à ses 40\u00a0000 derniers messages)\u00a0: «\u00a0messages, les plus récents.\u00a0» au lieu de «\u00a0du premier au dernier\u00a0». La meta de la conv lue est retouchée.",
+    changement: "Nouveau (PR 5, lot C)\u00a0: une conv coupée.",
+  },
+  {
+    id: "V1c",
+    section: "rapport",
+    title: "Révélation du verdict",
+    state: "Les chiffres, sans date",
+    route: "/rapport/verdict",
+    compte: "gratuit-sans-date",
+    sheet: true,
+    note: "Une vraie lecture de captures où l’on ne voit aucune date\u00a0: pas de pastille de durée.",
+    changement: "Nouveau (PR 5, lot C)\u00a0: des captures sans date.",
+  },
+  {
     id: "V2",
     section: "rapport",
     title: "Révélation du verdict",
@@ -688,6 +737,17 @@ export const STATES = [
     ref: "09-rapport-apercu-gratuit",
     changement:
       "Le bas de l’aperçu au dessin du prototype des bulles (PiedGratuit)\u00a0: «\u00a0Lire la suite · 9,90\u00a0€\u00a0» et les 3 bulles offertes. Les chapitres fermés portent les titres que le verdict écrit pour leur histoire, comme dans le prototype (ici ceux du modèle factice, inventés)\u00a0; le rapport débloqué les garde.",
+  },
+  {
+    id: "09s",
+    section: "rapport",
+    title: "Rapport, aperçu gratuit",
+    state: "Sans date",
+    route: "/rapport",
+    compte: "gratuit-sans-date",
+    full: true,
+    note: "Une vraie lecture de captures où l’on ne voit aucune date\u00a0: l’en-tête du rapport n’a pas de période, seulement le jour de la lecture\u00a0; sous une preuve, le prénom seul (ni jour ni heure).",
+    changement: "Nouveau (PR 5, lot C)\u00a0: des captures sans date.",
   },
   {
     id: "09a",

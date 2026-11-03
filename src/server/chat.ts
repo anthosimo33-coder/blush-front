@@ -302,6 +302,7 @@ export async function repondre(
     aujourdhui: jour.t,
     chiffres: ctx.chiffres,
     fin: ctx.fin,
+    dates: { sansDate: ctx.sansDate, finSansDate: ctx.finSansDate },
     etat: memoire.etat,
     lignes,
     editions: editionsBornees(memoire.editions),

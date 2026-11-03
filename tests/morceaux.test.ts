@@ -226,7 +226,8 @@ describe("une conv en plusieurs morceaux", () => {
     );
     const imp = await importerCaptures({ appli: "instagram", t: sansDate, consentement: accordDeTest() });
     creees.histoires.push(imp.id);
-    expect(imp.meta.resume).toMatchObject({ debut: "2026-10-22", fin: "2026-10-22" });
+    expect(imp.meta.resume).toMatchObject({ debut: "2026-10-22", fin: "2026-10-22", sansDate: true });
+    expect(storyAffichee(imp.id, imp.meta).sources[0]!.period).toBeUndefined();
     await ajouterUnExport(imp.secret, exportWhatsapp("2026-09-01T10:00", 60, { texte }));
     const m = await meta(imp.id);
     expect(m).toMatchObject({ doublons: 5, resume: { debut: "2026-09-01", total: 79 } });
@@ -236,6 +237,27 @@ describe("une conv en plusieurs morceaux", () => {
       ["whatsapp", "2026-09-01", "2026-09-01", 60],
     ]);
     expect(provenancesDe(m)[0]).toMatchObject({ source: "captures", debut: "2026-09-01" });
+    /* Datées par l’export : ni leur résumé, ni leur provenance, ni leur source à l’écran ne sont plus sans date */
+    expect(m.morceaux?.[0]?.resume.sansDate).toBeUndefined();
+    expect(provenancesDe(m)[0]!.sansDate).toBeUndefined();
+    expect(m.resume.sansDate).toBeUndefined();
+    const sources = storyAffichee(imp.id, m).sources;
+    expect(sources.map((x) => [x.mode, x.period])).toEqual([
+      ["captures", "1 sept."],
+      ["export", "1 sept."],
+    ]);
+  });
+
+  it("un export arrêté par WhatsApp (40 000 messages), ajouté en morceau : le morceau et la conv réunie sont coupés, le modèle lit lequel", async () => {
+    const imp = await importerCaptures({ appli: "instagram", t: capturesDu("2026-10-20", 24), consentement: accordDeTest() });
+    creees.histoires.push(imp.id);
+    await ajouterUnExport(imp.secret, exportWhatsapp("2025-12-01T10:00", 40_000));
+    const m = await meta(imp.id);
+    expect(m.morceaux?.map((x) => x.coupe)).toEqual([undefined, true]);
+    expect(m.coupe).toBe(true);
+    expect(provenancesDe(m).map((p) => p.coupe)).toEqual([undefined, true]);
+    /* Le plus ancien morceau est l’export coupé : le verdict dit « les plus récents » */
+    expect(storyAffichee(imp.id, m).startMissing).toBe(true);
   });
 
   it("des captures d’abord, puis un export : ses noms deviennent ceux de la conv, et « Qui es-tu ? » les redemande", async () => {

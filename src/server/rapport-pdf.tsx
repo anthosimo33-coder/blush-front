@@ -608,7 +608,8 @@ function PageDeGarde({ payload, story, moi, le, site, bulle, emoji }: RapportEnP
                 </View>
                 <Text style={{ flex: 1, fontSize: 36, fontWeight: 900, lineHeight: 1.05, letterSpacing: -0.72 }}>{titreDuo(story)}</Text>
               </View>
-              <Text style={{ fontSize: T.note, color: GRIS }}>{story.period}</Text>
+              {/* Aucune date sur ses captures : pas de période */}
+              {story.period ? <Text style={{ fontSize: T.note, color: GRIS }}>{story.period}</Text> : null}
               <View style={{ flexDirection: "row", gap: 8, borderTopWidth: 1.5, borderColor: TEINTES.trait, paddingTop: 11, marginTop: 2 }}>
                 {chiffres.map((c) => (
                   <Chiffre key={c.nom} {...c} />

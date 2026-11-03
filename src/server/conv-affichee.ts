@@ -36,8 +36,9 @@ export function storyAffichee(id: string, meta: Meta): Story {
 
 /** Une source de la conv (son seul morceau, ou l’un d’eux) : un export, ou des captures (combien). */
 function sourceDe(id: string, m: MorceauMeta): Source {
-  const { debut, fin, total, vocaux } = m.resume;
-  const periode = periodeLisible(debut, fin);
+  const { debut, fin, total, vocaux, sansDate } = m.resume;
+  /* Des captures qui ne montrent aucune date : ni période (le jour de l’import n’est pas le leur) */
+  const periode = sansDate ? {} : { period: periodeLisible(debut, fin) };
   /* Des captures : combien (« 1 capture »), ou « vidéo » pour un enregistrement d’écran */
   const lot = m.video ? "vidéo" : `${m.captures} capture${(m.captures ?? 0) > 1 ? "s" : ""}`;
   return m.captures
@@ -48,7 +49,7 @@ function sourceDe(id: string, m: MorceauMeta): Source {
         screenshotCount: m.captures,
         /* « Captures ou vidéo » d’une appli qu’on ne nomme pas : le nombre seul */
         label: m.appli === "autre" ? lot : `${APPLIS[m.appli]} · ${lot}`,
-        period: periode,
+        ...periode,
         messageCount: total,
         voiceCount: vocaux,
         ...medias(m.resume),
@@ -63,7 +64,7 @@ function sourceDe(id: string, m: MorceauMeta): Source {
         fileName: m.fichier,
         /* Le jour de son premier message, avec l’année quand ce n’est pas celle du dernier */
         label: `${APPLIS[m.appli]} · ${dateCourte(debut, debut.slice(0, 4) !== fin.slice(0, 4))}`,
-        period: periode,
+        ...periode,
         messageCount: total,
         voiceCount: vocaux,
         ...medias(m.resume),
@@ -77,9 +78,7 @@ function sourceDe(id: string, m: MorceauMeta): Source {
  * morceaux, la dernière ajoutée (ce que répond un import). Les morceaux s’y rangent du plus ancien au plus récent.
  */
 export function storyEtSource(id: string, meta: Meta): { story: Story; source: Source } {
-  const { debut, fin, total, vocaux } = meta.resume;
-  const periode = periodeLisible(debut, fin);
-  const jours = joursCouverts(debut, fin);
+  const { debut, fin, total, vocaux, sansDate } = meta.resume;
   const [a, b] = meta.participants;
   /* Le pronom de chacun, une fois « Tu es » rempli : l’utilisateur a le sien, l’autre celui de pronomDeLAutre */
   const pronom = (k: 0 | 1) =>
@@ -87,6 +86,11 @@ export function storyEtSource(id: string, meta: Meta): { story: Story; source: S
   const morceaux = meta.morceaux ?? [meta];
   const ordre = morceaux.map((m, k) => ({ m, k })).sort((x, y) => x.m.resume.debut.localeCompare(y.m.resume.debut) || x.k - y.k);
   const sources = ordre.map(({ m }, i) => sourceDe(`s${i + 1}`, m));
+  /*
+   * Le début de la conv n’a pas été importé : elle est coupée, ou le plus ancien de ses morceaux datés l’est (rendre,
+   * prompts/lib/conv.ts : la même règle)
+   */
+  const debutManque = meta.morceaux ? !!ordre.find(({ m }) => !m.resume.sansDate)?.m.coupe : !!meta.coupe;
   /*
    * Leurs noms, distincts quand ils ont le même prénom (comme ceux que lit le modèle, histoireDe, mais jamais « Léa
    * (l’autre) », qui ne se lit pas à l’écran : « Léa & Léa ») : sur « Qui es-tu ? », chacun
@@ -114,8 +118,9 @@ export function storyEtSource(id: string, meta: Meta): { story: Story; source: S
     totalMessages: total,
     voiceCount: vocaux,
     ...medias(meta.resume),
-    period: periode,
-    durationLabel: dureeLisible(jours),
+    /* Aucune date sur ses captures : ni période ni durée */
+    ...(sansDate ? {} : { period: periodeLisible(debut, fin), durationLabel: dureeLisible(joursCouverts(debut, fin)) }),
+    ...(debutManque ? { startMissing: true as const } : {}),
     /* Qui est l’utilisateur : le rapport ouvert depuis le mail (un autre onglet, sans parcours) met les bons avatars */
     ...(meta.moi == null ? {} : { me: meta.moi === 0 ? "p0" : "p1" }),
     ...(meta.moi == null && meta.contact != null ? { other: meta.contact === 0 ? "p0" : "p1" } : {}),

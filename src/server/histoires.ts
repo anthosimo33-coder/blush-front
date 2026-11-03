@@ -3,6 +3,7 @@ import { and, desc, eq, getTableColumns, isNull } from "drizzle-orm";
 import {
   detecterFormat,
   erreurImport,
+  jourConnu,
   lire,
   MIN_MESSAGES,
   MIN_MESSAGES_CAPTURES,
@@ -28,7 +29,7 @@ import { db, schema, uneLigne } from "./db";
 import { PREDICATS } from "./depot";
 import type { Utilisateur } from "./auth";
 import { ErreurInvariant, ErreurPublique } from "./erreurs";
-import { borner, ErreurImport, TEXTE_LU_MAX_CARACTERES } from "./import";
+import { borner, ErreurImport, mesurerLExport, TEXTE_LU_MAX_CARACTERES } from "./import";
 import { journal } from "./journal";
 import type { Consentement } from "./juridique";
 import {
@@ -71,8 +72,12 @@ export type Meta = {
    * qu’une meta lue en a bien deux (src/server/coffre.ts).
    */
   participants: [Participant, Participant];
-  /** `medias` : ceux que l’export ne nomme pas (« <Médias omis> »), absent d’une conv importée avant le 2 novembre 2026. */
-  resume: { debut: string; fin: string; total: number; vocaux: number; medias?: number };
+  /**
+   * `medias` : ceux que l’export ne nomme pas (« <Médias omis> »), absent d’une conv importée avant le 2 novembre 2026.
+   * `sansDate` : aucun message daté (des captures qui ne montrent aucune date, jourConnu) : `debut` et `fin` ne sont que
+   * le jour de l’import, que les écrans ne montrent pas ; absent d’une conv importée avant la PR 5 (datée du jour de l’import).
+   */
+  resume: { debut: string; fin: string; total: number; vocaux: number; medias?: number; sansDate?: true };
   /** Des captures : combien. L’utilisateur y est « Moi » (à droite), son prénom vient de « Qui es-tu ? ». */
   captures?: number;
   /** L’export était trop long pour partir en entier : seule sa partie la plus récente a été gardée (de `resume.debut` à la fin). */
@@ -133,18 +138,23 @@ export type LigneEcran = Ligne & { aConv: boolean };
  * Le résumé d’une conv lue (au moins un message) : son premier et son dernier jour, ses messages, dont ses vocaux. Et
  * ses médias quand l’export ne dit pas lesquels sont des vocaux : un export Android « sans médias » (`format`), qui
  * n’écrit que « <Médias omis> », légendés compris. Un export qui nomme ses médias (une photo, un vocal), Instagram et ses
- * partages, des captures : rien, l’écran garde ses vocaux.
+ * partages, des captures : rien, l’écran garde ses vocaux. Son premier et son dernier jour sont ceux de ses messages
+ * datés (jourConnu) ; sans aucun, ceux écrits au-dessus d’eux, dits `sansDate`.
  */
 export function resumeDe(messages: Message[], format?: Format): Meta["resume"] {
   const [premier] = messages;
   const dernier = messages.at(-1);
   /* erreurImport refuse une conv sans message avant d’arriver ici */
   if (!premier || !dernier) throw new ErreurInvariant("conv:sans_message", "une conv lue a au moins un message");
+  /* Ses bornes : ses messages datés ; aucun (des captures qui ne montrent aucune date), le jour écrit au-dessus d’eux, celui de l’import (sansDate) */
+  const dates = messages.filter(jourConnu);
+  const [a, b] = dates.length ? [dates[0]!, dates.at(-1)!] : [premier, dernier];
   return {
-    debut: new Date(premier.t).toISOString().slice(0, 10),
-    fin: new Date(dernier.t).toISOString().slice(0, 10),
+    debut: new Date(a.t).toISOString().slice(0, 10),
+    fin: new Date(b.t).toISOString().slice(0, 10),
     total: messages.length,
     vocaux: messages.filter((m) => m.media === "vocal").length,
+    ...(dates.length ? {} : { sansDate: true as const }),
     ...(format === "whatsapp-android" ? mediasSansNom(messages) : {}),
   };
 }
@@ -199,8 +209,12 @@ async function creerBrouillon(meta: Meta, texte: string, secret: string, consent
   return { id: ligne.id, meta, secret };
 }
 
-/** Un export lu, prêt à devenir une conv ou l’un de ses morceaux : son texte borné, son format, ses deux participants (le plus bavard d’abord). */
-function exportLu(recu: ExportLu & { nom: string; coupe?: boolean }) {
+/**
+ * Un export lu, prêt à devenir une conv (`ou` : « import ») ou l’un de ses morceaux (« morceau ») : son texte borné, son
+ * format, ses deux participants (le plus bavard d’abord). Un export arrêté par le plafond de WhatsApp est coupé, comme un
+ * texte trop long (mesurerLExport, src/server/import.ts, qui le dit au journal).
+ */
+function exportLu(recu: ExportLu & { nom: string; coupe?: boolean }, ou: "import" | "morceau") {
   const { nom, appli, texte, coupe } = borner(recu);
   const format = detecterFormat(texte);
   if (format === "captures" || !format) throw new ErreurImport("fichier");
@@ -213,7 +227,9 @@ function exportLu(recu: ExportLu & { nom: string; coupe?: boolean }) {
   if (noms.some((n) => n.nom.length > NOM_MAX || /[\u0000-\u001f\u007f]/.test(n.nom))) throw new ErreurImport("fichier");
   /* « Discussion WhatsApp avec Léa » : le nom du fichier désigne l’autre (Instagram nomme le compte, pas la conv) */
   const contact = appli === "whatsapp" ? contactDuFichier(nom, [premier.nom, second.nom]) : undefined;
-  return { nom, appli, texte, coupe, format, premier, second, contact };
+  /* WhatsApp n’exporte que ses 40 000 derniers messages (10 000 avec les médias) : un export qui s’y arrête n’a pas son début (mesurerLExport le dit aussi au journal) */
+  const plafond = mesurerLExport({ appli, texte, coupe }, ou)?.plafond ?? null;
+  return { nom, appli, texte, coupe: coupe || plafond !== null || undefined, format, premier, second, contact };
 }
 
 /**
@@ -226,7 +242,7 @@ export async function importer(
   recu: ExportLu & { nom: string; coupe?: boolean; fuseau?: string },
   consentement: Consentement,
 ): Promise<{ id: string; meta: Meta; secret: string }> {
-  const { nom, appli, texte, coupe, format, premier, second, contact } = exportLu(recu);
+  const { nom, appli, texte, coupe, format, premier, second, contact } = exportLu(recu, "import");
   const personne = ({ nom }: { nom: string }) => ({ prenom: prenomDe(nom), pronom: "il" as const, nomExport: nom });
   const participant = ({ nom, messages }: { nom: string; messages: number }, pronomLu?: Pronom): Participant => ({
     nom,
@@ -495,7 +511,7 @@ async function ajouterMorceau(secret: string, recu: MorceauRecu, info: Omit<Morc
 
 /** Un autre export de leur conv, ajouté au brouillon du cookie (ajouterMorceau) : lu et borné comme un premier import. */
 export async function ajouterUnExport(secret: string, recu: ExportLu & { nom: string; coupe?: boolean }): Promise<{ id: string; meta: Meta }> {
-  const { nom, appli, texte, coupe, format, premier, second, contact } = exportLu(recu);
+  const { nom, appli, texte, coupe, format, premier, second, contact } = exportLu(recu, "morceau");
   const morceau: MorceauRecu = { format, texte, noms: [premier.nom, second.nom], empreinte: empreinte(texte), ...(contact ? { contact } : {}) };
   return ajouterMorceau(secret, morceau, { appli, fichier: nom.slice(0, 200), ...(coupe ? { coupe: true } : {}) });
 }
@@ -691,12 +707,19 @@ export function nomsDeToi(meta: Meta): string[] {
 }
 
 /**
- * D’où vient chaque morceau d’une conv réunie (son appli, un export ou des captures, ses dates), pour la ligne qui ouvre
- * la conv que lit le modèle (rendre, prompts/lib/conv.ts) : le trou entre deux morceaux n’y est plus lu comme un
- * silence. Aucun pour une conv d’un seul morceau.
+ * D’où vient chaque morceau d’une conv réunie (son appli, un export ou des captures, ses dates, s’il est coupé (son
+ * début n’a pas été importé) et s’il n’a aucune date), pour la ligne qui ouvre la conv que lit le modèle (rendre,
+ * prompts/lib/conv.ts) : le trou entre deux morceaux n’y est plus lu comme un silence. Aucun pour une conv d’un seul morceau.
  */
 export const provenancesDe = (meta: Pick<Meta, "morceaux">): Provenance[] =>
-  (meta.morceaux ?? []).map((m) => ({ appli: m.appli, source: m.captures ? "captures" : "export", debut: m.resume.debut, fin: m.resume.fin }));
+  (meta.morceaux ?? []).map((m) => ({
+    appli: m.appli,
+    source: m.captures ? "captures" : "export",
+    debut: m.resume.debut,
+    fin: m.resume.fin,
+    ...(m.coupe ? { coupe: true as const } : {}),
+    ...(m.resume.sansDate ? { sansDate: true as const } : {}),
+  }));
 
 export async function definirQui(
   id: string,

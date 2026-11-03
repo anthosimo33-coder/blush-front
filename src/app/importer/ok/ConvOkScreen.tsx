@@ -56,7 +56,8 @@ export function ConvOkScreen({ story, source, ajout }: { story: Story; source: S
           {/* data-prive : le nom du fichier (souvent le prénom) et sa période, masqués dans l’enregistrement des visites */}
           <span data-prive="" className="flex min-w-0 flex-1 flex-col gap-0.5">
             <span className="truncate text-corps font-black">{fileName}</span>
-            <span className="text-legende font-extrabold text-grey">{source.period}</span>
+            {/* Des captures qui ne montrent aucune date : pas de période */}
+            {source.period && <span className="text-legende font-extrabold text-grey">{source.period}</span>}
           </span>
           <DoneCheck size={26} label={captures ? "Captures ajoutées" : "Fichier ajouté"} />
         </div>

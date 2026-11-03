@@ -2,7 +2,8 @@
  * Les trouvailles de la lecture : trois phrases courtes, calculées par le code sur les chiffres de la conv
  * (jamais par le modèle), qui apparaissent pendant que BLUSH lit. D’abord ce qui est déséquilibré entre eux
  * (qui ouvre, qui relance, qui répond vite, qui écrit long), puis leur mot à eux, puis le volume.
- * Textes validés le 8 octobre. Des textes de l’appli : ils vivaient dans le sous-module des prompts (prompts/lib/trouvailles.ts).
+ * Textes validés le 8 octobre ; le volume sans date, le 3 novembre. Des textes de l’appli : ils vivaient dans le
+ * sous-module des prompts (prompts/lib/trouvailles.ts).
  */
 import { cleDuMot, debutDuMot, listeDeMots, motsEcrits, type Chiffres, type Histoire, type Message } from "@prompts/lib/conv";
 import { formatCount } from "@/lib/format";
@@ -104,9 +105,9 @@ export function trouvailles(c: Chiffres, h: Pick<Histoire, "autre">, messages: M
   const mot = candidats.find(([w]) => !noms.has(cleDuMot(w)));
   const motAVous = mot ? `Votre mot à vous\u00a0: «\u00a0${mot[0]}\u00a0»\u00a0×\u00a0${mot[1]}` : null;
 
-  /* Le volume, toujours disponible */
+  /* Le volume, toujours disponible ; sans aucune date (des captures), sans durée */
   const etendue = c.debut && c.fin ? joursCouverts(c.debut, c.fin) : 0;
-  const volume = etendue ? `${formatCount(total)}\u00a0messages en ${dureeLisible(etendue)}` : null;
+  const volume = etendue ? `${formatCount(total)}\u00a0messages en ${dureeLisible(etendue)}` : `${formatCount(total)}\u00a0messages`;
 
   /* Deux déséquilibres au plus, puis leur mot, puis de quoi compléter */
   const desequilibres = [ouvre, relance, delai, longueur, soir].filter((x): x is string => !!x);

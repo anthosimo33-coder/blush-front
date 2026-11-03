@@ -489,9 +489,14 @@ export function VerdictReveal({ initial, story, rendu }: { initial: ReportPayloa
   );
 }
 
-/** Carte 1 : le nombre de messages défile jusqu’au vrai total, puis la durée, les applis, les vocaux. */
+/**
+ * Carte 1 : le nombre de messages défile jusqu’au vrai total, puis la durée, les applis, les vocaux ; « les plus
+ * récents » d’une conv dont le début n’a pas été importé, plutôt que « du premier au dernier ».
+ */
 function Numbers({ story, heading, step }: { story: Story; heading: RefObject<HTMLHeadingElement | null>; step: ReactNode }) {
   const shown = useCountUp(story.totalMessages, 1300, 350);
+  /* Une conv dont le début n’a pas été importé : ses messages les plus récents, pas « du premier au dernier » */
+  const etendue = story.startMissing ? "les plus récents" : "du premier au dernier";
   const apps = nombreDApplis(story);
   /* Ses vocaux, ou ses médias quand l’export ne les distingue pas ; rien quand il n’y en a aucun */
   const vocaux = vocauxOuMedias(story);
@@ -503,12 +508,12 @@ function Numbers({ story, heading, step }: { story: Story; heading: RefObject<HT
       </p>
       <h2 ref={heading} tabIndex={-1} className="m-0 mt-1 outline-none">
         {step}
-        <span className="sr-only">{`${formatCount(story.totalMessages)} messages, du premier au dernier.`}</span>
+        <span className="sr-only">{`${formatCount(story.totalMessages)} messages, ${etendue}.`}</span>
         <span aria-hidden="true" className="block text-[clamp(64px,24vw,124px)] font-black leading-[0.95] tracking-[-0.045em] tabular-nums">
           {formatCount(shown)}
         </span>
         <span aria-hidden="true" data-rise="" style={delai(0.2)} className="mt-3 block text-[22px] font-black leading-[1.2] lg:text-[26px]">
-          messages, du premier au dernier.
+          messages, {etendue}.
         </span>
       </h2>
       <ul className="m-0 mt-7 flex list-none flex-wrap justify-center gap-2 p-0">

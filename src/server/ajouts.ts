@@ -17,6 +17,7 @@ import { ErreurPublique } from "./erreurs";
 import { aPrendre } from "./taches";
 import { db, schema, uneLigne } from "./db";
 import { contexteDe, fuseauDe, histoireDe, metaDe, type Ligne, type Transaction } from "./histoires";
+import { mesurerLExport } from "./import";
 import { majQuiAttend, retenir, sansAttendre } from "./memoire-groupee";
 import { relancerApres } from "./pipeline";
 import type { Contexte, DonneesMemoire } from "./stockage/types";
@@ -82,11 +83,17 @@ export function lireLus(s: string | undefined): Lu[] | undefined {
  * captures d’un jour suivant (l’ancien code, depuis le 7 octobre) : sauf s’il a ses secondes (une capture ne donne que la
  * minute), l’export d’après repart au plus tard de l’heure de son import (son export était fait avant), quitte à relire
  * un export Android déjà ajouté (dit s’il dépasse la borne), plutôt que de perdre ce que les captures ne montraient pas.
+ * Une conv de captures sans aucune date (Contexte.sansDate) n’en a pas tant qu’aucun export n’a été lu (aucun message lu
+ * à la minute dans `lus`) : −∞, tout l’export est à lire, ce qu’elle a lu y retrouve son jumeau, le reste est neuf (au
+ * plus MESSAGES_MAX, dit).
  */
-const curseurDe = (c: Contexte, story: Pick<Ligne, "createdAt" | "meta">) =>
-  lireLus(c.lus) || c.dernier % MINUTE || new Date(c.dernier).toISOString().slice(0, 10) <= c.fin
+function curseurDe(c: Contexte, story: Pick<Ligne, "createdAt" | "meta">): number {
+  const lus = lireLus(c.lus);
+  if (c.sansDate && !lus?.some((e) => e.heure === "exacte")) return -Infinity;
+  return lus || c.dernier % MINUTE || new Date(c.dernier).toISOString().slice(0, 10) <= c.fin
     ? c.dernier
     : Math.min(c.dernier, heureNaiveDans(fuseauDe(metaDe(story)), story.createdAt));
+}
 
 /**
  * Ce que la conv a déjà lu : le curseur d’un export, le dernier instant lu tout compris (des captures aussi ; jamais
@@ -135,8 +142,12 @@ export async function noterLAjout(storyId: string, ajout: Pick<AjoutLu, "lus" | 
   const story = uneLigne(await tx.select().from(schema.stories).where(eq(schema.stories.id, storyId)).for("update"), "stories:curseur");
   const c = contexteDe(story);
   if (!c) return;
-  /* Le premier ajout d’une conv d’avant le 2 novembre écrit son curseur corrigé (curseurDe) */
-  const dernier = Math.max(curseurDe(c, story), ajout.curseur ?? -Infinity);
+  /*
+   * Le premier ajout d’une conv d’avant le 2 novembre écrit son curseur corrigé (curseurDe) ; une conv sans date sans
+   * export lu garde le sien (JSON écrirait −∞ en null, que le coffre refuse)
+   */
+  const curseur = Math.max(curseurDe(c, story), ajout.curseur ?? -Infinity);
+  const dernier = Number.isFinite(curseur) ? curseur : c.dernier;
   const deja = lireLus(c.lus) ?? [];
   const lus = elaguer(ajout.curseur !== undefined ? remplacer(deja, ajout.lus, ajout.repris ?? []) : inserer(deja, ajout.lus, ajout.ancre), dernier);
   const vuJusqua = Math.max(c.vuJusqua ?? c.dernier, ajout.dernier ?? -Infinity, ajout.curseur ?? -Infinity);
@@ -182,6 +193,8 @@ export async function depuisExport(story: Ligne, memoire: DonneesMemoire, lu: Ex
   const h = histoireDe(metaDe(story));
   const j = aujourdhuiDans(fuseauDe(metaDe(story)));
   const { apres, lus, cle } = dejaLu(story, j);
+  /* Le journal des longs exports (mesurerLExport) : un ajout ne garde que ses nouveaux messages, la coupe n’y change rien */
+  mesurerLExport(lu, "ajout");
   const r = messagesDeLExport(lu.texte, h, apres, { lus, cle });
   if (typeof r === "string") throw new ErreurAjout(r);
   if (!r.nouveaux.length) {

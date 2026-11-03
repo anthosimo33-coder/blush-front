@@ -4,7 +4,7 @@ import { blocAjout, inserer, messagesDeLExport, messagesDesCaptures, numeroter, 
 import { cleDuMessage, heureLue, type Heure, type Lu } from "@prompts/lib/reconnaitre";
 import { versTexteCaptures } from "@prompts/lib/captures";
 import { lire, type Histoire, type Message } from "@prompts/lib/conv";
-import { ligneMessage, TETE_DU_RAPPEL } from "@prompts/lib/ligne";
+import { JOUR_INCONNU, ligneMessage, lireLigne, TETE_DU_RAPPEL } from "@prompts/lib/ligne";
 import { rendreNouveau } from "@prompts/lib/memoire";
 import type { Captures } from "@prompts/lib/schemas";
 import { lireExport, resumeConvInstagram } from "@prompts/lib/export";
@@ -671,6 +671,30 @@ describe("un export ajouté : ce qui est déjà lu, à l’heure près (H1, H5)"
     expect([r.repris.length, r.fin]).toEqual([3, Date.UTC(2026, 9, 31, 10, 2)]);
   });
 
+  it("une conv de captures sans aucune date, puis l’export : sans curseur, ce qu’elles montraient est reconnu, tout le reste est nouveau", () => {
+    /* Ce que la conv a lu : trois messages « au plus tard » le jour de l’import (heureLue), et pas de curseur (src/server/ajouts.ts, curseurDe) */
+    const deja = [
+      lu("autre", "tu fais quoi ce soir", "2026-10-31 00:00:00", "auPlusTard"),
+      lu("toi", "rien de ouf et toi", "2026-10-31 00:00:00", "auPlusTard"),
+      lu("autre", "je regarde une série", "2026-10-31 00:00:00", "auPlusTard"),
+    ];
+    const r = lireExport_(
+      ios([
+        ["01/09/2026 21:00:00", "Léa", "salut toi"],
+        ["01/09/2026 21:02:00", "Tom", "hey"],
+        ["10/09/2026 21:02:10", "Léa", "tu fais quoi ce soir"],
+        ["10/09/2026 21:40:33", "Tom", "rien de ouf et toi"],
+        ["10/09/2026 22:58:03", "Léa", "je regarde une série"],
+        ["20/10/2026 10:02:00", "Léa", "bien dormi ?"],
+      ]),
+      -Infinity,
+      deja,
+    );
+    expect(textes(r.nouveaux)).toEqual(["salut toi", "hey", "bien dormi ?"]);
+    /* Le curseur que la conv prend dès lors : le dernier message de l’export, fini */
+    expect([r.repris.length, r.fin]).toEqual([3, Date.UTC(2026, 9, 20, 10, 2)]);
+  });
+
   it("l’export après deux envois de captures : il ne relit pas ce qu’elles ont apporté, et garde ce qu’elles ne montraient pas", () => {
     const deja = [
       lu("autre", "bonne nuit", "2026-11-01 22:00:00"),
@@ -935,6 +959,24 @@ describe("le jour deviné et les appels décrochés (PR 5)", () => {
         expect([r.dejaLus, r.nouveaux]).toEqual([true, []]);
       }
     }
+  });
+
+  it("des captures sans aucune date envoyées dans le chat : leurs lignes disent le jour inconnu, et elles restent nouvelles", () => {
+    const hier = lu("autre", "bonne nuit", "2026-10-30 23:10:00");
+    const r = messagesDesCaptures(
+      capture({
+        date: null,
+        messages: [
+          ["autre", "t’as vu mon message ?"],
+          ["moi", "pas encore"],
+        ],
+      }),
+      H,
+      { aujourdhui: "2026-10-31", apres: hier.t, lus: [hier] },
+    );
+    expect(textes(r.nouveaux)).toEqual(["t’as vu mon message ?", "pas encore"]);
+    const { lignes } = numeroter(r.nouveaux, [], H, { debut: 1000, aujourdhui: "2026-10-31" });
+    expect(lignes.map((l) => lireLigne(l)?.jour)).toEqual([JOUR_INCONNU, JOUR_INCONNU]);
   });
 
   it("un appel décroché n’est pas distinctif (deux appels de 12 min, deux soirs de suite, sont deux appels), ni la cible de la réponse", () => {

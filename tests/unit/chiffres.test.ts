@@ -5,6 +5,7 @@ import {
   chiffrer,
   jourCompte,
   lire,
+  recents as recentsDe,
   RECENT_J,
   SANS_REPONSE_H,
   SILENCE_REPRISE_H,
@@ -165,6 +166,97 @@ describe("le bloc <chiffres>", () => {
     expect(silence({ toi: 1, autre: 1 })).toHaveLength(base);
     /* L’autre n’a jamais écrit : rien n’attend de réponse de lui */
     expect(silence({ toi: 3, autre: 0 }, { autre: null })).toHaveLength(base);
+  });
+
+  it("aucune date (des captures sans repère) : ni période, ni 21 derniers jours, ni dernier message duMois, jamais « 0 messages »", () => {
+    const sansDate = lignes(
+      blocChiffres(
+        chiffres({ debut: null, fin: null, joursActifs: 0, approx: NB }),
+        NB,
+        recents({ sansDate: true, n: 0, c: null, derniers: { toi: "inconnu", autre: "inconnu" } }),
+      ),
+    );
+    const datee = lignes(blocChiffres(chiffres({ approx: NB }), NB, recents({ n: 0, c: null })));
+    for (const l of sansDate) expect(l).not.toMatch(/\d{4}-\d{2}-\d{2}/);
+    expect(sansDate[1]).toMatch(new RegExp(`\\b${NB}\\b`));
+    const vingtEtUn = sansDate.find((l) => l.includes(`${RECENT_J}`))!;
+    expect(vingtEtUn).not.toMatch(/\b0\b/);
+    expect(sansDate.at(-2)).not.toMatch(/Tom le |Inès le /);
+    /* Une ligne pour une ligne : rien n’est ajouté ni retiré, seulement dit autrement */
+    expect(sansDate).toHaveLength(datee.length);
+  });
+
+  it("une conv coupée : la première ligne dit en plus que son début n’a pas été importé ; rien d’autre ne change", () => {
+    const entiere = lignes(blocChiffres(chiffres(), NB, recents()));
+    const coupee = lignes(blocChiffres(chiffres(), NB, recents(), { coupe: true }));
+    expect(coupee).toHaveLength(entiere.length);
+    expect(coupee.flatMap((l, k) => (l === entiere[k] ? [] : [k]))).toEqual([1]);
+    expect(coupee[1]).toMatch(new RegExp(`\\b${NB}\\b.*\\b23\\b`));
+    expect(coupee[1]).toContain("2026-09-30");
+    /* Le premier jour importé, dit deux fois : la période, puis ce qui manque d’avant lui */
+    expect(coupee[1]!.split("2026-08-20")).toHaveLength(3);
+  });
+
+  it("une conv qui finit sans date : ni « 0 messages » sur 21 jours, ni silence de plusieurs jours, ni « sans réponse » mesuré", () => {
+    const fin = (autres: Partial<Recents>) => lignes(blocChiffres(chiffres(), NB, recents({ n: 0, c: null, sansDateALaFin: 4, depuisSilence: { toi: 4, autre: 0 }, ...autres })));
+    /* Leurs derniers messages viennent tous deux des captures sans date */
+    const tous = fin({ derniers: { toi: "inconnu", autre: "inconnu" } });
+    const vingtEtUn = tous.find((l) => l.includes(`${RECENT_J}`))!;
+    expect(vingtEtUn).toMatch(/\b4\b/);
+    expect(vingtEtUn).not.toMatch(/\b0\b|\d{4}-\d{2}-\d{2}/);
+    expect(tous.some((l) => /il y a \d+ jours/.test(l))).toBe(false);
+    /* Dans l’ordre des captures, ses 4 messages restent sans réponse : la ligne reste, sans durée */
+    expect(tous.filter((l) => /\b4\b/.test(l) && l.includes("d’Inès") && l.includes("de Tom"))).toHaveLength(1);
+    /* Le dernier d’Inès est daté, ceux de Tom d’après ne le sont pas : son jour reste, mais aucun silence ne se mesure depuis */
+    const elle = fin({ derniers: { toi: "inconnu", autre: { date: "2026-09-15", jours: 16 } } });
+    expect(elle.at(-2)).toMatch(/Inès le 2026-09-15 /);
+    expect(elle.at(-2)).not.toMatch(/Tom le /);
+    expect(elle.some((l) => /\b4\b/.test(l) && l.includes("d’Inès") && l.includes("de Tom"))).toBe(false);
+    /* Les mesures des 21 derniers jours ne s’écrivent pas, même quand des messages duMois y tombent */
+    const mesures = fin({ n: 25, c: recents().c, derniers: { toi: "inconnu", autre: "inconnu" } });
+    for (const f of Object.values(RECENTES)) expect(place(mesures.join("\n"), f), f).toBe(-1);
+  });
+
+  it("chiffrer et recents : sans aucun message daté, ni début, ni fin, ni jours avec des messages ; leurs messages comptent toujours", () => {
+    const h = qui("Moi", "Inès", "captures");
+    const texte = versTexteCaptures(captures({ autre: "Inès", blocs: [{ repere: null, messages: fois(30, (k) => msg(k % 2 ? "autre" : "moi", `on se dit des trucs ${k}`)) }] }), {
+      aujourdhui: "2026-10-31",
+    }).texte;
+    const { messages } = lire(texte, h);
+    expect(messages.every((m) => m.jourDevine === "inconnu")).toBe(true);
+    const c = chiffrer(h, messages);
+    expect([c.debut, c.fin, c.joursActifs, c.total.toi + c.total.autre]).toEqual([null, null, 0, 30]);
+    const r = recentsDe({ ...h, aujourdhui: "2026-10-31" }, messages);
+    expect(r).toMatchObject({ sansDate: true, n: 0, c: null, derniers: { toi: "inconnu", autre: "inconnu" } });
+    expect(r.sansDateALaFin).toBeUndefined();
+    expect(trouvailles(c, h, messages).at(-1)).toBe("30\u00a0messages");
+  });
+
+  it("des messages sans date au bout d’une conv datée : la période et les jours viennent des duMois, les 21 jours et les derniers messages ne se mesurent pas", () => {
+    const h = qui("Tom", "Inès");
+    const texte = fois(60, (k) => {
+      const d = new Date(Date.UTC(2026, 8, 1, 9) + Math.floor((k * 15) / 60) * 86400e3 + (k % 4) * 3600e3);
+      return `[${pad(d.getUTCDate())}/${pad(d.getUTCMonth() + 1)}/2026 ${pad(d.getUTCHours())}:00:00] ${k % 2 ? "Inès" : "Tom"}: message ${k}`;
+    }).join("\n");
+    const duMois = lire(texte, h).messages;
+    const suite = fois(4, (k): Message => ({
+      ...duMois.at(-1)!,
+      id: "",
+      t: Date.parse("2026-10-31T00:00:00Z"),
+      role: k % 2 ? "autre" : "toi",
+      jourDevine: "inconnu",
+      approx: "jour",
+      ligne: 61 + k,
+    }));
+    const messages = [...duMois, ...suite];
+    const c = chiffrer(h, messages);
+    expect([c.debut, c.fin]).toEqual(["2026-09-01", "2026-09-15"]);
+    expect(c.joursActifs).toBe(chiffrer(h, duMois).joursActifs);
+    const r = recentsDe({ ...h, aujourdhui: "2026-10-31" }, messages);
+    expect(r.sansDate).toBeUndefined();
+    expect(r).toMatchObject({ sansDateALaFin: 4, n: 0, derniers: { toi: "inconnu", autre: "inconnu" } });
+    /* Sans les messages de la fin : le dernier jour daté, le 15 septembre, il y a plus de six semaines */
+    expect(recentsDe({ ...h, aujourdhui: "2026-10-31" }, duMois).derniers.autre).toMatchObject({ date: "2026-09-15", jours: 46 });
   });
 });
 

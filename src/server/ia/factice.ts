@@ -52,9 +52,14 @@ const chapitre = (numero: number, preuve: string): Chapitre => ({
 });
 
 export function fournisseurFactice(req: RequeteFactice): SortieFactice {
-  /* Lire des captures : une transcription fixe (FACTICE.messagesCaptures, en deux soirées), l’avant-veille et la veille du jour de la requête, et une ligne de son profil */
+  /*
+   * Lire des captures : une transcription fixe (FACTICE.messagesCaptures, en deux soirées), l’avant-veille et la veille du
+   * jour de la requête, et une ligne de son profil ; sans aucun repère pour une image qui porte FACTICE.sansDate
+   */
   if (req.tache === "01-captures") {
     const auj = Date.parse(`${lu(textes(req)[0]?.match(/aujourd’hui : \S+ (\d{4}-\d{2}-\d{2})/)?.[1], "« aujourd’hui : »", req)}T00:00:00Z`);
+    /* Des captures sans aucune date (une image qui porte FACTICE.sansDate) : aucun repère, comme des bulles recadrées */
+    const sansDate = req.blocs.some((b) => "image" in b && Buffer.from(b.image.base64, "base64").includes(FACTICE.sansDate));
     const parSoiree = FACTICE.messagesCaptures / 2;
     const veille = (k: number) => new Date(auj - k * 86400e3).toISOString().slice(0, 10);
     return {
@@ -63,11 +68,11 @@ export function fournisseurFactice(req: RequeteFactice): SortieFactice {
       captures: req.blocs.filter((b) => "image" in b).map((_, k) => ({ numero: k + 1, place: k + 1, hors_sujet: false })),
       blocs: [
         {
-          repere: { date: veille(2), heure: "13:12" },
+          repere: sansDate ? null : { date: veille(2), heure: "13:12" },
           messages: Array.from({ length: parSoiree }, (_, k) => ({ de: k % 2 ? "moi" : "autre", texte: `message ${k + 1}`, media: null, coupe: false, reaction: null })),
         },
         {
-          repere: { date: veille(1), heure: "21:05" },
+          repere: sansDate ? null : { date: veille(1), heure: "21:05" },
           messages: Array.from({ length: parSoiree }, (_, k) => ({
             de: k % 2 ? "autre" : "moi",
             texte: `suite ${k + 1}`,

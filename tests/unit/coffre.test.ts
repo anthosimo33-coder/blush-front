@@ -208,6 +208,15 @@ describe("le coffre", () => {
     expect(coffre.lire("stories.context", chiffrer(contexte))).toEqual(contexte);
   });
 
+  it("une conv sans date, ou qui finit sans date : son contexte le garde ; un contexte d’avant se relit sans", () => {
+    for (const marque of [{ sansDate: true as const }, { finSansDate: true as const }]) {
+      const contexte = { ...EXEMPLES["stories.context"], ...marque };
+      expect(coffre.lire("stories.context", chiffrer(contexte))).toEqual(contexte);
+    }
+    const davant = coffre.lire("stories.context", chiffrer(EXEMPLES["stories.context"]));
+    expect([davant.sansDate, davant.finSansDate]).toEqual([undefined, undefined]);
+  });
+
   it("refuse une ligne qui n’a pas la forme de sa colonne, en nommant les champs, jamais leur contenu", () => {
     const lire = () => coffre.lire("memories.data", chiffrer({ etat: MEMOIRE, lignes: "m0002 Léa : on se voit jeudi ?", suivant: 221 }));
     expect(lire).toThrow("memories.data : forme inattendue (lignes)");

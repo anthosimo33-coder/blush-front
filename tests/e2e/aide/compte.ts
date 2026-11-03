@@ -4,7 +4,7 @@ import { CASE_IMPORT } from "../../../src/contenu/consentements";
 import { attendreTaches, sql } from "./base";
 import { ENTETE_DU_JETON, prouverHumain } from "./captcha";
 import { dernierCode } from "./boite";
-import { exportWhatsApp, NOE_ET_MAELYS, type Ajout, type Personnes } from "./exports";
+import { capturesPng, exportWhatsApp, NOE_ET_MAELYS, type Ajout, type Personnes } from "./exports";
 import { RESEAU } from "./page";
 
 /*
@@ -44,31 +44,54 @@ export type Lecture = {
    * gratuit, qui restent ceux de ces comptes. Faux : la conv attend son paiement, rien n’est lu (le paywall d’abord).
    */
   verdictOffert?: boolean;
+  /**
+   * Une capture plutôt qu’un export (POST /api/captures), le modèle factice y lisant ses 24 messages avec Elias ; `marque`
+   * : un texte que la capture porte (un déclencheur du modèle factice, FACTICE.sansDate : des captures sans aucune date).
+   * Toi y es « Moi » (p0), de prénom `personnes.toi`.
+   */
+  captures?: { marque?: string };
 };
 
 /**
- * Une conv WhatsApp fictive importée puis lue pour le compte connecté (comme « Qui es-tu ? » rempli : toi, on s’est vus,
- * qu’on soit ensemble, ou en couple avec `enCouple` ; puis « Lancer la lecture ») : elle devient la conv ouverte. Renvoie son identifiant. La lecture
- * tourne ensuite sur le serveur : attendreTaches (aide/base.ts) attend sa fin.
+ * Une conv WhatsApp fictive (ou une capture, `captures`) importée puis lue pour le compte connecté (comme « Qui es-tu ? »
+ * rempli : toi, on s’est vus, qu’on soit ensemble, ou en couple avec `enCouple` ; puis « Lancer la lecture ») : elle
+ * devient la conv ouverte. Renvoie son identifiant. La lecture tourne ensuite sur le serveur : attendreTaches
+ * (aide/base.ts) attend sa fin.
  */
 export async function lireUneConvParApi(
   page: Page,
   testInfo: TestInfo,
-  { personnes = NOE_ET_MAELYS, jeSuis = "Un garçon", ajout, enCouple = false, verdictOffert = true }: Lecture = {},
+  { personnes = NOE_ET_MAELYS, jeSuis = "Un garçon", ajout, enCouple = false, verdictOffert = true, captures }: Lecture = {},
 ): Promise<string> {
-  const conv = exportWhatsApp(testInfo, { personnes, ajout });
   await prouverHumain(page.request, testInfo);
-  const envoi = await page.request.post("/api/import", {
-    headers: origine(testInfo),
-    multipart: { fichier: { name: conv.nom, mimeType: "application/zip", buffer: readFileSync(conv.chemin) }, consentement: CASE_IMPORT.version },
-    timeout: RESEAU,
-  });
-  expect(envoi.status(), `l’export de la conv avec ${personnes.autre} est importé`).toBe(200);
+  const conv = captures ? null : exportWhatsApp(testInfo, { personnes, ajout });
+  const envoi = conv
+    ? await page.request.post("/api/import", {
+        headers: origine(testInfo),
+        multipart: { fichier: { name: conv.nom, mimeType: "application/zip", buffer: readFileSync(conv.chemin) }, consentement: CASE_IMPORT.version },
+        timeout: RESEAU,
+      })
+    : await page.request.post("/api/captures", {
+        headers: origine(testInfo),
+        multipart: {
+          captures: { name: "capture-1.png", mimeType: "image/png", buffer: readFileSync(capturesPng(testInfo, 1, { marque: captures?.marque })[0]!) },
+          app: "instagram",
+          consentement: CASE_IMPORT.version,
+        },
+        timeout: RESEAU,
+      });
+  expect(envoi.status(), `la conv ${conv ? `avec ${personnes.autre}` : "en captures"} est importée`).toBe(200);
   const { story } = (await envoi.json()) as { story: { id: string } };
-  /* Le premier de l’export (p0) est celui qui importe : il écrit le plus (aide/exports.ts) */
+  /* Le premier de l’export (p0) est celui qui importe : il écrit le plus (aide/exports.ts) ; des captures : « Moi », son prénom donné */
   const lecture = await page.request.post("/api/analyse", {
     headers: origine(testInfo),
-    data: { me: "p0", pronom: jeSuis === "Une fille" ? "elle" : "il", guess: enCouple ? "ensemble" : "vus", goal: enCouple ? "mieux" : "ensemble" },
+    data: {
+      me: "p0",
+      pronom: jeSuis === "Une fille" ? "elle" : "il",
+      guess: enCouple ? "ensemble" : "vus",
+      goal: enCouple ? "mieux" : "ensemble",
+      ...(conv ? {} : { prenom: personnes.toi }),
+    },
     timeout: RESEAU,
   });
   expect(lecture.status(), `la lecture de la conv avec ${personnes.autre} part`).toBe(200);

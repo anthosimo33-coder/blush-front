@@ -118,6 +118,9 @@ const ContexteGarde = z
     chiffres: z.string(),
     style: z.string(),
     fin: z.string(),
+    /* Avant la PR 5 du chantier lecture : absents (une conv datée, ou datée du jour de son import) */
+    sansDate: z.literal(true).optional(),
+    finSansDate: z.literal(true).optional(),
     /* Avant le 7 octobre : absent (rempli plus bas) */
     dernier: z.number().optional(),
     /* Avant le 8 octobre : absentes, la lecture n’en montre aucune */

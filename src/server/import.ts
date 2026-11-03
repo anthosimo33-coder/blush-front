@@ -2,11 +2,13 @@ import "server-only";
 import { gunzipSync } from "node:zlib";
 import { strFromU8, unzipSync } from "fflate";
 import { z } from "zod";
+import { detecterFormat, plafondDeWhatsApp, type PlafondDeWhatsApp } from "@prompts/lib/conv";
 import { choisirParties, debutDeMessage, estFichierUtile, lireExport, type ExportLu } from "@prompts/lib/export";
 import { fuseauSur } from "@/lib/jours";
 import { CORPS_VERCEL_MAX, PARTIES_MAX, TEXTE_CONV_MAX, type Paquet } from "@/lib/limites";
 import type { CodeErreur } from "@/types/erreurs-api";
 import { ErreurPublique } from "./erreurs";
+import { journal } from "./journal";
 
 /*
  * Ce qu’on reçoit d’un export (le fichier tel quel, ou le paquet préparé par le navigateur) devient le texte de la conv,
@@ -83,6 +85,32 @@ export function borner<T extends ExportLu & { coupe?: boolean }>(lu: T): T & { c
   if (morceaux.length) garde = morceaux.join("") + garde.slice(fait);
   if (garde === texte) return lu;
   return { ...lu, texte: garde, ...(debut > 0 ? { coupe: true } : {}) };
+}
+
+/** Un export WhatsApp d’au moins tant d’en-têtes laisse sa ligne au journal (mesurerLExport). */
+const EXPORT_LONG_AU_JOURNAL = 9_000;
+
+/**
+ * Le plafond de WhatsApp sur un export lu (plafondDeWhatsApp, prompts/lib/conv.ts), et, pour un export d’au moins
+ * EXPORT_LONG_AU_JOURNAL en-têtes, une ligne au journal, des nombres seulement : de quoi vérifier sur les vrais exports
+ * que WhatsApp s’arrête bien à 10 000 ou 40 000 messages, d’iPhone comme d’Android. `ou` : le premier import, un morceau
+ * ajouté, ou un export ajouté dans le chat ou sur sa fiche (dont seuls comptent les nouveaux messages : la coupe n’y
+ * change rien, seule la mesure sert). null : un export d’Instagram.
+ */
+export function mesurerLExport(lu: ExportLu & { coupe?: boolean }, ou: "import" | "morceau" | "ajout"): PlafondDeWhatsApp | null {
+  if (lu.appli !== "whatsapp") return null;
+  const p = plafondDeWhatsApp(lu.texte);
+  if (p.entetes >= EXPORT_LONG_AU_JOURNAL)
+    journal("import : export WhatsApp long", {
+      ou,
+      format: detecterFormat(lu.texte),
+      entetes: p.entetes,
+      medias: p.avecMedias,
+      chiffrement: p.chiffrementEnTete,
+      plafond: p.plafond,
+      coupe: !!lu.coupe,
+    });
+  return p;
 }
 
 /** Un fichier envoyé tel quel (un .txt, un message_1.html, ou un .zip) : on en tire le texte de la conv. */

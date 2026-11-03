@@ -28,6 +28,13 @@ export const FACTICE = {
   autreRapport: "#factice-rapport",
   autrePersonne: "#factice-autre",
   refus: "#factice-refus",
+  /**
+   * Dans une capture (ses octets : un PNG qui le porte dans un bloc de texte, capturesPng(…, { marque }), tests/e2e/aide),
+   * le modèle factice n’y lit aucun repère de date : des captures où l’on ne voit aucune date (PR 5 du chantier lecture),
+   * pour la galerie et les tests de bout en bout. Le navigateur réencode les captures qu’on choisit à l’écran : seule une
+   * capture envoyée par la route (/api/captures) le garde.
+   */
+  sansDate: "#factice-sans-date",
   /** Les messages qu’il lit dans des captures, quelles qu’elles soient : deux soirées de 12. */
   messagesCaptures: 24,
   /** La ligne de son profil qu’il lit dans des captures (elle devient une info de sa fiche). */

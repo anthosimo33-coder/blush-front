@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { messagesDesCaptures } from "@prompts/lib/ajouts";
 import { versTexteCaptures } from "@prompts/lib/captures";
-import { heure as hhmm, jour as jourIso, lire, type Message } from "@prompts/lib/conv";
+import { blocChiffres, chiffrer, heure as hhmm, jour as jourIso, lire, recents, RECENT_J, type Message } from "@prompts/lib/conv";
 import { cleDuMessage, heureLue } from "@prompts/lib/reconnaitre";
 import { relier, reunir, type ConvEnMorceaux, type MorceauRecu } from "@/server/morceaux";
 import { fusionnerLots } from "@/server/video";
@@ -860,6 +860,28 @@ describe("des captures où l’on ne voit aucune date (G1b)", () => {
     expect(r).toMatchObject({ doublons: 2, gardes: [27, 2] });
     expect(r.messages.slice(-2).map(quand)).toEqual(Array(2).fill("2026-09-15 --:-- lu 2026-10-31 00:00 inconnu"));
     expect(heureLue(r.messages.at(-1)!)).toEqual({ t: Date.UTC(2026, 9, 31), heure: "auPlusTard" });
+  });
+
+  it("la suite d’un export sur des captures sans date ne fait pas de silence : ni plusieurs semaines sans message, ni « 0 messages » (lot C)", () => {
+    const h = { utilisateur: HUGO, autre: LEA, aujourdhui: "2026-10-31" };
+    /* Le bloc <chiffres> de la conv réunie, importée le 31 octobre : l’export finit le 15 septembre, les captures le reprennent puis le suivent */
+    const chiffres = (neufs: [de: "moi" | "autre", t: string][]) => {
+      const { messages } = reunir([exportDuMois(), capturees([bloc([["autre", "bon je vais dormir"], ["moi", "bonne nuit"], ...neufs], null)], "2026-10-31")]);
+      return blocChiffres(chiffrer(h, messages), messages.length, recents(h, messages)).split("\n");
+    };
+    const HUGO_INSISTE: [de: "moi", t: string][] = [
+      ["moi", "t’es là ?"],
+      ["moi", "réponds stp"],
+      ["moi", "bon tant pis"],
+    ];
+    /* Léa écrit, puis Hugo trois fois : leurs derniers messages sont sans date ; l’ordre des captures dit les trois restés sans réponse */
+    const tous = chiffres([["autre", "attends t’as vu mon message de ce matin"], ...HUGO_INSISTE]);
+    expect(tous.some((l) => /il y a \d+ jours/.test(l))).toBe(false);
+    expect(tous.find((l) => l.includes(`${RECENT_J}`))).not.toMatch(/\b0\b/);
+    /* Hugo seul : le dernier message de Léa reste daté, mais rien ne mesure le silence d’après lui */
+    const lui = chiffres(HUGO_INSISTE);
+    expect(lui.find((l) => l.includes(`${RECENT_J}`))).not.toMatch(/\b0\b/);
+    expect(lui.some((l) => l.endsWith("sans réponse"))).toBe(false);
   });
 
   it("entre deux repris du même jour, un message prend ce jour ; entre deux jours, il reste inconnu", () => {

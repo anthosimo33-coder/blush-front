@@ -1,7 +1,7 @@
 import "server-only";
 import { eq, sql } from "drizzle-orm";
 import { heureLue } from "@prompts/lib/reconnaitre";
-import { chiffrer as chiffresDe, lire, rendre } from "@prompts/lib/conv";
+import { chiffrer as chiffresDe, jourConnu, lire, rendre } from "@prompts/lib/conv";
 import { DEMANDE_PLAN, demandeMoitie, requeteMemoireCreation, requeteMemoireMaj, requeteRapport, requeteVerdict, requeteVocal } from "@prompts/lib/contextes";
 import { alerteRetenue, appliquerMaj, aTrancher, estFaite, rapportCourt, rendreNouveaux, reunirLesAlertes, type Echange } from "@prompts/lib/memoire";
 import { introuvables, preuvesChapitres, preuvesMaj, preuvesMemoire, preuvesPlan, preuvesRapport, preuvesVerdict, preuvesVocal } from "@prompts/lib/preuves";
@@ -64,10 +64,12 @@ function relire(story: LigneComplete) {
   const h = { ...histoireDe(meta), aujourdhui: aujourdhuiDans(fuseauDe(meta), story.createdAt).iso };
   /*
    * Comme à l’import : un message collé d’un autre reste du texte. Plusieurs morceaux : réunis, « Moi » des captures
-   * étant celui qui importe (src/server/morceaux.ts), et le modèle lit d’où vient chacun (provenancesDe)
+   * étant celui qui importe (src/server/morceaux.ts), et le modèle lit d’où vient chacun (provenancesDe). Une conv d’un
+   * seul morceau dont le début n’a pas été importé (Meta.coupe) : le modèle le lit (rendre, `coupe`) ; en morceaux,
+   * provenancesDe dit lequel est coupé
    */
   const lu = typeof conv === "string" ? lire(conv, h, { autresEnTexte: true }) : lectureReunie(conv, h, { k: meta.moi ?? 0, connu: true });
-  return { meta, h, lu, rendu: rendre(h, lu, { morceaux: provenancesDe(meta) }) };
+  return { meta, h, lu, rendu: rendre(h, lu, { morceaux: provenancesDe(meta), ...(meta.morceaux ? {} : { coupe: !!meta.coupe }) }) };
 }
 
 /* ———— Les étapes ———— */
@@ -105,7 +107,13 @@ function contexteDuCode(story: LigneComplete) {
     chiffres: rendu.chiffres,
     style: profil(h, lu.messages).bloc,
     fin: rendu.fin,
-    dernier: lu.messages.at(-1)!.t,
+    /*
+     * Aucune date sur ses captures, ou pas à sa fin : le chat le dit au lieu de son dernier jour, et une conv sans aucune
+     * date n’a pas de curseur d’export (curseurDe, src/server/ajouts.ts)
+     */
+    ...(rendu.sansDate ? { sansDate: true as const } : rendu.finSansDate ? { finSansDate: true as const } : {}),
+    /* Le dernier message daté : un export ajouté repart de lui, et retrouve les messages sans date d’après par `lus` */
+    dernier: (lu.messages.findLast(jourConnu) ?? lu.messages.at(-1)!).t,
     /*
      * Ses derniers messages, leur empreinte et l’heure lue sur leur capture (heureLue : avant que la réunion des morceaux
      * ne la recale ; src/server/ajouts.ts) : une capture ou un export qui les reprend ne les relit pas, même quand leur
