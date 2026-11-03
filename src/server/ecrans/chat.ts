@@ -12,6 +12,13 @@ export const citationsMontrees = (reponses: Pick<BlushAnswer, "bubbles">[]): Set
   new Set(reponses.flatMap((r) => r.bubbles.flatMap((b) => (b.messages ?? []).map(cleDeCitation))));
 
 /**
+ * Les identifiants des messages déjà montrés (`montrees`, citationsMontrees) : l’appli ne les remontrant pas, le modèle
+ * les reçoit (<deja_montres>) pour en citer d’autres. Deux messages identiques le sont ensemble, comme à l’écran.
+ */
+export const identifiantsMontres = (messages: Map<string, Message>, montrees: ReadonlySet<string>): string[] =>
+  [...messages].flatMap(([id, m]) => (montrees.has(cleDeCitation(m)) ? [id] : []));
+
+/**
  * Une bulle de la lecture, avec les messages qu’elle cite, sauf ceux que `montrees` a déjà (les dernières réponses du
  * chat, et les bulles d’avant dans la même réponse) : `montrees` grandit de ce qu’elle montre. La réponse au fil et la
  * réponse gardée lisent les mêmes bulles dans le même ordre, depuis les mêmes citations : elles montrent les mêmes.

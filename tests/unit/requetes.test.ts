@@ -226,9 +226,10 @@ describe("le chat (prompt 10) : la mémoire à la place de la conv", () => {
     ajout: ["  m0061 2026-10-01 jeu. 10:02 Léa : alors ?"],
     vocal: true,
     heure: Date.UTC(2026, 9, 1, 10, 36),
+    dejaMontres: ["m0001"],
   });
 
-  it("le premier bloc, mis en cache, ne dépend que de l’histoire et de la mémoire : le fil, ce qu’il dit, un ajout, le vocal ou l’heure n’y changent rien", () => {
+  it("le premier bloc, mis en cache, ne dépend que de l’histoire et de la mémoire : le fil, ce qu’il dit, un ajout, le vocal, l’heure ou les messages déjà montrés n’y changent rien", () => {
     const premier = chat();
     expect(premier.blocs[0]).toMatchObject({ cache: true });
     expect(suite.blocs[0]).toEqual(premier.blocs[0]);
@@ -270,7 +271,7 @@ describe("le chat (prompt 10) : la mémoire à la place de la conv", () => {
     expect(bloc(textes(chat({ etat: { ...etat, niveau: null } }))[0]!, "<histoire>", "</histoire>").at(-2)).toMatch(/ : mode sobre$/);
   });
 
-  it("ses blocs : l’histoire, les chiffres, la mémoire et l’aide, puis le style, l’heure et le nouveau (instantané)", () => {
+  it("ses blocs : l’histoire, les chiffres, la mémoire et l’aide, puis le style, l’heure, les messages déjà montrés et le nouveau (instantané)", () => {
     expect({ premier: structure(chat()), suite: structure(suite) }).toMatchInlineSnapshot(`
       {
         "premier": {
@@ -314,11 +315,12 @@ describe("le chat (prompt 10) : la mémoire à la place de la conv", () => {
               "balises": [
                 "style",
                 "heure",
+                "deja_montres",
                 "nouveau",
                 "vocal",
               ],
               "cache": false,
-              "messages": "m0060, m0061",
+              "messages": "m0001, m0060, m0061",
             },
           ],
           "tache": "10-chat",
