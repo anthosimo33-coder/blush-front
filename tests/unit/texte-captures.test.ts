@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { cleDuMessage, heureDuMessage } from "@prompts/lib/ajouts";
 import { versTexteCaptures } from "@prompts/lib/captures";
 import { chiffrer, lire, rendre, type Histoire } from "@prompts/lib/conv";
+import { cleDuMessage, heureDuMessage } from "@prompts/lib/reconnaitre";
 import type { Captures } from "@prompts/lib/schemas";
 import { trouvailles } from "@/server/ecrans/trouvailles";
 import { fusionnerLots } from "@/server/video";

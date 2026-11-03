@@ -67,6 +67,13 @@ const AJOUT_D_UN_MORCEAU = {
   autre_conv: "Ce morceau n’est pas avec la même personne.",
 } as const;
 
+/**
+ * Un enregistrement d’écran ajouté où l’on ne voit aucune date (« sans_date ») : y ajouter une capture remplacerait la
+ * vidéo (CapturesScreen), il faut la refilmer. TODO(produit): texte nouveau, à valider (la décision du 3 novembre ne
+ * parle que des captures).
+ */
+export const SANS_DATE_VIDEO = "On ne voit aucune date dans cette vidéo\u00a0: filme-la à nouveau en remontant jusqu’à une date.";
+
 /** Un morceau ajouté avec quelqu’un d’autre (« autre_conv ») : la personne de la conv, par son prénom quand on sait qui c’est. */
 export const pasLaMemePersonne = (prenom: string | null) => (prenom ? `Ce morceau n’est pas avec ${prenom}.` : AJOUT_D_UN_MORCEAU.autre_conv);
 
@@ -109,6 +116,8 @@ const MESSAGES = {
     refus: "BLUSH ne peut pas lire ces captures. Essaie avec d’autres.",
     captcha: `${CAPTCHA} Tes captures restent là.`,
     ...AJOUT_D_UN_MORCEAU,
+    /* Des captures où l’on ne voit aucune date, sans message en commun avec la conv (src/server/morceaux.ts, relier) : BLUSH ne sait pas où les ranger. Texte décidé le 3 novembre ; une vidéo a le sien (SANS_DATE_VIDEO) */
+    sans_date: "On ne voit aucune date sur ces captures\u00a0: ajoute aussi celle où l’on voit le jour.",
     defaut: "Ta conv n’a pas pu partir. Vérifie ta connexion et réessaie.",
   },
   /* « Lancer la lecture », sur « Qui es-tu ? » */

@@ -1,6 +1,6 @@
 import "server-only";
 import { eq, sql } from "drizzle-orm";
-import { heureDuMessage } from "@prompts/lib/ajouts";
+import { heureLue } from "@prompts/lib/reconnaitre";
 import { chiffrer as chiffresDe, lire, rendre } from "@prompts/lib/conv";
 import { DEMANDE_PLAN, demandeMoitie, requeteMemoireCreation, requeteMemoireMaj, requeteRapport, requeteVerdict, requeteVocal } from "@prompts/lib/contextes";
 import { alerteRetenue, appliquerMaj, aTrancher, estFaite, rapportCourt, rendreNouveaux, reunirLesAlertes, type Echange } from "@prompts/lib/memoire";
@@ -107,10 +107,11 @@ function contexteDuCode(story: LigneComplete) {
     fin: rendu.fin,
     dernier: lu.messages.at(-1)!.t,
     /*
-     * Ses derniers messages, leur empreinte et leur heure (src/server/ajouts.ts) : une capture ou un export qui les
-     * reprend ne les relit pas, même quand leur heure n’était que celle d’un repère (une conv de captures)
+     * Ses derniers messages, leur empreinte et l’heure lue sur leur capture (heureLue : avant que la réunion des morceaux
+     * ne la recale ; src/server/ajouts.ts) : une capture ou un export qui les reprend ne les relit pas, même quand leur
+     * heure n’était que celle d’un repère (une conv de captures)
      */
-    lus: ecrireLus(lu.messages.slice(-LUS_MAX).map((m) => ({ cle: cleSecrete(m), t: m.t, heure: heureDuMessage(m) }))),
+    lus: ecrireLus(lu.messages.slice(-LUS_MAX).map((m) => ({ cle: cleSecrete(m), ...heureLue(m) }))),
     trouvailles: trouvailles(chiffres, h, lu.messages),
     accroche: genreDuHaut(apercuDuPaywall(chiffres, lu.messages)),
   };

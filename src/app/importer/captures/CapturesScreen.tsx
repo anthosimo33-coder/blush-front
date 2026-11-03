@@ -10,7 +10,7 @@ import { ACCEPT_IMAGES, CAPTURES_MAX } from "@/lib/limites";
 import { connexionPuis } from "@/lib/suite";
 import { useApercusFichiers } from "@/lib/useApercusFichiers";
 import { useMonte } from "@/lib/useMonte";
-import { codeDe, erreurDeParcours, messageErreur, type ErreurParcours } from "@/lib/messages-erreur";
+import { codeDe, erreurDeParcours, messageErreur, SANS_DATE_VIDEO, type ErreurParcours } from "@/lib/messages-erreur";
 import { prechargerVideo, uploadRecording, uploadScreenshots } from "@/services/api";
 import { CASE_IMPORT } from "@/contenu/consentements";
 import { MentionImport, useAccord } from "@/components/juridique/cases";
@@ -228,6 +228,8 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
       if (parcours) return echec(parcours);
       /* Un morceau avec quelqu’un d’autre : on le dit en la nommant */
       if (code === "autre_conv") return void messagePasAvecElle().then((m) => monte.current && setSouci(m));
+      /* Une vidéo où l’on ne voit aucune date : y ajouter une capture la remplacerait (handle), elle est à refilmer */
+      if (code === "sans_date" && video) return setSouci(SANS_DATE_VIDEO);
       setSouci(messageErreur("captures", e));
     }
   };

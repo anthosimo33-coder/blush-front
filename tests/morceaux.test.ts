@@ -32,23 +32,37 @@ import { creees } from "./aide/nettoyage";
  * convs sont inventées : Hugo et Léa, des messages numérotés.
  */
 
-/** Un export WhatsApp d’iPhone inventé : un message par minute à partir de `debut` (AAAA-MM-JJTHH:MM), Hugo et Léa en alternance. */
-function exportWhatsapp(debut: string, n: number, { toi = "Hugo", autre = "Léa", depuis = 0, fichier }: { toi?: string; autre?: string; depuis?: number; fichier?: string } = {}) {
+/** Un export WhatsApp d’iPhone inventé : un message par minute à partir de `debut` (AAAA-MM-JJTHH:MM), Hugo et Léa en alternance, « message k ». */
+function exportWhatsapp(
+  debut: string,
+  n: number,
+  {
+    toi = "Hugo",
+    autre = "Léa",
+    depuis = 0,
+    fichier,
+    texte = (k: number) => `message ${k}`,
+  }: { toi?: string; autre?: string; depuis?: number; fichier?: string; texte?: (k: number) => string } = {},
+) {
   const t0 = Date.parse(`${debut}:00Z`);
   const p2 = (x: number) => String(x).padStart(2, "0");
   const lignes = Array.from({ length: n }, (_, k) => {
     const d = new Date(t0 + (depuis + k) * 60e3);
     const date = `${p2(d.getUTCDate())}/${p2(d.getUTCMonth() + 1)}/${d.getUTCFullYear()} ${p2(d.getUTCHours())}:${p2(d.getUTCMinutes())}:00`;
-    return `[${date}] ${(depuis + k) % 2 ? autre : toi}: message ${depuis + k}`;
+    return `[${date}] ${(depuis + k) % 2 ? autre : toi}: ${texte(depuis + k)}`;
   });
   return { appli: "whatsapp" as const, texte: lignes.join("\n"), nom: fichier ?? `Discussion WhatsApp avec ${autre}.txt` };
 }
 
-/** Des captures lues (prompt 01) le `jour` à 21:00 : `n` messages de lui (« Moi ») et d’elle en alternance, « capture k ». */
-function capturesDu(jour: string, n: number, { autre = "Léa", texte = (k: number) => `capture ${k}` }: { autre?: string | null; texte?: (k: number) => string } = {}) {
+/** Des captures lues (prompt 01) le `jour` à `heure` (21:00) : `n` messages de lui (« Moi ») et d’elle en alternance, « capture k ». */
+function capturesDu(
+  jour: string,
+  n: number,
+  { autre = "Léa", texte = (k: number) => `capture ${k}`, heure = "21:00" }: { autre?: string | null; texte?: (k: number) => string; heure?: string } = {},
+) {
   const c: Captures = captures({
     autre,
-    blocs: [{ repere: { date: jour, heure: "21:00" }, messages: Array.from({ length: n }, (_, k) => msg(k % 2 ? "autre" : "moi", texte(k))) }],
+    blocs: [{ repere: { date: jour, heure }, messages: Array.from({ length: n }, (_, k) => msg(k % 2 ? "autre" : "moi", texte(k))) }],
   });
   return versTexteCaptures(c, { aujourdhui: "2026-10-22" });
 }
@@ -182,11 +196,46 @@ describe("une conv en plusieurs morceaux", () => {
 
   it("au plus 5 morceaux (« trop »), et un morceau sans rien de nouveau (« rien_de_neuf »)", async () => {
     const imp = await brouillon(exportWhatsapp("2026-09-01T10:00", 60));
-    /* Des captures de messages déjà dans l’export (le même jour, le même texte) : rien de neuf */
-    const dejaLa = capturesDu("2026-09-01", 24, { texte: (k) => `message ${k}` });
+    /* Des captures de messages déjà dans l’export (le même jour, sous un repère de l’heure de l’export, le même texte) : rien de neuf */
+    const dejaLa = capturesDu("2026-09-01", 24, { texte: (k) => `message ${k}`, heure: "10:00" });
     await expect(ajouterDesCaptures(imp.secret, { appli: "whatsapp", t: dejaLa })).rejects.toMatchObject({ code: "rien_de_neuf" });
     for (const jour of ["2026-08-01", "2026-08-05", "2026-08-10", "2026-08-15"]) await ajouterDesCaptures(imp.secret, { appli: "instagram", t: capturesDu(jour, 24) });
     await expect(ajouterDesCaptures(imp.secret, { appli: "instagram", t: capturesDu("2026-08-20", 24) })).rejects.toMatchObject({ code: "trop" });
+  });
+
+  it("des captures où l’on ne voit aucune date, sans rien en commun : refusées (« sans_date »), la conv inchangée", async () => {
+    const imp = await brouillon(exportWhatsapp("2026-09-01T10:00", 60));
+    const sansDate = versTexteCaptures(
+      captures({ autre: "Léa", blocs: [{ repere: null, messages: Array.from({ length: 24 }, (_, k) => msg(k % 2 ? "autre" : "moi", `capture ${k}`)) }] }),
+      {
+        aujourdhui: "2026-10-22",
+      },
+    );
+    await expect(ajouterDesCaptures(imp.secret, { appli: "whatsapp", t: sansDate })).rejects.toMatchObject({ code: "sans_date" });
+    expect((await meta(imp.id)).morceaux).toBeUndefined();
+  });
+
+  it("des captures sans date, puis l’export qui reprend leurs premiers messages : le résumé des captures prend les jours de l’export", async () => {
+    /* Des messages qui en disent assez pour être reconnus sans date */
+    const texte = (k: number) => `on parle du film numéro ${k}`;
+    const sansDate = versTexteCaptures(
+      captures({ autre: "Léa", blocs: [{ repere: null, messages: Array.from({ length: 24 }, (_, k) => msg(k % 2 ? "autre" : "moi", k < 5 ? texte(k) : `capture ${k}`)) }] }),
+      {
+        aujourdhui: "2026-10-22",
+      },
+    );
+    const imp = await importerCaptures({ appli: "instagram", t: sansDate, consentement: accordDeTest() });
+    creees.histoires.push(imp.id);
+    expect(imp.meta.resume).toMatchObject({ debut: "2026-10-22", fin: "2026-10-22" });
+    await ajouterUnExport(imp.secret, exportWhatsapp("2026-09-01T10:00", 60, { texte }));
+    const m = await meta(imp.id);
+    expect(m).toMatchObject({ doublons: 5, resume: { debut: "2026-09-01", total: 79 } });
+    /* Ses 5 premiers messages sont ceux de l’export ; les 19 d’après sont rangés après eux (leur jour reste inconnu pour le modèle) */
+    expect(m.morceaux?.map((x) => [x.appli, x.resume.debut, x.resume.fin, x.resume.total])).toEqual([
+      ["instagram", "2026-09-01", "2026-09-01", 24],
+      ["whatsapp", "2026-09-01", "2026-09-01", 60],
+    ]);
+    expect(provenancesDe(m)[0]).toMatchObject({ source: "captures", debut: "2026-09-01" });
   });
 
   it("des captures d’abord, puis un export : ses noms deviennent ceux de la conv, et « Qui es-tu ? » les redemande", async () => {

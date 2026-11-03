@@ -359,6 +359,28 @@ export const STATES = [
   },
   { id: "03b", section: "parcours", title: "Captures", state: "4 captures choisies", route: "/importer/captures?app=instagram", steps: pickCaptures, ref: "03-captures" },
   {
+    id: "03c",
+    section: "parcours",
+    title: "Captures",
+    state: "Morceau refusé\u00a0: aucune date",
+    route: "/importer/captures?app=whatsapp&mode=ajout",
+    compte: "brouillon",
+    journey: EXPORT,
+    steps: async (page) => {
+      /*
+       * La réponse du serveur à des captures sans aucune date, sans message en commun avec la conv (src/server/morceaux.ts,
+       * relier), posée par la page : le navigateur réencode les captures en JPEG avant l’envoi (preparerCaptures), et la
+       * marque qui fait lire au modèle factice des captures sans date s’y perdrait
+       */
+      await page.route("**/api/captures", (route) => route.fulfill({ status: 422, json: { erreur: "sans_date" } }));
+      await pickCaptures(page);
+      await page.getByRole("button", { name: "Continuer" }).click();
+      await page.waitForTimeout(600);
+    },
+    note: "Des captures où l’on ne voit aucune date, ajoutées à une conv datée sans message en commun\u00a0: BLUSH ne sait pas où les ranger. Texte décidé le 3 novembre, absent des maquettes. Un enregistrement d’écran refusé de même a son texte (le refilmer), à valider.",
+    changement: "Nouveau (PR 5, lot B)\u00a0: le refus «\u00a0sans_date\u00a0».",
+  },
+  {
     id: "04",
     section: "parcours",
     title: "Ta conv est ajoutée",

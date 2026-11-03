@@ -1,6 +1,7 @@
 import { gzipSync } from "node:zlib";
 import { describe, expect, it } from "vitest";
-import { blocAjout, cleDuMessage, heureDuMessage, inserer, messagesDeLExport, messagesDesCaptures, numeroter, remplacer, type Heure, type Lu } from "@prompts/lib/ajouts";
+import { blocAjout, inserer, messagesDeLExport, messagesDesCaptures, numeroter, remplacer } from "@prompts/lib/ajouts";
+import { cleDuMessage, heureLue, type Heure, type Lu } from "@prompts/lib/reconnaitre";
 import { versTexteCaptures } from "@prompts/lib/captures";
 import { lire, type Histoire, type Message } from "@prompts/lib/conv";
 import { ligneMessage, TETE_DU_RAPPEL } from "@prompts/lib/ligne";
@@ -927,7 +928,7 @@ describe("le jour deviné et les appels décrochés (PR 5)", () => {
       const t = versTexteCaptures(c, { moi: "Moi", autre: "Elle", aujourdhui: "2026-10-31" });
       const { messages } = lire(t.texte, { utilisateur: { ...H.utilisateur, nomExport: "Moi" }, autre: { ...H.autre, nomExport: "Elle" }, format: "captures" });
       /* Ce que la conv garde à l’import (src/server/analyse.ts, contexteDuCode) */
-      const lus: Lu[] = messages.map((m) => ({ cle: cleDuMessage(m), t: m.t, heure: heureDuMessage(m) }));
+      const lus: Lu[] = messages.map((m) => ({ cle: cleDuMessage(m), ...heureLue(m) }));
       expect(lus.map((e) => e.heure)).toEqual(heures);
       for (const aujourdhui of ["2026-10-31", "2026-11-01"]) {
         const r = messagesDesCaptures(c, H, { aujourdhui, apres: Math.max(...lus.map((e) => e.t)), lus });

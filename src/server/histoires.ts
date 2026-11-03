@@ -412,10 +412,18 @@ function mediasReunis(conv: ConvEnMorceaux, lu: { messages: Message[]; parMorcea
 }
 
 /**
+ * Ce que contenait chaque morceau (meta.morceaux), résumé d’après la conv réunie (`parMorceau`, ses messages datés comme
+ * elle) : des captures sans date y prennent le jour des messages qu’elles reprennent, un doublon celui de son jumeau.
+ */
+const resumesReunis = (metas: readonly Omit<MorceauMeta, "resume">[], conv: ConvEnMorceaux, parMorceau: Message[][]): MorceauMeta[] =>
+  metas.map((m, k) => ({ ...m, resume: resumeDe(parMorceau[k]!, conv.morceaux[k]!.format) }));
+
+/**
  * La meta d’une conv réunie : ses morceaux relus ensemble (lectureReunie), toi au participant `qui.k`. Les participants
  * prennent les noms de l’identité, gardent le prénom qu’on leur connaissait (celui de « Qui es-tu ? », sur des
  * captures), et se recomptent ; le résumé et les doublons sont ceux de la conv réunie. `morceaux` reste celui de
- * `avant` (l’ajout y met le nouveau). Rend aussi ce que chaque morceau apporte (`gardes`) et ses messages lus (`parMorceau`).
+ * `avant` (l’ajout y met le nouveau). Rend aussi ce que chaque morceau apporte (`gardes`) et ses messages, datés comme
+ * dans la conv réunie (`parMorceau`).
  */
 function metaReunie(avant: Meta, conv: ConvEnMorceaux, id: Identite, qui: QuiLit) {
   const personne = (nom: string) => ({ prenom: prenomDe(nom), pronom: "il" as const, nomExport: nom });
@@ -455,7 +463,8 @@ function metaReunie(avant: Meta, conv: ConvEnMorceaux, id: Identite, qui: QuiLit
  * sans compte, qui a sa conv brute (pas un brouillon du mode tournage). Le même texte, ou le même envoi (`cle`, un
  * nouvel essai après une coupure), ne s’ajoute pas deux fois : la conv revient telle quelle. Au-delà de MORCEAUX_MAX, ou
  * de TEXTE_LU_MAX_CARACTERES pour tous les morceaux ensemble : « trop » ; un morceau qui n’apporte aucun message nouveau
- * (tout y est déjà) : « rien_de_neuf ».
+ * (tout y est déjà) : « rien_de_neuf » ; des captures où l’on ne voit aucune date, sans message en commun avec la conv :
+ * « sans_date » (relier). Le résumé de chaque morceau se refait d’après la conv réunie (resumesReunis).
  */
 async function ajouterMorceau(secret: string, recu: MorceauRecu, info: Omit<MorceauMeta, "resume">): Promise<{ id: string; meta: Meta }> {
   return db().transaction(async (tx) => {
@@ -474,7 +483,7 @@ async function ajouterMorceau(secret: string, recu: MorceauRecu, info: Omit<Morc
     /* Avant « Qui es-tu ? » : toi est le participant 0, comme à l’import d’un seul morceau */
     const { meta: lue, parMorceau, gardes } = metaReunie(avant, reunie, identite, { k: 0, connu: false });
     if (!gardes.at(-1)) throw new ErreurMorceau("rien_de_neuf");
-    const metas = [...(avant.morceaux ?? [morceauMetaDe(avant)]), { ...info, resume: resumeDe(parMorceau.at(-1)!, recu.format) }];
+    const metas = resumesReunis([...(avant.morceaux ?? [morceauMetaDe(avant)]), info], reunie, parMorceau);
     const meta: Meta = { ...lue, morceaux: metas, ...(metas.some((m) => m.coupe) ? { coupe: true } : {}) };
     await tx
       .update(schema.stories)
@@ -697,9 +706,13 @@ export async function definirQui(
   const brute = ligne.conv ? coffre.lire("stories.conv", ligne.conv) : null;
   /*
    * Plusieurs morceaux : ils se relisent avec le bon « Moi » (sur des captures, c’est lui), qu’on n’avait que deviné.
-   * Les doublons et les comptes de la conv réunie sont alors ceux que lira la chaîne (relire, src/server/analyse.ts)
+   * Les doublons, les comptes et le résumé de chaque morceau (resumesReunis) sont alors ceux que lira la chaîne (relire,
+   * src/server/analyse.ts)
    */
-  const avant = brute && typeof brute !== "string" ? metaReunie(metaDe(ligne), brute, identiteDe(metaDe(ligne)), { k: qui.moi, connu: true }).meta : metaDe(ligne);
+  const enMorceaux = brute && typeof brute !== "string" ? brute : null;
+  const reunie = enMorceaux && metaReunie(metaDe(ligne), enMorceaux, identiteDe(metaDe(ligne)), { k: qui.moi, connu: true });
+  const avant =
+    enMorceaux && reunie ? { ...reunie.meta, ...(reunie.meta.morceaux ? { morceaux: resumesReunis(reunie.meta.morceaux, enMorceaux, reunie.parMorceau) } : {}) } : metaDe(ligne);
   /*
    * Des captures : l’utilisateur est « Moi », son prénom vient de l’écran. L’autre garde le nom lu en haut de la conv, ou
    * son nom d’export ; quand il ne dit pas son prénom (« Elle », un numéro, un compte supprimé, un surnom : doutePrenom),

@@ -1,6 +1,7 @@
 import "server-only";
 import { and, eq, inArray, or, sql } from "drizzle-orm";
-import { cleDuMessage, inserer, messagesDeLExport, messagesDesCaptures, numeroter, remplacer, type Ajout, type Heure, type Lu } from "@prompts/lib/ajouts";
+import { inserer, messagesDeLExport, messagesDesCaptures, numeroter, remplacer, type Ajout } from "@prompts/lib/ajouts";
+import { cleDuMessage, type Heure, type Lu } from "@prompts/lib/reconnaitre";
 import type { Message } from "@prompts/lib/conv";
 import { requeteCaptures, type Image } from "@prompts/lib/contextes";
 import type { ExportLu } from "@prompts/lib/export";

@@ -97,6 +97,8 @@ export const ERREURS_API = {
   autre_conv: 422,
   /** Un ajout sans rien de nouveau. */
   rien_de_neuf: 422,
+  /** Des captures où l’on ne voit aucune date, ajoutées à une conv qui a des dates sans aucun message en commun avec elle : on ne saurait où les ranger. */
+  sans_date: 422,
   /** Un vocal trop lourd, ou trop long. */
   vocal: 422,
   /** Un vocal vide, qui ne dure rien, ou où la transcription n’entend rien. */
