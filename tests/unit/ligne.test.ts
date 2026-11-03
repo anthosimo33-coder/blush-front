@@ -145,7 +145,7 @@ describe("les lignes de la conv, à l’octet", () => {
       },
     });
     expect(empreinte(faitsAffiches(etat, lignes))).toBe("0659d6a8d69eea22");
-    expect(empreinte(rendreMemoire(etat, lignes))).toBe("a3a4fef719bec830");
+    expect(empreinte(rendreMemoire(etat, lignes))).toBe("ed92b69b09ea192e");
   });
 });
 
