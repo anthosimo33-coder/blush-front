@@ -76,7 +76,7 @@ describe("le référencement", () => {
     const dates = Object.fromEntries(PAGES_PUBLIQUES.map((p) => [p.chemin, p.misAJourLe]));
     expect(dates).toMatchObject({ "/conditions": CONDITIONS.misAJourLe, "/mentions-legales": MENTIONS.misAJourLe, "/confidentialite": CONFIDENTIALITE_MISE_A_JOUR });
     expect(CONDITIONS.maj).toBe("Dernière mise à jour\u00a0: 26 octobre 2026.");
-    expect(MENTIONS.maj).toBe("Dernière mise à jour\u00a0: 13 octobre 2026.");
+    expect(MENTIONS.maj).toBe("Dernière mise à jour\u00a0: 3 novembre 2026.");
     /* Le premier du mois, comme on l’écrit : « 1er », jamais « 1 » (la date des pages légales, des articles, des offres) */
     expect(derniereMiseAJour("2026-12-01")).toBe("Dernière mise à jour\u00a0: 1er décembre 2026.");
     expect([jourEnLettres("2026-11-01"), jourEnLettres("2026-11-01", { court: true }), jourEnLettres("2026-11-10", { annee: true })]).toEqual([

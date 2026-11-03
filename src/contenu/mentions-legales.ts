@@ -5,8 +5,9 @@ import { derniereMiseAJour } from "@/lib/format";
  * article 6) demande l’identité de l’éditeur, de quoi le joindre, son immatriculation, le directeur de la publication et
  * l’hébergeur ; le Code de la consommation (L612-1), un médiateur de la consommation.
  * TODO(produit): à relire par un juriste, dont les champs laissés vides : pour une micro-entreprise, la LCEN demande
- * aussi le nom et le prénom de l’entrepreneur et une adresse (une domiciliation suffit) ; le médiateur (L612-1, L616-1)
- * et le directeur de la publication.
+ * aussi le nom et le prénom de l’entrepreneur et une adresse (une domiciliation suffit) ; le médiateur (L612-1, L616-1).
+ * Le directeur de la publication est rempli le 3 novembre 2026 (décidé par l’utilisateur) : il signe aussi les guides
+ * et le lexique (le relecteur des articles, src/contenu/articles).
  * Pour ouvrir au public, trois choses suffisent (champsEditeurManquants) : le nom, l’email, et l’adresse ou
  * l’immatriculation. Tant qu’il en manque une, la production reste en bêta fermée, même écrite BLUSH_BETA_FERMEE=0
  * (manquesPourOuvrir, src/server/drapeaux.ts), et l’équipe en est prévenue. Les autres champs sont facultatifs : vides,
@@ -50,7 +51,7 @@ export const EDITEUR: Editeur = {
   pays: "",
   immatriculation: "SIRET\u00a0: 901\u00a0129\u00a0168\u00a000013",
   telephone: "",
-  directeurPublication: "",
+  directeurPublication: "Anthony Luis",
   mediateur: "",
   email: "bonjour@askblush.com",
   droit: "",
@@ -129,7 +130,7 @@ export const HEBERGEUR = {
 } as const;
 
 /** Le jour de cette version des mentions légales : la page le dit (`maj`), le plan du site aussi (src/lib/referencement.ts). */
-const MIS_A_JOUR_LE = "2026-10-13";
+const MIS_A_JOUR_LE = "2026-11-03";
 
 /** Les textes de la page, autour des champs, et le jour de sa version. `mediateur` : seulement quand l’éditeur en a un. */
 export const MENTIONS = {
