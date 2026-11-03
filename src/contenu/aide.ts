@@ -1,10 +1,11 @@
 /*
  * L’aide à un toucher, partout où l’appli la donne, écrite une fois : les numéros d’urgence (les conditions, le chat en
  * alerte, et le chat quand il n’y a plus de bulles), les lignes d’écoute du rapport doux (le mode sobre), et les lignes
- * par situation qui les suivent. Les lignes d’écoute et par situation ne se voient que sur la feuille d’aide du rapport
- * doux et dans son PDF : depuis les 21 et 22 octobre 2026, seule la règle de l’âge (alerteSobre) met une conv en mode
- * sobre (un verdict gardé d’avant le reste, `mode_sobre`). La réponse 402 les porte aussi, mais l’écran n’en montre que
- * la première ligne (URGENCES).
+ * par situation qui les suivent. Les lignes d’écoute et par situation se voient sur la feuille d’aide du rapport doux et
+ * dans son PDF (depuis les 21 et 22 octobre 2026, seule la règle de l’âge, alerteSobre, met une conv en mode sobre ; un
+ * verdict gardé d’avant le reste, `mode_sobre`), et dans le bloc d’aide des guides et du lexique (zones orange et rouge,
+ * src/components/article/pieces.tsx). La réponse 402 les porte aussi, mais l’écran n’en montre que la première ligne
+ * (URGENCES).
  * Un numéro changé ici change partout dans l’appli, mais pas dans ce que dit le modèle : les prompts ont leur propre
  * liste d’aide (AIDE, prompts/lib/contextes.ts, dans le sous-module privé), à aligner à la main.
  * Aucune détection de la détresse ne tourne sur le serveur avant le modèle : c’est le modèle qui lève une alerte (le
@@ -44,9 +45,10 @@ export const LIGNES_D_ECOUTE = [
  * qui ne peut pas parler. Une ligne « Police secours · 17 » en tête (tel:17, « Si tu es en danger maintenant : police
  * ou gendarmerie, jour et nuit », le 112 en complément), ou URGENCES en haut de la feuille comme dans le chat en
  * alerte ? Jamais dans la carte du 3919, qui appelle le 3919 d’un toucher.
- * TODO(produit): les cinq ne se voient que sur la feuille du rapport doux et dans son PDF. Le chat en alerte ne montre
- * que URGENCES (src/server/historique.ts), le rapport complet d’une alerte « danger » ou « détresse » aucune ligne, et le
- * modèle a sa liste à part (AIDE des prompts, sans le 119, le 3018 ni commentonsaime.fr, le 3919 sans « femmes ») : les
+ * TODO(produit): dans l’appli, les cinq ne se voient que sur la feuille du rapport doux et dans son PDF (et sur les
+ * guides, dans le bloc d’aide). Le chat en alerte ne montre que URGENCES (src/server/historique.ts, décidé le 3 novembre
+ * 2026 : on n’y ajoute rien), le rapport complet d’une alerte « danger » ou « détresse » aucune ligne, et le modèle a sa
+ * liste à part (AIDE des prompts, sans le 119, le 3018 ni commentonsaime.fr, le 3919 sans « femmes ») : les
  * montrer aussi au chat en alerte et à ce rapport, et aligner la liste des prompts ?
  * TODO(produit): des promesses valables en France : l’appel au 3919 n’est gratuit que depuis la métropole et les DROM,
  * les horaires du 3018 et du tchat sont ceux de Paris (le 3018 en a d’autres outre-mer), et ces numéros courts ne
