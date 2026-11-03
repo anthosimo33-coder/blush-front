@@ -1,3 +1,5 @@
+import { derniereMiseAJour } from "@/lib/format";
+
 /*
  * Les mentions légales (la page /mentions-legales) : qui édite BLUSH, qui l’héberge, à qui écrire. La loi (LCEN,
  * article 6) demande l’identité de l’éditeur, de quoi le joindre, son immatriculation, le directeur de la publication et
@@ -126,12 +128,16 @@ export const HEBERGEUR = {
   site: "vercel.com",
 } as const;
 
-/** Les textes de la page, autour des champs. `mediateur` : seulement quand l’éditeur en a un. */
+/** Le jour de cette version des mentions légales : la page le dit (`maj`), le plan du site aussi (src/lib/referencement.ts). */
+const MIS_A_JOUR_LE = "2026-10-13";
+
+/** Les textes de la page, autour des champs, et le jour de sa version. `mediateur` : seulement quand l’éditeur en a un. */
 export const MENTIONS = {
   titre: "Mentions légales",
   sous: "Qui édite BLUSH, qui l’héberge, et où nous écrire.",
   donnees: "Ce que BLUSH fait de ta conv et de ton email, et chez qui ils vivent, est sur la page Confidentialité.",
   mediateur: "Un désaccord sur un achat\u00a0? Écris-nous d’abord. Si on ne trouve pas de solution, tu peux saisir gratuitement le médiateur de la consommation",
   marque: "Le nom BLUSH, son logo, le site et ses textes appartiennent à l’éditeur. Les reprendre demande notre accord.",
-  maj: "Dernière mise à jour\u00a0: 13 octobre 2026.",
+  misAJourLe: MIS_A_JOUR_LE,
+  maj: derniereMiseAJour(MIS_A_JOUR_LE),
 } as const;

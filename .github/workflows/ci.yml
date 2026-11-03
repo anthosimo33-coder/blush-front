@@ -271,3 +271,28 @@ jobs:
         run: |
           "$VERCEL" rollback "$AVANT" --yes --timeout 3m --token "$VERCEL_TOKEN"
           echo "::error::$URL ne répondait pas : $AVANT est revenu en ligne. Regarde ses logs dans Vercel (une variable d’environnement refusée, la base), corrige, puis relance la mise en production."
+
+      # IndexNow : Bing (et les autres moteurs du protocole, pas Google) apprend tout de suite les adresses du plan du site
+      # en ligne, articles compris, plutôt qu’à son prochain passage. Seulement après une mise en production réussie de main
+      # (ce job ne part que d’un lancement à la main sur main, jamais d’une PR ni d’un push), et sans jamais la faire
+      # échouer : un refus, une panne ou une lenteur d’IndexNow laisse le job au vert (continue-on-error, une minute au plus).
+      # La clé est publique par nature : son fichier, public/<clé>.txt, est servi à la racine du site, où IndexNow le vérifie.
+      - name: IndexNow (les adresses du plan du site)
+        if: success() && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+        continue-on-error: true
+        timeout-minutes: 1
+        run: |
+          # La clé : le nom du fichier de 32 caractères hexadécimaux de public/
+          cle="$(ls public | grep -E '^[0-9a-f]{32}\.txt$' | head -n 1 || true)"
+          cle="${cle%.txt}"
+          [ -n "$cle" ] || { echo "::warning::Pas de clé IndexNow dans public/ : rien n’est envoyé."; exit 0; }
+          # Les adresses du plan du site en ligne, celui du déploiement qu’on vient de vérifier
+          plan="$(curl --fail --silent --show-error --max-time 15 "$DOMAINE/sitemap.xml")"
+          adresses="$( (grep -o '<loc>[^<]*</loc>' <<< "$plan" || true) | sed -e 's/<loc>//' -e 's/<\/loc>//' | jq -R . | jq -sc .)"
+          [ "$(jq 'length' <<< "$adresses")" -gt 0 ] || { echo "::warning::Le plan du site n’a aucune adresse : rien n’est envoyé."; exit 0; }
+          corps="$(jq -nc --arg hote "${DOMAINE#https://}" --arg cle "$cle" --arg fichier "$DOMAINE/$cle.txt" --argjson adresses "$adresses" \
+            '{host: $hote, key: $cle, keyLocation: $fichier, urlList: $adresses}')"
+          statut="$(curl --silent --show-error --max-time 20 --output /dev/null --write-out '%{http_code}' \
+            -H 'Content-Type: application/json; charset=utf-8' --data "$corps" https://api.indexnow.org/indexnow)"
+          echo "IndexNow : $(jq 'length' <<< "$adresses") adresses envoyées, réponse $statut"
+          case "$statut" in 200|202) ;; *) echo "::warning::IndexNow a répondu $statut (la mise en production reste faite)." ;; esac

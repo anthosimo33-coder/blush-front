@@ -3,7 +3,8 @@ import { HeroHeader, InsetGroup, InsetRow, RowIcon } from "@/components/ui/inset
 import { Icon } from "@/components/ui/icons";
 import { MobileTopBar, Screen } from "@/components/shell/Screen";
 import { LiensJuridiques } from "@/components/juridique/pages";
-import { NBSP } from "@/lib/format";
+import { CONFIDENTIALITE_MISE_A_JOUR } from "@/contenu/confidentialite";
+import { derniereMiseAJour, NBSP } from "@/lib/format";
 
 /*
  * Ce que BLUSH fait de ta conv, en mots simples. Les faits suivent le code (src/server : chiffrement, purge,
@@ -162,7 +163,7 @@ export function ConfidentialiteScreen() {
         </Ligne>
       </InsetGroup>
 
-      <InsetGroup title="Nos prestataires" id="prestataires" className="mt-6" footer={`BLUSH est ouvert dès 15 ans. Dernière mise à jour\u00a0: 22 octobre 2026.`}>
+      <InsetGroup title="Nos prestataires" id="prestataires" className="mt-6" footer={`BLUSH est ouvert dès 15 ans. ${derniereMiseAJour(CONFIDENTIALITE_MISE_A_JOUR)}`}>
         <InsetRow title="Vercel" sub="L’hébergement du site, à Francfort" />
         <InsetRow title="Neon" sub="La base de données, à Francfort" />
         <InsetRow title="Le prestataire qui fait tourner BLUSH" sub="Il lit ta conv pour BLUSH, aux États-Unis" />

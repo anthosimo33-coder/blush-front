@@ -1,10 +1,15 @@
+import { readdirSync } from "node:fs";
+import { articlesDu } from "../../src/contenu/articles";
 import { NB_CHAPITRES } from "../../src/contenu/chapitres";
+import { PHRASE_D_IDENTITE } from "../../src/contenu/identite";
 import { TEMOIGNAGES } from "../../src/contenu/landing";
+import { pagesPubliques } from "../../src/lib/referencement";
 import { desactiverPartage, expect, partageIllisible, test } from "./aide";
 
 /*
  * Les pages publiques, sans compte : la landing (la promesse, les convs d’exemple, le quotidien, les boutons vers le
- * parcours), la confidentialité, le choix de l’appli, la page introuvable et celle d’une page qui plante. Elles figent
+ * parcours), la confidentialité, le choix de l’appli, la page introuvable et celle d’une page qui plante, puis ce que
+ * voient les moteurs (chaque page publique, registre des articles compris, sa barre finale, /llms.txt). Elles figent
  * le comportement d’aujourd’hui (le back-end, la bêta ouverte).
  */
 
@@ -278,6 +283,14 @@ test("les pages de l’équipe s’ouvrent hors de Vercel, et n’y montrent rie
   ]) {
     expect((await request.get(chemin)).status(), chemin).toBe(200);
   }
+  /* Le gabarit des guides et du lexique, sur des articles d’exemple inventés, jamais dans les moteurs */
+  for (const chemin of ["/apercu/guide", "/apercu/lexique"]) {
+    const r = await request.get(chemin);
+    expect(r.status(), chemin).toBe(200);
+    const html = await r.text();
+    expect(html, chemin).toContain("exemple inventé");
+    expect(html, chemin).toMatch(/<meta name="robots" content="noindex, nofollow"/);
+  }
   const carte = await request.get("/apercu/carte?cas=court");
   expect(carte.status(), "/apercu/carte").toBe(200);
   expect(carte.headers()["content-type"], "/apercu/carte").toBe("image/png");
@@ -291,25 +304,68 @@ test("les pages de l’équipe s’ouvrent hors de Vercel, et n’y montrent rie
   expect((await request.post("/apercu/demander", { data: { text: "elle m’a répondu « on verra »" } })).status(), "/apercu/demander").toBe(404);
 });
 
-test("les moteurs de recherche : les pages publiques s’indexent (canonique, aperçu, données structurées), le parcours non ; robots.txt et le plan du site répondent", async ({
+test("les moteurs de recherche : chaque page publique s’indexe (canonique, aperçu complet, données structurées), le parcours non ; robots.txt et le plan du site répondent", async ({
   page,
   request,
 }) => {
-  for (const chemin of ["/", "/conditions", "/confidentialite", "/mentions-legales"]) {
+  /* Toutes les pages publiques, registre des articles compris (src/lib/referencement.ts) : chacune dans le plan du site, avec sa date */
+  const pages = pagesPubliques();
+  const plan = await (await request.get("/sitemap.xml")).text();
+  for (const { chemin, misAJourLe } of pages) {
     await page.goto(chemin);
     await expect(page.locator('meta[name="robots"]'), chemin).toHaveAttribute("content", /^index, follow/);
     await expect(page.locator('link[rel="canonical"]'), chemin).toHaveCount(1);
+    /* Hors de Vercel, sans metadataBase (src/app/layout.tsx), l’adresse canonique s’écrit sans son domaine */
+    expect(new URL((await page.locator('link[rel="canonical"]').getAttribute("href"))!, page.url()).pathname, chemin).toBe(chemin);
     await expect(page.locator('meta[property="og:image"]'), chemin).toHaveCount(1);
+    await expect(page.locator('meta[property="og:site_name"]'), chemin).toHaveAttribute("content", "BLUSH");
+    await expect(page.locator('meta[property="og:locale"]'), chemin).toHaveAttribute("content", "fr_FR");
+    await expect(page.locator('meta[property="og:type"]'), chemin).toHaveAttribute("content", /^(website|article)$/);
+    expect(plan, chemin).toMatch(new RegExp(`<loc>https?://[^/<]+${chemin === "/" ? "" : chemin}</loc>\\s*<lastmod>${misAJourLe}`));
   }
   await page.goto("/");
   const ld = JSON.parse((await page.locator('script[type="application/ld+json"]').textContent()) ?? "{}") as { "@graph"?: { "@type": string }[] };
-  expect(ld["@graph"]?.map((n) => n["@type"])).toEqual(["Organization", "WebApplication"]);
+  expect(ld["@graph"]?.map((n) => n["@type"])).toEqual(["Organization", "WebSite", "WebApplication"]);
+  /* Une rubrique sans article n’existe pas : la page introuvable, hors du plan du site */
+  for (const [genre, hub] of [
+    ["guide", "/guides"],
+    ["lexique", "/lexique"],
+  ] as const)
+    if (!articlesDu(genre).length) {
+      expect((await request.get(hub)).status(), hub).toBe(404);
+      expect(plan, hub).not.toContain(`${hub}</loc>`);
+    }
   /* Le parcours reste hors des moteurs */
   await page.goto("/commencer");
   await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", /noindex/);
-  /* L’image d’aperçu se dessine, robots.txt et le plan du site répondent (hors de Vercel, robots.txt n’ouvre rien) */
+  /* L’image d’aperçu se dessine, robots.txt répond (hors de Vercel, il n’ouvre rien) */
   const og = await request.get("/opengraph-image");
   expect([og.status(), og.headers()["content-type"]]).toEqual([200, "image/png"]);
   expect((await request.get("/robots.txt")).status()).toBe(200);
-  expect(await (await request.get("/sitemap.xml")).text()).toContain("/conditions");
+});
+
+test("une seule adresse par page publique : sa barre finale mène à la même sans (308), et rien d’autre ne bouge (le relais de PostHog, l’API, le proxy)", async ({ request }) => {
+  /* Les pages publiques, et les adresses des articles avant même qu’ils existent (la redirection passe avant la page) */
+  for (const chemin of new Set(["/guides", "/lexique/ghosting", ...pagesPubliques().map((p) => p.chemin)].filter((c) => c !== "/"))) {
+    const r = await request.get(`${chemin}/?depuis=test`, { maxRedirects: 0 });
+    expect(r.status(), `${chemin}/`).toBe(308);
+    expect(r.headers()["location"], `${chemin}/`).toBe(`${chemin}?depuis=test`);
+  }
+  /* Les requêtes de PostHog gardent leur barre : sans sa clé, ce serveur n’a pas de relais (404), jamais une redirection */
+  for (const chemin of ["/ingest/e/", "/ingest/s/"]) expect((await request.post(chemin, { data: "{}", maxRedirects: 0 })).status(), chemin).toBe(404);
+  expect((await request.get("/api/reveil/", { maxRedirects: 0 })).status()).not.toBe(308);
+  /* Les pages du proxy ont leur propre redirection (src/proxy.ts) */
+  const commencer = await request.get("/commencer/", { maxRedirects: 0 });
+  expect([commencer.status(), commencer.headers()["location"]]).toEqual([308, expect.stringMatching(/\/commencer$/)]);
+});
+
+test("/llms.txt présente BLUSH par sa phrase et ses pages publiques ; la clé IndexNow est servie à la racine", async ({ request }) => {
+  const llms = await request.get("/llms.txt");
+  expect([llms.status(), llms.headers()["content-type"]]).toEqual([200, "text/plain; charset=utf-8"]);
+  const texte = await llms.text();
+  expect(texte).toContain(`> ${PHRASE_D_IDENTITE}`);
+  for (const { nom } of pagesPubliques()) expect(texte, nom).toContain(`[${nom}](`);
+  const [cle] = readdirSync("public").filter((f) => /^[0-9a-f]{32}\.txt$/.test(f));
+  const fichier = await request.get(`/${cle}`);
+  expect([fichier.status(), await fichier.text()]).toEqual([200, cle!.replace(/\.txt$/, "")]);
 });

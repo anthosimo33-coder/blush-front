@@ -29,3 +29,9 @@ const JOUR_COURT = new Intl.DateTimeFormat("fr-FR", { timeZone: "Europe/Paris", 
  */
 export const jourEnLettres = (iso: string, { annee = false, court = false }: { annee?: boolean; court?: boolean } = {}) =>
   (court ? JOUR_COURT : annee ? JOUR_ET_ANNEE : JOUR_EN_LETTRES).format(new Date(iso));
+
+/**
+ * La dernière ligne d’une page légale, d’après le jour de sa version (« AAAA-MM-JJ ») : « Dernière mise à jour : 26
+ * octobre 2026. ». Le même jour va au plan du site (src/lib/referencement.ts) : la page et les moteurs disent la même date.
+ */
+export const derniereMiseAJour = (jour: string) => `Dernière mise à jour\u00a0: ${jourEnLettres(jour, { annee: true })}.`;
