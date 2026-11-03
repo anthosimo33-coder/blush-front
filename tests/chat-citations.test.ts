@@ -31,6 +31,8 @@ import { compteDeTest, donnerDesBulles, facticePourChaqueTest, histoireLue } fro
 
 /* Ce que le modèle factice cite à la prochaine réponse : des rangs dans les messages qu’il peut citer, bulle par bulle */
 let aCiter: number[][] = [];
+/* Ce que la dernière requête du chat lui a donné : les messages à citer, dans l’ordre, et ceux déjà montrés */
+let recu: { ids: string[]; dejaMontres: string[] } = { ids: [], dejaMontres: [] };
 
 /** Les identifiants des messages que la requête du chat lui donne à citer, dans l’ordre où elle les montre. */
 const identifiants = (req: Requete) => [
@@ -45,6 +47,8 @@ const identifiants = (req: Requete) => [
 facticePourChaqueTest((req) => {
   if (req.tache !== "10-chat") return fournisseurFactice(req);
   const ids = identifiants(req);
+  const texte = req.blocs.flatMap((b) => ("texte" in b ? [b.texte] : [])).join("\n");
+  recu = { ids, dejaMontres: /<deja_montres>(.*)<\/deja_montres>/.exec(texte)?.[1]?.split(", ") ?? [] };
   return {
     ...(fournisseurFactice(req) as Record<string, unknown>),
     lecture: aCiter.map((rangs, i) => ({ texte: `bulle ${i + 1}`, preuves: rangs.map((r) => ids[r]!) })),
@@ -100,6 +104,18 @@ describe("une citation déjà montrée ne revient pas", () => {
     /* Ce qui part au fil de l’eau est ce que la réponse gardée montre */
     expect(seconde.auFil).toEqual(seconde.reponse);
     expect((await historique(id)).echanges.at(-1)?.answer).toMatchObject({ bubbles: seconde.reponse });
+  });
+
+  it("le modèle le sait : la requête suivante lui donne les messages déjà montrés, et aucun avant la première citation", async () => {
+    await convDuTest("modele");
+    await demander([[0], [1]]);
+    expect(recu.dejaMontres).toEqual([]);
+    const cites = recu.ids.slice(0, 2);
+    await demander([[2]]);
+    expect([...recu.dejaMontres].sort()).toEqual([...cites].sort());
+    const troisieme = recu.ids[2]!;
+    await demander([[]]);
+    expect([...recu.dejaMontres].sort()).toEqual([...cites, troisieme].sort());
   });
 
   it("dans la même réponse : un message cité deux fois ne se montre qu’une", async () => {

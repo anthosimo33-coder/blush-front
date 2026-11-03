@@ -13,7 +13,7 @@ import { ondeDe, texteDit } from "@/lib/vocal";
 import type { BlushAnswer, EvenementChat, Message } from "@/types";
 import { coutDe, garderVerrouillee, soldeDe } from "./bulles";
 import { ErreurInvariant, ErreurPublique, ErreurTache } from "./erreurs";
-import { bulleAffichee, bullesAffichees, citationsMontrees } from "./ecrans/chat";
+import { bulleAffichee, bullesAffichees, citationsMontrees, identifiantsMontres } from "./ecrans/chat";
 import { messagesAffiches } from "./ecrans/messages";
 import * as coffre from "./coffre";
 import { CLES, compter } from "./compteurs";
@@ -317,6 +317,7 @@ export async function repondre(
   const sansVoix = !!reglement?.ecrit;
   const verrouAttendu = !!reglement?.verrouillee;
   const vocalAttendu = !sansVoix && repondEnVocal(story, parVocal);
+  const messages = messagesAffiches(lignes, nomsDeToi(meta), { fin: meta.resume.fin });
   const req = requeteChat({
     h,
     aujourdhui: jour.t,
@@ -331,8 +332,9 @@ export async function repondre(
     dit,
     ...(ajout ? { ajout: blocAjout(ajout.ajout) } : {}),
     vocal: vocalAttendu,
+    /* Ce que ses dernières réponses ont montré : les bulles ne le remontrent pas, le modèle cite autre chose */
+    dejaMontres: identifiantsMontres(messages, citees),
   });
-  const messages = messagesAffiches(lignes, nomsDeToi(meta), { fin: meta.resume.fin });
 
   /*
    * Une preuve introuvable : on rejoue (appelVerifie), sauf après une bulle montrée, qu’un nouvel essai réécrirait autrement
