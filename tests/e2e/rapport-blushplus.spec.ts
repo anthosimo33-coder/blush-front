@@ -84,8 +84,9 @@ test("un rapport ouvert : les huit chapitres se lisent, le chat et ta question s
     const mail = await attendreMail(email, { filtre: (m) => m.sujet === SUJET_PRET });
     expect(mailsPour(email).filter((m) => m.sujet === SUJET_PRET)).toHaveLength(1);
     expect(mail.texte).toContain("Ton rapport est prêt\u00a0: 8 chapitres");
-    expect(mail.texte).toContain(lien);
-    expect(mail.html).toContain(`href="${lien}"`);
+    /* Marqué pour /admin : la visite qu’il amène compte en « Mail » (src/server/email.ts, marquerLesLiens) */
+    expect(mail.texte).toContain(`${lien}?utm_source=email&utm_campaign=rapport`);
+    expect(mail.html).toContain(`href="${lien}?utm_source=email&amp;utm_campaign=rapport"`);
     expect(mail.html).toContain("Lire mon rapport");
     /* Ni verdict, ni message ; ton prénom dans la première bulle, le sien dans une bulle, le titre et au sommaire (le titre de son chapitre) */
     for (const prive of ["Vous êtes à deux doigts", "esquivé", "marché aux puces"]) expect(`${mail.sujet}\n${mail.texte}\n${mail.html}`).not.toContain(prive);

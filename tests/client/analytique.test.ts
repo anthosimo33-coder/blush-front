@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CaptureResult } from "posthog-js";
+import { cheminSur } from "@/lib/chemins";
 
 /*
  * La mesure d’audience chez PostHog (src/lib/analytique.ts) : ce qui part, et ce qui n’en part jamais. Les adresses
@@ -36,7 +37,6 @@ afterEach(() => {
 
 describe("ce qui part chez PostHog", () => {
   it("les chemins sans leurs identifiants", async () => {
-    const { cheminSur } = await page("/");
     expect(cheminSur("/v/Ab3dE9xYz")).toBe("/v/:id");
     expect(cheminSur("/ouvrir/1b9d6bcd-bbfd-4b2d-9b5d-ab8dfbbd4bed")).toBe("/ouvrir/:id");
     expect(cheminSur("/p/LEA42")).toBe("/p/:id");

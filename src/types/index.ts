@@ -102,9 +102,10 @@ export const DESINSCRIPTIONS = ["conseils", "offres", "tout"] as const;
 export type Desinscription = (typeof DESINSCRIPTIONS)[number];
 /**
  * L’écran où se trouve un visiteur en ce moment (presences.etape, /admin en direct), d’après son adresse : l’accueil, un
- * verdict partagé (/v/…), l’import, le verdict, le rapport, le paiement, le chat, son compte, ou ailleurs (src/lib/presence.ts).
+ * verdict partagé (/v/…), un guide ou une entrée du lexique (/guides/…, /lexique/…), l’import, le verdict, le rapport, le
+ * paiement, le chat, son compte, ou ailleurs (src/lib/presence.ts).
  */
-export const ETAPES_VISITE = ["accueil", "partage", "import", "verdict", "rapport", "paiement", "chat", "compte", "autre"] as const;
+export const ETAPES_VISITE = ["accueil", "partage", "guides", "import", "verdict", "rapport", "paiement", "chat", "compte", "autre"] as const;
 export type EtapeVisite = (typeof ETAPES_VISITE)[number];
 /**
  * Les jalons du tunnel (jalons, /admin « L’import, écran par écran » et « Le paywall, jusqu’au paiement ») : ce qu’un
@@ -221,11 +222,15 @@ export type MetriqueWeb = (typeof METRIQUES_WEB)[number];
 export const FAMILLES_NAVIGATEUR = ["iphone", "iphone-appli", "android", "android-appli", "ordinateur", "autre"] as const;
 export type FamilleNavigateur = (typeof FAMILLES_NAVIGATEUR)[number];
 /**
- * D’où vient un visiteur (visites.source, users.source) : le lien d’une créatrice (utm_source), sinon le site d’où il
- * arrive, sinon le navigateur intégré de l’appli qui l’a ouvert, sinon « direct » (src/server/visites.ts, sourceDe).
- * « partage » : le lien d’un verdict partagé (/v/…).
+ * D’où vient un visiteur (visites.source, users.source) : le lien d’une créatrice ou d’un mail (utm_source), sinon le
+ * site (ou l’appli Android) d’où il arrive, sinon le navigateur intégré de l’appli qui l’a ouvert, sinon « direct »
+ * (src/server/visites.ts, sourceDe). « partage » : le lien d’un verdict partagé (/v/…) ; « google » : la recherche
+ * Google seule ; « moteurs » : les autres moteurs de recherche (Bing, DuckDuckGo, Qwant…) ; « assistants » : les
+ * assistants IA (ChatGPT, Perplexity, Gemini…) ; « mail » : une messagerie, et les liens de nos mails (utm_source=email).
+ * « moteurs », « assistants » et « mail » datent du 3 novembre 2026 : avant, les moteurs et les assistants comptaient
+ * « autre », Gemini et Gmail « google » ; les visites déjà comptées gardent leur source.
  */
-export const SOURCES_VISITE = ["tiktok", "instagram", "snapchat", "partage", "google", "autre", "direct"] as const;
+export const SOURCES_VISITE = ["tiktok", "instagram", "snapchat", "partage", "google", "moteurs", "assistants", "mail", "autre", "direct"] as const;
 export type SourceVisite = (typeof SOURCES_VISITE)[number];
 /**
  * Les gestes du fil d’/admin en direct (fil_direct.genre) : une première visite du jour, une conv importée, la page du

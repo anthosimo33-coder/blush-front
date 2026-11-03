@@ -26,6 +26,10 @@ import { derniereMiseAJour, NBSP } from "@/lib/format";
  * demande d’accord) : sa phrase dans « Les visites, sans cookie » et la ligne de PostHog, à relire, puis le PDF de Whop.
  * Le 20 octobre, l’interface s’y lit (tout masqué ne servait à rien) ; la conv, les prénoms, l’email, les saisies et les
  * images restent masqués (src/lib/secrets.ts) : la phrase le dit, à relire.
+ * Le 3 novembre 2026, la page d’arrivée (visites.arrivee, users.arrivee : le chemin de la première page, sans requête
+ * ni identifiant, src/lib/chemins.ts) entre dans « Les visites, sans cookie » (« et par quelle page », « et ta page
+ * d’arrivée ») : phrase validée par l’utilisateur ce jour-là, date de la page dans CONFIDENTIALITE_MISE_A_JOUR.
+ * TODO(produit): reporter cette phrase dans le PDF de confidentialité de Whop.
  */
 
 function Ligne({ icone, ton, titre, children }: { icone: Parameters<typeof RowIcon>[0]["icon"]; ton?: Parameters<typeof RowIcon>[0]["tone"]; titre: string; children: ReactNode }) {
@@ -77,14 +81,15 @@ export function ConfidentialiteScreen() {
           Si tu ouvres le paiement sans aller au bout, BLUSH peut t’envoyer un mail deux heures après, une seule fois. Rien de ta conv, aucun prénom, et un lien pour ne plus en
           recevoir.
         </Ligne>
-        {/* Le comptage des visites et le direct d’/admin (src/server/visites.ts) : sans cookie, l’adresse IP jamais écrite, gardés deux jours (la ville, l’écran) et 90 jours (la visite du jour, les jalons du tunnel) */}
+        {/* Le comptage des visites et le direct d’/admin (src/server/visites.ts) : sans cookie, l’adresse IP jamais écrite, gardés deux jours (la ville, l’écran) et 90 jours (la visite du jour et sa page d’arrivée, les jalons du tunnel) */}
         <Ligne icone="people" titre="Les visites, sans cookie">
-          Pour savoir combien de personnes passent sur BLUSH et d’où elles arrivent (TikTok, Instagram, un lien partagé…), on compte les visites sans cookie{NBSP}: ton adresse IP
-          sert à faire un code anonyme qui change chaque jour, et n’est gardée nulle part. La ville de ta connexion et l’écran où tu es restent deux jours, sans ton nom. Avec ce
-          même code, on compte jusqu’où tu vas (ton fichier choisi, le paiement ouvert…), une fois par jour, sans rien de ta conv{NBSP}: 90 jours au plus. Ces pages vues et ces
-          étapes partent aussi chez PostHog, notre outil de mesure, en Allemagne{NBSP}: sans cookie, sans ton nom ni ton email, et sans rien de ta conv. PostHog enregistre aussi
-          comment tu te sers du site (où tu touches, jusqu’où tu fais défiler, les écrans de BLUSH tels qu’ils s’affichent), jamais ta conv{NBSP}: ses messages, ton rapport, le
-          chat, les prénoms, ton email, ce que tu tapes et les images y restent masqués. Si tu crées un compte, il garde seulement d’où tu es venu.
+          Pour savoir combien de personnes passent sur BLUSH, d’où elles arrivent (TikTok, Instagram, un moteur de recherche, un lien partagé…) et par quelle page, on compte les
+          visites sans cookie{NBSP}: ton adresse IP sert à faire un code anonyme qui change chaque jour, et n’est gardée nulle part. La ville de ta connexion et l’écran où tu es
+          restent deux jours, sans ton nom. Avec ce même code, on compte jusqu’où tu vas (ton fichier choisi, le paiement ouvert…), une fois par jour, sans rien de ta conv{NBSP}:
+          90 jours au plus. Ces pages vues et ces étapes partent aussi chez PostHog, notre outil de mesure, en Allemagne{NBSP}: sans cookie, sans ton nom ni ton email, et sans rien
+          de ta conv. PostHog enregistre aussi comment tu te sers du site (où tu touches, jusqu’où tu fais défiler, les écrans de BLUSH tels qu’ils s’affichent), jamais ta conv
+          {NBSP}: ses messages, ton rapport, le chat, les prénoms, ton email, ce que tu tapes et les images y restent masqués. Si tu crées un compte, il garde seulement d’où tu es
+          venu et ta page d’arrivée.
         </Ligne>
         {/* La sentinelle (src/lib/sentinelle.tsx, src/server/navigateur.ts) : sans compte, ni adresse IP, ni adresse de page ; gardées 30 jours */}
         <Ligne icone="bolt" titre="Les erreurs et la vitesse de l’appli">

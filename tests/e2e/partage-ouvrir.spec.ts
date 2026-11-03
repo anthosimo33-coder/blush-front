@@ -14,15 +14,22 @@ test("le lien du mail « ton rapport est prêt », ouvert dans un autre navigate
   const lien = await test.step("le mail porte le lien de cette conv", async () => {
     const mail = await attendreMail(email, { filtre: (m) => m.sujet === "📖 ton rapport est prêt. j’ai pas été tendre" });
     const lien = mail.texte.match(/https?:\/\/\S+\/ouvrir\/\S+/)?.[0];
-    expect(lien).toBe(`${testInfo.project.use.baseURL}/ouvrir/${id}`);
+    /* Marqué pour /admin : la visite qu’il amène compte en « Mail » (src/server/email.ts, marquerLesLiens) */
+    expect(lien).toBe(`${testInfo.project.use.baseURL}/ouvrir/${id}?utm_source=email&utm_campaign=rapport`);
     return lien!;
   });
 
   /* Le mail ouvert sur un autre appareil : un autre navigateur, sans session */
   const ailleurs = await autreAppareil();
-  await test.step("sans session : la connexion, qui garde le lien pour après", async () => {
+  await test.step("sans session : la connexion, qui garde le lien pour après, et reçoit ses utm_ (c’est elle qui compte la visite)", async () => {
     await ailleurs.goto(lien);
-    await expect(ailleurs).toHaveURL((url) => url.pathname === "/connexion" && url.searchParams.get("suite") === `/ouvrir/${id}`);
+    await expect(ailleurs).toHaveURL(
+      (url) =>
+        url.pathname === "/connexion" &&
+        url.searchParams.get("suite") === `/ouvrir/${id}` &&
+        url.searchParams.get("utm_source") === "email" &&
+        url.searchParams.get("utm_campaign") === "rapport",
+    );
     await expect(ailleurs.getByLabel("Ton email")).toBeVisible();
   });
 

@@ -55,6 +55,34 @@ export const refusDuPrestataire = (e: unknown): boolean => e instanceof ErreurRe
  */
 export type SorteSuivie = "code" | SorteDeMail | `sequence-${string}`;
 
+/** Le genre d’un mail dans ses liens (utm_campaign) : sa sorte suivie, sans « sequence- » (« s1_haut », « rapport », « code »). */
+const campagneDe = (suivi: SorteSuivie) => suivi.replace(/^sequence-/, "");
+
+/**
+ * Le mail tel qu’il part : chaque lien vers le site (`base`) marqué pour /admin, utm_source=email (la source « Mail »,
+ * src/server/visites.ts) et utm_campaign=<son genre> (campagneDe), ajoutés au bout du lien, dans le HTML (les href,
+ * échappés) comme dans le texte brut. Rien de personnel : le genre du mail, jamais le compte. Les images (src), un lien
+ * vers un autre site, un lien déjà marqué et les en-têtes (la désinscription en un clic, que la messagerie appelle
+ * elle-même) ne bougent pas. /ouvrir/<conv> passe ces utm_ à la page où il mène (src/app/ouvrir/[id]/route.ts).
+ */
+export function marquerLesLiens<M extends Mail>(mail: M, { base, suivi }: { base: string; suivi: SorteSuivie }): M {
+  const site = base.replace(/\/+$/, "");
+  const utm = `utm_source=email&utm_campaign=${encodeURIComponent(campagneDe(suivi))}`;
+  /* Un lien du site (le site lui-même, ou une de ses pages), pas encore marqué : les utm_ au bout, avant un fragment */
+  const marquer = (lien: string, et: string) => {
+    if (!/^[/?#]?$/.test(lien.slice(site.length, site.length + 1)) || /[?&](amp;)?utm_source=/.test(lien)) return lien;
+    const [debut = "", fragment] = lien.split("#", 2);
+    const page = debut === site ? `${site}/` : debut;
+    return `${page}${page.includes("?") ? et : "?"}${utm.replaceAll("&", et)}${fragment === undefined ? "" : `#${fragment}`}`;
+  };
+  const echappe = site.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return {
+    ...mail,
+    texte: mail.texte.replace(new RegExp(`${echappe}\\S*`, "g"), (lien) => marquer(lien, "&")),
+    ...(mail.html !== undefined && { html: mail.html.replace(new RegExp(`href="(${echappe}[^"]*)"`, "g"), (_, lien: string) => `href="${marquer(lien, "&amp;")}"`) }),
+  };
+}
+
 /** L’adresse seule d’un expéditeur : « bonjour@askblush.com » pour « BLUSH <bonjour@askblush.com> ». */
 const adresseDe = (expediteur: string) => /<([^<>]+)>\s*$/.exec(expediteur)?.[1]?.trim() ?? expediteur.trim();
 
@@ -105,7 +133,8 @@ async function poster(
  * pas), à un ou plusieurs destinataires, avec RESEND_API_KEY. `sorte` : ce qu’il est pour le quota du prestataire
  * (plafondsDesMails, src/server/limites.ts : « rapport » par défaut, « alerte », « attente », « relance ») ; au-delà de sa
  * part, il ne part pas, le journal le dit, et la réponse est false. Elle choisit aussi son expéditeur (expediteurDe).
- * `suivi` : son tag pour la délivrabilité, sa sorte au défaut. Sans clé (dev), seul son sujet s’affiche dans les logs.
+ * `suivi` : son tag pour la délivrabilité, sa sorte au défaut, et le genre du mail dans ses liens (marquerLesLiens, que
+ * la boîte des tests reçoit aussi). Sans clé (dev), seul son sujet s’affiche dans les logs.
  * Rejette avec ErreurResend si le prestataire le refuse : à l’appelant de dire ce qu’il en fait (une alerte, l’équipe prévenue).
  */
 export async function envoyerMail(
@@ -115,9 +144,10 @@ export async function envoyerMail(
 ): Promise<boolean> {
   const pour = typeof destinataires === "string" ? [destinataires] : destinataires;
   if (!pour.length) return true;
+  const parti = marquerLesLiens(mail, { base: env().BLUSH_URL, suivi });
   const boite = boiteAMails();
   if (boite) {
-    await deposer(boite, pour, { sujet: mail.sujet, texte: mail.texte, ...(mail.html !== undefined && { html: mail.html }), ...(mail.entetes && { entetes: mail.entetes }) });
+    await deposer(boite, pour, { sujet: parti.sujet, texte: parti.texte, ...(parti.html !== undefined && { html: parti.html }), ...(parti.entetes && { entetes: parti.entetes }) });
     return true;
   }
   const { RESEND_API_KEY, RESEND_API_KEY_CODES } = env();
@@ -131,7 +161,7 @@ export async function envoyerMail(
     return false;
   }
   try {
-    await poster(pour, mail, { cle: RESEND_API_KEY, ...expediteurDe(sorte, env()), suivi });
+    await poster(pour, parti, { cle: RESEND_API_KEY, ...expediteurDe(sorte, env()), suivi });
   } catch (e) {
     /* Refusé, il n’a rien pris au prestataire : il rend sa place. Perdu en route, il a pu partir : il la garde */
     if (e instanceof ErreurResend) await auMieux(rendreAuQuotaDesMails(pour.length), "quota des mails non rendu");
@@ -140,12 +170,13 @@ export async function envoyerMail(
   return true;
 }
 
-/** Envoie le code de connexion. Sans clé (dev), il s’affiche dans les logs du serveur. */
+/** Envoie le code de connexion, son lien vers le site marqué (marquerLesLiens, « code »). Sans clé (dev), il s’affiche dans les logs du serveur. */
 export async function envoyerCodeParEmail(email: string, code: string): Promise<void> {
   const { BLUSH_URL } = env();
+  const mail = marquerLesLiens(mailCode(code, BLUSH_URL), { base: BLUSH_URL, suivi: "code" });
   const boite = boiteAMails();
   /* La boîte des tests garde aussi le code seul : le test le lit sans fouiller le HTML */
-  if (boite) return deposer(boite, [email], { ...mailCode(code, BLUSH_URL), code });
+  if (boite) return deposer(boite, [email], { ...mail, code });
   /* La clé des codes (RESEND_API_KEY_CODES, un quota à part) et son expéditeur, sinon ceux de tous les mails */
   const { RESEND_API_KEY, RESEND_API_KEY_CODES, BLUSH_EMAIL_FROM, BLUSH_EMAIL_FROM_CODES } = env();
   const cle = RESEND_API_KEY_CODES ?? RESEND_API_KEY;
@@ -154,5 +185,5 @@ export async function envoyerCodeParEmail(email: string, code: string): Promise<
     return;
   }
   /* Leur part du quota se compte avant (plafondsDesMails().codes, src/server/auth.ts : envoyerCode) */
-  await poster([email], mailCode(code, BLUSH_URL), { cle, de: BLUSH_EMAIL_FROM_CODES ?? BLUSH_EMAIL_FROM, suivi: "code" });
+  await poster([email], mail, { cle, de: BLUSH_EMAIL_FROM_CODES ?? BLUSH_EMAIL_FROM, suivi: "code" });
 }

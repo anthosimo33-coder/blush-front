@@ -112,7 +112,7 @@ test("/connexion : le même écran et le même statut pour un invité et pour un
     expect(mail.texte).toContain("BLUSH est en bêta privée, sur invitation. Ton email est sur la liste d’attente\u00a0: on t’écrit dès que ta place est prête.");
     /* Rien n’avait été importé sur ce navigateur : rien à dire sur une conv */
     expect(mail.texte).not.toContain("La conv que tu viens d’importer");
-    expect(lienDeRetrait(mail)).toMatch(new RegExp(`^${URL_BETA}/attente/retirer\\?id=[\\w-]+&cle=[\\w-]+$`));
+    expect(lienDeRetrait(mail)).toMatch(new RegExp(`^${URL_BETA}/attente/retirer\\?id=[\\w-]+&cle=[\\w-]+&utm_source=email&utm_campaign=attente$`));
   });
 
   await test.step("côté serveur : l’email hors de la liste est sur la liste d’attente, sans compte ; l’invité a son compte (de l’équipe)", async () => {

@@ -23,6 +23,7 @@ import {
   texteDeLaFuite,
   texteDuGeste,
 } from "@/app/admin/calculs";
+import { ETAPES_VISITE } from "@/types";
 import type { GesteDuFil } from "@/types/api";
 
 /*
@@ -212,6 +213,9 @@ describe("le direct", () => {
     [{ genre: "arrivee", ville: "Lyon", le: "", source: "google" }, "arrive de Google", null],
     [{ genre: "arrivee", ville: "Lyon", le: "", source: "partage" }, "arrive d’un verdict partagé", null],
     [{ genre: "arrivee", ville: "Lyon", le: "", source: "autre" }, "arrive d’un autre site", null],
+    [{ genre: "arrivee", ville: "Lyon", le: "", source: "moteurs" }, "arrive d’un autre moteur", null],
+    [{ genre: "arrivee", ville: "Lyon", le: "", source: "assistants" }, "arrive d’un assistant IA", null],
+    [{ genre: "arrivee", ville: "Lyon", le: "", source: "mail" }, "arrive d’un mail", null],
     [{ genre: "arrivee", ville: "Lyon", le: "", source: "direct" }, "arrive en direct", null],
     [{ genre: "import", ville: "Lyon", le: "" }, "a importé une conv", null],
     [{ genre: "paiement", ville: "Lyon", le: "", offre: "premium" }, "ouvre le paiement · Premium", null],
@@ -244,5 +248,7 @@ describe("le direct", () => {
     ]);
     expect(etapesPeuplees([...etapes], 2).map((e) => e.etape)).toEqual(["accueil", "import"]);
     expect(etapesPeuplees([])).toEqual([]);
+    /* Sans borne (l’écran du direct) : tous les écrans, même quand chacun a du monde */
+    expect(etapesPeuplees(ETAPES_VISITE.map((etape, k) => ({ etape, n: k + 1 }))).map((e) => e.etape)).toEqual([...ETAPES_VISITE]);
   });
 });

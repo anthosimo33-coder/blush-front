@@ -157,7 +157,7 @@ export async function purger(maintenant = new Date()) {
       .where(lt(schema.mesuresNavigateur.le, il_y_a(NAVIGATEUR_GARDE_JOURS)));
   });
   await etape("accès de Claude à /admin", () => purgerLOAuth(maintenant));
-  /* Le sel d’hier sert encore (sourceDeLaVisite retrouve la visite de la veille) ; celui d’avant-hier, plus rien */
+  /* Le sel d’hier sert encore (visiteDeLaConnexion retrouve la visite de la veille) ; celui d’avant-hier, plus rien */
   await etape("sels des visites", async () => {
     await db()
       .delete(schema.selsDesVisites)
