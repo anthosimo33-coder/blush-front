@@ -27,6 +27,14 @@ const TIKTOK = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebK
 const SAFARI = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Version/18.0 Mobile/15E148 Safari/604.1";
 /* Une adresse IP à ce test, jamais vue par un lancement d’avant */
 const ipNeuve = () => `10.${Math.floor(Math.random() * 250)}.${Math.floor(Math.random() * 250)}.${Math.floor(Math.random() * 250)}`;
+/*
+ * Un guide d’essai, jamais vu par un lancement d’avant, en lettres seules : six chiffres de suite font de l’adresse un
+ * identifiant (LONG_NOMBRE, src/lib/chemins.ts), « /guides/:id », et le test échouait une fois sur dix environ.
+ */
+const guideDEssai = () =>
+  `/guides/essai-${randomUUID()
+    .slice(0, 8)
+    .replace(/\d/g, (c) => "abcdefghij"[Number(c)]!)}`;
 const LYON = { "x-vercel-ip-city": "Lyon", "x-vercel-ip-country": "FR", "x-vercel-ip-latitude": "45.75", "x-vercel-ip-longitude": "4.85" };
 
 const requete = (ip: string, agent: string, entetes: Record<string, string> = {}, init: RequestInit = {}) =>
@@ -285,7 +293,7 @@ describe("la page d’arrivée et les nouvelles sources", () => {
       return { p, groupe, page };
     };
     const avant = await lire();
-    const chemin = `/guides/essai-${randomUUID().slice(0, 8)}`;
+    const chemin = guideDEssai();
     const ip = ipNeuve();
     await noterSigne(requete(ip, SAFARI), { onglet: randomUUID(), etape: "guides", premier: true, arrivee: `${chemin}?utm_source=x` });
     await noterSigne(requete(ipNeuve(), SAFARI), { onglet: randomUUID(), etape: "accueil", premier: true, arrivee: "/" });
@@ -309,7 +317,7 @@ describe("la page d’arrivée et les nouvelles sources", () => {
   });
 
   it("au-delà des dix pages les plus vues d’un groupe, le pilotage garde chaque page qui a vendu, même vue une seule fois", async () => {
-    const essai = `/guides/essai-${randomUUID().slice(0, 8)}`;
+    const essai = guideDEssai();
     /* Onze guides plus vus (deux visiteurs chacun), sans vente */
     for (let k = 0; k < 11; k++)
       for (const ip of [ipNeuve(), ipNeuve()]) await noterSigne(requete(ip, SAFARI), { onglet: randomUUID(), etape: "guides", premier: true, arrivee: `${essai}-${k}` });
