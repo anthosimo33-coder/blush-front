@@ -25,9 +25,7 @@ test("la landing : la promesse, les boutons vers le parcours, les faits, sans fa
     await expect(titre).toContainText("en dit plus");
     await expect(titre).toContainText("que tu crois");
     /* Sous le titre, ce que BLUSH lit, en toutes lettres (la seule phrase visible qui le dit en entier), et les mots du titre de la page */
-    await expect(
-      main.getByText(`Captures, enregistrement d’écran, export Instagram ou WhatsApp${NB}: BLUSH te dit ce qui se passe vraiment entre vous, et quoi répondre.`),
-    ).toBeVisible();
+    await expect(main.getByText(`Captures d’écran, export Instagram ou WhatsApp${NB}: BLUSH te dit ce qui se passe vraiment entre vous, et quoi répondre.`)).toBeVisible();
     await expect(main.getByRole("link", { name: "Analyser ma conv" })).toHaveAttribute("href", "/commencer");
     await expect(main.getByText("Paiement unique · Ta conv reste confidentielle")).toBeVisible();
     /* Le pied de page fait le dernier appel : son titre géant, le bouton blanc et la même ligne, puis ses liens */
@@ -203,7 +201,7 @@ test("la confidentialité : « Retour » ramène d’où l’on vient, et à la 
   });
 });
 
-test("/commencer : trois applis et « Captures ou vidéo », chacune vers son import (Instagram par son export), sans bandeau de bêta privée", async ({ page }) => {
+test("/commencer : trois applis et « Captures d’écran », chacune vers son import (Instagram par son export), sans bandeau de bêta privée", async ({ page }) => {
   const reponse = await page.goto("/commencer");
   expect(reponse?.status()).toBe(200);
   await expect(page).toHaveTitle("Vous vous parlez où ? · BLUSH");
@@ -214,7 +212,7 @@ test("/commencer : trois applis et « Captures ou vidéo », chacune vers son im
     ["WhatsApp", "/importer/export?app=whatsapp"],
     ["iMessage", "/importer/captures?app=imessage"],
     ["Instagram", "/importer/export?app=instagram"],
-    ["Captures ou vidéo", "/importer/captures?app=autre"],
+    ["Captures d’écran", "/importer/captures?app=autre"],
   ];
   for (const [nom, href] of attendues) await expect(applis.getByRole("link", { name: nom })).toHaveAttribute("href", href);
   await expect(page.getByRole("link", { name: "Comment ça marche" })).toHaveAttribute("href", "/confidentialite");

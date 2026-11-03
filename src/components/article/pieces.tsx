@@ -125,7 +125,7 @@ export function AppelImport({ zone }: { zone: Zone }) {
         Tu veux savoir pour toi{NBSP}?
       </h2>
       <p className="m-0 max-w-[460px] text-detail font-extrabold leading-[1.5] text-soft">
-        Importe ta conv{NBSP}: captures, enregistrement d’écran, export Instagram ou WhatsApp. BLUSH la lit et te dit ce qui se passe vraiment entre vous.
+        Importe ta conv{NBSP}: captures d’écran, export Instagram ou WhatsApp. BLUSH la lit et te dit ce qui se passe vraiment entre vous.
       </p>
       <CtaButton retour={null} className="mt-2 w-full max-w-[340px]" />
       <span className="text-note font-extrabold text-grey">{cta.note}</span>

@@ -199,7 +199,7 @@ test("les pages publiques, sans compte", async ({ page }) => {
     ["importer-export-whatsapp", "/importer/export?app=whatsapp", "Exporte votre conv."],
     ["importer-export-instagram", "/importer/export?app=instagram", "Exporte votre conv."],
     ["importer-captures-autre", "/importer/captures?app=autre", "Choisis tes captures."],
-    ["importer-captures-imessage", "/importer/captures?app=imessage", "Filme ta conv."],
+    ["importer-captures-imessage", "/importer/captures?app=imessage", "Choisis tes captures."],
     ["connexion", "/connexion", "Retrouve tes convs."],
     ["attente", "/attente", "BLUSH est en bêta privée."],
     ["confidentialite", "/confidentialite", "Ta conv, en sécurité."],

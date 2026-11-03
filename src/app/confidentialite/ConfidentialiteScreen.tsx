@@ -56,20 +56,13 @@ export function ConfidentialiteScreen() {
           Ton export est ouvert sur ton appareil{NBSP}: seuls les messages partent. Les photos, les vidéos et les vocaux ne quittent jamais ton téléphone.
         </Ligne>
         {/*
-         * Les lots d’un enregistrement (src/server/lots.ts) : leur texte lu, gardé chiffré dix minutes en base (lectures_des_lots),
-         * pour qu’un nouvel essai ne les relise pas ; jamais les images.
-         * La lecture partielle des longues vidéos (src/server/lecture-partielle.ts, src/server/ecrans-gardes.ts) : les écrans
-         * les plus anciens gardés chiffrés tant que la conv peut être achetée (48 h avant « Qui es-tu ? », 11 jours après le
-         * paywall, le temps des relances), puis 7 jours au plus après le paiement le temps de leur lecture, et effacés ; ou
-         * effacés sans être lus. Les deux durées dites, celle d’avant le paiement et celle d’après.
-         * TODO(produit): la phrase sur les dix minutes et celle sur les longues vidéos (26 octobre), à valider avec le juriste ; le PDF de Whop à refaire
+         * Le 3 novembre 2026, l’enregistrement d’écran a quitté l’import (VIDEO_A_L_IMPORT, src/lib/limites.ts) : ses
+         * phrases (la vidéo qui reste sur le téléphone, le texte de ses lots gardé dix minutes, la lecture partielle des
+         * longues vidéos) sont parties avec lui. Rallumé, elles sont à remettre (le commit de ce jour-là les montre).
+         * TODO(produit): reporter le retrait dans le PDF de confidentialité de Whop.
          */}
-        <Ligne icone="photo" ton="elle" titre="Ou des captures, ou un enregistrement de l’écran">
-          Les captures sont lues une fois pour en tirer le texte, puis oubliées{NBSP}: on ne garde aucune image. Un enregistrement ne quitte pas ton téléphone{NBSP}: seuls les
-          écrans de la conv en partent, et ils sont lus puis oubliés de la même façon. Le texte lu de ces écrans attend dix minutes au plus, chiffré, le temps de rassembler ta conv
-          {NBSP}: si ta connexion coupe, rien n’est relu. Pour une longue vidéo, BLUSH peut lire d’abord les écrans les plus récents{NBSP}: les autres restent chiffrés, sans être
-          lus, le temps que tu puisses prendre ton rapport (11{NBSP}jours au plus), puis sont lus juste avant lui (7{NBSP}jours au plus après ton paiement) et effacés, ou effacés
-          sans avoir été lus.
+        <Ligne icone="photo" ton="elle" titre="Ou des captures d’écran">
+          Elles sont lues une fois pour en tirer le texte, puis oubliées{NBSP}: on ne garde aucune image.
         </Ligne>
         {/* Resend l’envoie (les mails) et Whop le reçoit (le reçu) : « il ne part que chez Whop » contredisait la liste des prestataires, plus bas */}
         <Ligne icone="mail" titre="Ton email">

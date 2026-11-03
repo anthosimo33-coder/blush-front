@@ -130,7 +130,7 @@ describe("les guides et le lexique, avec des articles", () => {
     expect(t).toContain(cta.label);
     expect(t).toContain(cta.note!);
     expect(t).toContain(`Le rapport\u00a0: ${prixDe("rapport")}`);
-    expect(t).toContain("Tu veux savoir pour toi\u00a0? Importe ta conv\u00a0: captures, enregistrement d’écran, export Instagram ou WhatsApp.");
+    expect(t).toContain("Tu veux savoir pour toi\u00a0? Importe ta conv\u00a0: captures d’écran, export Instagram ou WhatsApp.");
     /* Les liés, les sources datées, la phrase de BLUSH, le fil d’Ariane */
     expect(html).toContain(`href="/lexique/${ENTREE.slug}"`);
     for (const s of GUIDE.sources) expect(t).toContain(`${s.titre} , consultée le 3 novembre 2026`);

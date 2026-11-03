@@ -1,11 +1,16 @@
 import { readFileSync } from "node:fs";
+import { VIDEO_A_L_IMPORT } from "@/lib/limites";
 import { choisirFichier, enregistrementEcran, expect, LECTURE_DES_CAPTURES, suivreLesEnvois, suivreLesRequetes, test } from "./aide";
 
 /*
  * L’enregistrement d’écran (iMessage ne s’exporte pas) : le navigateur regarde la vidéo et en tire les écrans de la conv,
  * puis BLUSH les lit par lots. La vidéo ne part jamais : seules ces images partent. La vidéo est filmée par le test (une
  * conv inventée qu’on remonte, aide/instagram-captures.ts) ; le modèle factice lit toujours 24 messages avec Elias.
+ * Sauté tant que la vidéo ne se propose plus à l’import (VIDEO_A_L_IMPORT, retirée le 3 novembre) : son écran n’est plus
+ * là. Ses routes, elles, se testent encore (import-lecture-partielle.spec.ts).
  */
+test.skip(!VIDEO_A_L_IMPORT, "la vidéo ne se propose plus à l’import (VIDEO_A_L_IMPORT)");
+
 test("iMessage : l’enregistrement d’écran est lu dans le navigateur, seules des images partent, puis « Qui es-tu ? » demande le prénom", async ({ page, browser }, testInfo) => {
   const video = await enregistrementEcran(browser, testInfo);
   const envoisVers = await suivreLesEnvois(page);

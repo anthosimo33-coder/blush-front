@@ -406,7 +406,7 @@ export function Styleguide() {
           <Spec label="TUILE D’APPLI" width={560}>
             <div className="grid grid-cols-2 gap-3">
               <AppTile app="whatsapp" title="WhatsApp" subtitle="Export en 1 minute" href="#" />
-              <AppTile app="autre" title="Captures ou vidéo" subtitle="Hinge, Tinder… toutes les applis" href="#" />
+              <AppTile app="autre" title="Captures d’écran" subtitle="Hinge, Tinder… toutes les applis" href="#" />
             </div>
           </Spec>
           <Spec label="TUILE DE CHOIX" width={360}>

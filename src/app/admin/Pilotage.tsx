@@ -6,6 +6,7 @@ import { NOMS_DES_MAILS } from "@/contenu/mails";
 import { NOTE_DU_RAPPORT } from "@/contenu/mesures";
 import { prixDe } from "@/contenu/offres";
 import {
+  APPLIS_SANS_VIDEO,
   CIBLE_DE_MARGE,
   EUROS_PAR_DOLLAR,
   NOMS_DES_ARRIVEES,
@@ -18,10 +19,11 @@ import {
   NOMS_DES_VENTES,
   PAIRES,
   SOURCE_INCONNUE,
+  VIDEO_RETIREE_LE,
   margeApresIA,
 } from "@/contenu/pilotage";
 import { cn } from "@/lib/cn";
-import { NBSP } from "@/lib/format";
+import { jourEnLettres, NBSP } from "@/lib/format";
 import { jourDeParisAvant } from "@/lib/jours";
 import type { Delivrabilite as ChiffresDeDelivrabilite } from "@/server/delivrabilite";
 import type { SanteDesNavigateurs } from "@/server/navigateur";
@@ -647,7 +649,13 @@ function DuChoixAuFichier({ applis }: { applis: Chiffres["jalonsParAppli"] }) {
           const taux = tauxLisible(j.fichier, j.appli);
           return (
             <li key={appli} className="flex items-baseline justify-between gap-3 text-note font-bold text-soft">
-              <span className="min-w-0">{nomDeLAppli(appli)}</span>
+              <span className="min-w-0">
+                {nomDeLAppli(appli)}
+                {/* iMessage et la tuile des captures : la vidéo de l’écran en est partie ce jour-là, leurs chiffres changent de nature */}
+                {APPLIS_SANS_VIDEO.includes(appli) && (
+                  <span className="ml-1.5 text-micro font-black text-elle-ink">{`captures seules depuis le ${jourEnLettres(VIDEO_RETIREE_LE)}`}</span>
+                )}
+              </span>
               <span className="flex shrink-0 items-baseline gap-2 tabular-nums">
                 <span>{`${nombre(j.appli)} → ${nombre(j.fichier)}`}</span>
                 <span className="min-w-[44px] text-right font-black text-ink">{taux === null ? "—" : pourcent(taux * 100, 0)}</span>
@@ -1390,6 +1398,8 @@ function IAAvantLAchat({ p }: { p: Chiffres }) {
                   <tr key={x.type} className="border-t border-sep text-detail font-extrabold">
                     <th scope="row" className="py-3 pr-3 text-left font-extrabold">
                       <span className="block">{NOMS_DES_TYPES_D_IMPORT[x.type]}</span>
+                      {/* Retirée de l’import ce jour-là : ce qui en reste vient d’onglets ouverts avant */}
+                      {x.type === "video" && <span className="block text-micro font-black text-elle-ink">{`retirée de l’import le ${jourEnLettres(VIDEO_RETIREE_LE)}`}</span>}
                       {ecrans !== null && lots !== null && x.lots > 0 && (
                         <span className="block text-micro font-bold text-grey">{`${pluriel(moyenne(ecrans), "écran")}, ${pluriel(moyenne(lots), "lot")} par import`}</span>
                       )}

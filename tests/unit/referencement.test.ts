@@ -165,9 +165,7 @@ describe("le référencement", () => {
     const texte = await r.text();
     expect(texte).toMatch(/^# BLUSH\n\n> /);
     expect(texte).toContain(`> ${PHRASE_D_IDENTITE}`);
-    expect(PHRASE_D_IDENTITE).toBe(
-      "BLUSH lit une conv que tu importes (captures, enregistrement d’écran, export Instagram ou WhatsApp) et te dit ce qui se passe vraiment entre vous.",
-    );
+    expect(PHRASE_D_IDENTITE).toBe("BLUSH lit une conv que tu importes (captures d’écran, export Instagram ou WhatsApp) et te dit ce qui se passe vraiment entre vous.");
     for (const { chemin, nom } of PAGES_PUBLIQUES) expect(texte).toContain(`- [${nom}](${URL_SITE}${chemin === "/" ? "" : chemin})`);
     expect(texte).not.toMatch(/(?<![\p{L}])(IA|Claude|Anthropic|ElevenLabs|Mistral|OpenAI|GPT)(?![\p{L}])/u);
     if (!ARTICLES.length) expect(texte).not.toMatch(/## (Guides|Lexique)/);

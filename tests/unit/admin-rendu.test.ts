@@ -5,6 +5,8 @@ import { PageEnDirect } from "@/app/admin/PageEnDirect";
 import { Pilotage } from "@/app/admin/Pilotage";
 import { directDExemple, statsDExemple } from "@/app/apercu/admin/exemple";
 import { AIDES_DU_PILOTAGE } from "@/contenu/aide-pilotage";
+import { VIDEO_RETIREE_LE } from "@/contenu/pilotage";
+import { jourEnLettres } from "@/lib/format";
 import type { Periode } from "@/server/stats";
 
 /*
@@ -47,9 +49,15 @@ describe("le pilotage, rendu", () => {
     expect(t).toMatch(/\d+\u00a0envois ratés/);
     /* Sous « Choisissent leur fichier », appli par appli : ses deux nombres et son taux, « — » sous les 30 personnes */
     expect(html).toContain('aria-label="De l’appli au fichier, appli par appli"');
-    for (const appli of ["WhatsApp", "Instagram", "Captures ou vidéo"]) expect(t).toMatch(new RegExp(`${appli} [\\d\u202f]+ → [\\d\u202f]+ \\d+\u00a0%`));
+    /* iMessage et la tuile des captures disent, sous leur nom, le jour où la vidéo de l’écran en est partie */
+    const sansVideo = `captures seules depuis le ${jourEnLettres(VIDEO_RETIREE_LE)} `;
+    for (const appli of ["WhatsApp", "Instagram", "Captures d’écran"]) expect(t).toMatch(new RegExp(`${appli} (${sansVideo})?[\\d\u202f]+ → [\\d\u202f]+ \\d+\u00a0%`));
+    expect(t).toContain(`Captures d’écran ${sansVideo}`);
+    expect(t).not.toContain(`WhatsApp ${sansVideo}`);
+    /* La vidéo, dans « L’IA avant l’achat » : le jour où elle a quitté l’import */
+    expect(t).toContain(`Vidéo retirée de l’import le ${jourEnLettres(VIDEO_RETIREE_LE)}`);
     if (jours === 1) {
-      expect(t).toMatch(/iMessage \d+ → \d+ — Instagram/);
+      expect(t).toMatch(new RegExp(`iMessage ${sansVideo}\\d+ → \\d+ — Instagram`));
       expect(t).toContain("«\u00a0—\u00a0»\u00a0: moins de 30\u00a0personnes, trop peu pour un taux.");
     }
     /* Qui importe : celui qui importe, puis la paire, chaque ligne avec sa part, et l’autre, dont ceux devinés */

@@ -12,15 +12,15 @@ export type TuileImport = { app: AppKind; title: string; subtitle: string; href:
  */
 export const TUILES_IMPORT: readonly TuileImport[] = [
   { app: "whatsapp", title: "WhatsApp", subtitle: "Export en 1 minute", href: "/importer/export?app=whatsapp" },
-  /* iMessage ne s’exporte pas : on filme son écran (ou des captures) */
-  { app: "imessage", title: "iMessage", subtitle: "Enregistrement de l’écran", href: "/importer/captures?app=imessage" },
+  /* iMessage ne s’exporte pas : des captures (la vidéo de l’écran est retirée depuis le 3 novembre, VIDEO_A_L_IMPORT) */
+  { app: "imessage", title: "iMessage", subtitle: "Captures de votre conv", href: "/importer/captures?app=imessage" },
   /* Instagram passe par son export (la lecture des captures arrive ensuite) */
   { app: "instagram", title: "Instagram", subtitle: "Export de tes messages", href: "/importer/export?app=instagram" },
   /*
-   * Des captures ou une vidéo de l’écran, de n’importe quelle appli : Hinge et Tinder y passent, et qui n’a pas d’export
-   * Instagram ou WhatsApp aussi (à la place des tuiles Hinge et « Autre appli », 22 octobre)
+   * Des captures de n’importe quelle appli : Hinge et Tinder y passent, et qui n’a pas d’export Instagram ou WhatsApp
+   * aussi (à la place des tuiles Hinge et « Autre appli », 22 octobre ; « Captures ou vidéo » jusqu’au 3 novembre)
    */
-  { app: "autre", title: "Captures ou vidéo", subtitle: "Hinge, Tinder… toutes les applis", href: "/importer/captures?app=autre" },
+  { app: "autre", title: "Captures d’écran", subtitle: "Hinge, Tinder… toutes les applis", href: "/importer/captures?app=autre" },
 ];
 
 /** Les tuiles de la feuille « Ajoute un morceau » : les mêmes, vers les mêmes écrans, en mode ajout (`mode=ajout`). */

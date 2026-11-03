@@ -165,7 +165,7 @@ describe("les jalons du tunnel", () => {
       "WhatsApp",
       "iMessage",
       "Instagram",
-      "Captures ou vidéo",
+      "Captures d’écran",
       "Hinge",
     ]);
   });

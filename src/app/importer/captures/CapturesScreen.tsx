@@ -6,7 +6,7 @@ import { cn } from "@/lib/cn";
 import { NBSP } from "@/lib/format";
 import { useFilePicker } from "@/lib/hooks";
 import { marquerJalon, useJalon } from "@/lib/jalons";
-import { ACCEPT_IMAGES, CAPTURES_MAX } from "@/lib/limites";
+import { ACCEPT_IMAGES, CAPTURES_MAX, VIDEO_A_L_IMPORT } from "@/lib/limites";
 import { connexionPuis } from "@/lib/suite";
 import { useApercusFichiers } from "@/lib/useApercusFichiers";
 import { useMonte } from "@/lib/useMonte";
@@ -52,25 +52,27 @@ const texteAvance = (a: AvanceVideo) =>
 
 /*
  * Ce que l’écran des captures dit d’abord, d’après l’appli. Instagram (et WhatsApp) s’exportent : on y arrive souvent
- * juste après un export trop court, l’écran ne dit donc pas le contraire. Hinge ne s’exporte pas, il le dit. « autre »
- * (la tuile « Captures ou vidéo ») : n’importe quelle appli, Instagram et WhatsApp compris quand on n’a pas leur export.
+ * juste après un export trop court, l’écran ne dit donc pas le contraire. Hinge et iMessage (sans la vidéo, VIDEO_A_L_IMPORT)
+ * ne s’exportent pas, il le dit. « autre » (la tuile des captures) : n’importe quelle appli, Instagram et WhatsApp compris
+ * quand on n’a pas leur export.
  * TODO(produit): « Les captures suffisent aussi » (12 octobre), à valider. « Des captures de n’importe quelle appli suffisent »
  * (22 octobre) est relu.
  */
 const leadCaptures = (app: AppKind) =>
   (EXPORTS as readonly AppKind[]).includes(app)
     ? "Les captures suffisent aussi\u00a0: on reconnaît les messages, les dates et qui parle."
-    : app === "hinge"
-      ? "Hinge ne permet pas d’exporter\u00a0: les captures suffisent. On reconnaît les messages, les dates et qui parle."
+    : app === "hinge" || app === "imessage"
+      ? `${app === "hinge" ? "Hinge" : "iMessage"} ne permet pas d’exporter\u00a0: les captures suffisent. On reconnaît les messages, les dates et qui parle.`
       : "Des captures de n’importe quelle appli suffisent\u00a0: on reconnaît les messages, les dates et qui parle.";
 
 /** Pendant la lecture des captures (sans avancée à dire) : ce que BLUSH fait, en clair dans le bouton. */
 const texteLecture = (n: number) => (n > 1 ? `BLUSH lit tes ${n} captures…` : "BLUSH lit ta capture…");
 
 /*
- * Écran 03 — Captures : sélection, puis l’ordre se règle en glissant (BLUSH retrie aussi par date). Ou un enregistrement
- * d’écran : le téléphone en tire les écrans de la conv (la vidéo ne part pas), puis BLUSH les lit. Pour iMessage (pas
- * d’export possible), l’enregistrement est le chemin principal.
+ * Écran 03 — Captures : sélection, puis l’ordre se règle en glissant (BLUSH retrie aussi par date). Ou, quand la vidéo
+ * se propose (VIDEO_A_L_IMPORT, éteinte depuis le 3 novembre), un enregistrement d’écran : le téléphone en tire les écrans
+ * de la conv (la vidéo ne part pas), puis BLUSH les lit ; pour iMessage (pas d’export possible), c’est alors le chemin
+ * principal. Sans elle, iMessage passe par des captures, comme Hinge.
  * Une première conv passe ensuite par l’écran de la conv reçue (/importer/ok), d’où l’on peut lui ajouter un morceau.
  * `addMode` (?mode=ajout) : des captures, ou un enregistrement, ajoutées à la conv qu’on importe (un morceau de plus,
  * src/server/morceaux.ts), puis l’histoire réunie (/importer/histoire). Pas un import de plus pour le tunnel d’/admin.
@@ -102,7 +104,7 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
   const appliDuTunnel = app ?? journey.app ?? undefined;
   useJalon(addMode ? null : "appli", appliDuTunnel);
   const jalon = (j: JalonParAppli) => !addMode && marquerJalon(j, appliDuTunnel);
-  const enregistrement = captureApp === "imessage";
+  const enregistrement = VIDEO_A_L_IMPORT && captureApp === "imessage";
   const all = useRef<Shot[]>([]);
   useEffect(() => {
     all.current = items;
@@ -321,32 +323,34 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
         </div>
       )}
 
-      {/* L’autre façon d’ajouter la conv, en ligne discrète comme sur l’écran suivant */}
-      <InsetGroup>
-        {enregistrement ? (
-          <InsetRow
-            leading={<RowIcon icon="photo" tone="toi" />}
-            title="Ou choisis des captures d’écran"
-            sub="Pour une conv courte, quelques captures suffisent."
-            onClick={busy ? undefined : shots.open}
-            chevron={!busy}
-            className={cn(busy && "opacity-50")}
-          />
-        ) : (
-          <InsetRow
-            leading={
-              <RowIcon tone="elle">
-                <span className="size-3.5 rounded-[7px] bg-elle" />
-              </RowIcon>
-            }
-            title={"Plus rapide\u00a0: enregistre ton écran"}
-            sub={"Remonte la conv doucement en filmant ton écran\u00a0: BLUSH lit tout."}
-            onClick={busy ? undefined : choisirEnregistrement}
-            chevron={!busy}
-            className={cn(busy && "opacity-50")}
-          />
-        )}
-      </InsetGroup>
+      {/* L’autre façon d’ajouter la conv, en ligne discrète comme sur l’écran suivant : seulement quand la vidéo se propose */}
+      {VIDEO_A_L_IMPORT && (
+        <InsetGroup>
+          {enregistrement ? (
+            <InsetRow
+              leading={<RowIcon icon="photo" tone="toi" />}
+              title="Ou choisis des captures d’écran"
+              sub="Pour une conv courte, quelques captures suffisent."
+              onClick={busy ? undefined : shots.open}
+              chevron={!busy}
+              className={cn(busy && "opacity-50")}
+            />
+          ) : (
+            <InsetRow
+              leading={
+                <RowIcon tone="elle">
+                  <span className="size-3.5 rounded-[7px] bg-elle" />
+                </RowIcon>
+              }
+              title={"Plus rapide\u00a0: enregistre ton écran"}
+              sub={"Remonte la conv doucement en filmant ton écran\u00a0: BLUSH lit tout."}
+              onClick={busy ? undefined : choisirEnregistrement}
+              chevron={!busy}
+              className={cn(busy && "opacity-50")}
+            />
+          )}
+        </InsetGroup>
+      )}
 
       <div aria-live="polite" className="min-h-6">
         {/* L’avancée s’affiche dans le bouton ; ici, elle est seulement annoncée aux lecteurs d’écran */}
@@ -362,7 +366,7 @@ export function CapturesScreen({ app, addMode }: { app: AppKind | null; addMode:
       </div>
 
       <FileInput inputRef={shots.ref} accept={ACCEPT_IMAGES} multiple onFiles={(f) => handle(f, false)} label="Captures d’écran de la conversation" />
-      <FileInput inputRef={rec.ref} accept="video/*" onFiles={(f) => handle(f, true)} label="Enregistrement d’écran de la conversation" />
+      {VIDEO_A_L_IMPORT && <FileInput inputRef={rec.ref} accept="video/*" onFiles={(f) => handle(f, true)} label="Enregistrement d’écran de la conversation" />}
     </ParcoursScreen>
   );
 }

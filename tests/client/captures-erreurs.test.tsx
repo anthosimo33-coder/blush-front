@@ -2,6 +2,7 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { CapturesScreen } from "@/app/importer/captures/CapturesScreen";
 import { CASE_IMPORT } from "@/contenu/consentements";
+import { VIDEO_A_L_IMPORT } from "@/lib/limites";
 import { SOUFFLE } from "@/lib/messages-erreur";
 import { prechargerVideo, uploadScreenshots } from "@/services/api";
 import { ErreurApi, type CodeApi } from "@/types/erreurs-api";
@@ -118,7 +119,7 @@ describe("l’import de captures en échec", () => {
 });
 
 describe("ce que l’écran des captures dit d’abord", () => {
-  it("Instagram s’exporte : l’écran ne dit pas le contraire ; Hinge ne s’exporte pas, il le dit ; « Captures ou vidéo » : n’importe quelle appli", () => {
+  it("Instagram s’exporte : l’écran ne dit pas le contraire ; Hinge ne s’exporte pas, il le dit ; « Captures d’écran » : n’importe quelle appli", () => {
     const { unmount } = render(<CapturesScreen app="instagram" addMode={false} />);
     expect(screen.queryByText(/ne permett?(ent)? pas d’exporter/)).toBeNull();
     expect(screen.getByText("Les captures suffisent aussi : on reconnaît les messages, les dates et qui parle.")).toBeTruthy();
@@ -126,13 +127,29 @@ describe("ce que l’écran des captures dit d’abord", () => {
     render(<CapturesScreen app="hinge" addMode={false} />);
     expect(screen.getByText("Hinge ne permet pas d’exporter : les captures suffisent. On reconnaît les messages, les dates et qui parle.")).toBeTruthy();
     cleanup();
-    /* La tuile « Captures ou vidéo » : n’importe quelle appli, Instagram et WhatsApp compris, sans rien dire de leur export */
+    /* La tuile « Captures d’écran » : n’importe quelle appli, Instagram et WhatsApp compris, sans rien dire de leur export */
     render(<CapturesScreen app="autre" addMode={false} />);
     expect(screen.queryByText(/ne permett?(ent)? pas d’exporter/)).toBeNull();
     expect(screen.getByText("Des captures de n’importe quelle appli suffisent : on reconnaît les messages, les dates et qui parle.")).toBeTruthy();
   });
 
-  it("iMessage : « Comment filmer » est une carte, sa liste hors de tout bouton, et la carte un bouton nommé comme celui du pied", () => {
+  /* Sans la vidéo (VIDEO_A_L_IMPORT, retirée le 3 novembre) : iMessage passe par des captures, comme Hinge, et rien ne propose de filmer */
+  it.runIf(!VIDEO_A_L_IMPORT)("sans la vidéo : iMessage ne s’exporte pas, il le dit, et l’écran ne propose que des captures", () => {
+    render(<CapturesScreen app="imessage" addMode={false} />);
+    expect(screen.getByRole("heading", { level: 1, name: "Choisis tes captures." })).toBeTruthy();
+    expect(screen.getByText("iMessage ne permet pas d’exporter : les captures suffisent. On reconnaît les messages, les dates et qui parle.")).toBeTruthy();
+    expect(screen.getAllByRole("button", { name: "Choisir mes captures" })).not.toHaveLength(0);
+    expect(screen.queryByRole("button", { name: "Choisir mon enregistrement" })).toBeNull();
+    expect(screen.queryByText(/enregistre ton écran/i)).toBeNull();
+    expect(screen.queryByLabelText("Enregistrement d’écran de la conversation")).toBeNull();
+    cleanup();
+    /* Ni sur les autres applis : plus de ligne « Plus rapide : enregistre ton écran » */
+    render(<CapturesScreen app="autre" addMode={false} />);
+    expect(screen.queryByText(/enregistre ton écran/i)).toBeNull();
+    expect(screen.queryByLabelText("Enregistrement d’écran de la conversation")).toBeNull();
+  });
+
+  it.runIf(VIDEO_A_L_IMPORT)("iMessage : « Comment filmer » est une carte, sa liste hors de tout bouton, et la carte un bouton nommé comme celui du pied", () => {
     render(<CapturesScreen app="imessage" addMode={false} />);
     const etapes = screen.getByText("Ouvre votre conv dans Messages").closest("ol");
     expect(etapes).not.toBeNull();
