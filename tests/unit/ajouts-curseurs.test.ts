@@ -1,6 +1,7 @@
 import { gzipSync } from "node:zlib";
 import { describe, expect, it } from "vitest";
-import { blocAjout, cleDuMessage, inserer, messagesDeLExport, messagesDesCaptures, numeroter, remplacer, type Heure, type Lu } from "@prompts/lib/ajouts";
+import { blocAjout, cleDuMessage, heureDuMessage, inserer, messagesDeLExport, messagesDesCaptures, numeroter, remplacer, type Heure, type Lu } from "@prompts/lib/ajouts";
+import { versTexteCaptures } from "@prompts/lib/captures";
 import { lire, type Histoire, type Message } from "@prompts/lib/conv";
 import { ligneMessage, TETE_DU_RAPPEL } from "@prompts/lib/ligne";
 import { rendreNouveau } from "@prompts/lib/memoire";
@@ -891,5 +892,69 @@ describe("le jour et l’heure du téléphone (H7, C7)", () => {
     expect(await depuisPaquet(paquet("America/Sao_Paulo"), { fuseau: "Europe/Paris" })).toMatchObject({ texte: "[01/10/2026 02:30:00] Ana: oi", fuseau: "Europe/Paris" });
     /* Un navigateur d’avant le fuseau : Paris, sans fuseau gardé (fuseauDe le redonne) */
     expect((await depuisPaquet(paquet())).fuseau).toBeUndefined();
+  });
+});
+
+describe("le jour deviné et les appels décrochés (PR 5)", () => {
+  it("le haut sans date et des captures sans aucune date valent « au plus tard » ; renvoyées, même le lendemain, elles sont reconnues", () => {
+    const cas: [Captures, Heure[]][] = [
+      [
+        capture(
+          {
+            date: null,
+            messages: [
+              ["autre", "bonne nuit 😘"],
+              ["moi", "dors bien"],
+            ],
+          },
+          { date: "2026-10-31", heure: "09:50", messages: [["autre", "bien dormi ?"]] },
+        ),
+        ["auPlusTard", "auPlusTard", "repere"],
+      ],
+      [
+        capture({
+          date: null,
+          messages: [
+            ["autre", "on se voit quand pour le ciné"],
+            ["moi", "samedi ?"],
+            ["autre", "ok"],
+          ],
+        }),
+        ["auPlusTard", "auPlusTard", "auPlusTard"],
+      ],
+    ];
+    for (const [c, heures] of cas) {
+      const t = versTexteCaptures(c, { moi: "Moi", autre: "Elle", aujourdhui: "2026-10-31" });
+      const { messages } = lire(t.texte, { utilisateur: { ...H.utilisateur, nomExport: "Moi" }, autre: { ...H.autre, nomExport: "Elle" }, format: "captures" });
+      /* Ce que la conv garde à l’import (src/server/analyse.ts, contexteDuCode) */
+      const lus: Lu[] = messages.map((m) => ({ cle: cleDuMessage(m), t: m.t, heure: heureDuMessage(m) }));
+      expect(lus.map((e) => e.heure)).toEqual(heures);
+      for (const aujourdhui of ["2026-10-31", "2026-11-01"]) {
+        const r = messagesDesCaptures(c, H, { aujourdhui, apres: Math.max(...lus.map((e) => e.t)), lus });
+        expect([r.dejaLus, r.nouveaux]).toEqual([true, []]);
+      }
+    }
+  });
+
+  it("un appel décroché n’est pas distinctif (deux appels de 12 min, deux soirs de suite, sont deux appels), ni la cible de la réponse", () => {
+    /* Hier soir, un appel de 12 min, lu dans un export */
+    const hier = lu("autre", "Appel vocal, 12 min", "2026-10-30 21:00:00");
+    const c = captures({
+      autre: "Léa",
+      blocs: [
+        {
+          repere: { date: "2026-10-31", heure: "20:00" },
+          messages: [
+            msg("autre", "Appel vocal · 12 min", { media: "appel" }),
+            msg("moi", "trop bien de t’entendre"),
+            msg("autre", "pareil"),
+            msg("autre", "Appel vocal · 5 min", { media: "appel" }),
+          ],
+        },
+      ],
+    });
+    const r = messagesDesCaptures(c, H, { aujourdhui: "2026-10-31", apres: hier.t, lus: [hier] });
+    expect(textes(r.nouveaux)).toEqual(["Appel vocal, 12\u00a0min", "trop bien de t’entendre", "pareil", "Appel vocal, 5\u00a0min"]);
+    expect(numeroter(r.nouveaux, [], H, { debut: 501, aujourdhui: "2026-10-31" }).cibles).toEqual(["m0503"]);
   });
 });

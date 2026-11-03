@@ -76,8 +76,11 @@ describe("les lignes de la conv, à l’octet", () => {
     );
     const hc: Histoire = { ...h, format: "captures", utilisateur: { ...h.utilisateur, nomExport: "Moi" }, autre: { ...h.autre, nomExport: c.autre } };
     const r = rendre(hc, lire(c.texte, hc));
-    /* De même : la photo légendée des captures compte dans les médias */
-    expect(empreinte(r.texte)).toBe("66a6cbb817182577");
+    /*
+     * De même : la photo légendée des captures compte dans les médias ; et depuis le 3 novembre 2026, la pastille sans
+     * heure du 21 compte ce jour-là (jourCompte) : 2 jours avec des messages, et non plus 1
+     */
+    expect(empreinte(r.texte)).toBe("b27f9b2d4021290d");
   });
 
   it("les messages ajoutés, son profil, et le bloc <nouveau> du chat", () => {

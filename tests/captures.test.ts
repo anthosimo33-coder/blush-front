@@ -78,7 +78,7 @@ describe("des captures à l’histoire", () => {
       ],
     });
     expect(versTexteCaptures(c, { aujourdhui: "2026-09-13" }).texte).toBe(
-      "# captures · autre · 1 captures\n== 2026-09-08 ==\nLéo le vrai: salut\n== 2026-09-08 ==\nMoi: audio omis",
+      "# captures · autre · 1 captures · haut sans date\n== 2026-09-08 ==\nLéo le vrai: salut\n== 2026-09-08 ==\nMoi: audio omis",
     );
   });
 });

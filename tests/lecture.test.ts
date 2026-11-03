@@ -313,22 +313,25 @@ describe("lire les formes réelles des exports WhatsApp", () => {
     expect(chiffrer(hc, lu.messages).medias).toEqual({ toi: { vidéo: 1 }, autre: { photo: 1 } });
   });
 
-  it("iOS : un appel manqué suivi de « Appuyez pour rappeler » ou « Tap to call back » est un appel manqué", () => {
+  it("iOS : un appel que personne n’a décroché, manqué ou sans réponse, est un appel manqué au nom de celui qui appelle", () => {
     const formes: [string, string, boolean][] = [
       ["\u200eAppel vidéo manqué\u202f \u200eAppuyez pour rappeler", "appel manqué", false],
       ["\u200eAppel vocal manqué\u202f \u200eAppuyez pour rappeler", "appel manqué", false],
       ["\u200eAppel vocal manqué, \u200eAppuyez pour rappeler", "appel manqué", false],
       ["\u200eMissed voice call, \u200eTap to call back", "appel manqué", false],
-      /* Comme avant : un appel sans réponse reste un contenu de WhatsApp, un message tapé reste un message */
-      /* TODO(produit): « Sans réponse » (WhatsApp) et la fin d’appel à 0 s (Instagram) : appel manqué, ou genre à part ? */
-      ["\u200eAppel vocal\u202f \u200eSans réponse", "Appel vocal\u202f Sans réponse", true],
-      ["\u200eVoice call, \u200eNo answer", "Voice call, No answer", true],
+      /* L’autre n’a pas décroché : le même événement, vu du téléphone de celui qui appelle (décision du 3 novembre 2026) */
+      ["\u200eAppel vocal\u202f \u200eSans réponse", "appel manqué", false],
+      ["\u200eAppel vidéo\u202f \u200eSans réponse", "appel manqué", false],
+      ["\u200eVoice call, \u200eNo answer", "appel manqué", false],
+      ["\u200eVideo call, \u200eNo answer", "appel manqué", false],
+      /* Comme avant : un message tapé, sans la marque, reste un message */
       ["missed video call, tap to call back", "missed video call, tap to call back", false],
+      ["Appel vocal, sans réponse", "Appel vocal, sans réponse", false],
     ];
     const lu = avec(formes.map(([t]) => t));
     const messages = lu.messages.slice(10, 10 + formes.length);
     expect(messages.map((m) => [m.media ?? m.texte, !!m.deWhatsApp])).toEqual(formes.map(([, attendu, deWhatsApp]) => [attendu, deWhatsApp]));
-    expect(chiffrer(qui("Tom", "Léa"), lu.messages).medias.autre).toEqual({ "appel manqué": 4 });
+    expect(chiffrer(qui("Tom", "Léa"), lu.messages).medias.autre).toEqual({ "appel manqué": 8 });
   });
 
   it("Android : la légende d’un média, écrite sur la ligne d’après, devient son texte", () => {

@@ -1,6 +1,20 @@
 import { describe, expect, it } from "vitest";
 import { versTexteCaptures } from "@prompts/lib/captures";
-import { blocChiffres, chiffrer, lire, RECENT_J, SANS_REPONSE_H, SILENCE_REPRISE_H, SOIR, type Chiffres, type Format, type Recents } from "@prompts/lib/conv";
+import {
+  blocChiffres,
+  chiffrer,
+  jourCompte,
+  lire,
+  RECENT_J,
+  SANS_REPONSE_H,
+  SILENCE_REPRISE_H,
+  SOIR,
+  type Chiffres,
+  type Format,
+  type Message,
+  type Recents,
+} from "@prompts/lib/conv";
+import type { Captures } from "@prompts/lib/schemas";
 import { trouvailles } from "@/server/ecrans/trouvailles";
 import { captures, msg } from "../aide/fabriques";
 
@@ -387,5 +401,40 @@ describe("les mots qui reviennent : ce qui reste un mot, ce qui se réunit", () 
     expect(en.trouvailles).toContain(motAVous("tacos", 12));
     const ailleurs = "também hoje acho tava minha ainda depois sempre coisa tambem ahora mañana creo cosa luego siempre manana".split(" ");
     expect(avecLibanais([...ailleurs, ...ailleurs]).c.recurrents).toEqual([["libanais", 5]]);
+  });
+});
+
+describe("le jour où compte un message (jourCompte)", () => {
+  /** Un message à `iso` (UTC, l’heure « naïve » de la conv), daté à la minute, au repère près, ou du jour seulement. */
+  const a = (iso: string, approx: Message["approx"]) => ({ t: Date.parse(iso), approx });
+
+  it("sa journée va de 5 h à 5 h ; un message daté du jour seulement (une pastille sans heure) compte le jour de sa pastille", () => {
+    expect([a("2026-10-20T00:00Z", "jour"), a("2026-10-20T01:30Z", false), a("2026-10-20T04:59Z", "heure"), a("2026-10-20T05:00Z", false)].map(jourCompte)).toEqual([
+      "2026-10-20",
+      "2026-10-19",
+      "2026-10-19",
+      "2026-10-20",
+    ]);
+  });
+
+  it("les jours avec des messages : une pastille sans heure n’est plus comptée la veille, un jour inconnu ne compte pas", () => {
+    const h = qui("Moi", "Léa", "captures");
+    const bloc = (n: number, prefixe: string, repere: Captures["blocs"][number]["repere"]) => ({
+      repere,
+      messages: fois(n, (k) => msg(k % 2 ? "autre" : "moi", `${prefixe} ${k}`)),
+    });
+    const jours = (blocs: Captures["blocs"]) => chiffrer(h, lire(versTexteCaptures(captures({ blocs }), { aujourdhui: "2026-10-31" }).texte, h).messages).joursActifs;
+    /* Le 19 à 21 h, puis les pastilles du 20 et du 21 : trois jours (avant, deux : la pastille du 20 comptait le 19) */
+    expect(
+      jours([bloc(4, "x", { date: "2026-10-19", heure: "21:00" }), bloc(4, "y", { date: "2026-10-20", heure: null }), bloc(4, "z", { date: "2026-10-21", heure: null })]),
+    ).toBe(3);
+    expect(jours([bloc(4, "x", { date: "2026-10-19", heure: "10:00" }), bloc(4, "y", { date: "2026-10-20", heure: null })])).toBe(2);
+    /* Le haut sans repère compte le jour qu’il emprunte (au plus tard ce jour-là) : un seul jour */
+    expect(jours([bloc(4, "x", null), bloc(4, "y", { date: "2024-02-21", heure: "09:05" })])).toBe(1);
+    /* Aucune date sur les captures : aucun jour connu */
+    expect(jours([bloc(4, "x", null)])).toBe(0);
+    /* Un export à 1 h 30 le 20 compte la nuit du 19 ; une capture sous la pastille du 20 compte le 20 */
+    const nuit: Message = { id: "m0001", t: Date.parse("2026-10-20T01:30:00Z"), nom: "Léa", role: "autre", texte: "nuit", approx: false, ligne: 1 };
+    expect(chiffrer(h, [nuit, { ...nuit, id: "m0002", texte: "jour", t: Date.parse("2026-10-20T00:00:00Z"), approx: "jour", ligne: 2 }]).joursActifs).toBe(2);
   });
 });
