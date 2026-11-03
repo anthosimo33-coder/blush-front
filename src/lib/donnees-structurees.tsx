@@ -17,8 +17,9 @@ import { PHRASE_D_IDENTITE } from "@/contenu/identite";
  */
 const COMPTES_OFFICIELS = ["https://www.instagram.com/askblush_/"];
 
-/** L’@id de l’éditeur (l’Organization) et celui du site (le WebSite) : les mêmes sur toutes les pages. */
+/** L’@id de l’éditeur (l’Organization) : le même sur toutes les pages. */
 const idEditeur = (site: string) => `${site}/#editeur`;
+/** L’@id du site (le WebSite) : le même sur toutes les pages. */
 const idSite = (site: string) => `${site}/#site`;
 
 /** L’éditeur : BLUSH, son adresse, son logo et ses comptes officiels. */

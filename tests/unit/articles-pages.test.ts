@@ -175,10 +175,15 @@ describe("les guides et le lexique, avec des articles", () => {
     expect(graphe(html).find((n) => n["@type"] === "BreadcrumbList")).toMatchObject({ itemListElement: [{}, { name: "Lexique" }, { name: ENTREE.titre }] });
   });
 
-  it("la zone rouge : l’expert signe aussi, et l’appel n’est qu’un lien discret, sans bouton ni prix", () => {
+  it("la zone rouge : le bloc d’aide en tête, avant la réponse courte ; l’expert signe aussi ; l’appel n’est qu’un lien discret, sans bouton ni prix", () => {
     const rouge: Article = { ...GUIDE, zone: "rouge", expert: { nom: "Sam Martin", role: "psychologue (test)" } };
     const html = renderToStaticMarkup(createElement(PageArticle, { article: rouge, lies: liesDe(rouge) }) as ReactElement);
     const t = texte(html);
+    expect(t.match(new RegExp(tel(URGENCES), "g"))).toHaveLength(1);
+    expect(t.indexOf(URGENCES)).toBeLessThan(t.indexOf("La réponse courte"));
+    expect(t.indexOf("relu par")).toBeLessThan(t.indexOf(URGENCES));
+    /* Sous le titre de la page, le sien est un h2 : les titres se suivent sans sauter de marche */
+    expect(html).toMatch(/<h2 id="[^"]+"[^>]*>.*?Besoin d’en parler/s);
     expect(t).toContain("relu par Alex Dupont, relecteur de test et Sam Martin, psychologue (test)");
     expect(t).toContain("Importe-la sur BLUSH");
     expect(t).not.toContain(ctaDe(null).label);

@@ -65,13 +65,35 @@ describe("les garde-fous des articles", () => {
       expect(fautesDeLArticle(avecTexte("Un export Instagram ou WhatsApp se lit pareil."))).toEqual([]);
     });
 
-    it("refuse « verdict gratuit », « satisfait ou remboursé » et un prix écrit à la main", () => {
-      expect(fautesDeLArticle(avecTexte("Ton verdict gratuit arrive vite."))).toEqual([expect.stringContaining("« verdict gratuit »")]);
-      expect(fautesDeLArticle(avecTexte("Satisfait ou remboursé, toujours."))).toEqual([expect.stringContaining("« satisfait ou remboursé »")]);
-      expect(fautesDeLArticle(avecTexte("Le rapport coûte 9,90 € seulement."))).toEqual([expect.stringContaining("un prix écrit à la main")]);
-      expect(fautesDeLArticle(avecTexte("Moins de 10 euros pour savoir."))).toEqual([expect.stringContaining("un prix écrit à la main")]);
-      /* Un nombre sans monnaie reste permis */
-      expect(fautesDeLArticle(avecTexte("Il a mis 3 jours à répondre."))).toEqual([]);
+    it.each([
+      "Ton verdict gratuit arrive vite.",
+      "Ton verdict est gratuit.",
+      "Offert, le rapport complet.",
+      "Importer ta conv sur BLUSH ne coûte rien.",
+      "La lecture se fait sans payer.",
+    ])("refuse une gratuité écrite à la main : %s", (texte) => {
+      expect(fautesDeLArticle(avecTexte(texte))).toEqual([expect.stringContaining("« verdict gratuit »")]);
+    });
+
+    it.each(["Satisfait ou remboursé, toujours.", "Satisfaite ou remboursée, toujours."])("refuse %s", (texte) => {
+      expect(fautesDeLArticle(avecTexte(texte))).toEqual([expect.stringContaining("« satisfait ou remboursé »")]);
+    });
+
+    it.each(["Le rapport coûte 9,90 € seulement.", "Moins de 10 euros pour savoir.", "Le rapport à €9,90 seulement.", "EUR 10 pour savoir."])(
+      "refuse un prix écrit à la main : %s",
+      (texte) => {
+        expect(fautesDeLArticle(avecTexte(texte))).toEqual([expect.stringContaining("un prix écrit à la main")]);
+      },
+    );
+
+    it.each([
+      "Il a mis 3 jours à répondre.",
+      "Leur 2 messages du soir se ressemblent.",
+      "Une remarque gratuite fait mal.",
+      "Il t’a offert des fleurs.",
+      "Le verdict tombe vite. Il t’a offert un verre, et puis plus rien.",
+    ])("laisse passer un nombre sans monnaie, et « gratuit » ou « offert » loin de ce que vend BLUSH : %s", (texte) => {
+      expect(fautesDeLArticle(avecTexte(texte))).toEqual([]);
     });
 
     it("BLUSH parle en minuscules, sans point final", () => {
@@ -87,6 +109,7 @@ describe("les garde-fous des articles", () => {
       "Tu as le droit de lire ses messages.",
       "Fouiller son téléphone ne sert à rien.",
       "Un logiciel espion le dirait.",
+      "Regarde sa localisation sur Snap Map.",
     ])("refuse la surveillance : %s", (texte) => {
       expect(fautesDeLArticle(avecTexte(texte))).toEqual([expect.stringContaining("surveill")]);
     });
@@ -95,16 +118,20 @@ describe("les garde-fous des articles", () => {
       expect(fautesDeLArticle(avecTexte(texte))).toEqual([expect.stringContaining("un diagnostic")]);
     });
 
-    it.each(["Patiente, il reviendra.", "Un résultat garanti.", "Ça marche à 100 % des fois."])("refuse une promesse : %s", (texte) => {
+    it.each(["Patiente, il reviendra.", "Un résultat garanti.", "BLUSH te le garantit.", "Ça marche à 100 % des fois."])("refuse une promesse : %s", (texte) => {
       expect(fautesDeLArticle(avecTexte(texte))).toEqual([expect.stringContaining("une promesse")]);
     });
 
-    it("la zone rouge : un expert, et le bloc d’aide en tête ; un mot de la zone rouge l’exige", () => {
+    it("la zone rouge : un expert ; le bloc d’aide, la page le met elle-même en tête (pas un second dans une section)", () => {
       const rouge = { ...GUIDE, zone: "rouge" } as const satisfies Article;
-      expect(fautesDeLArticle(rouge)).toEqual([expect.stringContaining("zone rouge sans expert"), expect.stringContaining("zone rouge sans bloc d’aide en tête")]);
-      const enRegle: Article = { ...avecBloc({ type: "aide" }, rouge), expert: { nom: "Sam Martin", role: "psychologue (test)" } };
+      expect(fautesDeLArticle(rouge)).toEqual([expect.stringContaining("zone rouge sans expert")]);
+      const enRegle: Article = { ...rouge, expert: { nom: "Sam Martin", role: "psychologue (test)" } };
       expect(fautesDeLArticle(enRegle)).toEqual([]);
-      expect(fautesDeLArticle(avecTexte("Le chantage n’est jamais de l’amour."))).toEqual([expect.stringContaining("sujet de la zone rouge")]);
+      expect(fautesDeLArticle(avecBloc({ type: "aide" }, enRegle))).toEqual([expect.stringContaining("la page met déjà le bloc d’aide en tête")]);
+    });
+
+    it.each(["Le chantage n’est jamais de l’amour.", "Il l’a frappée hier.", "Il a 15 ans, il est mineur."])("un mot de la zone rouge l’exige : %s", (texte) => {
+      expect(fautesDeLArticle(avecTexte(texte))).toEqual([expect.stringContaining("sujet de la zone rouge")]);
     });
 
     it("la zone orange a son bloc d’aide", () => {
@@ -152,19 +179,18 @@ describe("les garde-fous des articles", () => {
       expect(fautesDuRegistre([GUIDE, { ...ENTREE, slug: GUIDE.slug, lies: [] }])).toContainEqual(expect.stringContaining("est pris 2 fois"));
     });
 
-    it("un lien vers un article qui n’existe pas, ou une page que rien ne lie, est refusé", () => {
+    it("un lien vers un article qui n’existe pas, ou une page qu’aucun autre article ne lie, est refusé", () => {
       expect(fautesDuRegistre([{ ...GUIDE, lies: ["nulle-part"] }])).toEqual([expect.stringContaining("n’est pas dans le registre")]);
-      /* Seul, un article est lié par son hub ; si le hub ne le listait pas, ni un autre article : orphelin */
+      /* Le tout premier article n’a que son hub */
       expect(fautesDuRegistre([{ ...GUIDE, lies: [] }])).toEqual([]);
+      /* Dès le deuxième, le hub ne compte plus (il liste tout) : chacun est lié par un autre article */
       expect(
-        fautesDuRegistre(
-          [
-            { ...GUIDE, lies: [] },
-            { ...ENTREE, lies: [] },
-          ],
-          { hubs: { guide: [], lexique: [ENTREE.slug] } },
-        ),
-      ).toEqual([expect.stringContaining(`« ${GUIDE.slug} » est une page orpheline`)]);
+        fautesDuRegistre([
+          { ...GUIDE, lies: [] },
+          { ...ENTREE, lies: [] },
+        ]),
+      ).toEqual([expect.stringContaining(`« ${GUIDE.slug} » est une page orpheline`), expect.stringContaining(`« ${ENTREE.slug} » est une page orpheline`)]);
+      expect(fautesDuRegistre([GUIDE, { ...ENTREE, lies: [] }])).toEqual([expect.stringContaining(`« ${GUIDE.slug} » est une page orpheline`)]);
     });
 
     it("au plus 5 publications par semaine (du lundi au dimanche)", () => {

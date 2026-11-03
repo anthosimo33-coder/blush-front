@@ -1,5 +1,4 @@
-import { articlesDu, RUBRIQUES } from "@/contenu/articles";
-import type { Article, BlocArticle, Genre, Personne } from "@/contenu/articles/types";
+import type { Article, BlocArticle, Personne } from "@/contenu/articles/types";
 
 /*
  * Les garde-fous des articles (src/contenu/articles), pour tests/unit/articles.test.ts : chaque règle de la charte
@@ -12,8 +11,12 @@ import type { Article, BlocArticle, Genre, Personne } from "@/contenu/articles/t
 
 /** Une lettre ou un chiffre, de n’importe quel alphabet : ce qui borne un mot (\b ne connaît pas les accents). */
 const BORD = "[\\p{L}\\p{N}]";
-/** Le mot ou l’expression `motif`, entier : ni collé à une lettre avant, ni après (insensible à la casse). */
-const mot = (motif: string) => new RegExp(`(?<!${BORD})(?:${motif})(?!${BORD})`, "iu");
+/** Le motif d’un mot ou d’une expression entière : ni collée à une lettre avant, ni après. */
+const entier = (motif: string) => `(?<!${BORD})(?:${motif})(?!${BORD})`;
+/** Le mot ou l’expression `motif`, entier (insensible à la casse). */
+const mot = (motif: string) => new RegExp(entier(motif), "iu");
+/** Deux mots ou expressions entiers dans une même phrase (sans . ! ? entre eux), dans un ordre ou dans l’autre. */
+const dansUnePhrase = (a: string, b: string) => new RegExp(`${entier(a)}[^.!?]*${entier(b)}|${entier(b)}[^.!?]*${entier(a)}`, "iu");
 
 /** Les textes d’un morceau de section, tels qu’affichés. */
 function textesDuBloc(b: BlocArticle): string[] {
@@ -63,7 +66,7 @@ const MOTS_REFUSES: readonly { motif: RegExp; pourquoi: string }[] = [
   },
   { motif: mot("situationships?"), pourquoi: "« situationship » : personne ne le dit en français, écris « crush »" },
   {
-    motif: mot("espionn\\p{L}*|(?:g[ée]o)?localis(?:er|e|es|ent|ez|é|ée|és|ées)|logiciels? espions?|mouchards?|spyware|stalkerware|pirat\\p{L}*"),
+    motif: mot("espionn\\p{L}*|(?:g[ée]o)?localis\\p{L}*|logiciels? espions?|mouchards?|spyware|stalkerware|pirat\\p{L}*"),
     pourquoi: "un mot de surveillance (espionner, localiser, un logiciel espion…) : jamais de méthode pour surveiller quelqu’un (art. 226-15 du Code pénal)",
   },
   {
@@ -75,25 +78,29 @@ const MOTS_REFUSES: readonly { motif: RegExp; pourquoi: string }[] = [
     pourquoi: "un diagnostic sur une personne (pervers narcissique, bipolaire, borderline…) : un article décrit des messages, jamais une personne",
   },
   {
-    motif: mot("(?:il|elle|iel) (?:reviendra|va revenir)|garanti(?:e|s|es)?|100\\s?%|à coup sûr|à tous les coups|sans aucun doute"),
+    motif: mot("(?:il|elle|iel) (?:reviendra|va revenir)|garanti\\p{L}*|100\\s?%|à coup sûr|à tous les coups|sans aucun doute"),
     pourquoi: "une promesse (« il reviendra », « garanti », « 100 % ») : un article ne promet jamais un résultat",
   },
   {
-    motif: mot("(?:verdict|rapport|analyse|lecture|essai|aper[cç]u)s? (?:gratuit|offert)e?s?"),
+    /* La gratuité de ce que vend BLUSH, dans la même phrase, quel que soit l’ordre (« ton verdict est gratuit », « offert,
+       le rapport ») ; « gratuit » seul garde son autre sens (« une remarque gratuite ») */
+    motif: dansUnePhrase("(?:verdict|rapport|analyse|lecture|essai|aper[cç]u)s?|blush|import\\p{L}*", "gratuit\\p{L}*|gratos|offert\\p{L}*|sans payer|ne co[uû]te rien"),
     pourquoi: "« verdict gratuit » ou une autre gratuité écrite à la main : ce qui est gratuit se lit dans le code (src/contenu/offres.ts), et le verdict vient après le paiement",
   },
-  { motif: mot("satisfait(?:e|s|es)? ou rembours[ée]"), pourquoi: "« satisfait ou remboursé » : BLUSH ne le promet pas (les conditions disent quand on rembourse)" },
+  { motif: mot("satisfait\\p{L}* ou rembours\\p{L}*"), pourquoi: "« satisfait ou remboursé » : BLUSH ne le promet pas (les conditions disent quand on rembourse)" },
   {
-    motif: /\d(?:[\d\s]*\d)?(?:[,.]\d+)?\s*(?:€|euros?(?![\p{L}])|EUR(?![\p{L}]))/iu,
+    /* Le montant, la monnaie après (« 9,90 € », « 10 euros ») ou avant (« €9,90 », « EUR 10 ») */
+    motif: /\d(?:[\d\s]*\d)?(?:[,.]\d+)?\s*(?:€|euros?(?![\p{L}])|EUR(?![\p{L}]))|(?<![\p{L}])(?:€|EUR)\s*\d/iu,
     pourquoi: "un prix écrit à la main : le bouton d’import l’affiche, tiré du catalogue (src/contenu/offres.ts)",
   },
 ];
 
 /**
- * Les mots de la zone rouge (la violence, la détresse, le chantage, les images intimes) : un article qui les emploie est
- * en zone rouge, avec son expert et le bloc d’aide en tête.
+ * Les mots de la zone rouge (la violence, la détresse, le chantage, les images intimes, les mineurs) : un article qui les
+ * emploie est en zone rouge, avec son expert et le bloc d’aide en tête. Au figuré aussi (« ce qui frappe », « un détail
+ * mineur ») : la machine ne sait pas lire le sens, une autre tournure suffit (« ce qui saute aux yeux », « un petit détail »).
  */
-const MOTS_ROUGES = mot("suicid\\p{L}*|nudes?|sextorsion|chantage|harc[eè]l\\p{L}*|viol(?:s|e|é|ée|er|ences?)?|automutil\\p{L}*|scarifi\\p{L}*");
+const MOTS_ROUGES = mot("suicid\\p{L}*|nudes?|sextorsion|chantage|harc[eè]l\\p{L}*|viol(?:s|e|é|ée|er|ences?)?|frapp\\p{L}*|mineur(?:e|s|es)?|automutil\\p{L}*|scarifi\\p{L}*");
 
 /** Une phrase où « ta conv WhatsApp » (ou Instagram) arrive seule, sans les captures ni les enregistrements d’écran. */
 function convWhatsappSeule(texte: string): boolean {
@@ -219,32 +226,27 @@ export function fautesDeLArticle(a: Article, { exemple = false }: { exemple?: bo
     if (avant) fautes.push(`${ici} : un changement mal écrit (« ${avant.le} », « ${avant.quoi} ») : un jour qui existe, après la publication, et ce qui a changé.`);
   }
 
-  /* Les zones : le bloc d’aide en orange, et en tête en rouge, avec un expert */
-  const aides = a.sections.map((s) => s.blocs.some((b) => b.type === "aide"));
-  if (a.zone === "orange" && !aides.includes(true)) fautes.push(`${ici} : zone orange sans bloc d’aide. Ajoute { type: "aide" } dans une section.`);
+  /* Les zones : le bloc d’aide en orange, à sa place dans une section ; en rouge, la page le met elle-même en tête
+     (src/components/article/PageArticle.tsx), et un expert relit */
+  const aide = a.sections.some((s) => s.blocs.some((b) => b.type === "aide"));
+  if (a.zone === "orange" && !aide) fautes.push(`${ici} : zone orange sans bloc d’aide. Ajoute { type: "aide" } dans une section.`);
   if (a.zone === "rouge") {
     if (!a.expert) fautes.push(`${ici} : zone rouge sans expert. Un psychologue ou une association relit aussi, et signe (le champ expert).`);
-    if (!aides[0]) fautes.push(`${ici} : zone rouge sans bloc d’aide en tête. Mets { type: "aide" } dans la première section.`);
+    if (aide) fautes.push(`${ici} : en zone rouge, la page met déjà le bloc d’aide en tête, sous la signature. Retire le { type: "aide" } de la section : il serait en double.`);
   }
   const rouge = textes.find((t) => MOTS_ROUGES.test(t));
-  if (rouge && a.zone !== "rouge") fautes.push(`${ici} : un sujet de la zone rouge (violence, détresse, chantage, images intimes), en zone ${a.zone}. Dans : « ${rouge} »`);
+  if (rouge && a.zone !== "rouge")
+    fautes.push(`${ici} : un sujet de la zone rouge (violence, détresse, chantage, images intimes, mineurs), en zone ${a.zone}. Dans : « ${rouge} »`);
 
   return fautes;
 }
 
-/** Ce que liste le hub de chaque rubrique : les slugs de ses articles (articlesDu, comme src/components/article/HubArticles.tsx). */
-const hubsDe = (articles: readonly Article[]) =>
-  Object.fromEntries((Object.keys(RUBRIQUES) as Genre[]).map((genre) => [genre, articlesDu(genre, articles).map((a) => a.slug)])) as Record<Genre, string[]>;
-
 /**
  * Les fautes d’un registre entier : celles de chaque article, puis celles qui se voient à plusieurs (un slug ou un
- * mot-clé pris deux fois, un lien vers un article qui n’existe pas, une page que rien ne lie, trop de publications dans
- * une semaine, deux textes trop semblables). `hubs` : ce que listent les hubs (par défaut, ce qu’ils listent vraiment).
+ * mot-clé pris deux fois, un lien vers un article qui n’existe pas, une page qu’aucun autre article ne lie, trop de
+ * publications dans une semaine, deux textes trop semblables).
  */
-export function fautesDuRegistre(
-  articles: readonly Article[],
-  { exemple = false, hubs = hubsDe(articles) }: { exemple?: boolean; hubs?: Record<Genre, readonly string[]> } = {},
-): string[] {
+export function fautesDuRegistre(articles: readonly Article[], { exemple = false }: { exemple?: boolean } = {}): string[] {
   const fautes = articles.flatMap((a) => fautesDeLArticle(a, { exemple }));
   const parSlug = new Map(articles.map((a) => [a.slug, a]));
 
@@ -258,17 +260,18 @@ export function fautesDuRegistre(
   for (const l of doublons(motCle))
     fautes.push(`Le mot-clé « ${l[0]!.motCle} » est celui de ${l.map((a) => `« ${a.slug} »`).join(" et ")} : un seul article par mot-clé, sinon ils se gênent dans les moteurs.`);
 
-  /* Les liens : vers un article qui existe, et chaque article lié par un autre ou par son hub */
+  /* Les liens : vers un article qui existe, et chaque article lié par un autre (le maillage de la charte, règle 15). Le
+     hub, qui liste tous les articles de sa rubrique, ne compte pas : il mènerait toujours à chacun. Seul le tout premier
+     article n’a que lui. */
   for (const a of articles)
     for (const slug of a.lies) {
       if (slug === a.slug) fautes.push(`« ${a.slug} » : il se lie à lui-même.`);
       else if (!parSlug.has(slug)) fautes.push(`« ${a.slug} » : il se lie à « ${slug} », qui n’est pas dans le registre.`);
     }
-  for (const a of articles) {
-    const parUnArticle = articles.some((b) => b.slug !== a.slug && b.lies.includes(a.slug));
-    if (!parUnArticle && !hubs[a.genre].includes(a.slug))
-      fautes.push(`« ${a.slug} » est une page orpheline : ni un autre article ni son hub n’y mènent. Ajoute-le aux lies d’un article voisin.`);
-  }
+  if (articles.length > 1)
+    for (const a of articles)
+      if (!articles.some((b) => b.slug !== a.slug && b.lies.includes(a.slug)))
+        fautes.push(`« ${a.slug} » est une page orpheline : aucun autre article n’y mène. Ajoute-le aux lies d’un article voisin (une entrée du lexique, un guide proche).`);
 
   /* La cadence : au plus 5 publications par semaine */
   const parSemaine = new Map<string, Article[]>();

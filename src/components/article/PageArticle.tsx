@@ -5,14 +5,15 @@ import { InsetGroup, InsetRow, RowIcon } from "@/components/ui/inset";
 import { cheminDe, RUBRIQUES } from "@/contenu/articles";
 import type { Article } from "@/contenu/articles/types";
 import { BlocsArticle } from "./blocs";
-import { AppelImport, DateEnLettres, FilDAriane, PiedArticle } from "./pieces";
+import { AppelImport, BlocAide, DateEnLettres, FilDAriane, PiedArticle } from "./pieces";
 
 /*
  * La page d’un guide ou d’une entrée du lexique (src/contenu/articles), rendue sur le serveur : du HTML statique, lisible
  * sans JavaScript (les robots des assistants n’en exécutent pas), dans l’habit des pages légales (le papier crème,
  * l’encre, Nunito, les cartes blanches) et les bulles de BLUSH. Le gabarit de la charte : le titre (la requête telle
- * qu’on la tape), la signature, « La réponse courte », les sections aux intertitres en questions, la FAQ en texte,
- * l’appel à importer sa conv (tiré du code), les articles liés et les sources datées.
+ * qu’on la tape), la signature, le bloc d’aide en zone rouge (en tête, avant tout le texte), « La réponse courte », les
+ * sections aux intertitres en questions, la FAQ en texte, l’appel à importer sa conv (tiré du code), les articles liés et
+ * les sources datées.
  * Les mêmes écrans servent aux aperçus de l’équipe (/apercu/guide, /apercu/lexique), sur un article d’exemple.
  */
 
@@ -58,6 +59,14 @@ export function PageArticle({ article, lies }: { article: Article; lies: readonl
           </ScreenTitle>
           <Signature article={article} />
         </header>
+
+        {/* La zone rouge : les numéros d’abord, avant la moindre ligne (charte, règle 27). Posé ici, il ne peut pas manquer
+            ni descendre : un article rouge n’en met pas dans ses sections (tests/aide/articles.ts) */}
+        {article.zone === "rouge" && (
+          <div className="mt-6">
+            <BlocAide niveau={2} />
+          </div>
+        )}
 
         <section aria-labelledby="reponse-courte" className="mt-6 flex flex-col gap-2 rounded-[22px] bg-white px-5 py-4 shadow-card">
           <h2 id="reponse-courte" className="m-0 text-legende font-black text-elle-ink">

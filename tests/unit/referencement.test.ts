@@ -8,6 +8,7 @@ import { CONFIDENTIALITE_MISE_A_JOUR } from "@/contenu/confidentialite";
 import { PHRASE_D_IDENTITE } from "@/contenu/identite";
 import { MENTIONS } from "@/contenu/mentions-legales";
 import { donneesDuSite } from "@/lib/donnees-structurees";
+import { derniereMiseAJour, jourEnLettres } from "@/lib/format";
 import { CHEMINS_PRIVES, PAGES_PUBLIQUES, pagePublique, pagesPubliques } from "@/lib/referencement";
 import { URL_SITE } from "@/server/env";
 import { BARRE_FINALE } from "../../next.config";
@@ -17,7 +18,7 @@ import { verifierLesPagesPubliques } from "../aide/referencement";
  * Ce que les moteurs de recherche voient (src/lib/referencement.ts, src/app/robots.ts, src/app/sitemap.ts, /llms.txt,
  * la barre finale de next.config.ts, IndexNow) : les pages publiques, registre des articles compris, chacune indexable
  * avec son adresse canonique et dans le plan du site, rien de privé. Ici le vrai registre (src/contenu/articles, vide
- * tant qu’aucun article n’est signé) ; tests/unit/referencement-registre.test.ts refait tout avec des articles.
+ * tant qu’aucun article n’est signé) ; tests/unit/articles-pages.test.ts refait tout avec des articles.
  */
 
 /* Les pages importent la police des bulles (next/font), qui ne se charge que dans la compilation de Next */
@@ -76,6 +77,13 @@ describe("le référencement", () => {
     expect(dates).toMatchObject({ "/conditions": CONDITIONS.misAJourLe, "/mentions-legales": MENTIONS.misAJourLe, "/confidentialite": CONFIDENTIALITE_MISE_A_JOUR });
     expect(CONDITIONS.maj).toBe("Dernière mise à jour\u00a0: 26 octobre 2026.");
     expect(MENTIONS.maj).toBe("Dernière mise à jour\u00a0: 13 octobre 2026.");
+    /* Le premier du mois, comme on l’écrit : « 1er », jamais « 1 » (la date des pages légales, des articles, des offres) */
+    expect(derniereMiseAJour("2026-12-01")).toBe("Dernière mise à jour\u00a0: 1er décembre 2026.");
+    expect([jourEnLettres("2026-11-01"), jourEnLettres("2026-11-01", { court: true }), jourEnLettres("2026-11-10", { annee: true })]).toEqual([
+      "1er novembre",
+      "1er nov.",
+      "10 novembre 2026",
+    ]);
     for (const { chemin, misAJourLe } of PAGES_PUBLIQUES) expect(misAJourLe, chemin).toMatch(/^2026-\d{2}-\d{2}$/);
   });
 

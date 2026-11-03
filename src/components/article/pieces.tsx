@@ -56,16 +56,18 @@ export function FilDAriane({ etapes }: { etapes: readonly { nom: string; href?: 
 
 /**
  * Le bloc d’aide d’une page orange ou rouge : les numéros d’urgence et les lignes d’écoute de src/contenu/aide.ts, tels
- * qu’ils sont (un numéro changé là change ici), chacun à un toucher.
+ * qu’ils sont (un numéro changé là change ici), chacun à un toucher. `niveau` : celui de son titre, h3 dans une section,
+ * h2 en tête de page (la zone rouge), pour que les titres se suivent sans sauter de marche.
  */
-export function BlocAide() {
+export function BlocAide({ niveau = 3 }: { niveau?: 2 | 3 }) {
   const titre = useId();
+  const Titre = niveau === 2 ? "h2" : "h3";
   return (
     <aside aria-labelledby={titre} className="flex flex-col gap-3 rounded-[22px] bg-white px-4 py-4 shadow-card">
-      <h3 id={titre} className="m-0 flex items-center gap-2 text-carte font-black text-ink">
+      <Titre id={titre} className="m-0 flex items-center gap-2 text-carte font-black text-ink">
         <Icon name="shield" size={20} stroke={2.3} className="text-vrai-ink" />
         Besoin d’en parler{NBSP}?
-      </h3>
+      </Titre>
       <p className="m-0 text-detail font-extrabold leading-[1.5] text-soft">{URGENCES}</p>
       <ul className="m-0 flex list-none flex-col gap-2 p-0">
         {LIGNES_D_ECOUTE.map((l) => (

@@ -13,7 +13,8 @@ export type Genre = "guide" | "lexique";
 /**
  * La zone du sujet, décidée avant d’écrire. Verte : la drague, les délais, les mots (la voix de BLUSH en entier). Orange :
  * la rupture, la jalousie, l’estime de soi (sans diagnostic, sources citées, le bloc d’aide). Rouge : la violence, le
- * contrôle, le harcèlement, la détresse, les mineurs (le bloc d’aide en tête, aucune vanne, un expert nommé qui relit).
+ * contrôle, le harcèlement, la détresse, les mineurs (le bloc d’aide en tête, que la page pose elle-même sous la
+ * signature, aucune vanne, un expert nommé qui relit).
  */
 export type Zone = "verte" | "orange" | "rouge";
 
@@ -44,8 +45,8 @@ export type Replique = { de: "moi" | "autre"; texte: string };
  *   absente du texte ;
  * - `regarde` : « Ce que BLUSH regarde », les signes qu’il lit dans une conv, écrits à neuf (jamais tirés des prompts) ;
  * - `pieges` : « Les pièges », ce qu’il vaut mieux ne pas faire ;
- * - `aide` : le bloc d’aide, avec les numéros de src/contenu/aide.ts tels qu’ils sont (exigé en zone orange et rouge,
- *   dans la première section en zone rouge).
+ * - `aide` : le bloc d’aide, avec les numéros de src/contenu/aide.ts tels qu’ils sont (exigé en zone orange ; en zone
+ *   rouge, la page le met elle-même en tête, jamais dans une section).
  */
 export type BlocArticle =
   | { type: "paragraphe"; texte: string }
