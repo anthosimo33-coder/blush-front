@@ -35,9 +35,11 @@ describe("les pubs de Meta : ce que le navigateur et le serveur partagent", () =
 });
 
 describe("ce qu’une requête peut dire à Meta (traceDe)", () => {
-  it("rien sans l’accord : refusé, ou pas encore choisi", () => {
+  it("rien sans l’accord : refusé, ou pas encore choisi ; ni en mode tournage, même avec l’accord", () => {
     expect(traceDe(requete(`_fbp=${FBP}`))).toBeNull();
     expect(traceDe(requete(`blush-pubs=non; _fbp=${FBP}`))).toBeNull();
+    expect(traceDe(requete(`blush-pubs=oui; _fbp=${FBP}; blush-tournage=secret`))).toBeNull();
+    expect(traceDe(requete(`blush-pubs=oui; _fbp=${FBP}; __Host-blush-tournage=secret`))).toBeNull();
   });
 
   it("avec l’accord : les cookies de Meta au bon format, et le navigateur", () => {

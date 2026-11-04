@@ -15,6 +15,8 @@ import { env } from "./env";
  * chaque essai plus cher (un humain, ou un service payant qui en résout) : les limites restent la borne.
  */
 export const LIMITES = {
+  /** Les accords des pubs depuis une adresse IP (POST /api/pubs/vue : une page vue chez Meta), le garde-fou d’une boucle. */
+  vuesPubsParIp: { max: 30, fenetreS: 3600 },
   /** Les codes de connexion demandés depuis une adresse IP, quel que soit l’email. */
   codeParIp: { max: 100, fenetreS: 3600 },
   /**
