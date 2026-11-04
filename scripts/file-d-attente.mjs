@@ -478,8 +478,15 @@ async function prendrePlace({ racine, places, plafond, quoi, ou, dire }) {
         if (e.code !== "ENOENT") throw e;
       }
       if (vu?.place) {
+        /* Un signal arrivé pendant le regard (bloquant, sourd aux signaux) se traite ici, avant de lancer quoi que ce soit */
+        await new Promise((r) => setImmediate(r));
+        const tenue = tenir(dossier, vu.place, dire);
+        if (interrompue) {
+          tenue.rendre();
+          throw new Error("attente interrompue par un signal");
+        }
         retirer();
-        return tenir(dossier, vu.place, dire);
+        return tenue;
       }
       if (vu && maintenant - dernierMessage >= RAPPEL_MS) {
         dernierMessage = maintenant;
@@ -493,6 +500,8 @@ async function prendrePlace({ racine, places, plafond, quoi, ou, dire }) {
       await new Promise((r) => setTimeout(r, REGARD_MS + Math.floor(Math.random() * REGARD_HASARD_MS)));
     }
   } catch (e) {
+    /* Un Ctrl-C reçu pendant les 20 s d’un verrou figé se traite ici : la suite ne part pas sans place après lui */
+    if (!interrompue) await new Promise((r) => setImmediate(r));
     try {
       /* Le verrou introuvable : 20 s de plus à l’attendre n’y changeraient rien */
       if (!interrompue && e.code !== "EVERROU") rendreLeTicket();
@@ -511,14 +520,15 @@ async function prendrePlace({ racine, places, plafond, quoi, ou, dire }) {
  * que les places à son jeton. La tenue ajoute à chaque battement le temps depuis le précédent, au plus deux fois son
  * rythme : une veille du poste (sur Mac, l’horloge monotone avance pendant la veille) ou un Ctrl-Z ne l’allongent pas.
  * Une place reprise pendant qu’elle tournait (la suite arrêtée plus de 30 s, le dossier effacé) se réinscrit au
- * battement suivant, sous un nom libre : la suite tourne, les autres doivent le voir. Un verrou introuvable (EVERROU)
- * arrête le battement, plutôt que de bloquer 20 s toutes les 5 s.
+ * battement suivant, sous un nom libre : la suite tourne, les autres doivent le voir. Un battement qui échoue (un verrou
+ * introuvable, EVERROU) prévient une fois et réessaie au suivant.
  */
 function tenir(dossier, place, dire) {
   const { contenu } = place;
   let dernier = performance.now();
   let rendue = false;
   let prevenue = false;
+  let enPanne = false;
   const battre = () =>
     sousVerrou(dossier, () => {
       const eveil = performance.now();
@@ -536,9 +546,12 @@ function tenir(dossier, place, dire) {
     try {
       battre();
     } catch (e) {
-      if (e.code === "EVERROU") clearInterval(battement);
-      dire(`Le battement de la file ${e.code === "EVERROU" ? "s’arrête" : "a échoué"} : ${e.message}`);
+      /* Une fois prévenu, on réessaie au battement suivant : un verrou réparé à la main laisse la suite battre de nouveau */
+      if (!enPanne) dire(`Le battement de la file a échoué (il réessaie toutes les ${BATTEMENT_MS / 1000} s) : ${e.message}`);
+      enPanne = true;
+      return;
     }
+    enPanne = false;
   }, BATTEMENT_MS);
   battement.unref();
   return {
@@ -563,11 +576,16 @@ function tenir(dossier, place, dire) {
  */
 function lancer(commande, place) {
   return new Promise((resolve) => {
-    const enfant = spawn(commande[0], commande.slice(1), { stdio: "inherit", env: { ...process.env, BLUSH_FILE_TENUE: "1" } });
+    /* Les signaux écoutés avant de lancer la suite : sans écoute, un SIGTERM tuerait la file seule, et sa suite tournerait sans place */
+    let enfant = null;
+    let avantLeDepart = null;
     const transmettre = (signal) => {
-      enfant.kill(signal);
+      if (enfant) enfant.kill(signal);
+      else avantLeDepart = signal;
     };
     for (const s of SIGNAUX) process.on(s, transmettre);
+    enfant = spawn(commande[0], commande.slice(1), { stdio: "inherit", env: { ...process.env, BLUSH_FILE_TENUE: "1" } });
+    if (avantLeDepart) enfant.kill(avantLeDepart);
     let finie = false;
     const fin = (code) => {
       if (finie) return;
