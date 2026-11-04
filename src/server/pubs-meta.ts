@@ -163,10 +163,7 @@ export async function signalerVueAMeta(req: Request, chemin: string | null): Pro
   const trace = configMeta() ? traceDe(req) : null;
   if (!trace) return;
   const page = pageSure(chemin ? new URL(chemin, URL_SITE).href : req.headers.get("referer"));
-  await auMieux(
-    envoyer(evenementMeta({ nom: "PageView", id: randomUUID(), le: new Date(), page, personne: { ...trace, ip: adresseDe(req) } })),
-    "page vue non envoyée à Meta",
-  );
+  await auMieux(envoyer(evenementMeta({ nom: "PageView", id: randomUUID(), le: new Date(), page, personne: { ...trace, ip: adresseDe(req) } })), "page vue non envoyée à Meta");
 }
 
 /**
