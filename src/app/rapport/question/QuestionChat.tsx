@@ -264,7 +264,10 @@ export function QuestionChat({ ideas, story, ferme = false }: { ideas: string[];
           />
           {question && (
             <div data-rise="" className="flex justify-end">
-              <span className="max-w-[80%] whitespace-pre-wrap rounded-[20px] bg-toi-ink px-4 py-2.5 text-corps font-bold leading-[1.4] text-white">{question}</span>
+              {/* Ta question : masquée dans l’enregistrement des visites (src/lib/secrets.ts) */}
+              <span data-prive="" className="max-w-[80%] whitespace-pre-wrap rounded-[20px] bg-toi-ink px-4 py-2.5 text-corps font-bold leading-[1.4] text-white">
+                {question}
+              </span>
             </div>
           )}
           {asking && (

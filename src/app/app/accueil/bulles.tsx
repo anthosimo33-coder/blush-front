@@ -335,6 +335,8 @@ function groupesEgaux(a: GroupProps, b: GroupProps) {
 /**
  * Une bulle de la conv (src/components/ui/messages.tsx, BulleDeBlush) : ses coins viennent de sa place dans le groupe,
  * son style de son contenu (`plain`, la bulle blanche de BLUSH). `quote` : 7 · ce qu’on creuse en la glissant.
+ * Tes messages (ton texte, ton fichier) sont masqués dans l’enregistrement des visites ; ceux de BLUSH s’y lisent, les
+ * messages de la conv qu’il cite masqués (Bubble), ses prénoms aussi (src/lib/secrets.ts).
  */
 function BubbleShape({ side, pos, node, id, unfold = null }: { side: "blush" | "toi"; pos: PlaceBulle; node: BulleDeBlush; id: string; unfold?: number | null }) {
   const tone = node.tone ?? (side === "toi" ? "toi" : "plain");
@@ -342,6 +344,7 @@ function BubbleShape({ side, pos, node, id, unfold = null }: { side: "blush" | "
   return (
     <div
       data-bubble={id}
+      data-prive={side === "toi" ? "" : undefined}
       data-quote={quote}
       data-unfold={unfold !== null ? "" : undefined}
       style={unfold !== null ? delai(unfold) : undefined}
@@ -647,7 +650,7 @@ function bullesDeLaReponse(r: BlushAnswer, shine: boolean): BulleDeBlush[] {
   ];
 }
 
-/** Les messages à lui envoyer, une bulle chacun, à copier en un geste. */
+/** Les messages à lui envoyer, une bulle chacun, à copier en un geste (tes futurs messages : masqués dans l’enregistrement des visites). */
 function SendReply({ lines, why, shine = false }: { lines: string[]; why?: string; shine?: boolean }) {
   return (
     <span className="flex flex-col gap-2">
@@ -655,7 +658,7 @@ function SendReply({ lines, why, shine = false }: { lines: string[]; why?: strin
         <span className="text-micro font-black text-vrai-ink">Ta meilleure réponse</span>
         <Tag tone="recommandee" />
       </span>
-      <span className="flex flex-col items-start gap-[3px]">
+      <span data-prive="" className="flex flex-col items-start gap-[3px]">
         {lines.map((l, i) => (
           <span
             key={i}

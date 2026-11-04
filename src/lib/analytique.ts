@@ -19,10 +19,11 @@ import { cleDePostHog } from "./publique";
  *   identifiants (une conv, un lien partagé, un code de parrainage, un lien de tournage deviennent « :id »), ni le titre
  *   de la page ; d’un autre site, seulement son nom (nettoyer) ;
  * - l’enregistrement des visites montre les écrans de BLUSH tels qu’ils s’affichent (les titres, les boutons, les
- *   messages d’erreur : décidé le 20 octobre, tout masqué ne servait à rien), jamais la conv ni qui l’on est
- *   (masquerTexte) : tout le texte d’une zone marquée `data-prive` (le chat, le rapport, la fiche, la lecture, le haut
- *   du paywall, les avatars…), les prénoms et l’email retenus de la conv ouverte (retenirSecrets, partout ailleurs), tout
- *   email, le titre de la page, et toutes les saisies masqués (« *** ») ; les images, les vidéos et les cadres bloqués
+ *   messages d’erreur : décidé le 20 octobre, tout masqué ne servait à rien ; les réponses de BLUSH et le rapport aussi,
+ *   décidé le 4 novembre), jamais la conv ni qui l’on est (masquerTexte) : tout le texte d’une zone marquée `data-prive`
+ *   (les messages de la conv cités, les tiens à BLUSH, les réponses à envoyer, les infos de la fiche, les avatars…), les
+ *   prénoms et l’email retenus de la conv ouverte (retenirSecrets, partout ailleurs), tout email, le titre de la page, et
+ *   toutes les saisies masqués (« *** ») ; les images, les vidéos et les cadres bloqués
  *   (un rectangle vide : les captures d’une conv, l’enregistrement d’écran, la carte de Whop), les attributs qui peuvent
  *   dire un prénom masqués (aria-label, title, alt…), les liens et l’adresse des pages nettoyés comme le reste, ni la
  *   console, ni le réseau. L’enregistreur est dans le code (posthog-recorder) : aucun script chargé depuis PostHog ;

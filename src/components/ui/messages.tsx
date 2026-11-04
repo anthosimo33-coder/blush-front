@@ -4,24 +4,31 @@ import { delai } from "@/lib/motion";
 import { BubbleLogo } from "@/components/brand/objects3d";
 import type { Confidence } from "@/types";
 
-/* ———— Bulle : elle grise à gauche, toi bleue à droite. Figtree uniquement ici. ———— */
+/*
+ * ———— Bulle : elle grise à gauche, toi bleue à droite. Figtree uniquement ici. ————
+ * Un vrai message de la conv : son texte masqué dans l’enregistrement des visites (src/lib/secrets.ts), sa légende
+ * lisible (ses prénoms masqués comme partout). `prive={false}` : un message inventé (les convs d’exemple de la landing).
+ */
 export function Bubble({
   from,
   children,
   caption,
   className,
   style,
+  prive = true,
 }: {
   from: "elle" | "toi";
   children: ReactNode;
   caption?: ReactNode;
   className?: string;
   style?: CSSProperties;
+  prive?: boolean;
 }) {
   const her = from === "elle";
   return (
     <div className={cn("flex max-w-[82%] flex-col gap-1", her ? "items-start self-start" : "items-end self-end", className)} style={style}>
       <span
+        data-prive={prive ? "" : undefined}
         className={cn(
           "px-[13px] py-[9px] font-message text-detail font-bold leading-[1.35]",
           her ? "rounded-[18px_18px_18px_6px] bg-bubble-her text-ink" : "rounded-[18px_18px_6px_18px] bg-bubble-me text-white",

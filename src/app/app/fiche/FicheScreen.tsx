@@ -381,7 +381,10 @@ export function FicheScreen({ initial, fixed = false, storyId, rendu }: { initia
                           </span>
                         )
                       )}
-                      <span className="min-w-0 flex-1 text-corps font-extrabold leading-[1.35]">{f.text}</span>
+                      {/* Ce qu’on sait d’elle (sa ville, son âge, son travail…) : masqué dans l’enregistrement des visites (src/lib/secrets.ts) */}
+                      <span data-prive="" className="min-w-0 flex-1 text-corps font-extrabold leading-[1.35]">
+                        {f.text}
+                      </span>
                       <span className="shrink-0 text-right text-[12.5px] font-extrabold text-grey">{f.sourceLabel}</span>
                     </li>
                   );
@@ -548,7 +551,10 @@ function Found({ what, update, onUndo, onClose }: { what: string; update: FicheU
           {update.added.map((f) => (
             <li key={f.id} className="flex min-h-[40px] items-center gap-2.5 px-4 py-1.5">
               <span aria-hidden="true" className="size-[7px] shrink-0 rounded-full bg-elle" />
-              <span className="min-w-0 flex-1 text-detail font-extrabold leading-[1.35]">{f.text}</span>
+              {/* Une info sur elle : masquée dans l’enregistrement des visites, comme dans la fiche */}
+              <span data-prive="" className="min-w-0 flex-1 text-detail font-extrabold leading-[1.35]">
+                {f.text}
+              </span>
               <span className="shrink-0 rounded-full bg-paper px-2.5 py-1 text-micro font-black leading-none text-soft">
                 {titreDeRubrique(f.section, update.fiche.person.pronoun)}
               </span>

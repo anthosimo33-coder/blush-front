@@ -47,8 +47,7 @@ export default async function Page({ searchParams }: PageProps<"/app">) {
    */
   return (
     <PageDeConv rendu={rendu}>
-      {/* data-prive : tout son texte masqué dans l’enregistrement des visites (src/lib/secrets.ts) */}
-      <div data-prive="" className="[background:var(--paper-light)]">
+      <div className="[background:var(--paper-light)]">
         <HomeScreen
           quick={quick}
           script={chat.echanges}
