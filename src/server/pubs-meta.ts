@@ -5,7 +5,10 @@ import type { Jalon } from "@/types";
 import { cheminSur } from "@/lib/chemins";
 import { NOMS_DU_TOURNAGE } from "@/lib/noms-cookies";
 import { COOKIE_CHOIX_PUBS, COOKIE_FBC, COOKIE_FBP, evenementMetaDe, traceValide, type TraceMeta } from "@/lib/pubs";
+import { utilisateurDeSession, type Utilisateur } from "./auth";
+import { lireSession } from "./cookies";
 import { db, schema } from "./db";
+import { estEquipe } from "./droits";
 import { env, URL_SITE } from "./env";
 import { auMieux, journal } from "./journal";
 import { adresseDe } from "./limites";
@@ -21,8 +24,9 @@ import { adresseDe } from "./limites";
  *   leur jalon (src/server/visites.ts, noterJalon) ; et l’achat payé (Purchase, son montant), depuis son webhook, d’un
  *   vrai client seulement (achats.population : ni l’équipe, ni le tournage, ni l’offert) ;
  * - avec ce que Meta sait relier à un clic : ses deux cookies (_fbp, _fbc), le navigateur, l’adresse IP de la requête
- *   (lue, jamais écrite) et, pour un achat, l’email du compte haché (SHA-256, comme Meta le demande) ; l’adresse de la
- *   page sans identifiant ni requête (cheminSur).
+ *   (lue, jamais écrite) et, une fois le compte créé (sa session, ou l’acheteur), son email et son identifiant hachés
+ *   (SHA-256, comme Meta le demande) ; l’adresse de la page sans identifiant ni requête (cheminSur) ;
+ * - jamais pour un compte de l’équipe ou un invité (estEquipe) : leurs essais ne sont pas des clients.
  * À la commande, l’achat garde les deux cookies et le navigateur (achats.pubs_meta : le webhook n’a pas la requête),
  * effacés dès l’achat envoyé, et au plus tard par la purge. Rien de tout ça ne fait échouer ce qu’il suit (auMieux).
  */
@@ -34,8 +38,8 @@ export const PUBS_META_GARDEES_JOURS = 7;
 /** Le temps laissé à Meta pour répondre : court, la livraison d’un achat l’attend. */
 const DELAI_MS = 4000;
 
-/** Ce que Meta reçoit de la personne (user_data). */
-type Personne = TraceMeta & { ip?: string | null; email?: string | null };
+/** Ce que Meta reçoit de la personne (user_data) : `compte`, l’identifiant de son compte (external_id, haché). */
+type Personne = TraceMeta & { ip?: string | null; email?: string | null; compte?: string | null };
 
 /** Un événement tel que Meta le reçoit (son API Conversions). */
 type EvenementMeta = {
@@ -73,6 +77,8 @@ export function traceDe(req: Request): TraceMeta | null {
 
 /** Un email tel que Meta le compare : sans espace, en minuscules, haché (SHA-256, en hexadécimal). */
 export const emailHache = (email: string) => createHash("sha256").update(email.trim().toLowerCase()).digest("hex");
+/** L’identifiant d’un compte tel qu’il part chez Meta (external_id) : haché, comme l’email. */
+const compteHache = (id: string) => createHash("sha256").update(id).digest("hex");
 
 /** L’adresse d’une page de BLUSH telle qu’elle part chez Meta : son chemin sans identifiant ni requête, sinon l’accueil. */
 export function pageSure(adresse: string | null): string {
@@ -106,6 +112,7 @@ export function evenementMeta({
   if (personne.agent) user_data.client_user_agent = personne.agent;
   if (personne.ip) user_data.client_ip_address = personne.ip;
   if (personne.email) user_data.em = [emailHache(personne.email)];
+  if (personne.compte) user_data.external_id = [compteHache(personne.compte)];
   return {
     event_name: nom,
     event_time: Math.floor(le.getTime() / 1000),
@@ -141,18 +148,34 @@ async function envoyer(evenement: EvenementMeta): Promise<void> {
 }
 
 /**
+ * Le compte de la requête (sa session), pour Meta ; null : pas de compte (pas encore créé), ou une session qui ne se
+ * lit pas. Seulement lu quand un événement part : le signe des onglets et les jalons ne la cherchent pas sinon.
+ */
+async function compteDeLaRequete(): Promise<Utilisateur | null> {
+  try {
+    return await utilisateurDeSession(await lireSession());
+  } catch {
+    return null;
+  }
+}
+
+/** La personne d’un événement parti d’une requête, ou null : un compte de l’équipe, qui ne part pas chez Meta. */
+async function personneDe(req: Request, trace: TraceMeta): Promise<Personne | null> {
+  const compte = await compteDeLaRequete();
+  if (compte && estEquipe(compte)) return null;
+  return { ...trace, ip: adresseDe(req), ...(compte && { email: compte.email, compte: compte.id }) };
+}
+
+/**
  * Le jalon d’une personne qui a accepté les pubs, chez Meta (son événement standard : EVENEMENTS_META), la première
  * fois du jour (`nouveau`, noterJalon) ; les autres jalons, et sans accord, rien.
  */
 export async function signalerJalonAMeta(req: Request, jalon: Jalon): Promise<void> {
   const nom = evenementMetaDe(jalon);
   const trace = nom && configMeta() ? traceDe(req) : null;
-  if (!nom || !trace) return;
-  await auMieux(
-    envoyer(evenementMeta({ nom, id: randomUUID(), le: new Date(), page: pageSure(req.headers.get("referer")), personne: { ...trace, ip: adresseDe(req) } })),
-    "jalon non envoyé à Meta",
-    { jalon },
-  );
+  const personne = nom && trace ? await personneDe(req, trace) : null;
+  if (!nom || !personne) return;
+  await auMieux(envoyer(evenementMeta({ nom, id: randomUUID(), le: new Date(), page: pageSure(req.headers.get("referer")), personne })), "jalon non envoyé à Meta", { jalon });
 }
 
 /**
@@ -161,9 +184,10 @@ export async function signalerJalonAMeta(req: Request, jalon: Jalon): Promise<vo
  */
 export async function signalerVueAMeta(req: Request, chemin: string | null): Promise<void> {
   const trace = configMeta() ? traceDe(req) : null;
-  if (!trace) return;
+  const personne = trace ? await personneDe(req, trace) : null;
+  if (!personne) return;
   const page = pageSure(chemin ? new URL(chemin, URL_SITE).href : req.headers.get("referer"));
-  await auMieux(envoyer(evenementMeta({ nom: "PageView", id: randomUUID(), le: new Date(), page, personne: { ...trace, ip: adresseDe(req) } })), "page vue non envoyée à Meta");
+  await auMieux(envoyer(evenementMeta({ nom: "PageView", id: randomUUID(), le: new Date(), page, personne })), "page vue non envoyée à Meta");
 }
 
 /**
@@ -175,7 +199,7 @@ export async function envoyerAchatAMeta(achatId: string): Promise<void> {
   if (!configMeta()) return;
   const a = schema.achats;
   const [achat] = await db()
-    .select({ id: a.id, statut: a.statut, population: a.population, centimes: a.centimes, payeLe: a.payeLe, pubsMeta: a.pubsMeta, email: schema.users.email })
+    .select({ id: a.id, userId: a.userId, statut: a.statut, population: a.population, centimes: a.centimes, payeLe: a.payeLe, pubsMeta: a.pubsMeta, email: schema.users.email })
     .from(a)
     .leftJoin(schema.users, eq(schema.users.id, a.userId))
     .where(eq(a.id, achatId));
@@ -188,7 +212,7 @@ export async function envoyerAchatAMeta(achatId: string): Promise<void> {
           id: achat.id,
           le: achat.payeLe ?? new Date(),
           page: `${URL_SITE}/`,
-          personne: { ...achat.pubsMeta, email: achat.email },
+          personne: { ...achat.pubsMeta, email: achat.email, compte: achat.userId },
           centimes: achat.centimes,
         }),
       ),

@@ -84,6 +84,19 @@ describe("un événement pour Meta (evenementMeta)", () => {
     expect(JSON.stringify(e)).not.toContain("lea@exemple.fr");
   });
 
+  it("un compte créé : son identifiant haché (external_id), jamais en clair", () => {
+    const e = evenementMeta({
+      nom: "ViewContent",
+      id: "x",
+      le: new Date(0),
+      page: `${URL_SITE}/lecture`,
+      personne: { email: "lea@exemple.fr", compte: "6f1c2a52-0000-4000-8000-000000000001" },
+    });
+    expect(e.user_data.em).toEqual([emailHache("lea@exemple.fr")]);
+    expect(e.user_data.external_id).toEqual([expect.stringMatching(/^[\da-f]{64}$/)]);
+    expect(JSON.stringify(e)).not.toContain("6f1c2a52-0000-4000-8000-000000000001");
+  });
+
   it("un jalon : sans montant, avec l’adresse IP de la requête", () => {
     const e = evenementMeta({ nom: "Lead", id: "x", le: new Date(0), page: `${URL_SITE}/importer`, personne: { ip: "203.0.113.7" } });
     expect(e.custom_data).toBeUndefined();

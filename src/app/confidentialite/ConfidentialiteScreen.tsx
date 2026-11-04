@@ -101,8 +101,9 @@ export function ConfidentialiteScreen() {
         <Ligne icone="link" titre="Les pubs sur Insta et Facebook, si tu acceptes" id="pubs">
           Si tu l’acceptes dans le bandeau, on dit à Meta (Facebook, Instagram) ce que tu fais après une de nos pubs, pour qu’il les montre aux bonnes personnes{NBSP}: les pages
           que tu ouvres, ta conv importée, ton compte créé, nos offres vues, un paiement lancé, un achat et son montant. Avec ça partent deux cookies de Meta (un code tiré au
-          hasard pour ce navigateur, et le clic de la pub), ton navigateur, ton adresse IP (lue, jamais gardée) et, pour un achat, une empreinte de ton email (pas ton email en
-          clair). Jamais ta conv, ni ce que BLUSH en dit, ni les prénoms. Sans ton accord, rien ne part. Ton choix se garde six mois, et tu le changes quand tu veux{NBSP}:
+          hasard pour ce navigateur, et le clic de la pub), ton navigateur, ton adresse IP (lue, jamais gardée) et, une fois ton compte créé, une empreinte de ton email et de ton
+          compte (pas ton email en clair). Jamais ta conv, ni ce que BLUSH en dit, ni les prénoms. Sans ton accord, rien ne part. Ton choix se garde six mois, et tu le changes
+          quand tu veux{NBSP}:
           <ChoixDesPubs />
         </Ligne>
         {/* La sentinelle (src/lib/sentinelle.tsx, src/server/navigateur.ts) : sans compte, ni adresse IP, ni adresse de page ; gardées 30 jours */}
