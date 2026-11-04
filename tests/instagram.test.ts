@@ -393,3 +393,83 @@ describe("une réponse à une story", () => {
     expect(texte).not.toContain("instagram.com");
   });
 });
+
+/*
+ * Un export Instagram demandé en espagnol ou en portugais : ses dates suivent la langue du compte, dans l’ordre de Meta
+ * (« ago 10, 2026 6:32 pm », vu sur de vrais exports) ; ses réactions ont la forme des françaises.
+ */
+describe("Instagram en espagnol et en portugais", () => {
+  const NB = String.fromCharCode(0xa0);
+  const seul = (quand: string) => depuisInstagramHtml(enHtml(blocHtml("Léa", "<div>hola</div>", quand)));
+
+  it("le HTML : les mois espagnols et portugais se lisent comme les anglais, « p. m. » compris", () => {
+    expect(seul("ago 10, 2026 6:32 pm").texte).toBe(seul("Aug 10, 2026 6:32 pm").texte);
+    expect(seul("ene 10, 2024 10:51:04 am").texte).toBe(seul("Jan 10, 2024 10:51:04 am").texte);
+    expect(seul("dic 24, 2025 11:59 pm").texte).toBe(seul("Dec 24, 2025 11:59 pm").texte);
+    expect(seul("set 18, 2026 8:57 pm").texte).toBe(seul("Sep 18, 2026 8:57 pm").texte);
+    expect(seul("out 18, 2026 8:57 pm").texte).toBe(seul("Oct 18, 2026 8:57 pm").texte);
+    expect(seul("18 de maio de 2026 20:57").texte).toBe(seul("May 18, 2026 8:57 pm").texte);
+    expect(seul(`oct 3, 2025, 7:05 p.${NB}m.`).texte).toBe(seul("Oct 3, 2025, 7:05 pm").texte);
+    /* Les douze mois de l’espagnol : aucun bloc perdu */
+    const mois = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+    const annee = depuisInstagramHtml(enHtml(...mois.map((m, k) => blocHtml(k % 2 ? "Tom" : "Léa", `<div>mensaje ${k}</div>`, `${m} 18, 2026 6:57 pm`))));
+    expect(annee.messages).toBe(12);
+    expect(annee.datesIllisibles).toBeUndefined();
+  });
+
+  it("une date qu’on ne sait pas lire n’est plus perdue sans rien dire : comptée, avec sa forme, chiffres masqués", () => {
+    const html = enHtml(
+      blocHtml("Léa", "<div>hallo</div>", "Okt 18, 2026 6:57 pm"),
+      blocHtml("Tom", "<div>hola</div>", "Sep 18, 2026 6:58 pm"),
+      blocHtml("Léa", "<div>tschüss</div>", "Okt 19, 2026 7:00 pm"),
+      /* Un bloc sans date n’est pas un message : il ne compte pas */
+      blocHtml("Léa", "<div>Mailbox thread pending</div>", ""),
+    );
+    const r = depuisInstagramHtml(html);
+    expect(r.messages).toBe(1);
+    expect(r.datesIllisibles).toEqual({ blocs: 2, forme: "Okt 00, 0000 0:00 pm" });
+    /* Jusqu’à l’import, qui le met au journal */
+    expect(lireExport([{ nom: "message_1.html", contenu: html }])).toMatchObject({ appli: "instagram", datesIllisibles: { blocs: 2, forme: "Okt 00, 0000 0:00 pm" } });
+  });
+
+  it("une réaction n’a que son emoji entre le verbe et le message : l’espagnol et le portugais sont jetés, les phrases qui en parlent restent", () => {
+    const texte = depuisInstagramJson(
+      enJson(
+        { sender_name: "Tom", timestamp_ms: T(0), content: "oi tudo bem?" },
+        { sender_name: "Léa", timestamp_ms: T(1), content: "Reaccionó ❤️ a tu mensaje " },
+        { sender_name: "Léa", timestamp_ms: T(2), content: "Reagiu com 😂 à sua mensagem" },
+        { sender_name: "Léa", timestamp_ms: T(3), content: "Ha reaccionado con 👍 a tu mensaje" },
+        { sender_name: "Léa", timestamp_ms: T(4), content: "A réagi (❤️) à votre message" },
+        { sender_name: "Léa", timestamp_ms: T(5), content: "elle a réagi bizarrement à ton message" },
+        { sender_name: "Tom", timestamp_ms: T(6), content: "she reacted so weird to your message" },
+        { sender_name: "Léa", timestamp_ms: T(7), content: "ela reagiu mal à sua mensagem?? kkk" },
+        /* Le « a » sans accent de l’espagnol ne vaut pas devant « message » : tapé sans accent, le français reste un message */
+        { sender_name: "Léa", timestamp_ms: T(8), content: "ma sœur a réagi 😂 a ton message" },
+      ),
+    ).texte;
+    expect(vus(texte)).toEqual([
+      "oi tudo bem?",
+      "elle a réagi bizarrement à ton message",
+      "she reacted so weird to your message",
+      "ela reagiu mal à sua mensagem?? kkk",
+      "ma sœur a réagi 😂 a ton message",
+    ]);
+  });
+
+  it("le JSON : la mention d’un reel partagé, dans n’importe quelle langue, n’est pas leur texte", () => {
+    const texte = depuisInstagramJson(
+      enJson(
+        {
+          sender_name: "Léa",
+          timestamp_ms: T(0),
+          content: "lucia.gr envió un archivo adjunto.",
+          share: { link: "https://www.instagram.com/reel/ABC123/", original_content_owner: "pareja.graciosa", share_text: "POV: cuando no contesta 😭" },
+        },
+        { sender_name: "Tom", timestamp_ms: T(1), content: "jajaja" },
+        /* Un lien tapé, sans propriétaire : leur texte */
+        { sender_name: "Léa", timestamp_ms: T(2), content: "mira esto", share: { link: "https://www.instagram.com/p/XYZ789/" } },
+      ),
+    ).texte;
+    expect(vus(texte)).toEqual(["média", "jajaja", "mira esto [média]"]);
+  });
+});

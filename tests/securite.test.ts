@@ -218,7 +218,8 @@ describe("le journal de l’import : une ligne marquée qu’aucune règle ne li
         nom: "WhatsApp Chat - Léa.txt",
         appli: "whatsapp",
         /* Deux libellés de même forme, et un vrai message marqué : lui ne revient pas, rien de lui n’en sort */
-        texte: exportIos(["<adjunto: 00000005-VIDEO-2025-01-09-12-23-16.mp4>", "rendez-vous à la gare", "<adjunto: 00000006-VIDEO-2025-01-09-12-23-20.mp4>"]),
+        /* L’allemand « <Anhang: …> », qu’on ne lit pas encore */
+        texte: exportIos(["<Anhang: 00000005-VIDEO-2025-01-09-12-23-16.mp4>", "rendez-vous à la gare", "<Anhang: 00000006-VIDEO-2025-01-09-12-23-20.mp4>"]),
       },
       accordDeTest(),
     );
@@ -232,9 +233,9 @@ describe("le journal de l’import : une ligne marquée qu’aucune règle ne li
       niveau: "alerte",
       format: "whatsapp-ios",
       lignes: 3,
-      forme: "<aaaaaaa: 00000000-AAAAA",
+      forme: "<Aaaaaa: 00000000-AAAAA-",
     });
-    for (const mot of ["samedi", "gare", "adjunto", "VIDEO"]) expect(lignes[0]).not.toContain(mot);
+    for (const mot of ["samedi", "gare", "Anhang", "VIDEO"]) expect(lignes[0]).not.toContain(mot);
   });
 
   it("deux messages marqués identiques : sur iOS, leur silhouette seule ; sur Android, ce sont des messages, rien au journal", async () => {
@@ -248,12 +249,12 @@ describe("le journal de l’import : une ligne marquée qu’aucune règle ne li
 
   it("deux documents Android dont le nom a des espaces : des médias, ou sa silhouette dans une langue qu’on ne lit pas", async () => {
     const francais = exportAvec(["Bulletin de salaire Tom Durand janvier.pdf (fichier joint)", "Bulletin de salaire Tom Durand février.pdf (fichier joint)"], true);
-    /* Le libellé espagnol d’un fichier joint, relevé sur de vrais exports */
-    const espagnol = exportAvec(["Contrato de alquiler Tom Durand.pdf (archivo adjunto)", "Contrato de alquiler Tom Durand.pdf (archivo adjunto)"], true);
-    const lignes = await journalDe(francais, espagnol);
+    /* Le libellé allemand d’un fichier joint, qu’on ne lit pas encore */
+    const allemand = exportAvec(["Contrato de alquiler Tom Durand.pdf (Datei angehängt)", "Contrato de alquiler Tom Durand.pdf (Datei angehängt)"], true);
+    const lignes = await journalDe(francais, allemand);
     expect(lignes).toHaveLength(1);
     expect(JSON.parse(lignes[0]!)).toMatchObject({ format: "whatsapp-android", lignes: 2, forme: "Aaaaaaaa aa aaaaaaaa Aaa" });
-    for (const mot of ["Bulletin", "salaire", "Contrato", "alquiler", "Tom", "Durand", "archivo"]) expect(lignes.join("\n")).not.toContain(mot);
+    for (const mot of ["Bulletin", "salaire", "Contrato", "alquiler", "Tom", "Durand", "Datei"]) expect(lignes.join("\n")).not.toContain(mot);
   });
 
   it("un export WhatsApp de 40 000 messages : coupé, « BLUSH lit vos N derniers mois » ; une ligne au journal, des nombres seulement", async () => {

@@ -14,12 +14,18 @@ const H = 3600e3;
 /*
  * Les mots trop courants pour dire quelque chose d’eux (en plus des mots vides de prompts/lib/conv.ts), cherchés comme
  * eux (listeDeMots : « soiree » est « soirée », « mercii » est « merci »). Le français (avec ce que tout couple s’écrit,
- * qu’on ne leur montre pas comme leur mot : « t’aime », « rendez-vous »), puis l’anglais.
+ * qu’on ne leur montre pas comme leur mot : « t’aime », « rendez-vous »), puis l’anglais, l’espagnol et le portugais
+ * (la politesse, les salutations, les jours, les jurons, les verbes courants). Les mots qui ont un sens plein dans une
+ * autre langue (« cara », « mano », « ella », « dice », « tens ») ne vont qu’ici, pas dans les mots vides : le modèle
+ * les voit encore.
  */
 const BANALS = listeDeMots(
   "qu’on qu’il qu’elle qu’ils qu’elles quand comment pourquoi envie merci coucou salut bisous bisou bonne bonnes nuit journée soirée matin semaine weekend avant toujours jamais beaucoup maintenant moment petit petite gros grosse super cool truc trucs chose choses fois gens monde parce cette celle celui ceux leur leurs notre votre dire dit voir aller venir viens vient faut fallait pense crois sait savoir serait sera haha ahah ahahah hahaha lol mdrr vrm hein enfin bientôt cours boulot travail taff jsuis j’suis chuis week tient lundi mardi mercredi jeudi vendredi samedi dimanche ptn putain wsh wesh chez beau belle vers sans sous entre depuis pendant contre autre autres chaque plein assez tant tellement mieux pire grand grande vraie franchement carrément direct wallah",
-  "t’aime j’aime m’aime m’aimes t’adore j’adore rendez-vous côté j’arrive jarrive",
+  "t’aime j’aime m’aime m’aimes t’adore j’adore rendez-vous côté j’arrive jarrive j’avoue javoue",
   "thanks thank sorry please hello night morning week weekend work school people little great nice pretty stuff every each next last better worse always never actually literally probably honestly seriously totally guess mean feel need monday tuesday wednesday thursday friday saturday sunday",
+  "says saying told thought getting coming looking trying talking making taking giving wait later sounds call text goodnight awesome amazing dude bruh broo plzz plss heyy byee tysm",
+  "gracias grax porfa porfi porfis favor buenas buenos noches besos besito besitos abrazo abrazos adiós chao chau perdón siento extraño verdad seguro mejor mira hablamos hablar decir dice pensando trabajo curro semana miércoles jueves viernes sábado domingo joder hostia mierda coño verga carajo pinche güey boludo neta ella",
+  "obrigado obrigada brigado brigada valeu beijo beijos beijinho beijinhos tchau noite manhã segunda terça quarta quinta sexta segunda-feira terça-feira quarta-feira quinta-feira sexta-feira falar fala falou pensando pensei pensar ficar fica fico tens preciso precisa beleza massa cara mano porra caralho putz merda foda",
 );
 
 const duree = (ms: number) => {
