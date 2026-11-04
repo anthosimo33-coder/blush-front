@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { versTexteCaptures } from "@prompts/lib/captures";
-import { chiffrer, erreurImport, jour, lire, participantsDe, principaux } from "@prompts/lib/conv";
+import { chiffrer, detecterFormat, erreurImport, heure, jour, lire, participantsDe, principaux } from "@prompts/lib/conv";
 import { depuisInstagramHtml, depuisInstagramJson } from "@prompts/lib/instagram";
 import { captures, msg } from "./aide/fabriques";
 
@@ -204,16 +204,16 @@ describe("ignorer les lignes système de WhatsApp", () => {
   });
 
   it("compte les lignes marquées qu’aucune règle ne lit, et garde la première silhouette qui revient", () => {
-    /* Un libellé qu’on ne connaît pas encore (l’espagnol « <adjunto: …> ») : jeté, mais compté, et sa silhouette revient */
+    /* Un libellé qu’on ne connaît pas encore (l’allemand « <Anhang: …> ») : jeté, mais compté, et sa silhouette revient */
     const lu = avec([
-      "\u200e<adjunto: 00000005-PHOTO-2025-01-09-12-23-16.jpg>",
-      "\u200e<adjunto: 00000006-VIDEO-2025-01-09-12-23-20.mp4>",
-      "\u200e<adjunto: 00000007-VIDEO-2025-01-09-12-23-24.mp4>",
+      "\u200e<Anhang: 00000005-PHOTO-2025-01-09-12-23-16.jpg>",
+      "\u200e<Anhang: 00000006-VIDEO-2025-01-09-12-23-20.mp4>",
+      "\u200e<Anhang: 00000007-VIDEO-2025-01-09-12-23-24.mp4>",
       "\u200eVous avez bloqué ce contact.",
       "salut, ça va ?",
     ]);
     expect(lu.messages).toHaveLength(56);
-    expect(lu.inconnues).toEqual({ lignes: 3, forme: "<aaaaaaa: 00000000-AAAAA" });
+    expect(lu.inconnues).toEqual({ lignes: 3, forme: "<Aaaaaa: 00000000-AAAAA-" });
     /* Un vrai message marqué d’un U+200E : compté ; répété, il ne laisse que sa silhouette, aucune lettre */
     expect(avec(["\u200eon se voit demain soir chez toi", "\u200eje t’attends en bas"]).inconnues).toEqual({ lignes: 2, forme: null });
     expect(avec(["\u200ebonne nuit mon cœur ❤️", "salut", "\u200ebonne nuit mon cœur ❤️"]).inconnues).toEqual({ lignes: 2, forme: "aaaaa aaaa aaa aaaa ··" });
@@ -227,9 +227,9 @@ describe("ignorer les lignes système de WhatsApp", () => {
     const lu = surAndroid([
       "\u200ebonne nuit mon cœur ❤️",
       "\u200ebonne nuit mon cœur ❤️",
-      /* Le libellé espagnol d’un fichier joint, relevé sur de vrais exports, deux fois */
-      "\u200eIMG-20260912-WA0004.jpg (archivo adjunto)",
-      "\u200eIMG-20260912-WA0005.jpg (archivo adjunto)",
+      /* Le libellé allemand d’un fichier joint, qu’on ne lit pas encore, deux fois */
+      "\u200eIMG-20260912-WA0004.jpg (Datei angehängt)",
+      "\u200eIMG-20260912-WA0005.jpg (Datei angehängt)",
     ]);
     expect(lu.messages).toHaveLength(58);
     expect(lu.messages.slice(10, 12).map((m) => m.texte)).toEqual(["bonne nuit mon cœur ❤️", "bonne nuit mon cœur ❤️"]);
@@ -518,5 +518,287 @@ describe("lire un export Instagram", () => {
       ["message", 54],
       ["belle", 6],
     ]);
+  });
+});
+
+/*
+ * Les exports espagnols et portugais (du Portugal, du Brésil), lus comme les exports français. Les libellés sont ceux de
+ * vrais exports et des tables de traduction de WhatsApp ; les conversations sont inventées.
+ */
+describe("les exports WhatsApp en espagnol et en portugais", () => {
+  const LRM = String.fromCharCode(0x200e);
+  const NNB = String.fromCharCode(0x202f);
+  /** Un texte marqué d’un U+200E, comme WhatsApp marque ses libellés. */
+  const marque = (t: string) => `${LRM}${t}`;
+
+  it("iOS : les médias, les messages supprimés et les appels manqués se lisent comme en français", () => {
+    expect(
+      lus([
+        marque("audio omitido"),
+        marque("imagen omitida"),
+        marque("Video omitido"),
+        marque("sticker omitido"),
+        marque("GIF omitido"),
+        marque("Se eliminó este mensaje."),
+        `${marque("Llamada perdida")}, ${marque("Tocar para volver a llamar")}`,
+        `${marque("Llamada")},${NNB}${marque("Sin respuesta")}`,
+        marque("<adjunto: 00000004-AUDIO-2026-06-26-20-31-14.opus>"),
+        `mira ${marque("<adjunto: 00000016-PHOTO-2026-06-26-20-31-20.jpg>")}`,
+      ]),
+    ).toEqual(["vocal", "photo", "vidéo", "autocollant", "autocollant", "message supprimé", "appel manqué", "appel manqué", "vocal", "mira [photo]"]);
+    /* Le Portugal : des libellés de trois et de cinq mots, une légende devant l’un d’eux */
+    expect(
+      lus([
+        marque("ficheiro de áudio não revelado"),
+        marque("imagem não revelada"),
+        `olha ${marque("imagem não revelada")}`,
+        marque("vídeo não revelado"),
+        marque("sticker não revelado"),
+        marque("Apagou esta mensagem."),
+        marque("<anexo: 00000014-STICKER-2026-06-26-20-31-14.webp>"),
+      ]),
+    ).toEqual(["vocal", "photo", "olha [photo]", "vidéo", "autocollant", "message supprimé", "autocollant"]);
+    /* Le Brésil */
+    expect(
+      lus([
+        marque("áudio ocultado"),
+        marque("imagem ocultada"),
+        marque("figurinha omitida"),
+        marque("Mensagem apagada"),
+        marque("<anexado: 00000016-PHOTO-2026-06-26-20-31-20.jpg>"),
+      ]),
+    ).toEqual(["vocal", "photo", "autocollant", "message supprimé", "photo"]);
+  });
+
+  it("iOS : celle qui n’écrit que des vocaux reste une participante (elle disparaissait, et l’import se disait trop court)", () => {
+    const texte = conv(60)
+      .map((l, k) => (k % 2 ? l : l.replace(/message \d+$/, marque("audio omitido"))))
+      .join("\n");
+    expect(participantsDe(texte)).toEqual([
+      { nom: "Léa", messages: 30 },
+      { nom: "Tom", messages: 30 },
+    ]);
+  });
+
+  it("iOS : une carte de contact, une position, un appel décroché, un document et un sondage restent de WhatsApp, jamais leurs mots", () => {
+    const lu = avec([
+      marque("Tarjeta de contacto omitida"),
+      marque("Ubicación: https://maps.google.com/?q=40.4168,-3.7038"),
+      `${marque("Llamada")}, ${marque("32 s")}`,
+      `Factura.pdf • ${marque("2 páginas")} ${marque("documento omitido")}`,
+      marque("Contacto não revelado"),
+      marque("Localização: https://maps.google.com/?q=38.72,-9.14"),
+      `${marque("ENCUESTA:")}\n¿Cenamos el sábado?\n${marque("OPCIÓN: Sí (1 voto)")}`,
+      "salut",
+    ]);
+    const vus = lu.messages.slice(10, 18);
+    expect(vus.map((m) => !!m.deWhatsApp)).toEqual([true, true, true, true, true, true, true, false]);
+    expect(vus[3]!.texte).toBe("Factura.pdf • 2 páginas [média]");
+    /* Le sondage garde sa question et ses choix ; le message d’avant n’en reçoit rien */
+    expect(vus[6]!.texte).toBe("ENCUESTA:\n¿Cenamos el sábado?\nOPCIÓN: Sí (1 voto)");
+    expect(lu.messages).toHaveLength(60);
+    /* Écrits sans marque, les mêmes mots restent des messages */
+    expect(lus(["llamada perdida otra vez", "Localização: casa da vó"])).toEqual(["llamada perdida otra vez", "Localização: casa da vó"]);
+  });
+
+  it("un document dont le fichier joint a ses accents à part (NFD) reste un document, en portugais comme en français", () => {
+    for (const nom of ["Relação de pagos.pdf", "Récapitulatif.pdf"]) {
+      const [m] = avec([`${nom} ${marque(`<anexado: 00000535-${nom.normalize("NFD")}>`)}`]).messages.slice(10, 11);
+      expect(m).toMatchObject({ texte: `${nom} [média]`, deWhatsApp: true });
+    }
+  });
+
+  it("la marque d’un message modifié est retirée, en espagnol comme en portugais", () => {
+    expect(lus([`nos vemos mañana ${marque("<Se editó este mensaje.>")}`, "até amanhã <Mensagem editada>", "vale <Este mensaje fue editado>"])).toEqual([
+      "nos vemos mañana",
+      "até amanhã",
+      "vale",
+    ]);
+  });
+
+  it("la phrase du chiffrement, écrite au nom de quelqu’un sans marque (un vieil export), n’est pas un message", () => {
+    for (const phrase of [
+      "Los mensajes y las llamadas están cifrados de extremo a extremo. Nadie fuera de este chat, ni siquiera WhatsApp, puede leerlos ni escucharlos.",
+      "As mensagens e chamadas são encriptadas ponto a ponto. Ninguém fora desta conversa, nem mesmo o WhatsApp, as pode ler ou ouvir.",
+      "As mensagens e ligações são protegidas com a criptografia de ponta a ponta. Somente as pessoas que fazem parte da conversa podem ler.",
+    ])
+      expect(avec([phrase]).messages).toHaveLength(59);
+  });
+
+  it("Android : les médias, les fichiers joints, les messages supprimés, les appels manqués et la vue unique", () => {
+    const lu = surAndroid([
+      "<Multimedia omitido>",
+      "<Mídia oculta>",
+      "<Video note omitted>",
+      marque("IMG-20260912-WA0004.jpg (archivo adjunto)"),
+      marque("PTT-20260912-WA0005.opus (archivo adjunto)"),
+      marque("AUD-20260912-WA0006.opus (arquivo anexado)"),
+      "Se eliminó este mensaje",
+      "Mensagem apagada",
+      "Llamada perdida",
+      "null",
+    ]);
+    expect(lu.messages.slice(10, 20).map((m) => m.media ?? m.texte)).toEqual([
+      "média",
+      "média",
+      "média",
+      "photo",
+      "vocal",
+      "vocal",
+      "message supprimé",
+      "message supprimé",
+      "appel manqué",
+      "média",
+    ]);
+    expect(lu.inconnues).toEqual({ lignes: 0, forme: null });
+  });
+
+  it("Android : la légende d’une photo reste à son auteur ; une position, un sondage, un message en attente restent de WhatsApp", () => {
+    const lu = surAndroid([
+      `${marque("IMG-20260912-WA0004.jpg (archivo adjunto)")}\nmira esto`,
+      "ubicación: https://maps.google.com/?q=40.4168,-3.7038",
+      "ENCUESTA:\n¿Cenamos el sábado?\nOPCIÓN: Sí (1 voto)\nOPCIÓN: No (0 votos)",
+      "Esperando este mensaje",
+      "Vale. Mándame la ubicación.",
+      /* Un sondage s’écrit en capitales : tapé autrement, c’est leur message */
+      "Enquete :\nqui vient au bowling samedi ?",
+    ]);
+    const vus = lu.messages.slice(10, 16);
+    expect(vus[0]).toMatchObject({ nom: "Léa", texte: "mira esto [photo]" });
+    expect(vus.map((m) => !!m.deWhatsApp)).toEqual([false, true, true, true, false, false]);
+    expect(vus[4]!.texte).toBe("Vale. Mándame la ubicación.");
+    expect(lu.messages).toHaveLength(60);
+  });
+
+  it("Android : un document sans extension (« DOC-…-WA0003. ») est un document, et la ligne de son nom n’est le texte de personne", () => {
+    const lu = surAndroid([`${marque("DOC-20260912-WA0003. (archivo adjunto)")}\nContrato de alquiler.pdf`]);
+    expect(lu.messages[10]).toMatchObject({ nom: "Léa", media: "média", texte: "" });
+    expect(lu.messages[9]!.texte).toBe("message 9");
+    expect(lu.messages).toHaveLength(60);
+  });
+
+  it("Android : « null » seul est une vue unique ; suivi d’une ligne, c’est un message tapé", () => {
+    const lu = surAndroid(["null", "null\nfranchement j’ai dormi à moitié", "null\n12/09/2026 10:12 - Meta AI: voici trois idées de restaurants"]);
+    /* Une ligne collée d’un autre nom n’en fait pas un message tapé : elle est jetée, comme après une photo */
+    expect(lu.messages.slice(10, 13).map((m) => m.media ?? m.texte)).toEqual(["média", "null\nfranchement j’ai dormi à moitié", "média"]);
+  });
+
+  it("Android : la phrase des messages éphémères, au nom de la personne et marquée, n’est pas son message", () => {
+    expect(surAndroid([marque("Léa desactivó los mensajes temporales. Toca para cambiar esta opción.")]).messages).toHaveLength(59);
+    /* Un message marqué reste un message, même s’il commence par son nom et finit par un point */
+    expect(surAndroid([marque("bonne nuit mon cœur ❤️")]).messages).toHaveLength(60);
+    expect(surAndroid([marque("Léa rentre à 20h, prépare-toi.")]).messages).toHaveLength(60);
+  });
+
+  it("les libellés entre chevrons d’un export de 2026, sans marque, et la légende qui les suit sur la même ligne", () => {
+    expect(lus(["<imagem ocultada> olha que lindo", "<documento omitido> contrato do apartamento", "<imagem ocultada> olha\nque lindo"])).toEqual([
+      "olha que lindo [photo]",
+      "contrato do apartamento [média]",
+      "olha\nque lindo [photo]",
+    ]);
+    expect(surAndroid(["<Arquivo de mídia oculto>"]).messages[10]!.media).toBe("média");
+    expect(lus(["<mensaje de voz omitido>", "<mensagem de voz omitida>", "<imagem ocultada>", "<figurinha omitida>", "<documento omitido>"])).toEqual([
+      "vocal",
+      "vocal",
+      "photo",
+      "autocollant",
+      "média",
+    ]);
+  });
+
+  it("les libellés ne deviennent jamais leurs mots, et leurs médias se comptent", () => {
+    const lu = surAndroid(Array.from({ length: 14 }, (_, k) => ["<Multimedia omitido>", "Se eliminó este mensaje", "nos vemos <Se editó este mensaje.>"][k % 3]!));
+    const c = chiffrer(qui("Tom", "Léa"), lu.messages);
+    for (const w of ["multimedia", "omitido", "eliminó", "mensaje", "editó"]) expect(c.recurrents.map(([x]) => x)).not.toContain(w);
+    expect(c.medias.autre).toMatchObject({ média: 5, "message supprimé": 5 });
+  });
+});
+
+/*
+ * Les heures sur 12 h de l’espagnol (« 8:26 p. m. », une espace entre les deux lettres, souvent insécable) et du
+ * portugais du Brésil (« 9:26 da noite ») : tout l’export était refusé.
+ */
+describe("les heures sur 12 h de l’espagnol et du portugais du Brésil", () => {
+  const NB = String.fromCharCode(0xa0);
+  const NNB = String.fromCharCode(0x202f);
+  const LRM = String.fromCharCode(0x200e);
+  const formatDe = (format: NonNullable<ReturnType<typeof detecterFormat>>) => ({ ...qui("Tom", "Léa"), format });
+  /** 60 messages, un toutes les `pas` minutes depuis le `j0` février 2025 à `h0` h, l’en-tête écrit par `entete`. */
+  const conv12 = (entete: (j: number, mo: number, a: number, h: number, mi: number) => string, { j0 = 8, h0 = 20, pas = 7 } = {}) =>
+    Array.from({ length: 60 }, (_, k) => {
+      const d = new Date(Date.UTC(2025, 1, j0, h0, 0) + k * pas * 60e3);
+      return `${entete(d.getUTCDate(), d.getUTCMonth() + 1, d.getUTCFullYear(), d.getUTCHours(), d.getUTCMinutes())}${k % 2 ? "Léa" : "Tom"}: hola ${k}`;
+    }).join("\n");
+  /** L’heure sur 12 h d’un téléphone hispanophone : 0 h est « 12 a. m. », 12 h « 12 p. m. ». */
+  const h12 = (h: number) => ({ h: h % 12 || 12, p: h >= 12 ? "p" : "a" });
+  const bornes = (texte: string) => {
+    const format = detecterFormat(texte);
+    const lu = lire(texte, formatDe(format ?? "whatsapp-android"));
+    const quand = (t: number) => `${jour(t)} ${heure(t)}`;
+    return { format, noms: participantsDe(texte).length, debut: quand(lu.messages[0]!.t), fin: quand(lu.messages.at(-1)!.t), n: lu.messages.length };
+  };
+  /* Du 8 février 2025 à 20:00 au 9 février à 02:53 */
+  const attendu = { debut: "2025-02-08 20:00", fin: "2025-02-09 02:53", n: 60, noms: 2 };
+  type Entete = (j: number, mo: number, a: number, h: number, mi: number) => string;
+
+  it.each<[string, Entete, string]>([
+    ["Android 2017–2022, insécable dans « p. m. »", (j, mo, a, h, mi) => `${j}/${mo}/${a} ${h12(h).h}:${pad(mi)} ${h12(h).p}.${NB}m. - `, "whatsapp-android"],
+    ["Android récent, U+202F partout", (j, mo, a, h, mi) => `${j}/${mo}/${a % 100}, ${h12(h).h}:${pad(mi)}${NNB}${h12(h).p}.${NNB}m. - `, "whatsapp-android"],
+    ["Android, espace ordinaire", (j, mo, a, h, mi) => `${j}/${pad(mo)}/${a % 100}, ${h12(h).h}:${pad(mi)} ${h12(h).p}. m. - `, "whatsapp-android"],
+    ["iOS ancien, « [3/6/18 1:55:00 p. m.] »", (j, mo, a, h, mi) => `[${j}/${mo}/${a % 100} ${h12(h).h}:${pad(mi)}:00 ${h12(h).p}. m.] `, "whatsapp-ios"],
+    ["iOS, insécable dans « p. m. »", (j, mo, a, h, mi) => `[${pad(j)}/${pad(mo)}/${a % 100}, ${h12(h).h}:${pad(mi)}:00 ${h12(h).p}.${NB}m.] `, "whatsapp-ios"],
+    [
+      "iOS récent, U+202F puis U+00A0, U+200E devant",
+      (j, mo, a, h, mi) => `${LRM}[${pad(j)}/${pad(mo)}/${a % 100}, ${h12(h).h}:${pad(mi)}:00${NNB}${h12(h).p}.${NB}m.] `,
+      "whatsapp-ios",
+    ],
+    [
+      "Brésil, Android : « da manhã », « da tarde », « da noite », « da madrugada »",
+      (j, mo, a, h, mi) => `${pad(j)}/${pad(mo)}/${a} ${h12(h).h}:${pad(mi)} ${h < 6 ? "da madrugada" : h < 12 ? "da manhã" : h < 19 ? "da tarde" : "da noite"} - `,
+      "whatsapp-android",
+    ],
+  ])("%s", (_, entete, format) => {
+    expect(bornes(conv12(entete))).toMatchObject({ ...attendu, format });
+  });
+
+  it("minuit et midi : « 12:05 a. m. » est 00:05, « 12:05 p. m. » est 12:05", () => {
+    const entete: Entete = (j, mo, a, h, mi) => `${j}/${mo}/${a % 100}, ${h12(h).h}:${pad(mi)}${NNB}${h12(h).p}.${NNB}m. - `;
+    expect(bornes(conv12(entete, { j0: 20, h0: 23, pas: 1 }))).toMatchObject({ debut: "2025-02-20 23:00", fin: "2025-02-20 23:59" });
+    expect(bornes(conv12(entete, { j0: 20, h0: 0, pas: 1 }))).toMatchObject({ debut: "2025-02-20 00:00", fin: "2025-02-20 00:59" });
+    expect(bornes(conv12(entete, { j0: 20, h0: 12, pas: 1 }))).toMatchObject({ debut: "2025-02-20 12:00", fin: "2025-02-20 12:59" });
+  });
+
+  it("Brésil : midi pile s’écrit « meio-dia », et son message garde son auteur", () => {
+    const matin = conv12((j, mo, a, h, mi) => `${pad(j)}/${pad(mo)}/${a} ${h12(h).h}:${pad(mi)} da manhã - `, { h0: 9, pas: 2 });
+    const texte = [matin, "08/02/2025 11:58 da manhã - Tom: vai almoçar?", "08/02/2025 12:00 meio-dia - Léa: sim, já saindo", "08/02/2025 12:01 da tarde - Tom: beleza"].join("\n");
+    const lu = lire(texte, formatDe("whatsapp-android"));
+    expect(lu.messages.slice(-3).map((m) => [m.nom, heure(m.t), m.texte])).toEqual([
+      ["Tom", "11:58", "vai almoçar?"],
+      ["Léa", "12:00", "sim, já saindo"],
+      ["Tom", "12:01", "beleza"],
+    ]);
+  });
+
+  it("une seule soirée, le 8 février (8 et 2 ≤ 12) : le jour d’abord, sauf avec « AM » ou « PM » en capitales (les États-Unis)", () => {
+    const soir = { pas: 2 };
+    const debut = "2025-02-08 20:00";
+    /* L’espagnol : « p. m. » espacé, et « p.m. » collé (des iPhone mexicains) */
+    expect(bornes(conv12((j, mo, a, h, mi) => `${j}/${pad(mo)}/${a % 100}, ${h12(h).h}:${pad(mi)}${NNB}${h12(h).p}.${NNB}m. - `, soir)).debut).toBe(debut);
+    expect(bornes(conv12((j, mo, a, h, mi) => `[${pad(j)}/${pad(mo)}/${a % 100}, ${h12(h).h}:${pad(mi)}:00${NNB}${h12(h).p}.m.] `, soir)).debut).toBe(debut);
+    /* L’anglais en minuscules (« 08/02/25, 8:00 pm », l’Inde, le Royaume-Uni) : le jour d’abord aussi */
+    expect(bornes(conv12((j, mo, a, h, mi) => `${pad(j)}/${pad(mo)}/${a % 100}, ${h12(h).h}:${pad(mi)} ${h12(h).p}m - `, soir)).debut).toBe(debut);
+    /* Comme avant : un téléphone américain (« 2/8/25, 8:00 PM ») met le mois d’abord */
+    expect(bornes(conv12((j, mo, a, h, mi) => `${mo}/${j}/${a % 100}, ${h12(h).h}:${pad(mi)}${NNB}${h12(h).p.toUpperCase()}M - `, soir)).debut).toBe(debut);
+  });
+
+  it("une ligne système Android sans nom en « p. m. » reste une ligne système ; une ligne qui n’a pas la forme d’un en-tête reste du texte", () => {
+    const lignes = conv12((j, mo, a, h, mi) => `${j}/${mo}/${a % 100}, ${h12(h).h}:${pad(mi)}${NNB}${h12(h).p}.${NNB}m. - `).split("\n");
+    /* Après « hola 0 », la ligne système ; après « hola 1 », une ligne tapée qui commence comme un en-tête */
+    lignes.splice(1, 0, `8/2/25, 8:01${NNB}p.${NNB}m. - Los mensajes y las llamadas están cifrados de extremo a extremo.`);
+    lignes.splice(3, 0, "8/2/25 a las 8 p. m. - nos vemos ahí");
+    const lu = lire(lignes.join("\n"), formatDe("whatsapp-android"));
+    expect(lu.messages).toHaveLength(60);
+    expect(lu.messages[0]!.texte).toBe("hola 0");
+    expect(lu.messages[1]!.texte).toBe("hola 1\n8/2/25 a las 8 p. m. - nos vemos ahí");
   });
 });

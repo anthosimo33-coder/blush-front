@@ -91,6 +91,17 @@ export function borner<T extends ExportLu & { coupe?: boolean }>(lu: T): T & { c
 const EXPORT_LONG_AU_JOURNAL = 9_000;
 
 /**
+ * Des blocs d’un export Instagram en HTML perdus faute de date lisible (un mois d’une langue qu’on ne lit pas encore) :
+ * au journal, leur nombre et la forme de la première date, chiffres masqués. Rien de ce qu’ils disent. L’export lu
+ * repart sans eux.
+ */
+function noterLesDatesIllisibles({ datesIllisibles, ...lu }: ExportLu): ExportLu {
+  /* TODO(produit): refuser un export ainsi troué (en conseillant l’export en JSON, qui n’a pas ce problème) plutôt que de le lire sans ces blocs ? Et à partir de combien ? */
+  if (datesIllisibles) journal("import : blocs Instagram sans date lisible", datesIllisibles, "alerte");
+  return lu;
+}
+
+/**
  * Le plafond de WhatsApp sur un export lu (plafondDeWhatsApp, prompts/lib/conv.ts), et, pour un export d’au moins
  * EXPORT_LONG_AU_JOURNAL en-têtes, une ligne au journal, des nombres seulement : de quoi vérifier sur les vrais exports
  * que WhatsApp s’arrête bien à 10 000 ou 40 000 messages, d’iPhone comme d’Android. `ou` : le premier import, un morceau
@@ -145,7 +156,7 @@ export async function depuisFichier(fichier: File): Promise<ExportLu & { nom: st
     throw new ErreurImport("fichier");
   }
   if (!lu) throw new ErreurImport("fichier");
-  return borner({ ...lu, nom: fichier.name });
+  return borner({ ...noterLesDatesIllisibles(lu), nom: fichier.name });
 }
 
 const SchemaPaquet: z.ZodType<Paquet> = z.object({
@@ -175,7 +186,7 @@ export async function depuisPaquet(paquet: File, { fuseau }: { fuseau?: string }
     const zone = fuseau ?? fuseauSur(p.fuseau);
     const lu = lireExport(p.parties, { fuseau: zone });
     if (!lu) throw new ErreurImport("fichier");
-    return borner({ ...lu, nom: p.nom, ...(p.coupe ? { coupe: true } : {}), ...(p.fuseau || fuseau ? { fuseau: zone } : {}) });
+    return borner({ ...noterLesDatesIllisibles(lu), nom: p.nom, ...(p.coupe ? { coupe: true } : {}), ...(p.fuseau || fuseau ? { fuseau: zone } : {}) });
   } catch {
     throw new ErreurImport("fichier");
   }
