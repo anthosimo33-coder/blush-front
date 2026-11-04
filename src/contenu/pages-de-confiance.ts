@@ -16,7 +16,7 @@ import { EDITEUR } from "./mentions-legales";
  */
 
 /** Le jour où les trois pages ont été écrites. */
-const ECRITES_LE: Jour = "2026-11-03";
+const ECRITES_LE: Jour = "2026-11-04";
 
 /**
  * L’expression d’un titre de page de confiance que son h1 met dans une bulle, comme le titre de la landing : BLUSH en
@@ -50,9 +50,8 @@ export const A_PROPOS = {
 } as const;
 
 /*
- * TODO(produit): /methode, à faire relire par l’avocat (plan SEO, section 6), avant sa mise en ligne. Fusionner cette
- * page sur main, c’est la publier au déploiement suivant (le plan du site, /llms.txt, le pied de la landing, la
- * signature des articles, et `publishingPrinciples` de l’éditeur sur toutes les pages) : pas de fusion avant son oui.
+ * /methode a été relue et validée par l’avocat le 4 novembre 2026 (plan SEO, section 6), avant sa mise en ligne : un
+ * changement de fond de cette page repasse par lui.
  * TODO(produit): les avis (la note et le nombre d’avis de testeurs) n’y sont pas, tant qu’on ne sait pas comment les
  * décrire juridiquement (comment ils ont été recueillis) ; la charte (règle 22) veut un lien vers cette page à côté d’eux.
  */

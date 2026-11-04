@@ -13,9 +13,9 @@ export const IL_MET_DU_TEMPS_A_REPONDRE: Article = {
     "Vingt minutes ou une journée\u00a0: son délai se lit face à son propre rythme, pas face à une règle. Les signes qui comptent, des exemples inventés, et quoi faire sans courir après.",
   motCle: "il met du temps à répondre que faire",
   zone: "verte",
-  publieLe: "2026-11-06",
-  misAJourLe: "2026-11-06",
-  changements: [{ le: "2026-11-06", quoi: "Publication" }],
+  publieLe: "2026-11-04",
+  misAJourLe: "2026-11-04",
+  changements: [{ le: "2026-11-04", quoi: "Publication" }],
   valideLe: "2026-11-04",
   sources: [
     {

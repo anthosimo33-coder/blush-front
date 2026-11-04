@@ -19,7 +19,7 @@ import { A_PROPOS, METHODE, PAGE_AIDE } from "@/contenu/pages-de-confiance";
  * du site donne aux moteurs. À changer avec un texte de la landing changé (une phrase, un avis, une question), jamais
  * pour un style ou un bouton déplacé : une date qui bouge sans raison, les moteurs cessent de la croire.
  */
-const LANDING_MISE_A_JOUR: Jour = "2026-11-03";
+const LANDING_MISE_A_JOUR: Jour = "2026-11-04";
 
 /**
  * Les pages fixes à indexer : leur chemin, leur nom (/llms.txt), leur poids dans le plan du site, et le jour de leur

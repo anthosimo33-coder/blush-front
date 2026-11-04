@@ -12,9 +12,9 @@ export const IL_NE_REPOND_PLUS: Article = {
   description: "Pourquoi il ne répond plus, comment faire la différence entre une pause et une fin, et le seul message à envoyer ce soir. Avec des convs d’exemple inventées.",
   motCle: "il ne répond plus à mes messages",
   zone: "verte",
-  publieLe: "2026-11-06",
-  misAJourLe: "2026-11-06",
-  changements: [{ le: "2026-11-06", quoi: "Publication" }],
+  publieLe: "2026-11-04",
+  misAJourLe: "2026-11-04",
+  changements: [{ le: "2026-11-04", quoi: "Publication" }],
   valideLe: "2026-11-04",
   sources: [
     { titre: "Le Robert, définition de «\u00a0ghoster\u00a0»", url: "https://dictionnaire.lerobert.com/definition/ghoster", consulteLe: "2026-11-03" },
