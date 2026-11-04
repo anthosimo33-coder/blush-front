@@ -1,21 +1,22 @@
 import { describe, expect, it } from "vitest";
 import { ARTICLES } from "@/contenu/articles";
 import type { Article, BlocArticle, Jour } from "@/contenu/articles/types";
-import { ENTREE_D_EXEMPLE, EXEMPLES, GUIDE_D_EXEMPLE } from "@/app/apercu/guide/exemples";
-import { fautesDeLArticle, fautesDuRegistre, nombreDeMots, ressemblance, RESSEMBLANCE_MAX, semaineIso } from "../aide/articles";
+import { EDITEUR } from "@/contenu/mentions-legales";
+import { ENTREE_D_EXEMPLE, EXEMPLES, GUIDE_D_EXEMPLE, GUIDE_ORANGE_D_EXEMPLE, GUIDE_ROUGE_D_EXEMPLE } from "@/app/apercu/guide/exemples";
+import { fautesDeLArticle, fautesDuRegistre, nombreDeMots, ressemblance, RESSEMBLANCE_MAX, semaineIso, SURLIGNE_MAX } from "../aide/articles";
 
 /*
  * Les garde-fous des articles (tests/aide/articles.ts), appliqués au registre de production (src/contenu/articles) : un
  * article qui enfreint une règle de la charte fait échouer `npm run check`, donc la CI, avant toute mise en ligne. Chaque
  * règle est prouvée ici sur un article de test fautif, tiré des exemples des aperçus (src/app/apercu/guide/exemples.ts)
- * et signé par une personne inventée : un seul défaut à la fois, et le message qu’il fait lire à qui écrit.
+ * et validé un jour de test : un seul défaut à la fois, et le message qu’il fait lire à qui écrit.
  */
 
-/** Une personne de test, inventée : un prénom, un nom et un rôle. */
-const RELECTEUR = { nom: "Alex Dupont", role: "relecteur de test" };
+/** Le jour de validation de test : celui de la publication des exemples, au plus tard leur mise à jour. */
+const VALIDE_LE: Jour = "2026-11-03";
 
-/** Un exemple, signé par la personne de test : un article qui passe toutes les règles. */
-const signe = (a: Article): Article => ({ ...a, relecteur: RELECTEUR });
+/** Un exemple, validé le jour de test : un article qui passe toutes les règles. */
+const signe = (a: Article): Article => ({ ...a, valideLe: VALIDE_LE });
 const GUIDE = signe(GUIDE_D_EXEMPLE);
 const ENTREE = signe(ENTREE_D_EXEMPLE);
 
@@ -32,20 +33,67 @@ describe("les garde-fous des articles", () => {
     expect(fautesDuRegistre(ARTICLES)).toEqual([]);
   });
 
-  it("les exemples des aperçus suivent toutes les règles, sauf la signature : publiés tels quels, ils seraient refusés", () => {
+  it("les exemples des aperçus suivent toutes les règles, sauf la validation datée : publiés tels quels, ils seraient refusés", () => {
     expect(fautesDuRegistre(EXEMPLES, { exemple: true })).toEqual([]);
-    expect(fautesDuRegistre(EXEMPLES).filter((f) => f.includes("relecteur est vide"))).toHaveLength(2);
+    expect(fautesDuRegistre(EXEMPLES)).toEqual([expect.stringContaining("n’est pas un vrai jour"), expect.stringContaining("n’est pas un vrai jour")]);
   });
 
   it("deux articles signés, sourcés, liés l’un à l’autre : aucune faute", () => {
     expect(fautesDuRegistre([GUIDE, ENTREE])).toEqual([]);
   });
 
+  it("les guides d’exemple des zones orange et rouge (/apercu/guide?zone=…) suivent aussi toutes les règles, sauf la validation datée", () => {
+    expect(fautesDeLArticle(GUIDE_ORANGE_D_EXEMPLE, { exemple: true })).toEqual([]);
+    expect(fautesDeLArticle(GUIDE_ROUGE_D_EXEMPLE, { exemple: true })).toEqual([]);
+  });
+
+  describe("le thème et les mots surlignés du titre", () => {
+    it.each([
+      ["vide", ""],
+      ["de quatre mots", "Les silences et délais"],
+      ["sans majuscule", "les silences"],
+      ["fini par un point", "Les silences."],
+      ["fini par une espace", "Les silences "],
+    ])("refuse un thème %s : un surtitre de un à trois mots", (_, theme) => {
+      expect(fautesDeLArticle({ ...GUIDE, theme })).toEqual([expect.stringContaining("le thème")]);
+    });
+
+    it("refuse un thème absent (un article mal fusionné, ou lu d’ailleurs)", () => {
+      const sans: Partial<Article> = { ...GUIDE };
+      delete sans.theme;
+      expect(fautesDeLArticle(sans as Article)).toEqual([expect.stringContaining("le thème")]);
+    });
+
+    it("le thème est un texte affiché : les règles de la marque le lisent", () => {
+      expect(fautesDeLArticle({ ...GUIDE, theme: "Lu par IA" })).toEqual([expect.stringContaining("« IA »")]);
+    });
+
+    it.each<[string, Partial<Article["surligne"]>, string]>([
+      ["sans situation", { action: "quoi faire" }, "pas la situation (rose) à surligner"],
+      ["sans action", { situation: "met du temps" }, "pas l’action (bleue) à surligner"],
+      ["une situation absente du titre", { situation: "ne répond plus", action: "quoi faire" }, "n’est pas un morceau exact du titre"],
+      ["une action qui n’est pas en mots entiers", { situation: "met du temps", action: "oi faire" }, "coupe un mot du titre"],
+      ["une situation entourée d’espaces", { situation: " met du temps", action: "quoi faire" }, "commence ou finit par une espace"],
+      ["une action qui passe les deux-points", { situation: "met du temps", action: "répondre\u00a0: à partir" }, "passe par les deux-points"],
+      ["une action trop longue pour une ligne du téléphone", { situation: "met du temps", action: "ça veut dire quelque chose" }, `${SURLIGNE_MAX} au plus`],
+      ["deux morceaux qui se chevauchent", { situation: "met du temps", action: "temps à répondre" }, "se chevauchent"],
+    ])("refuse %s", (_, surligne, faute) => {
+      /* Le type exige les deux ; un article mal fusionné, ou lu d’ailleurs, peut en avoir perdu un */
+      expect(fautesDeLArticle({ ...GUIDE, surligne: surligne as Article["surligne"] })).toEqual([expect.stringContaining(faute)]);
+    });
+
+    it("refuse un morceau surligné qui revient deux fois dans le titre : le surligneur ne saurait pas lequel", () => {
+      const titre = "Il répond, puis il ne répond plus\u00a0: ce que ça veut dire, et quoi faire";
+      expect(fautesDeLArticle({ ...GUIDE, titre, surligne: { situation: "répond", action: "quoi faire" } })).toEqual([expect.stringContaining("revient deux fois")]);
+      expect(fautesDeLArticle({ ...GUIDE, titre, surligne: { situation: "ne répond plus", action: "quoi faire" } })).toEqual([]);
+    });
+  });
+
   describe("la marque", () => {
     it.each([
       ["« une IA »", avecTexte("Une IA ne lit pas tes messages comme toi.")],
       ["« l’IA » dans une bulle", avecBloc({ type: "blush", bulles: ["l’ia a lu ta conv"] })],
-      ["« IA » seul, dans le titre", { ...GUIDE, titre: "Analyse de conv par IA\u00a0: le délai" }],
+      ["« IA » seul, dans le titre", { ...GUIDE, titre: "Analyse de conv par IA\u00a0: le délai", surligne: { situation: "Analyse de conv", action: "le délai" } }],
       ["« intelligence artificielle »", avecTexte("Une intelligence artificielle lit la conv.")],
     ])("refuse %s", (_, a) => {
       expect(fautesDeLArticle(a)).toEqual([expect.stringContaining("« IA »")]);
@@ -61,7 +109,7 @@ describe("les garde-fous des articles", () => {
 
     it("refuse « ta conv WhatsApp » seul, pas la liste de toutes les sources", () => {
       expect(fautesDeLArticle(avecTexte("Importe ta conv WhatsApp et regarde."))).toEqual([expect.stringContaining("« ta conv WhatsApp » seul")]);
-      expect(fautesDeLArticle(avecTexte("Importe tes captures, un enregistrement d’écran ou ta conv WhatsApp en export."))).toEqual([]);
+      expect(fautesDeLArticle(avecTexte("Importe tes captures d’écran ou ta conv WhatsApp en export."))).toEqual([]);
       expect(fautesDeLArticle(avecTexte("Un export Instagram ou WhatsApp se lit pareil."))).toEqual([]);
     });
 
@@ -130,6 +178,15 @@ describe("les garde-fous des articles", () => {
       expect(fautesDeLArticle(avecBloc({ type: "aide" }, enRegle))).toEqual([expect.stringContaining("la page met déjà le bloc d’aide en tête")]);
     });
 
+    it.each([
+      ["vide", { nom: "", role: "" }],
+      ["sans nom de famille", { nom: "Alex", role: "psychologue (test)" }],
+      ["sans rôle", { nom: "Alex Dupont", role: " " }],
+      ["un tiret", { nom: "—", role: "psychologue (test)" }],
+    ])("refuse en zone rouge un expert %s : il signe « relu par », prénom, nom et rôle", (_, expert) => {
+      expect(fautesDeLArticle({ ...GUIDE, zone: "rouge", expert })).toEqual([expect.stringContaining("l’expert est incomplet")]);
+    });
+
     it.each(["Le chantage n’est jamais de l’amour.", "Il l’a frappée hier.", "Il a 15 ans, il est mineur."])("un mot de la zone rouge l’exige : %s", (texte) => {
       expect(fautesDeLArticle(avecTexte(texte))).toEqual([expect.stringContaining("sujet de la zone rouge")]);
     });
@@ -141,13 +198,70 @@ describe("les garde-fous des articles", () => {
   });
 
   describe("la signature, les sources, les dates", () => {
-    it.each([
-      ["vide", { nom: "", role: "" }],
-      ["sans nom de famille", { nom: "Alex", role: "relecteur" }],
-      ["sans rôle", { nom: "Alex Dupont", role: " " }],
-      ["un tiret", { nom: "—", role: "relecteur" }],
-    ])("refuse un relecteur %s", (_, relecteur) => {
-      expect(fautesDeLArticle({ ...GUIDE, relecteur })).toEqual([expect.stringContaining("relecteur est vide")]);
+    it("refuse un article sans validation datée", () => {
+      /* Le type l’exige ; un article mal fusionné, ou lu d’ailleurs, peut l’avoir perdu */
+      const sans: Partial<Article> = { ...GUIDE };
+      delete sans.valideLe;
+      expect(fautesDeLArticle(sans as Article)).toEqual([expect.stringContaining("aucune validation datée")]);
+    });
+
+    it.each<[string, Jour]>([
+      ["un 31 juin", "2026-06-31"],
+      ["un 30 février", "2026-02-30"],
+      ["un mois 13", "2026-13-01"],
+      ["le jour d’un exemple, jamais validé", "0000-00-00"],
+    ])("refuse une validation à un jour impossible : %s", (_, valideLe) => {
+      expect(fautesDeLArticle({ ...GUIDE, valideLe })).toEqual([expect.stringContaining(`la validation (valideLe, « ${valideLe} ») n’est pas un vrai jour`)]);
+    });
+
+    it("refuse une validation après la mise à jour : on valide, puis on publie (le jour même, ou avant)", () => {
+      expect(fautesDeLArticle({ ...GUIDE, valideLe: "2026-11-04" })).toEqual([expect.stringContaining("validé le 2026-11-04, après sa mise à jour du 2026-11-03")]);
+      expect(fautesDeLArticle({ ...GUIDE, valideLe: "2026-11-03" })).toEqual([]);
+      expect(fautesDeLArticle({ ...GUIDE, valideLe: "2026-10-30" })).toEqual([]);
+      /* Une mise à jour de fond, validée avant d’être publiée */
+      const misAJour: Article = { ...GUIDE, misAJourLe: "2026-11-10", changements: [...GUIDE.changements, { le: "2026-11-10", quoi: "Une section sur les stories" }] };
+      expect(fautesDeLArticle({ ...misAJour, valideLe: "2026-11-09" })).toEqual([]);
+      expect(fautesDeLArticle({ ...misAJour, valideLe: "2026-11-11" })).toEqual([expect.stringContaining("après sa mise à jour du 2026-11-10")]);
+    });
+
+    it("refuse un changement de fond resté validé à la version d’avant : il se valide à nouveau, après le changement précédent", () => {
+      const misAJour: Article = { ...GUIDE, misAJourLe: "2026-12-10", changements: [...GUIDE.changements, { le: "2026-12-10", quoi: "Une section sur les stories" }] };
+      /* La validation de la publication, gardée telle quelle, ou plus vieille encore */
+      expect(fautesDeLArticle(misAJour)).toEqual([expect.stringContaining("validé le 2026-11-03, pas après le changement de fond précédent (2026-11-03)")]);
+      expect(fautesDeLArticle({ ...misAJour, valideLe: "2026-10-30" })).toEqual([expect.stringContaining("pas après le changement de fond précédent (2026-11-03)")]);
+      /* Validée à nouveau, après la version d’avant et au plus tard sa propre mise à jour */
+      expect(fautesDeLArticle({ ...misAJour, valideLe: "2026-11-04" })).toEqual([]);
+      expect(fautesDeLArticle({ ...misAJour, valideLe: "2026-12-10" })).toEqual([]);
+      /* Le changement précédent est le dernier avant la mise à jour, dans n’importe quel ordre */
+      const troisieme: Article = { ...misAJour, changements: [misAJour.changements[1]!, { le: "2026-11-20", quoi: "Une FAQ de plus" }, misAJour.changements[0]!] };
+      expect(fautesDeLArticle({ ...troisieme, valideLe: "2026-11-15" })).toEqual([expect.stringContaining("pas après le changement de fond précédent (2026-11-20)")]);
+      expect(fautesDeLArticle({ ...troisieme, valideLe: "2026-11-21" })).toEqual([]);
+    });
+
+    it("refuse le directeur de la publication, où qu’il soit dans l’article, par son nom, son prénom, son nom de famille ou son titre : il ne signe pas les guides", () => {
+      const nom = EDITEUR.directeurPublication;
+      expect(nom.trim()).not.toBe("");
+      const mots = nom.trim().split(/\s+/);
+      const [prenom, famille] = [mots[0]!, mots.at(-1)!];
+      expect(prenom).not.toBe(famille);
+      const rouge: Article = { ...GUIDE, zone: "rouge", expert: { nom: "Sam Martin", role: "psychologue (test)" } };
+      const cas: [string, Article][] = [
+        ["le texte", avecTexte(`Relu par ${nom}, fondateur de BLUSH.`)],
+        ["la FAQ, en majuscules", { ...GUIDE, faq: [...GUIDE.faq, { question: "Qui relit\u00a0?", reponse: nom.toLocaleUpperCase("fr") }] }],
+        ["une insécable entre le prénom et le nom", avecTexte(nom.replace(" ", "\u00a0"))],
+        ["le nom de famille seul", { ...GUIDE, faq: [...GUIDE.faq, { question: "Qui relit\u00a0?", reponse: `M.\u00a0${famille}.` }] }],
+        ["le prénom seul", avecTexte(`${prenom} a relu ce guide.`)],
+        ["« fondateur de BLUSH », sans nom", avecTexte("Relu par le Fondateur de\u00a0BLUSH.")],
+        ["l’expert", { ...rouge, expert: { nom, role: "psychologue (test)" } }],
+        ["le rôle de l’expert", { ...rouge, expert: { nom: "Sam Martin", role: "cofondateur de BLUSH" } }],
+        ["une source", { ...GUIDE, sources: [{ ...GUIDE.sources[0]!, titre: `L’avis de ${nom}` }, ...GUIDE.sources.slice(1)] }],
+        ["l’historique", { ...GUIDE, changements: [{ le: "2026-11-03", quoi: `Publication, relue par ${famille}` }] }],
+      ];
+      for (const [ou, a] of cas) expect(fautesDeLArticle(a), ou).toEqual([expect.stringContaining("l’article nomme le directeur de la publication")]);
+      expect(fautesDeLArticle(rouge)).toEqual([]);
+      /* Un mot entier seulement, et « fondateur » dans son autre sens */
+      expect(fautesDeLArticle(avecTexte(`Son écran ${famille.toLocaleLowerCase("fr")}ant, à deux heures du matin.`))).toEqual([]);
+      expect(fautesDeLArticle(avecTexte("Ce premier message est fondateur de votre histoire."))).toEqual([]);
     });
 
     it("refuse moins de 2 sources datées (une seule, sans date, sans adresse), et plus de 5", () => {
@@ -161,7 +275,14 @@ describe("les garde-fous des articles", () => {
 
     it("« mis à jour le » ne bouge que sur un changement de fond déclaré", () => {
       expect(fautesDeLArticle({ ...GUIDE, misAJourLe: "2026-11-10" })).toEqual([expect.stringContaining("n’est pas le jour du dernier changement de fond")]);
-      expect(fautesDeLArticle({ ...GUIDE, misAJourLe: "2026-11-10", changements: [...GUIDE.changements, { le: "2026-11-10", quoi: "Une section sur les stories" }] })).toEqual([]);
+      expect(
+        fautesDeLArticle({
+          ...GUIDE,
+          misAJourLe: "2026-11-10",
+          changements: [...GUIDE.changements, { le: "2026-11-10", quoi: "Une section sur les stories" }],
+          valideLe: "2026-11-10",
+        }),
+      ).toEqual([]);
       expect(fautesDeLArticle({ ...GUIDE, changements: [] })).toEqual([expect.stringContaining("aucun changement de fond")]);
     });
 

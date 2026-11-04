@@ -1,15 +1,18 @@
 import { readdirSync } from "node:fs";
-import { articlesDu } from "../../src/contenu/articles";
+import { ARTICLES, articlesDu, cheminDe } from "../../src/contenu/articles";
 import { NB_CHAPITRES } from "../../src/contenu/chapitres";
 import { PHRASE_D_IDENTITE } from "../../src/contenu/identite";
 import { TEMOIGNAGES } from "../../src/contenu/landing";
+import { EDITEUR } from "../../src/contenu/mentions-legales";
 import { pagesPubliques } from "../../src/lib/referencement";
-import { desactiverPartage, expect, partageIllisible, test } from "./aide";
+import { NUMEROS_D_URGENCE } from "../../src/contenu/aide";
+import { bullesSurPlusieursLignes, debordements, desactiverPartage, expect, partageIllisible, test } from "./aide";
 
 /*
  * Les pages publiques, sans compte : la landing (la promesse, les convs d’exemple, le quotidien, les boutons vers le
  * parcours), la confidentialité, le choix de l’appli, la page introuvable et celle d’une page qui plante, puis ce que
- * voient les moteurs (chaque page publique, registre des articles compris, sa barre finale, /llms.txt). Elles figent
+ * voient les moteurs (chaque page publique, registre des articles compris, sa barre finale, /llms.txt) et la signature
+ * des articles publiés, sans aucun nom. Elles figent
  * le comportement d’aujourd’hui (le back-end, la bêta ouverte).
  */
 
@@ -284,8 +287,8 @@ test("les pages de l’équipe s’ouvrent hors de Vercel, et n’y montrent rie
   ]) {
     expect((await request.get(chemin)).status(), chemin).toBe(200);
   }
-  /* Le gabarit des guides et du lexique, sur des articles d’exemple inventés, jamais dans les moteurs */
-  for (const chemin of ["/apercu/guide", "/apercu/lexique"]) {
+  /* Le gabarit des guides et du lexique, sur des articles d’exemple inventés (le guide dans ses trois zones), jamais dans les moteurs */
+  for (const chemin of ["/apercu/guide", "/apercu/guide?zone=orange", "/apercu/guide?zone=rouge", "/apercu/lexique"]) {
     const r = await request.get(chemin);
     expect(r.status(), chemin).toBe(200);
     const html = await r.text();
@@ -343,6 +346,73 @@ test("les moteurs de recherche : chaque page publique s’indexe (canonique, ape
   const og = await request.get("/opengraph-image");
   expect([og.status(), og.headers()["content-type"]]).toEqual([200, "image/png"]);
   expect((await request.get("/robots.txt")).status()).toBe(200);
+});
+
+test("les guides et le lexique publiés : « Par l’équipe BLUSH », sans aucun nom ni « relu par » hors de l’expert, ni dans la page ni dans ses données structurées", async ({
+  page,
+}) => {
+  for (const a of ARTICLES) {
+    const chemin = cheminDe(a);
+    await page.goto(chemin);
+    const html = await page.content();
+    await expect(page.locator("article > header"), chemin).toContainText(/Par l’équipe BLUSH · (relu par [^·]+ · )?mis à jour le .+ · Notre méthode/);
+    /* Un seul h1, au texte du registre : ses bulles (la situation, l’action) ne font que l’habiller */
+    await expect(page.locator("h1"), chemin).toHaveCount(1);
+    expect(await page.locator("h1").textContent(), chemin).toBe(a.titre);
+    await expect(page.locator("h1").getByText(a.surligne.situation, { exact: true }), chemin).toBeVisible();
+    await expect(page.locator("h1").getByText(a.surligne.action, { exact: true }), chemin).toBeVisible();
+    /* Le nom, nulle part dans le HTML, charge RSC comprise (elle redit chaque texte de la page) ; « relu par » se compte
+       dans le texte affiché, une fois pour l’expert d’une page rouge */
+    expect(html.toLocaleLowerCase("fr"), chemin).not.toContain(EDITEUR.directeurPublication.toLocaleLowerCase("fr"));
+    expect((await page.locator("body").innerText()).match(/relu par/gi) ?? [], chemin).toHaveLength(a.expert ? 1 : 0);
+    const ld = (await page.locator('script[type="application/ld+json"]').textContent()) ?? "";
+    expect(ld, chemin).toContain(`"lastReviewed":"${a.valideLe}"`);
+    expect(ld, chemin).not.toMatch(/relu par/i);
+  }
+});
+
+test("les guides et le lexique au téléphone : rien ne déborde à 320 ni à 375 px, chaque bulle du titre tient sur une ligne ; la zone rouge, sobre, a ses numéros d’urgence dans le premier écran, ni bouton, ni prix, ni bloc rose, un simple lien", async ({
+  page,
+}) => {
+  const chemins = [
+    ...(articlesDu("guide").length ? ["/guides"] : []),
+    ...ARTICLES.map(cheminDe),
+    "/apercu/guide",
+    "/apercu/guide?zone=orange",
+    "/apercu/guide?zone=rouge",
+    "/apercu/lexique",
+  ];
+  /* Le cadre coupe ce qui dépasse (la page ne défile jamais de côté) : chaque élément est mesuré, là où il se voit (aide/mise-en-page.ts) */
+  for (const largeur of [320, 375]) {
+    await page.setViewportSize({ width: largeur, height: 667 });
+    for (const chemin of chemins) {
+      await page.goto(chemin);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth), `${chemin} à ${largeur} px`).toBeLessThanOrEqual(0);
+      expect(await debordements(page), `${chemin} à ${largeur} px`).toEqual([]);
+      expect(await bullesSurPlusieursLignes(page), `${chemin} à ${largeur} px`).toEqual([]);
+    }
+  }
+  /* La zone rouge : les numéros d’urgence entiers dans le premier écran, sur un ordinateur (à côté du titre) comme au téléphone */
+  for (const [largeur, hauteur] of [
+    [1280, 800],
+    [375, 667],
+  ] as const) {
+    await page.setViewportSize({ width: largeur, height: hauteur });
+    await page.goto("/apercu/guide?zone=rouge");
+    for (const n of Object.values(NUMEROS_D_URGENCE)) await expect(page.locator(`main a[href="tel:${n}"]`), `${n} à ${largeur} px`).toBeInViewport({ ratio: 1 });
+  }
+  /* Sobre : ni couverture, ni bulle dans le titre */
+  await expect(page.locator("[data-couverture]")).toHaveCount(0);
+  await expect(page.locator("h1 .inline-block")).toHaveCount(0);
+  await expect(page.getByRole("heading", { level: 2, name: `Besoin d’en parler${NB}?` })).toBeVisible();
+  await expect(page.getByText("Analyser ma conv")).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Commencer" })).toHaveCount(0);
+  await expect(page.getByText(/Le rapport\s*:/)).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Importe-la sur BLUSH" })).toBeVisible();
+  /* Ailleurs, la fin rose de la landing : son bouton, ses deux promesses et le prix tiré du code */
+  await page.goto("/apercu/guide?zone=orange");
+  await expect(page.getByRole("contentinfo").getByRole("link", { name: "Analyser ma conv" })).toBeVisible();
+  await expect(page.getByRole("contentinfo").getByText(/Le rapport\s*:/)).toBeVisible();
 });
 
 test("une seule adresse par page publique : sa barre finale mène à la même sans (308), et rien d’autre ne bouge (le relais de PostHog, l’API, le proxy)", async ({ request }) => {

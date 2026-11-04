@@ -27,6 +27,12 @@ async function metadonneesDe(chemin: string): Promise<Metadata> {
       return (await import("@/app/conditions/page")).metadata;
     case "/mentions-legales":
       return (await import("@/app/mentions-legales/page")).metadata;
+    case "/a-propos":
+      return (await import("@/app/a-propos/page")).metadata;
+    case "/methode":
+      return (await import("@/app/methode/page")).metadata;
+    case "/aide":
+      return (await import("@/app/aide/page")).metadata;
     case "/guides":
       return (await import("@/app/guides/page")).generateMetadata();
     case "/lexique":

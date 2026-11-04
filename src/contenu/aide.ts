@@ -15,8 +15,15 @@
  * numéros d’urgence (AIDE_SANS_BULLES), quoi qu’il ait écrit.
  */
 
+/**
+ * Les numéros de la phrase des urgences, dans son ordre : la police, le numéro d’urgence européen, la prévention du
+ * suicide. URGENCES est écrite avec eux, et /aide en fait un bouton chacun (src/contenu/pages-de-confiance.ts) : un
+ * numéro à ajouter à la phrase s’ajoute ici, jamais à la main dans son texte, où il n’aurait pas de bouton.
+ */
+export const NUMEROS_D_URGENCE = { police: "17", europeen: "112", suicide: "3114" } as const;
+
 /** Les numéros d’urgence, et celui de la prévention du suicide, en une phrase. */
-export const URGENCES = "Si tu te sens en danger, appelle le 17 ou le 112. Si tu vas mal, le 3114 répond jour et nuit, gratuitement.";
+export const URGENCES = `Si tu te sens en danger, appelle le ${NUMEROS_D_URGENCE.police} ou le ${NUMEROS_D_URGENCE.europeen}. Si tu vas mal, le ${NUMEROS_D_URGENCE.suicide} répond jour et nuit, gratuitement.`;
 
 /** Les lignes d’écoute du rapport doux (le mode sobre), absentes des maquettes (validées). */
 export const LIGNES_D_ECOUTE = [

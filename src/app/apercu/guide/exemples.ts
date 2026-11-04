@@ -1,15 +1,16 @@
-import type { Article } from "@/contenu/articles/types";
+import type { Article, Jour } from "@/contenu/articles/types";
 
 /*
  * Deux articles d’exemple pour les aperçus de l’équipe (/apercu/guide, /apercu/lexique, hors de Vercel seulement) : le
- * vrai gabarit sur un texte INVENTÉ, jamais publié (il n’est pas dans le registre, src/contenu/articles). Ni signé (« relu
- * par — (exemple) »), ni sourcé (des adresses d’exemple, example.com) : un vrai article a son relecteur et ses sources, et
- * les garde-fous de tests/unit/articles.test.ts le refuseraient sans eux. Les règles de marque, elles, valent aussi ici
- * (le même test les vérifie). Le guide est en zone verte ; l’entrée du lexique en zone orange, pour montrer le bloc d’aide.
+ * vrai gabarit sur un texte INVENTÉ, jamais publié (il n’est pas dans le registre, src/contenu/articles). Ni validé (un
+ * jour de validation qui n’existe pas), ni sourcé (des adresses d’exemple, example.com) : un vrai article a sa validation
+ * datée et ses sources, et les garde-fous de tests/unit/articles.test.ts le refuseraient sans elles. Les règles de
+ * marque, elles, valent aussi ici (le même test les vérifie). Le guide est en zone verte ; l’entrée du lexique en zone
+ * orange, pour montrer le bloc d’aide.
  */
 
-/** Le relecteur d’un exemple : personne. */
-const PERSONNE = { nom: "— (exemple)", role: "" };
+/** Le jour de validation d’un exemple : aucun, un jour qui n’existe pas (jamais validé, les garde-fous refuseraient de le publier). */
+const JAMAIS_VALIDE: Jour = "0000-00-00";
 
 /** Des sources d’exemple, à remplacer par de vraies sources datées. */
 const SOURCES_D_EXEMPLE = [
@@ -21,7 +22,9 @@ const SOURCES_D_EXEMPLE = [
 export const GUIDE_D_EXEMPLE: Article = {
   slug: "il-met-du-temps-a-repondre",
   genre: "guide",
-  titre: "Il met du temps à répondre\u00a0: à partir de quand ça veut dire quelque chose",
+  theme: "Les délais",
+  titre: "Il met du temps à répondre\u00a0: à partir de quand ça veut dire quelque chose, et quoi faire",
+  surligne: { situation: "met du temps", action: "quoi faire" },
   description:
     "Un délai de réponse seul ne dit pas grand-chose. Ce qui compte, c’est un rythme qui change, qui relance, et ce qu’il y a dans les messages. Avec des exemples inventés.",
   motCle: "il met du temps à répondre",
@@ -29,7 +32,7 @@ export const GUIDE_D_EXEMPLE: Article = {
   publieLe: "2026-11-03",
   misAJourLe: "2026-11-03",
   changements: [{ le: "2026-11-03", quoi: "Publication (exemple)" }],
-  relecteur: PERSONNE,
+  valideLe: JAMAIS_VALIDE,
   sources: SOURCES_D_EXEMPLE,
   reponseCourte:
     "Un délai seul ne veut presque rien dire\u00a0: les gens répondent selon leur journée, leur téléphone et leur façon d’écrire. Ça commence à vouloir dire quelque chose quand son rythme change sans raison, quand c’est toujours toi qui relances, ou quand ses réponses raccourcissent en même temps.",
@@ -134,7 +137,9 @@ export const GUIDE_D_EXEMPLE: Article = {
 export const ENTREE_D_EXEMPLE: Article = {
   slug: "ghosting",
   genre: "lexique",
+  theme: "Les silences",
   titre: "Ghosting\u00a0: ce que ça veut dire, et quoi faire",
+  surligne: { situation: "Ghosting", action: "quoi faire" },
   description:
     "Le ghosting, c’est quand une personne arrête de te répondre du jour au lendemain, sans rien dire. La définition, un exemple inventé, et la différence avec un simple silence.",
   motCle: "ghosting",
@@ -142,7 +147,7 @@ export const ENTREE_D_EXEMPLE: Article = {
   publieLe: "2026-11-03",
   misAJourLe: "2026-11-03",
   changements: [{ le: "2026-11-03", quoi: "Publication (exemple)" }],
-  relecteur: PERSONNE,
+  valideLe: JAMAIS_VALIDE,
   sources: SOURCES_D_EXEMPLE,
   reponseCourte:
     "Le ghosting, c’est quand une personne avec qui tu parlais arrête de te répondre du jour au lendemain, sans explication. Elle ne dit pas non, elle disparaît. Ça fait souvent plus mal qu’un refus, parce que tu restes sans réponse et que tu cherches ce que tu as mal fait.",
@@ -210,3 +215,20 @@ export const ENTREE_D_EXEMPLE: Article = {
 
 /** Les deux exemples, comme un petit registre : leurs liens se retrouvent entre eux (liesDe). */
 export const EXEMPLES: readonly Article[] = [GUIDE_D_EXEMPLE, ENTREE_D_EXEMPLE];
+
+/**
+ * Le guide d’exemple en zone orange (/apercu/guide?zone=orange) : le même texte, avec le bloc d’aide au bout de sa
+ * dernière section, là où un guide orange le pose. Pour voir le gabarit de cette zone, rien de plus.
+ */
+export const GUIDE_ORANGE_D_EXEMPLE: Article = {
+  ...GUIDE_D_EXEMPLE,
+  zone: "orange",
+  sections: GUIDE_D_EXEMPLE.sections.map((s, k, toutes) => (k === toutes.length - 1 ? { ...s, blocs: [...s.blocs, { type: "aide" }] } : s)),
+};
+
+/**
+ * Le guide d’exemple en zone rouge (/apercu/guide?zone=rouge) : le même texte, et ce que la page pose d’elle-même dans
+ * cette zone (le bloc d’aide en tête, l’expert dans la signature, un simple lien au lieu du bouton et du prix). L’expert
+ * est un nom de place, pas une personne : un vrai article rouge a le sien, nommé.
+ */
+export const GUIDE_ROUGE_D_EXEMPLE: Article = { ...GUIDE_D_EXEMPLE, zone: "rouge", expert: { nom: "Prénom Nom", role: "psychologue (exemple)" } };

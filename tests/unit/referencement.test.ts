@@ -7,6 +7,7 @@ import { CONDITIONS } from "@/contenu/conditions";
 import { CONFIDENTIALITE_MISE_A_JOUR } from "@/contenu/confidentialite";
 import { PHRASE_D_IDENTITE } from "@/contenu/identite";
 import { MENTIONS } from "@/contenu/mentions-legales";
+import { A_PROPOS, METHODE, PAGE_AIDE } from "@/contenu/pages-de-confiance";
 import { donneesDuSite } from "@/lib/donnees-structurees";
 import { derniereMiseAJour, jourEnLettres } from "@/lib/format";
 import { CHEMINS_PRIVES, PAGES_PUBLIQUES, pagePublique, pagesPubliques } from "@/lib/referencement";
@@ -28,6 +29,9 @@ afterEach(() => vi.unstubAllEnvs());
 
 /** Le Disallow de robots.txt qui couvre ce chemin, lu comme les moteurs le lisent (un début de chemin), s’il y en a un. */
 const disallowDe = (chemin: string) => CHEMINS_PRIVES.find((prive) => chemin.startsWith(prive));
+
+/** Les pages fixes, dans l’ordre du plan du site : la landing, les pages légales, puis les pages de confiance. */
+const FIXES = ["/", "/confidentialite", "/conditions", "/mentions-legales", "/a-propos", "/methode", "/aide"];
 
 /** Le fichier de la clé IndexNow (public/<clé>.txt) : 32 caractères hexadécimaux. */
 const FICHIERS_INDEXNOW = readdirSync("public").filter((f) => /^[0-9a-f]{32}\.txt$/.test(f));
@@ -66,15 +70,22 @@ describe("le référencement", () => {
   it("chaque page publique, registre compris, s’indexe avec son adresse canonique et figure dans le plan du site, avec sa date", async () => {
     const { default: sitemap } = await import("@/app/sitemap");
     const pages = pagesPubliques();
-    expect(pages.map((p) => p.chemin).slice(0, 4)).toEqual(["/", "/confidentialite", "/conditions", "/mentions-legales"]);
-    expect(pages).toHaveLength(4 + (ARTICLES.length ? ARTICLES.length + new Set(ARTICLES.map((a) => a.genre)).size : 0));
+    expect(pages.map((p) => p.chemin).slice(0, PAGES_PUBLIQUES.length)).toEqual(FIXES);
+    expect(pages).toHaveLength(PAGES_PUBLIQUES.length + (ARTICLES.length ? ARTICLES.length + new Set(ARTICLES.map((a) => a.genre)).size : 0));
     await verifierLesPagesPubliques(pages, sitemap());
     expect(sitemap()[0]!.priority).toBe(1);
   });
 
-  it("le plan du site : la date des pages légales est celle qu’elles affichent, jamais celle du build", () => {
+  it("le plan du site : la date des pages légales et de confiance est celle qu’elles affichent, jamais celle du build", () => {
     const dates = Object.fromEntries(PAGES_PUBLIQUES.map((p) => [p.chemin, p.misAJourLe]));
-    expect(dates).toMatchObject({ "/conditions": CONDITIONS.misAJourLe, "/mentions-legales": MENTIONS.misAJourLe, "/confidentialite": CONFIDENTIALITE_MISE_A_JOUR });
+    expect(dates).toMatchObject({
+      "/conditions": CONDITIONS.misAJourLe,
+      "/mentions-legales": MENTIONS.misAJourLe,
+      "/confidentialite": CONFIDENTIALITE_MISE_A_JOUR,
+      "/a-propos": A_PROPOS.misAJourLe,
+      "/methode": METHODE.misAJourLe,
+      "/aide": PAGE_AIDE.misAJourLe,
+    });
     expect(CONDITIONS.maj).toBe("Dernière mise à jour\u00a0: 26 octobre 2026.");
     expect(MENTIONS.maj).toBe("Dernière mise à jour\u00a0: 3 novembre 2026.");
     /* Le premier du mois, comme on l’écrit : « 1er », jamais « 1 » (la date des pages légales, des articles, des offres) */
@@ -88,7 +99,7 @@ describe("le référencement", () => {
   });
 
   it("une rubrique n’existe qu’avec un article : son hub, à jour de son article le plus récent, puis ses articles", () => {
-    expect(pagesPubliques([]).map((p) => p.chemin)).toEqual(["/", "/confidentialite", "/conditions", "/mentions-legales"]);
+    expect(pagesPubliques([]).map((p) => p.chemin)).toEqual(FIXES);
     const recent = {
       ...ENTREE_D_EXEMPLE,
       slug: "ghosting-2",
@@ -97,7 +108,7 @@ describe("le référencement", () => {
       changements: [{ le: "2026-11-20", quoi: "Une section de plus" }],
     } as const;
     const pages = pagesPubliques([...EXEMPLES, recent]);
-    expect(pages.slice(4).map((p) => [p.chemin, p.misAJourLe])).toEqual([
+    expect(pages.slice(FIXES.length).map((p) => [p.chemin, p.misAJourLe])).toEqual([
       ["/guides", "2026-11-03"],
       ["/guides/il-met-du-temps-a-repondre", "2026-11-03"],
       ["/lexique", "2026-11-20"],

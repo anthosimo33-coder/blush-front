@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { AIDE_SANS_BULLES, LIGNES_D_ECOUTE, LIGNES_PAR_SITUATION, URGENCES } from "@/contenu/aide";
+import { AIDE_SANS_BULLES, LIGNES_D_ECOUTE, LIGNES_PAR_SITUATION, NUMEROS_D_URGENCE, URGENCES } from "@/contenu/aide";
 
 /*
  * L’aide écrite une fois (src/contenu/aide.ts) : les numéros d’urgence, les lignes d’écoute et les lignes par situation
@@ -42,7 +42,7 @@ describe("les lignes par situation", () => {
      * Le 17, le 112 et le 3114 sont dans URGENCES (les conditions, le chat en alerte, la réponse 402) : aucune des cinq ne
      * les redit. La feuille d’aide ne les montre pas : décidé le 3 novembre 2026 (src/contenu/aide.ts).
      */
-    for (const numero of URGENCES.match(/\d+/g)!) expect(LIGNES_PAR_SITUATION.map((l) => l.label)).not.toContain(numero);
+    for (const numero of Object.values(NUMEROS_D_URGENCE)) expect(LIGNES_PAR_SITUATION.map((l) => l.label)).not.toContain(numero);
   });
 
   it("disent pour qui elles sont, en tutoiement", () => {
@@ -84,6 +84,14 @@ describe("les lignes par situation", () => {
     expect(tchat.detail).toMatch(/lundi au jeudi/);
     expect(textes(tchat).join(" ")).not.toMatch(/anonyme|confidentiel/i);
     expect(tchat.detail).toMatch(/sous un prénom ou un pseudo/);
+  });
+});
+
+describe("les numéros d’urgence", () => {
+  it("sont ceux de la phrase des urgences, chacun une fois et dans son ordre, sans autre nombre écrit à la main (il n’aurait pas son bouton sur /aide)", () => {
+    const numeros = Object.values(NUMEROS_D_URGENCE);
+    expect(URGENCES.match(/\d+/g)).toEqual(numeros);
+    expect(new Set(numeros).size).toBe(numeros.length);
   });
 });
 

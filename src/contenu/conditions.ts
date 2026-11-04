@@ -51,6 +51,20 @@ export const CONDITIONS = {
   maj: derniereMiseAJour(MIS_A_JOUR_LE),
 } as const;
 
+/**
+ * Ce que BLUSH n’est pas, au début de « Une lecture, pas un conseil » : la page /a-propos le reprend tel quel, sans la
+ * phrase qui suit (l’une des deux seules qui disent qu’il est une intelligence artificielle, AGENTS.md).
+ */
+export const PAS_UN_CONSEIL =
+  "BLUSH t’aide à y voir plus clair, avec un peu d’humour. Ce n’est ni un service de conseil, ni une thérapie, ni un avis médical, psychologique ou juridique.";
+
+/**
+ * La règle des convs importées, au début de « Ta conv, et ce qu’elle dit d’intime » : une obligation de qui importe, pas
+ * une garantie technique de BLUSH (la section « compte » dit ce qu’il en coûte de ne pas la tenir). /methode la cite
+ * telle quelle.
+ */
+export const QUE_TES_CONVS = "Tu n’importes qu’une conv à laquelle tu as pris part.";
+
 /** Utiliser BLUSH : les conditions d’utilisation. */
 const UTILISATION: readonly Section[] = [
   {
@@ -64,10 +78,7 @@ const UTILISATION: readonly Section[] = [
   {
     id: "conseil",
     titre: "Une lecture, pas un conseil",
-    blocs: [
-      "BLUSH t’aide à y voir plus clair, avec un peu d’humour. Ce n’est ni un service de conseil, ni une thérapie, ni un avis médical, psychologique ou juridique. BLUSH est une intelligence artificielle et peut se tromper\u00a0: ce que tu décides reste ta décision.",
-      URGENCES,
-    ],
+    blocs: [`${PAS_UN_CONSEIL} BLUSH est une intelligence artificielle et peut se tromper\u00a0: ce que tu décides reste ta décision.`, URGENCES],
   },
   {
     id: "age",
@@ -78,7 +89,7 @@ const UTILISATION: readonly Section[] = [
     id: "conv",
     titre: "Ta conv, et ce qu’elle dit d’intime",
     blocs: [
-      "Tu n’importes qu’une conv à laquelle tu as pris part.",
+      QUE_TES_CONVS,
       "Une conv peut dire des choses intimes, sur toi comme sur l’autre personne\u00a0: sa santé, sa vie amoureuse, sa sexualité. Avant chaque import, tu acceptes, en continuant, que BLUSH les lise pour écrire ton analyse. BLUSH garde la date de cet accord, et la version du texte que tu as accepté.",
       "La personne avec qui tu parles n’est jamais contactée. Ce que tu lis ici ne sert pas à la surveiller, la harceler ou l’exposer.",
       "Ce que BLUSH fait de ta conv, combien de temps il la garde et comment tout effacer\u00a0: la page Confidentialité.",
@@ -203,3 +214,10 @@ export const partiesConditions = (editeur: Editeur): readonly { titre: string; s
 
 /** Les conditions de BLUSH : celles de son éditeur (src/contenu/mentions-legales.ts). */
 export const PARTIES_CONDITIONS = partiesConditions(EDITEUR);
+
+/** Une section des conditions, par son ancre (« age », « conseil ») : la page /a-propos en reprend, telles quelles. */
+export function sectionDesConditions(id: string): Section {
+  const section = PARTIES_CONDITIONS.flatMap((p) => p.sections).find((s) => s.id === id);
+  if (!section) throw new Error(`Aucune section « ${id} » dans les conditions (src/contenu/conditions.ts)`);
+  return section;
+}

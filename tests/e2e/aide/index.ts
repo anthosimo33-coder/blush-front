@@ -68,6 +68,7 @@ export * from "./exports";
 export * from "./import";
 export * from "./instagram-captures";
 export * from "./lecture";
+export * from "./mise-en-page";
 export * from "./page";
 export * from "./paiement";
 export * from "./parcours";

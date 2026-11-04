@@ -1,4 +1,6 @@
+import { SOURCES } from "@/contenu/articles";
 import type { Article, BlocArticle, Personne } from "@/contenu/articles/types";
+import { EDITEUR } from "@/contenu/mentions-legales";
 
 /*
  * Les garde-fous des articles (src/contenu/articles), pour tests/unit/articles.test.ts : chaque règle de la charte
@@ -6,7 +8,7 @@ import type { Article, BlocArticle, Personne } from "@/contenu/articles/types";
  * à chaque `npm run check`. Une faute est une phrase en français, pour qui écrit l’article : ce qui ne va pas, où, et
  * quoi faire. La relecture humaine garde le reste (le sens, le ton, un conseil qui ferait du mal).
  * Les règles lisent tout le texte affiché d’un article (textesDe), pas ses sources (des titres d’autres sites) ni sa
- * signature.
+ * signature ; seule celle du nom du directeur de la publication lit tout l’article, chacun de ses champs (chainesDe).
  */
 
 /** Une lettre ou un chiffre, de n’importe quel alphabet : ce qui borne un mot (\b ne connaît pas les accents). */
@@ -38,15 +40,55 @@ function textesDuBloc(b: BlocArticle): string[] {
   }
 }
 
-/** Tout le texte affiché d’un article, morceau par morceau : son titre, sa description, sa réponse courte, ses sections, sa FAQ. */
-const textesDe = (a: Article): string[] => [
-  a.titre,
-  a.description,
-  a.motCle,
-  a.reponseCourte,
-  ...a.sections.flatMap((s) => [s.question, ...s.blocs.flatMap(textesDuBloc)]),
-  ...a.faq.flatMap((q) => [q.question, q.reponse]),
+/** Tout le texte affiché d’un article, morceau par morceau : son thème, son titre, sa description, sa réponse courte, ses sections, sa FAQ. */
+const textesDe = (a: Article): string[] =>
+  [
+    a.theme,
+    a.titre,
+    a.description,
+    a.motCle,
+    a.reponseCourte,
+    ...a.sections.flatMap((s) => [s.question, ...s.blocs.flatMap(textesDuBloc)]),
+    ...a.faq.flatMap((q) => [q.question, q.reponse]),
+    /* Un champ perdu (un article mal fusionné, ou lu d’ailleurs) n’a pas de texte : sa propre règle le dit */
+  ].filter((t) => typeof t === "string");
+
+/**
+ * Toutes les chaînes d’un article, de chacun de ses champs, à toute profondeur : le texte affiché, l’expert, les sources,
+ * l’historique. Ce qu’aucune partie de l’article ne doit contenir s’y cherche.
+ */
+function chainesDe(valeur: unknown): string[] {
+  if (typeof valeur === "string") return [valeur];
+  if (Array.isArray(valeur)) return valeur.flatMap(chainesDe);
+  if (valeur && typeof valeur === "object") return Object.values(valeur).flatMap(chainesDe);
+  return [];
+}
+
+/** Un texte comparé sans casse, sans accents et les espaces resserrées (une insécable compte comme une espace). */
+export const aPlat = (texte: string) => texte.normalize("NFD").replace(/\p{M}/gu, "").toLocaleLowerCase("fr").replace(/\s+/g, " ").trim();
+
+/** Un texte, lu tel quel dans une regex. */
+const tel = (texte: string) => texte.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/**
+ * Le prénom et le nom de famille du directeur de la publication, à plat : le premier et le dernier mot de son nom (pas
+ * une particule du milieu, « de » ou « la », qui se trouverait partout).
+ */
+const MOTS_DU_DIRECTEUR = [
+  ...new Set(
+    aPlat(EDITEUR.directeurPublication)
+      .split(" ")
+      .filter(Boolean)
+      .filter((m, k, mots) => k === 0 || k === mots.length - 1),
+  ),
 ];
+
+/**
+ * Ce qui nommerait le directeur de la publication dans un article, cherché à plat (aPlat) : son prénom ou son nom de
+ * famille, chacun en mot entier (son nom complet, « M. » et son nom de famille, son prénom seul), ou son titre de
+ * « fondateur de BLUSH » (la fin de l’ancienne signature).
+ */
+const NOMME_LE_DIRECTEUR = new RegExp(entier([...MOTS_DU_DIRECTEUR.map(tel), "(?:co-?)?fondat(?:eur|rice)s? de blush"].join("|")), "u");
 
 /** Les mots d’un texte (les lettres et les chiffres, apostrophes comprises : « c’est » est un mot). */
 const motsDe = (texte: string) => texte.toLocaleLowerCase("fr").match(/[\p{L}\p{N}’']+/gu) ?? [];
@@ -102,14 +144,30 @@ const MOTS_REFUSES: readonly { motif: RegExp; pourquoi: string }[] = [
  */
 const MOTS_ROUGES = mot("suicid\\p{L}*|nudes?|sextorsion|chantage|harc[eè]l\\p{L}*|viol(?:s|e|é|ée|er|ences?)?|frapp\\p{L}*|mineur(?:e|s|es)?|automutil\\p{L}*|scarifi\\p{L}*");
 
-/** Une phrase où « ta conv WhatsApp » (ou Instagram) arrive seule, sans les captures ni les enregistrements d’écran. */
+/** Une phrase où « ta conv WhatsApp » (ou Instagram) arrive seule, sans les captures d’écran. */
 function convWhatsappSeule(texte: string): boolean {
   return texte
     .split(/(?<=[.!?])\s+/)
-    .some(
-      (phrase) =>
-        mot("(?:ta|tes|votre|vos|sa|ses) conv(?:ersation)?s? (?:whatsapp|insta(?:gram)?)").test(phrase) && !(/captures?/i.test(phrase) && /enregistrements?/i.test(phrase)),
+    .some((phrase) => mot("(?:ta|tes|votre|vos|sa|ses) conv(?:ersation)?s? (?:whatsapp|insta(?:gram)?)").test(phrase) && !/captures?/i.test(phrase));
+}
+
+/**
+ * Les fautes de marque et de sujets sensibles d’un texte public, morceau par morceau (`textes`) : les mots refusés
+ * (MOTS_REFUSES) et « ta conv WhatsApp » seul. `ici` : le nom de la page, en tête de chaque faute. Les articles s’en
+ * servent, et les pages de confiance aussi (tests/unit/pages-de-confiance.test.ts), sur tout leur texte affiché.
+ */
+export function fautesDuTexte(textes: readonly string[], ici: string): string[] {
+  const fautes: string[] = [];
+  for (const { motif, pourquoi } of MOTS_REFUSES) {
+    const trouve = textes.find((t) => motif.test(t));
+    if (trouve) fautes.push(`${ici} : ${pourquoi}. Dans : « ${trouve} »`);
+  }
+  const seule = textes.find(convWhatsappSeule);
+  if (seule)
+    fautes.push(
+      `${ici} : « ta conv WhatsApp » seul : BLUSH lit aussi les captures d’écran et l’export Instagram, écris « captures d’écran, export Instagram ou WhatsApp ». Dans : « ${seule} »`,
     );
+  return fautes;
 }
 
 /** Un jour « AAAA-MM-JJ » qui existe (pas un 31 juin). */
@@ -124,6 +182,51 @@ const personneValide = ({ nom, role }: Personne) =>
     .trim()
     .split(/\s+/)
     .filter((m) => /\p{L}{2,}/u.test(m)).length >= 2 && role.trim() !== "";
+
+/**
+ * Le plus long morceau surligné du titre, en signes : une borne, pas une garantie. Une bulle du titre (penchée d’un bloc,
+ * src/components/article/titre.tsx) passe à la ligne entière ; à 320 px de large, la tête du titre en tient de 13 à 18
+ * selon ses lettres (« mmm » plus large que « ill »), et une bulle plus large que la colonne passe à la ligne dans sa
+ * bulle au lieu de déborder. Les vrais titres sont mesurés au téléphone, chaque bulle sur une ligne
+ * (tests/e2e/public-admin-pages.spec.ts).
+ */
+export const SURLIGNE_MAX = 18;
+
+/**
+ * Les fautes des morceaux surlignés du titre (Article `surligne`) : chacun un morceau exact du titre, une seule fois, en
+ * mots entiers, court, sans les deux-points (le titre se coupe là en deux temps), et les deux sans se chevaucher.
+ */
+function fautesDuSurligne(a: Article, ici: string): string[] {
+  const fautes: string[] = [];
+  const surligne: Partial<Article["surligne"]> = a.surligne ?? {};
+  const places: { debut: number; fin: number }[] = [];
+  for (const [nom, morceau] of [
+    ["la situation (rose)", surligne.situation],
+    ["l’action (bleue)", surligne.action],
+  ] as const) {
+    if (typeof morceau !== "string" || !morceau.trim()) {
+      fautes.push(`${ici} : le titre n’a pas ${nom} à surligner. Ajoute surligne, deux morceaux exacts du titre : la situation en rose, l’action en bleu.`);
+      continue;
+    }
+    const debut = a.titre.indexOf(morceau);
+    const avant = a.titre.slice(0, Math.max(0, debut)).at(-1) ?? "";
+    const apres = a.titre.slice(debut + morceau.length).at(0) ?? "";
+    if (morceau !== morceau.trim()) fautes.push(`${ici} : ${nom} surlignée (« ${morceau} ») commence ou finit par une espace : écris le morceau seul.`);
+    else if (debut < 0) fautes.push(`${ici} : ${nom} surlignée (« ${morceau} ») n’est pas un morceau exact du titre (« ${a.titre} »).`);
+    else if (a.titre.indexOf(morceau, debut + 1) >= 0)
+      fautes.push(`${ici} : ${nom} surlignée (« ${morceau} ») revient deux fois dans le titre : choisis un morceau qui n’y est qu’une fois.`);
+    else if (new RegExp(BORD, "u").test(avant) || new RegExp(BORD, "u").test(apres))
+      fautes.push(`${ici} : ${nom} surlignée (« ${morceau} ») coupe un mot du titre : surligne des mots entiers.`);
+    else if (morceau.includes(":"))
+      fautes.push(`${ici} : ${nom} surlignée (« ${morceau} ») passe par les deux-points, où le titre se coupe en deux : prends un morceau d’un côté.`);
+    else if (morceau.length > SURLIGNE_MAX)
+      fautes.push(`${ici} : ${nom} surlignée (« ${morceau} ») fait ${morceau.length} signes, ${SURLIGNE_MAX} au plus : la bulle doit tenir sur une ligne du téléphone.`);
+    else places.push({ debut, fin: debut + morceau.length });
+  }
+  const [x, y] = places;
+  if (x && y && x.debut < y.fin && y.debut < x.fin) fautes.push(`${ici} : la situation et l’action surlignées se chevauchent dans le titre : deux morceaux à part.`);
+  return fautes;
+}
 
 /** Le nombre de mots d’un texte, comme on les compte à l’œil (« c’est » compte pour un). */
 export const nombreDeMots = (texte: string) => motsDe(texte).length;
@@ -166,8 +269,8 @@ export const RESSEMBLANCE_MAX = 0.5;
 const PUBLICATIONS_PAR_SEMAINE = 5;
 
 /**
- * Les fautes d’un article seul. `exemple` : un article d’aperçu (src/app/apercu), qui n’est signé par personne : la règle
- * de la signature ne s’y applique pas, toutes les autres oui.
+ * Les fautes d’un article seul. `exemple` : un article d’aperçu (src/app/apercu), que personne n’a validé : la règle de
+ * la validation datée ne s’y applique pas, toutes les autres oui.
  */
 export function fautesDeLArticle(a: Article, { exemple = false }: { exemple?: boolean } = {}): string[] {
   const fautes: string[] = [];
@@ -177,16 +280,17 @@ export function fautesDeLArticle(a: Article, { exemple = false }: { exemple?: bo
   if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(a.slug)) fautes.push(`${ici} : le slug s’écrit en minuscules sans accents, les mots séparés par des tirets (il fait l’adresse).`);
   if (!a.titre.trim() || !a.description.trim() || !a.motCle.trim()) fautes.push(`${ici} : le titre, la description et le mot-clé principal sont exigés.`);
 
+  /* Le thème : le surtitre de la page, de un à trois mots, une majuscule au début et rien au bout (« Les silences ») */
+  const theme: unknown = a.theme;
+  const motsDuTheme = typeof theme === "string" ? theme.trim().split(/\s+/).filter(Boolean) : [];
+  if (typeof theme !== "string" || !motsDuTheme.length || motsDuTheme.length > 3 || !/^\p{Lu}/u.test(theme) || /[\p{P}\s]$/u.test(theme))
+    fautes.push(`${ici} : le thème (« ${String(theme ?? "")} ») est un surtitre de un à trois mots, une majuscule au début, sans ponctuation au bout (« Les silences »).`);
+
+  /* Les mots surlignés du titre */
+  fautes.push(...fautesDuSurligne(a, ici));
+
   /* La marque et les sujets sensibles */
-  for (const { motif, pourquoi } of MOTS_REFUSES) {
-    const trouve = textes.find((t) => motif.test(t));
-    if (trouve) fautes.push(`${ici} : ${pourquoi}. Dans : « ${trouve} »`);
-  }
-  const seule = textes.find(convWhatsappSeule);
-  if (seule)
-    fautes.push(
-      `${ici} : « ta conv WhatsApp » seul : BLUSH lit aussi les captures d’écran et l’export Instagram, écris « captures d’écran, export Instagram ou WhatsApp ». Dans : « ${seule} »`,
-    );
+  fautes.push(...fautesDuTexte(textes, ici));
 
   /* BLUSH parle en minuscules, sans point final */
   for (const bulle of a.sections.flatMap((s) => s.blocs.flatMap((b) => (b.type === "blush" ? b.bulles : [])))) {
@@ -200,16 +304,45 @@ export function fautesDeLArticle(a: Article, { exemple = false }: { exemple?: bo
 
   if (a.genre === "guide" && (a.sections.length < 3 || a.sections.length > 5)) fautes.push(`${ici} : un guide a de 3 à 5 sections, il en a ${a.sections.length}.`);
 
-  /* La signature : une vraie personne, et l’expert en zone rouge */
-  if (!exemple && !personneValide(a.relecteur))
-    fautes.push(`${ici} : le relecteur est vide ou incomplet. Il faut une vraie personne, prénom et nom, avec son rôle : c’est elle qui signe « relu par ».`);
+  /* La signature : une validation datée (on valide le texte final, puis on publie), et l’expert en zone rouge */
+  const valideLe: unknown = a.valideLe;
+  if (!exemple) {
+    if (typeof valideLe !== "string" || !valideLe.trim())
+      fautes.push(`${ici} : aucune validation datée. Ajoute valideLe, le jour où le texte final a été validé (« AAAA-MM-JJ ») : rien ne se publie sans elle.`);
+    else if (!jourValide(valideLe))
+      fautes.push(`${ici} : la validation (valideLe, « ${valideLe} ») n’est pas un vrai jour. Écris le jour où le texte a été validé, « AAAA-MM-JJ », un jour qui existe.`);
+    else if (valideLe > a.misAJourLe)
+      fautes.push(
+        `${ici} : validé le ${valideLe}, après sa mise à jour du ${a.misAJourLe}. On valide le texte avant de le publier : valideLe vient au plus tard le jour de misAJourLe.`,
+      );
+    else {
+      /* Un changement de fond se valide à nouveau : la validation vient après la version d’avant (le jour du changement
+         précédent, où elle a été publiée), sinon c’est la sienne. Le même jour ne compte pas : on ne saurait plus
+         laquelle des deux versions elle valide. */
+      const jours = a.changements.map((c) => c.le);
+      const dernier = jours.reduce<string>((x, y) => (y > x ? y : x), "");
+      const precedent = jours.reduce<string>((x, y) => (y < dernier && y > x ? y : x), "");
+      if (precedent && valideLe <= precedent)
+        fautes.push(
+          `${ici} : validé le ${valideLe}, pas après le changement de fond précédent (${precedent}) : c’est la validation d’une version d’avant. Un changement de fond se valide à nouveau : pose valideLe au jour où la version du ${dernier} a été validée.`,
+        );
+    }
+  }
   if (a.expert && !personneValide(a.expert)) fautes.push(`${ici} : l’expert est incomplet (prénom, nom et rôle).`);
 
-  /* Les sources : de 2 à 5, chacune avec son adresse et le jour où on l’a lue */
+  /* Le directeur de la publication ne signe pas les articles : son nom reste dans les mentions légales, jamais dans un
+     article (ni son texte, ni l’expert, ni une source, ni l’historique), pour qu’il ne revienne pas par le texte */
+  const nomme = chainesDe(a).find((t) => NOMME_LE_DIRECTEUR.test(aPlat(t)));
+  if (nomme)
+    fautes.push(
+      `${ici} : l’article nomme le directeur de la publication (son prénom, son nom de famille, ou « fondateur de BLUSH »). Les guides sont signés « Par l’équipe BLUSH », sans nom : le sien reste dans les mentions légales. Dans : « ${nomme} »`,
+    );
+
+  /* Les sources : de 2 à 5 (SOURCES, que /methode dit), chacune avec son adresse et le jour où on l’a lue */
   const datees = a.sources.filter((s) => s.titre.trim() && /^https?:\/\/[^\s/]+\.[^\s/]+/.test(s.url) && jourValide(s.consulteLe));
-  if (datees.length < 2)
-    fautes.push(`${ici} : ${datees.length} source(s) datée(s) seulement. Il en faut 2 au moins, chacune avec son titre, son adresse et le jour où tu l’as lue.`);
-  if (a.sources.length > 5) fautes.push(`${ici} : ${a.sources.length} sources, 5 au plus : garde les meilleures.`);
+  if (datees.length < SOURCES.min)
+    fautes.push(`${ici} : ${datees.length} source(s) datée(s) seulement. Il en faut ${SOURCES.min} au moins, chacune avec son titre, son adresse et le jour où tu l’as lue.`);
+  if (a.sources.length > SOURCES.max) fautes.push(`${ici} : ${a.sources.length} sources, ${SOURCES.max} au plus : garde les meilleures.`);
 
   /* Les dates : « mis à jour le » ne bouge que sur un changement de fond déclaré */
   if (!jourValide(a.publieLe) || !jourValide(a.misAJourLe)) fautes.push(`${ici} : publieLe et misAJourLe s’écrivent « AAAA-MM-JJ », un jour qui existe.`);
@@ -256,7 +389,7 @@ export function fautesDuRegistre(articles: readonly Article[], { exemple = false
     return [...vus.values()].filter((l) => l.length > 1);
   };
   for (const l of doublons((a) => a.slug)) fautes.push(`Le slug « ${l[0]!.slug} » est pris ${l.length} fois : une adresse par article.`);
-  const motCle = (a: Article) => a.motCle.normalize("NFD").replace(/\p{M}/gu, "").toLocaleLowerCase("fr").replace(/\s+/g, " ").trim();
+  const motCle = (a: Article) => aPlat(a.motCle);
   for (const l of doublons(motCle))
     fautes.push(`Le mot-clé « ${l[0]!.motCle} » est celui de ${l.map((a) => `« ${a.slug} »`).join(" et ")} : un seul article par mot-clé, sinon ils se gênent dans les moteurs.`);
 

@@ -5,6 +5,7 @@ import { cn } from "@/lib/cn";
 import { NBSP } from "@/lib/format";
 import { NOTE_DES_AVIS } from "@/contenu/paiement";
 import { LogoIlot } from "@/components/shell/LogoIlot";
+import { PAGES_DE_CONFIANCE } from "@/components/juridique/confiance";
 import { ctaDe, type Retour } from "./cta";
 import { Cloche } from "./ilots";
 import { LogoAutocollant, Miaou, PiedEnVue, Perle, Telephone } from "./ilots-pied";
@@ -168,15 +169,25 @@ export function PiedDePage({ retour }: { retour: Retour }) {
             <LogoIlot size={30} fontSize={22} href="/" onInk />
             <span className="whitespace-nowrap text-legende font-extrabold">© 2026</span>
           </div>
-          <nav aria-label="Pied de page" className="flex flex-wrap gap-x-5 text-accent font-black lg:gap-x-6 xl:gap-x-8 xl:text-carte">
-            <LienDuPied href={cta.href} scroll={cta.scroll}>
-              {cta.label}
-            </LienDuPied>
-            <LienDuPied href={retour ? "/compte" : "/connexion"}>{retour ? "Mon compte" : "Se connecter"}</LienDuPied>
-            <LienDuPied href="/confidentialite">Confidentialité</LienDuPied>
-            <LienDuPied href="/conditions">Conditions</LienDuPied>
-            <LienDuPied href="/mentions-legales">Mentions légales</LienDuPied>
-          </nav>
+          <div className="flex flex-col lg:items-end">
+            <nav aria-label="Pied de page" className="flex flex-wrap gap-x-5 text-accent font-black lg:gap-x-6 xl:gap-x-8 xl:text-carte">
+              <LienDuPied href={cta.href} scroll={cta.scroll}>
+                {cta.label}
+              </LienDuPied>
+              <LienDuPied href={retour ? "/compte" : "/connexion"}>{retour ? "Mon compte" : "Se connecter"}</LienDuPied>
+              <LienDuPied href="/confidentialite">Confidentialité</LienDuPied>
+              <LienDuPied href="/conditions">Conditions</LienDuPied>
+              <LienDuPied href="/mentions-legales">Mentions légales</LienDuPied>
+            </nav>
+            {/* Les pages de confiance (qui est BLUSH, comment ses guides sont faits, les numéros d’aide) : une ligne plus discrète, sous les liens */}
+            <nav aria-label="À propos de BLUSH" className="flex flex-wrap gap-x-5 text-note font-extrabold lg:gap-x-6 xl:gap-x-8">
+              {PAGES_DE_CONFIANCE.map((p) => (
+                <LienDuPied key={p.href} href={p.href}>
+                  {p.nom}
+                </LienDuPied>
+              ))}
+            </nav>
+          </div>
         </div>
         <p
           aria-hidden="true"

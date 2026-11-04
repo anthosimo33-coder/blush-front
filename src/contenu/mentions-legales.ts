@@ -6,8 +6,9 @@ import { derniereMiseAJour } from "@/lib/format";
  * l’hébergeur ; le Code de la consommation (L612-1), un médiateur de la consommation.
  * TODO(produit): à relire par un juriste, dont les champs laissés vides : pour une micro-entreprise, la LCEN demande
  * aussi le nom et le prénom de l’entrepreneur et une adresse (une domiciliation suffit) ; le médiateur (L612-1, L616-1).
- * Le directeur de la publication est rempli le 3 novembre 2026 (décidé par l’utilisateur) : il signe aussi les guides
- * et le lexique (le relecteur des articles, src/contenu/articles).
+ * Le directeur de la publication est rempli le 3 novembre 2026 (décidé par l’utilisateur) : il répond aussi des guides
+ * et du lexique, qui ne le nomment pas (« Par l’équipe BLUSH », et le jour de leur validation, `valideLe` :
+ * src/contenu/articles ; /methode renvoie ici).
  * Pour ouvrir au public, trois choses suffisent (champsEditeurManquants) : le nom, l’email, et l’adresse ou
  * l’immatriculation. Tant qu’il en manque une, la production reste en bêta fermée, même écrite BLUSH_BETA_FERMEE=0
  * (manquesPourOuvrir, src/server/drapeaux.ts), et l’équipe en est prévenue. Les autres champs sont facultatifs : vides,
