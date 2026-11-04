@@ -225,7 +225,7 @@ function terrain(onTestFinished: (fn: () => void) => void) {
 describe.concurrent("la file d’attente des suites lourdes, à plusieurs processus", () => {
   /* Le plus long (20 s d’attente du verrou), en tête : dans l’ordre, il tourne pendant les autres */
   it(
-    "un verrou qu’on ne peut pas reprendre : la suite renonce au bout de 20 s, sur une erreur, sans ticket ; un fichier posé à sa place est repris",
+    "un verrou qu’on ne peut pas reprendre : au bout de 20 s, la suite part sans place, avec un avertissement, sans ticket ; un fichier posé à sa place est repris",
     { timeout: 240_000 },
     async ({ expect, onTestFinished }) => {
       const fige = terrain(onTestFinished);
@@ -246,11 +246,14 @@ describe.concurrent("la file d’attente des suites lourdes, à plusieurs proces
       expect(Date.now() - debut).toBeGreaterThan(9000);
       fichier.liberer("W");
       expect(await w.fin()).toEqual(OK);
-      expect(await x.fin()).toEqual({ code: 1, signal: null });
+      /* Une panne de la file ne bloque pas le travail : X part sans place, avec un avertissement, au bout de 20 s */
+      await fige.attendreDebut("X");
       expect(Date.now() - debut).toBeGreaterThan(19_000);
       expect(x.erreurs()).toContain("ne peut pas être repris");
-      expect(fige.debuts()).toEqual([]);
+      expect(x.erreurs()).toContain("la suite part sans attendre");
       expect(fige.etat()).toEqual({ places: [], tickets: [] });
+      fige.liberer("X");
+      expect(await x.fin()).toEqual(OK);
     },
   );
 

@@ -33,7 +33,8 @@
  *   depuis son dernier battement, veilles comprises) : au-delà, elle est effacée, car sa suite a pu finir et son numéro
  *   servir à un autre processus ;
  * - le verrou s’attend 20 s au plus (le fil principal est bloqué pendant l’attente, sourd à Ctrl-C) : un verrou qu’on
- *   ne peut pas reprendre (un jeton qu’on ne peut pas effacer) arrête la suite sur une erreur, sans figer le poste ;
+ *   ne peut pas reprendre (un jeton qu’on ne peut pas effacer) fait partir la suite sans place, avec un avertissement :
+ *   une panne de la file ne fige ni le poste ni le travail ;
  * - la suite qui attend recrée son ticket s’il a disparu (même numéro, donc même rang), et l’efface sur Ctrl-C, SIGTERM
  *   ou SIGHUP avant de mourir du même signal.
  *
@@ -645,11 +646,11 @@ async function principal(args) {
     const minutes = Number.parseFloat(process.env.BLUSH_FILE_MAX_MIN ?? "");
     const plafond = Math.round((minutes > 0 ? minutes : PLAFOND_MIN) * 60_000);
     const quoi = process.env.npm_lifecycle_event ? `npm run ${process.env.npm_lifecycle_event}` : commande.join(" ");
+    /* Une panne de la file ne bloque jamais le travail : la suite part sans place, avec un avertissement */
     try {
       place = await prendrePlace({ racine, places, plafond, quoi, ou: process.cwd(), dire: (m) => console.error(m) });
     } catch (e) {
-      console.error(`La file d’attente des suites lourdes : ${e.message} (BLUSH_SANS_FILE=1 passe sans elle).`);
-      return 1;
+      console.error(`La file d’attente des suites lourdes est en panne (${e.message}) : la suite part sans attendre. npm run file dit où en est la file.`);
     }
   }
   try {
