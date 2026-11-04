@@ -24,10 +24,13 @@ npm ci
 npm run check                           # types, lint (sans un avertissement), mise en forme, migrations, typographie, code mort (knip), tests et leur couverture (Postgres local : blush_test, créée au besoin)
 npm run forme:ecrire                    # met tout le dépôt en forme (Prettier) ; `npm run forme` vérifie seulement, comme check
 npm run couverture                      # les tests et leur couverture, seule (le rapport HTML dans coverage/)
-npm run test:unit                       # seulement les tests sans base (les projets vitest « unit » et « client ») : une boucle rapide, sans Postgres
+npm run test:unit                       # seulement les tests sans base (les projets vitest « unit » et « client ») : une boucle rapide, sans Postgres, hors de la file d’attente
 npm run e2e:build && npm run e2e        # les parcours dans Chromium et WebKit (voir BACKEND.md)
 npm run todo                            # les décisions produit en attente (les TODO(produit) du code), sans rien faire échouer
+npm run file                            # la file d’attente des suites lourdes : qui tourne, qui attend
 ```
+
+Les suites lourdes (`npm run check`, `npm test`, la couverture, les tests de bout en bout et la référence visuelle, la galerie, le banc de fluidité) attendent leur tour dans une file commune au poste (`scripts/file-d-attente.mjs`, son en-tête) : une à la fois, premier arrivé premier servi, toutes copies de travail et sessions confondues, pour qu’elles ne se battent pas pour le processeur et la mémoire. `BLUSH_FILE_PLACES=2` ouvre deux places, `BLUSH_SANS_FILE=1` passe sans attendre ; la CI de GitHub n’attend pas.
 
 Les garde-fous de `npm run check` :
 
