@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSyncExternalStore } from "react";
 import { Button } from "@/components/ui/Button";
+import { NBSP } from "@/lib/format";
 import { etapeDe } from "@/lib/presence";
 import { pixelMeta } from "@/lib/publique";
 import { CHOIX_PUBS_S, COOKIE_CHOIX_PUBS, COOKIE_FBC, COOKIE_FBP, fbcDe, fbclidDe, fbpDe, TRACES_META_S, type ChoixPubs } from "@/lib/pubs";
@@ -83,7 +84,7 @@ export function BandeauPubs() {
       className="fixed inset-x-3 bottom-[calc(12px+env(safe-area-inset-bottom))] z-50 mx-auto flex max-w-[560px] flex-col gap-2.5 rounded-card bg-white p-3.5 shadow-card sm:flex-row sm:items-center sm:gap-4"
     >
       <p className="m-0 flex-1 text-note font-extrabold leading-[1.4] text-soft">
-        On utilise des cookies pour la pub.{" "}
+        🍪 Aide BLUSH à grandir{NBSP}: des cookies pour nos pubs, jamais ta conv.{" "}
         <Link href="/confidentialite#pubs" className="text-toi-ink">
           En savoir plus
         </Link>
