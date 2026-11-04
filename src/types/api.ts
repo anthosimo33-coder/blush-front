@@ -458,6 +458,8 @@ type Reponses = {
   "GET /api/rapport/pdf": Blob;
   /** `{ ok: false }` en 503 : la base ne répond pas. */
   "POST /api/presence": Ok;
+  /** Toujours `{ ok: true }` : sans l’accord des pubs, rien ne part, sans le dire. */
+  "POST /api/pubs/vue": Ok;
   /** Toujours `{ ok: true }` : un jalon ignoré (la limite d’une adresse, le mode tournage) ne se dit pas. */
   "POST /api/jalon": Ok;
   /** Toujours `{ ok: true }` : une note déjà donnée pour cette conv ne se compte pas deux fois, sans le dire. */
@@ -680,6 +682,7 @@ export const ROUTES = {
    * gardé), l’écran, d’où il vient (utm_source, le site d’avant ou le paquet d’une appli Android), et à son premier signe
    * la page d’arrivée (son chemin nettoyé, que le serveur renettoie : src/lib/chemins.ts)
    */
+  "POST /api/pubs/vue": { corps: z.strictObject({}) },
   "POST /api/presence": {
     corps: z.strictObject({
       onglet: z.uuid(),

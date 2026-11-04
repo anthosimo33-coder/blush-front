@@ -783,6 +783,11 @@ export function faireSigne(corps: Routes["POST /api/presence"]["corps"]): void {
   void appel("POST /api/presence", { corps, keepalive: true }).catch((e: unknown) => tracer("presence", e));
 }
 
+/** La page où l’on vient d’accepter les pubs, pour Meta (src/components/shell/BandeauPubs.tsx). Ratée, rien ne se dit. */
+export function signalerLaPageAMeta(): void {
+  void appel("POST /api/pubs/vue", { corps: {}, keepalive: true }).catch((e: unknown) => tracer("pubs", e));
+}
+
 /** Un jalon du tunnel (src/lib/jalons.ts). Sans réponse attendue : un jalon raté ne se voit pas. */
 export function envoyerJalon(jalon: Jalon, appli?: AppKind): void {
   /* keepalive : le jalon d’un bouton qui change de page (ou la quitte, vers Whop) part quand même */

@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useSyncExternalStore } from "react";
 import { Button } from "@/components/ui/Button";
 import { etapeDe } from "@/lib/presence";
+import { signalerLaPageAMeta } from "@/services/api";
 import { pixelMeta } from "@/lib/publique";
 import { CHOIX_PUBS_S, COOKIE_CHOIX_PUBS, COOKIE_FBC, COOKIE_FBP, fbcDe, fbclidDe, fbpDe, TRACES_META_S, type ChoixPubs } from "@/lib/pubs";
 
@@ -64,6 +65,8 @@ function choisir(choix: ChoixPubs): void {
     const maintenant = Date.now();
     if (!cookieLu(COOKIE_FBP)) cookiePose(COOKIE_FBP, fbpDe(maintenant, Math.floor(Math.random() * 1e10)), TRACES_META_S);
     if (fbclidDArrivee) cookiePose(COOKIE_FBC, fbcDe(fbclidDArrivee, maintenant), TRACES_META_S);
+    /* La page d’où l’on accepte (souvent celle de la pub) : son premier signe est parti avant l’accord */
+    signalerLaPageAMeta();
   }
   rouvert = false;
   prevenir();

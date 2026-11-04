@@ -3,6 +3,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
 import type { Jalon } from "@/types";
 import { cheminSur } from "@/lib/chemins";
+import { NOMS_DU_TOURNAGE } from "@/lib/noms-cookies";
 import { COOKIE_CHOIX_PUBS, COOKIE_FBC, COOKIE_FBP, evenementMetaDe, traceValide, type TraceMeta } from "@/lib/pubs";
 import { db, schema } from "./db";
 import { env, URL_SITE } from "./env";
@@ -14,7 +15,8 @@ import { adresseDe } from "./limites";
  * qui s’en servent vraiment. Aucun script de Meta dans les pages : tout part d’ici, et seulement :
  * - avec l’accord de la personne (le cookie blush-pubs à « oui », src/components/shell/BandeauPubs.tsx) ;
  * - quand Meta est branché (NEXT_PUBLIC_META_PIXEL_ID et META_CAPI_TOKEN) : en local et dans les tests, rien ne part ;
- * - un événement standard et rien de la conv : la conv importée (Lead), le compte créé (CompleteRegistration), le
+ * - un événement standard et rien de la conv : chaque page chargée (PageView, au premier signe de l’onglet, et au clic sur
+ *   « Accepter » pour la page de la pub), la conv importée (Lead), le compte créé (CompleteRegistration), le
  *   paywall vu (ViewContent), le bouton qui paie touché (InitiateCheckout), une fois par jour et par personne comme
  *   leur jalon (src/server/visites.ts, noterJalon) ; et l’achat payé (Purchase, son montant), depuis son webhook, d’un
  *   vrai client seulement (achats.population : ni l’équipe, ni le tournage, ni l’offert) ;
@@ -58,11 +60,11 @@ function cookiesDe(req: Request): Map<string, string> {
 
 /**
  * Ce que cette requête peut dire à Meta : ses cookies de Meta (seulement au bon format) et son navigateur, si la
- * personne a accepté les pubs ; null sinon (refusé, ou pas encore choisi).
+ * personne a accepté les pubs ; null sinon (refusé, pas encore choisi, ou un navigateur en mode tournage).
  */
 export function traceDe(req: Request): TraceMeta | null {
   const pot = cookiesDe(req);
-  if (pot.get(COOKIE_CHOIX_PUBS) !== "oui") return null;
+  if (pot.get(COOKIE_CHOIX_PUBS) !== "oui" || NOMS_DU_TOURNAGE.some((nom) => pot.has(nom))) return null;
   const fbp = pot.get(COOKIE_FBP);
   const fbc = pot.get(COOKIE_FBC);
   const agent = req.headers.get("user-agent")?.slice(0, 512);
@@ -151,6 +153,17 @@ export async function signalerJalonAMeta(req: Request, jalon: Jalon): Promise<vo
     "jalon non envoyé à Meta",
     { jalon },
   );
+}
+
+/**
+ * Une page chargée, chez Meta (PageView) : au premier signe d’un onglet (POST /api/presence, `chemin` : sa page
+ * d’arrivée, déjà nettoyée) ou au clic sur « Accepter » (POST /api/pubs/vue, la page de la requête). Sans accord, rien.
+ */
+export async function signalerVueAMeta(req: Request, chemin: string | null): Promise<void> {
+  const trace = configMeta() ? traceDe(req) : null;
+  if (!trace) return;
+  const page = pageSure(chemin ? new URL(chemin, URL_SITE).href : req.headers.get("referer"));
+  await auMieux(envoyer(evenementMeta({ nom: "PageView", id: randomUUID(), le: new Date(), page, personne: { ...trace, ip: adresseDe(req) } })), "page vue non envoyée à Meta");
 }
 
 /**
