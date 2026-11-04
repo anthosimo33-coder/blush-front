@@ -1,5 +1,5 @@
 import "server-only";
-import { createHash, randomUUID } from "node:crypto";
+import { createHash } from "node:crypto";
 import { eq } from "drizzle-orm";
 import type { Jalon } from "@/types";
 import { cheminSur } from "@/lib/chemins";
@@ -8,6 +8,7 @@ import { db, schema } from "./db";
 import { env, URL_SITE } from "./env";
 import { auMieux, journal } from "./journal";
 import { adresseDe } from "./limites";
+import { aujourdhuiParis } from "./temps";
 
 /*
  * Les pubs sur Facebook et Instagram : ce que BLUSH dit à Meta (son API Conversions), pour qu’il montre les pubs à ceux
@@ -15,7 +16,8 @@ import { adresseDe } from "./limites";
  * - avec l’accord de la personne (le cookie blush-pubs à « oui », src/components/shell/BandeauPubs.tsx) ;
  * - quand Meta est branché (NEXT_PUBLIC_META_PIXEL_ID et META_CAPI_TOKEN) : en local et dans les tests, rien ne part ;
  * - un événement standard et rien de la conv : la conv importée (Lead), le compte créé (CompleteRegistration), le
- *   paywall vu (ViewContent), le bouton qui paie touché (InitiateCheckout), une fois par jour et par personne comme
+ *   paywall vu (ViewContent), une offre choisie (AddToCart), le bouton qui paie touché (InitiateCheckout), une fois par
+ *   jour et par personne comme
  *   leur jalon (src/server/visites.ts, noterJalon) ; et l’achat payé (Purchase, son montant), depuis son webhook, d’un
  *   vrai client seulement (achats.population : ni l’équipe, ni le tournage, ni l’offert) ;
  * - avec ce que Meta sait relier à un clic : ses deux cookies (_fbp, _fbc), le navigateur, l’adresse IP de la requête
@@ -139,6 +141,12 @@ async function envoyer(evenement: EvenementMeta): Promise<void> {
 }
 
 /**
+ * L’identifiant d’un événement de jalon : le même pour la même personne (son _fbp, sinon son adresse IP), le même jour
+ * et le même événement. Meta ignore le doublon : l’ajout au panier vient de deux jalons (le rapport, Premium).
+ */
+const idDuJour = (nom: string, personne: string) => createHash("sha256").update(`${aujourdhuiParis().iso}|${personne}|${nom}`).digest("hex").slice(0, 32);
+
+/**
  * Le jalon d’une personne qui a accepté les pubs, chez Meta (son événement standard : EVENEMENTS_META), la première
  * fois du jour (`nouveau`, noterJalon) ; les autres jalons, et sans accord, rien.
  */
@@ -147,7 +155,15 @@ export async function signalerJalonAMeta(req: Request, jalon: Jalon): Promise<vo
   const trace = nom && configMeta() ? traceDe(req) : null;
   if (!nom || !trace) return;
   await auMieux(
-    envoyer(evenementMeta({ nom, id: randomUUID(), le: new Date(), page: pageSure(req.headers.get("referer")), personne: { ...trace, ip: adresseDe(req) } })),
+    envoyer(
+      evenementMeta({
+        nom,
+        id: idDuJour(nom, trace.fbp ?? adresseDe(req) ?? ""),
+        le: new Date(),
+        page: pageSure(req.headers.get("referer")),
+        personne: { ...trace, ip: adresseDe(req) },
+      }),
+    ),
     "jalon non envoyé à Meta",
     { jalon },
   );

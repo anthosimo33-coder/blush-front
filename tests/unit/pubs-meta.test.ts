@@ -9,11 +9,14 @@ const FBP = "fb.1.1730000000000.1234567890";
 const FBC = "fb.1.1730000000000.IwAR2abcdefghij";
 
 describe("les pubs de Meta : ce que le navigateur et le serveur partagent", () => {
-  it("seuls quatre jalons partent chez Meta, sous leur événement standard", () => {
+  it("seuls six jalons partent chez Meta, sous leur événement standard", () => {
     expect(evenementMetaDe("importee")).toBe("Lead");
     expect(evenementMetaDe("code")).toBe("CompleteRegistration");
     expect(evenementMetaDe("paywall")).toBe("ViewContent");
     expect(evenementMetaDe("payer")).toBe("InitiateCheckout");
+    /* Une offre choisie, le rapport ou Premium : l’ajout au panier */
+    expect(evenementMetaDe("touche_rapport")).toBe("AddToCart");
+    expect(evenementMetaDe("touche_premium")).toBe("AddToCart");
     /* Premium choisi touche aussi « payer » : une seule fois InitiateCheckout */
     expect(evenementMetaDe("payer_premium")).toBeNull();
     expect(evenementMetaDe("fichier")).toBeNull();

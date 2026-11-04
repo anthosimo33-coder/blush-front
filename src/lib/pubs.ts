@@ -26,13 +26,16 @@ export const TRACES_META_S = 90 * 24 * 3600;
 
 /**
  * Les jalons du tunnel (src/lib/jalons.ts) qui partent chez Meta, et leur événement standard : la conv importée (le
- * vrai signal d’intention, assez fréquent pour que Meta apprenne), le compte créé (le code validé), le paywall vu, le
- * bouton qui paie touché. L’achat part de son webhook, payé (src/server/pubs-meta.ts, envoyerAchatAMeta).
+ * vrai signal d’intention, assez fréquent pour que Meta apprenne), le compte créé (le code validé), le paywall vu, une
+ * offre choisie (la carte du rapport ou de Premium touchée : l’ajout au panier, une fois par jour même si les deux le
+ * sont), le bouton qui paie touché. L’achat part de son webhook, payé (src/server/pubs-meta.ts, envoyerAchatAMeta).
  */
 const EVENEMENTS_META = {
   importee: "Lead",
   code: "CompleteRegistration",
   paywall: "ViewContent",
+  touche_rapport: "AddToCart",
+  touche_premium: "AddToCart",
   payer: "InitiateCheckout",
 } as const satisfies Partial<Record<Jalon, string>>;
 
