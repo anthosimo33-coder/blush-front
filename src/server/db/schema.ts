@@ -56,6 +56,7 @@ import {
   type DetailEcriture,
 } from "./enums";
 import { emailCanoniqueEnSQLBrut } from "../email-canonique";
+import type { TraceMeta } from "@/lib/pubs";
 
 /*
  * Le schéma de BLUSH. Règle : tout ce qui contient la conv, ou ce qu’on en a tiré, est dans une colonne
@@ -769,6 +770,12 @@ export const achats = pgTable(
      * range.
      */
     population: text("population", { enum: POPULATIONS }),
+    /**
+     * Pour les pubs de Meta (src/server/pubs-meta.ts) : ses deux cookies et le navigateur, gardés à la commande avec
+     * l’accord de la personne (le webhook n’a pas sa requête), pour dire l’achat payé à Meta. Effacés dès l’achat envoyé
+     * (ou pas : pas un vrai client), et par la purge au-delà de 7 jours. Vide : pas d’accord, ou déjà envoyé.
+     */
+    pubsMeta: jsonb("pubs_meta").$type<TraceMeta>(),
   },
   (t) => [index("achats_user_idx").on(t.userId), index("achats_story_idx").on(t.storyId), index("achats_cree_idx").on(t.creeLe)],
 );

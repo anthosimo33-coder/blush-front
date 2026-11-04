@@ -5,6 +5,7 @@ import { CATALOGUE, DUREE_AJOUT_MS, PASSAGES_EN_PREMIUM, RAPPORTS_SEULS, titreCh
 import { PACKS } from "@/contenu/recharge";
 import { champsDErreur } from "@/lib/tracer";
 import type { GenreVendu, IssueDuFauxWhop, OffreId, OffreProposee } from "@/types";
+import type { TraceMeta } from "@/lib/pubs";
 import type { Avoirs, EtatAchat, FeuilleDuPaiement, OffreUniqueMontree, PaiementCommence } from "@/types/api";
 import { avanceDuCompte, commander, convEnAlerte, marquerEchoue, premiumLePlusChoisi, type Achat, type RefusDeCommande } from "../achats";
 import type { Utilisateur } from "../auth";
@@ -221,7 +222,8 @@ export type RefusDePaiement = "bientot" | "carte" | RefusDeCommande;
  * son heure, gardées avec l’achat ; null pour le rapport d’avance, livré seulement à son usage) : l’achat écrit « en_attente » au prix du catalogue (commander : le droit de
  * l’acheter), puis, avec un `jeton` des Elements de Whop, le paiement dans la feuille ; sinon le paiement en un geste
  * (les offres de « C’est débloqué », et une recharge du chat quand il le demande : `geste`), ou la page de Whop où le payer.
- * `vente` : la carte du chat d’où il se paie, notée avec l’achat (commander).
+ * `vente` : la carte du chat d’où il se paie, notée avec l’achat (commander) ; `pubs`, ce que Meta saura relier à une pub
+ * (avec l’accord, traceDe), gardé avec lui jusqu’au paiement.
  * Refusé dans la feuille (« carte »), ou une page que Whop refuse de créer, l’achat passe « echoue » (rien n’a été
  * payé) ; une panne remonte (« panne »). Un paiement dont Whop n’a pas dit s’il est parti (aVerifier) reste en attente,
  * sans paiement : l’écran attend son webhook sur la page du retour. Un paiement parti malgré tout se livre quand même
@@ -232,12 +234,12 @@ export async function commencerPaiement(
   offre: OffreId,
   storyId: string | null,
   renonciation: Consentement | null,
-  { jeton = null, geste = false, vente = null }: { jeton?: string | null; geste?: boolean; vente?: GenreVendu | null } = {},
+  { jeton = null, geste = false, vente = null, pubs = null }: { jeton?: string | null; geste?: boolean; vente?: GenreVendu | null; pubs?: TraceMeta | null } = {},
 ): Promise<PaiementCommence | RefusDePaiement> {
   const f = fournisseur();
   if (!f) return "bientot";
   if (estEquipe(compte)) return "deja";
-  const achat = await commander(compte, offre, { storyId, fournisseur: f.mode, renonciation: renonciation ?? undefined, vente });
+  const achat = await commander(compte, offre, { storyId, fournisseur: f.mode, renonciation: renonciation ?? undefined, vente, pubs });
   if (typeof achat === "string") return achat;
   const retour = adresseDuRetour(f, achat.id);
   try {

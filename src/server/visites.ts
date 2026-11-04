@@ -38,6 +38,8 @@ export const VISITES_GARDEES_JOURS = 90;
 const APPLIS: [RegExp, SourceVisite][] = [
   [/musical_ly|bytedancewebview|tiktok|trill/i, "tiktok"],
   [/instagram/i, "instagram"],
+  /* Facebook et Messenger : FBAN/FBAV sur iPhone, FB_IAB/FB4A sur Android (après Instagram, qui ne les porte pas) */
+  [/FBAN|FBAV|FB_IAB|FB4A|FBIOS/i, "facebook"],
   [/snapchat/i, "snapchat"],
 ];
 /*
@@ -49,6 +51,7 @@ const APPLIS: [RegExp, SourceVisite][] = [
 const SITES: [RegExp, SourceVisite][] = [
   [/(^|\.)tiktok\.com$/, "tiktok"],
   [/(^|\.)instagram\.com$/, "instagram"],
+  [/(^|\.)(facebook\.com|fb\.com|fb\.me|messenger\.com)$/, "facebook"],
   [/(^|\.)snapchat\.com$/, "snapchat"],
   [/^(gemini|bard)\.google\.com$/, "assistants"],
   [/(^|\.)(chatgpt\.com|openai\.com|perplexity\.ai|claude\.ai|meta\.ai|grok\.com|deepseek\.com|duck\.ai|poe\.com|you\.com|phind\.com)$/, "assistants"],
@@ -65,6 +68,7 @@ const SITES: [RegExp, SourceVisite][] = [
 const PAQUETS: [RegExp, SourceVisite][] = [
   [/^com\.zhiliaoapp\.musically$|^com\.ss\.android\.ugc\.trill$/, "tiktok"],
   [/^com\.instagram\.android$/, "instagram"],
+  [/^com\.facebook\.(katana|lite|orca|mlite)$/, "facebook"],
   [/^com\.snapchat\.android$/, "snapchat"],
   /* L’appli Google, et Discover qu’elle montre */
   [/^com\.google\.android\.googlequicksearchbox$/, "google"],
@@ -73,10 +77,14 @@ const PAQUETS: [RegExp, SourceVisite][] = [
   /* Gmail, Outlook, Yahoo Mail */
   [/^com\.google\.android\.gm$|^com\.microsoft\.office\.outlook$|^com\.yahoo\.mobile\.client\.android\.mail$/, "mail"],
 ];
-/* Ce que les créatrices écrivent dans utm_source, ce que nos mails y mettent (src/server/email.ts), et le nom d’un assistant */
+/*
+ * Ce que les créatrices écrivent dans utm_source, ce que nos mails y mettent (src/server/email.ts), ce que les pubs Meta
+ * portent (utm_source=facebook, même montrées dans Instagram), et le nom d’un assistant
+ */
 const UTM: [RegExp, SourceVisite][] = [
   [/^(tiktok|tt|tik_tok)$/, "tiktok"],
   [/^(instagram|ig|insta)$/, "instagram"],
+  [/^(facebook|fb|meta|facebook_ads|fb_ads|meta_ads)$/, "facebook"],
   [/^(snapchat|snap|sc)$/, "snapchat"],
   [/^google$/, "google"],
   [/^email$/, "mail"],
@@ -242,20 +250,24 @@ const estParAppli = (jalon: Jalon): jalon is JalonParAppli => (JALONS_PAR_APPLI 
  * Note un jalon du tunnel (POST /api/jalon) : une fois par jour par l’empreinte de la connexion, comme la visite. Un
  * jalon de l’import (JALONS_PAR_APPLI) avec son appli se note aussi sous elle, une fois par jour et par appli ; l’appli
  * d’un autre jalon ne compte pas. Ni un navigateur en mode tournage, ni au-delà du garde-fou des signes (les jalons
- * comptent avec eux). Rien ne fait échouer.
+ * comptent avec eux). Rien ne fait échouer. Rend vrai la première fois du jour de cette personne (le jalon part alors
+ * chez Meta, avec son accord : src/server/pubs-meta.ts).
  */
-export async function noterJalon(req: Request, jalon: Jalon, appli?: AppKind): Promise<void> {
-  if (!signeAdmis(req) || enModeTournage(req)) return;
+export async function noterJalon(req: Request, jalon: Jalon, appli?: AppKind): Promise<boolean> {
+  if (!signeAdmis(req) || enModeTournage(req)) return false;
+  let nouveau = false;
   await auMieux(
     async () => {
       const jour = aujourdhuiParis().iso;
       const empreinte = await empreinteDe(req, jour);
-      await db().insert(schema.jalons).values({ jour, empreinte, jalon }).onConflictDoNothing();
+      const notes = await db().insert(schema.jalons).values({ jour, empreinte, jalon }).onConflictDoNothing().returning({ jour: schema.jalons.jour });
+      nouveau = notes.length > 0;
       if (appli && estParAppli(jalon)) await db().insert(schema.jalonsParAppli).values({ jour, empreinte, jalon, appli }).onConflictDoNothing();
     },
     "jalon non noté",
     { jalon, appli },
   );
+  return nouveau;
 }
 
 /** D’où vient une visite, et sa page d’arrivée (null : une visite d’avant qu’on la note, le 3 novembre 2026). */

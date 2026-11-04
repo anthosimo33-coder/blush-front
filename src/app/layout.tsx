@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Suspense } from "react";
+import { BandeauPubs } from "@/components/shell/BandeauPubs";
 import { SoundBoot } from "@/components/shell/SoundBoot";
 import { Reveil } from "@/components/shell/Reveil";
 import { SuiviNavigation } from "@/lib/navigation";
@@ -48,6 +49,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <SuiviNavigation />
         <Presence />
         <Sentinelle />
+        <BandeauPubs />
         <Suspense fallback={null}>
           <ErreurDeParcours />
         </Suspense>

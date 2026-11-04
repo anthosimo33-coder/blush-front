@@ -9,6 +9,9 @@ import { lieuDe, sourceDe } from "@/server/visites";
 const TIKTOK = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148 musical_ly_36.5.0 BytedanceWebview/d8a21c6";
 const INSTAGRAM = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148 Instagram 350.0.0.0";
 const SAFARI = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Version/18.0 Mobile/15E148 Safari/604.1";
+const FACEBOOK =
+  "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148 [FBAN/FBIOS;FBAV/490.0.0.40.107;FBBV/700000000;FBDV/iPhone15,2;FBMD/iPhone;FBSN/iOS;FBSV/18.0;FBSS/3;FBCR/;FBID/phone;FBLC/fr_FR;FBOP/5]";
+const FACEBOOK_ANDROID = "Mozilla/5.0 (Linux; Android 14; Pixel 8 Build/AP2A; wv) AppleWebKit/537.36 Chrome/130.0.0.0 Mobile Safari/537.36 [FB_IAB/FB4A;FBAV/490.0.0.40.107;]";
 
 describe("d’où vient un visiteur", () => {
   it("le lien d’une créatrice d’abord (utm_source), quelle que soit sa graphie", () => {
@@ -16,6 +19,21 @@ describe("d’où vient un visiteur", () => {
     expect(sourceDe({ utm: " ig ", agent: SAFARI })).toBe("instagram");
     expect(sourceDe({ utm: "snap", referent: "https://www.google.com", agent: INSTAGRAM })).toBe("snapchat");
     expect(sourceDe({ utm: "newsletter", agent: SAFARI })).toBe("autre");
+  });
+
+  it("Facebook : les pubs Meta (utm_source=facebook, même montrées dans Instagram), le site, l’appli et Messenger", () => {
+    expect(sourceDe({ utm: "facebook", agent: INSTAGRAM })).toBe("facebook");
+    expect(sourceDe({ utm: "FB", agent: SAFARI })).toBe("facebook");
+    expect(sourceDe({ utm: "meta", agent: SAFARI })).toBe("facebook");
+    expect(sourceDe({ referent: "https://l.facebook.com/", agent: SAFARI })).toBe("facebook");
+    expect(sourceDe({ referent: "https://m.facebook.com", agent: SAFARI })).toBe("facebook");
+    expect(sourceDe({ agent: FACEBOOK })).toBe("facebook");
+    expect(sourceDe({ agent: FACEBOOK_ANDROID })).toBe("facebook");
+    expect(sourceDe({ referent: "android-app://com.facebook.katana", agent: SAFARI })).toBe("facebook");
+    expect(sourceDe({ referent: "android-app://com.facebook.orca", agent: SAFARI })).toBe("facebook");
+    /* L’assistant de Meta reste un assistant, Instagram reste Instagram */
+    expect(sourceDe({ referent: "https://www.meta.ai/", agent: SAFARI })).toBe("assistants");
+    expect(sourceDe({ agent: INSTAGRAM })).toBe("instagram");
   });
 
   it("puis un verdict partagé, puis le site d’avant (pas le nôtre), puis l’appli qui l’a ouvert, sinon direct", () => {

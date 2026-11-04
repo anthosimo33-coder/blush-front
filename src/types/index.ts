@@ -230,7 +230,7 @@ export type FamilleNavigateur = (typeof FAMILLES_NAVIGATEUR)[number];
  * « moteurs », « assistants » et « mail » datent du 3 novembre 2026 : avant, les moteurs et les assistants comptaient
  * « autre », Gemini et Gmail « google » ; les visites déjà comptées gardent leur source.
  */
-export const SOURCES_VISITE = ["tiktok", "instagram", "snapchat", "partage", "google", "moteurs", "assistants", "mail", "autre", "direct"] as const;
+export const SOURCES_VISITE = ["tiktok", "instagram", "facebook", "snapchat", "partage", "google", "moteurs", "assistants", "mail", "autre", "direct"] as const;
 export type SourceVisite = (typeof SOURCES_VISITE)[number];
 /**
  * Les gestes du fil d’/admin en direct (fil_direct.genre) : une première visite du jour, une conv importée, la page du

@@ -108,6 +108,7 @@ export const NOMS_DES_VENTES: Record<GenreVendu, string> = {
 export const NOMS_DES_SOURCES: Record<SourceVisite, string> = {
   tiktok: "TikTok",
   instagram: "Instagram",
+  facebook: "Facebook",
   snapchat: "Snapchat",
   partage: "Verdicts partagés",
   google: "Google",

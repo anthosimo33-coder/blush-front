@@ -160,6 +160,7 @@ function pilotageDe(jours: Periode, { calme = false, suivi = true }: Variante): 
   /* Les sources : une part des visiteurs, un taux d’achat ; TikTok prend le reste, pour retomber sur les totaux */
   const parts: [NonNullable<Pilotage["sources"][number]["source"]>, number, number][] = [
     ["instagram", 0.174, 0.043],
+    ["facebook", 0.03, 0.035],
     ["partage", 0.085, 0.054],
     ["snapchat", 0.06, 0.021],
     ["google", 0.025, 0.04],

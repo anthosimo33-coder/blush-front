@@ -3,6 +3,7 @@ import { HeroHeader, InsetGroup, InsetRow, RowIcon } from "@/components/ui/inset
 import { Icon } from "@/components/ui/icons";
 import { MobileTopBar, Screen } from "@/components/shell/Screen";
 import { LiensJuridiques } from "@/components/juridique/pages";
+import { ChoixDesPubs } from "@/components/shell/BandeauPubs";
 import { CONFIDENTIALITE_MISE_A_JOUR } from "@/contenu/confidentialite";
 import { derniereMiseAJour, NBSP } from "@/lib/format";
 
@@ -32,8 +33,20 @@ import { derniereMiseAJour, NBSP } from "@/lib/format";
  * TODO(produit): reporter cette phrase dans le PDF de confidentialité de Whop.
  */
 
-function Ligne({ icone, ton, titre, children }: { icone: Parameters<typeof RowIcon>[0]["icon"]; ton?: Parameters<typeof RowIcon>[0]["tone"]; titre: string; children: ReactNode }) {
-  return <InsetRow leading={<RowIcon icon={icone} tone={ton} />} title={titre} sub={children} className="items-start [&>span:first-child]:mt-0.5" />;
+function Ligne({
+  icone,
+  ton,
+  titre,
+  id,
+  children,
+}: {
+  icone: Parameters<typeof RowIcon>[0]["icon"];
+  ton?: Parameters<typeof RowIcon>[0]["tone"];
+  titre: string;
+  id?: string;
+  children: ReactNode;
+}) {
+  return <InsetRow id={id} leading={<RowIcon icon={icone} tone={ton} />} title={titre} sub={children} className="items-start [&>span:first-child]:mt-0.5" />;
 }
 
 /** La page, rendue sur le serveur : seul son « Retour » tourne dans le navigateur (la page d’avant, ou la landing). */
@@ -83,6 +96,14 @@ export function ConfidentialiteScreen() {
           de ta conv. PostHog enregistre aussi comment tu te sers du site (où tu touches, jusqu’où tu fais défiler, les écrans de BLUSH tels qu’ils s’affichent), jamais ta conv
           {NBSP}: ses messages, ton rapport, le chat, les prénoms, ton email, ce que tu tapes et les images y restent masqués. Si tu crées un compte, il garde seulement d’où tu es
           venu et ta page d’arrivée.
+        </Ligne>
+        {/* Les pubs de Meta (src/server/pubs-meta.ts, src/components/shell/BandeauPubs.tsx) : seulement avec l’accord du bandeau ; TODO(produit): à relire par un juriste, puis le PDF de Whop */}
+        <Ligne icone="link" titre="Les pubs sur Insta et Facebook, si tu acceptes" id="pubs">
+          Si tu l’acceptes dans le bandeau, on dit à Meta (Facebook, Instagram) ce que tu fais après une de nos pubs, pour qu’il les montre aux bonnes personnes{NBSP}: ta conv
+          importée, ton compte créé, nos offres vues, un paiement lancé, un achat et son montant. Avec ça partent deux cookies de Meta (un code tiré au hasard pour ce navigateur,
+          et le clic de la pub), ton navigateur, ton adresse IP (lue, jamais gardée) et, pour un achat, une empreinte de ton email (pas ton email en clair). Jamais ta conv, ni ce
+          que BLUSH en dit, ni les prénoms. Sans ton accord, rien ne part. Ton choix se garde six mois, et tu le changes quand tu veux{NBSP}:
+          <ChoixDesPubs />
         </Ligne>
         {/* La sentinelle (src/lib/sentinelle.tsx, src/server/navigateur.ts) : sans compte, ni adresse IP, ni adresse de page ; gardées 30 jours */}
         <Ligne icone="bolt" titre="Les erreurs et la vitesse de l’appli">
@@ -170,6 +191,7 @@ export function ConfidentialiteScreen() {
         <InsetRow title="Resend" sub="L’envoi des mails (ton code, ton rapport prêt, le rappel d’un paiement, la liste d’attente)" />
         {/* La mesure d’audience (src/lib/analytique.ts) : son serveur européen, sans cookie ni compte, les adresses nettoyées */}
         <InsetRow title="PostHog" sub="La mesure d’audience et l’enregistrement des visites (sans ta conv, ni les prénoms, ni les images), sans cookie, en Allemagne" />
+        <InsetRow title="Meta" sub="Les pubs sur Facebook et Instagram, seulement si tu l’acceptes (sans ta conv)" />
         {/* TODO(produit): vérifier où Whop et Cloudflare traitent ces données (leurs conditions) */}
         <InsetRow title="Whop" sub="Le paiement, qu’il encaisse en son nom (vendeur en titre), aux États-Unis" />
         {/* Le CAPTCHA (src/server/captcha.ts) : Cloudflare voit l’adresse IP et le navigateur, jamais la conv (« Pas de robots », plus haut) */}

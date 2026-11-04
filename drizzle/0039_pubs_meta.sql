@@ -1,0 +1,1 @@
+ALTER TABLE "achats" ADD COLUMN "pubs_meta" jsonb;

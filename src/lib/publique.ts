@@ -12,3 +12,9 @@ export const cleDuSiteCaptcha = (): string | null => process.env.NEXT_PUBLIC_TUR
  * PostHog (src/lib/analytique.ts), et son relais /ingest répond 404 (src/proxy.ts). Jamais en local ni dans les tests.
  */
 export const cleDePostHog = (): string | null => process.env.NEXT_PUBLIC_POSTHOG_CLE || null;
+
+/**
+ * L’ensemble de données de Meta (son « pixel »), ou null : les pubs de Meta ne sont pas branchées, et le bandeau qui
+ * demande l’accord ne s’ouvre pas (src/components/shell/BandeauPubs.tsx).
+ */
+export const pixelMeta = (): string | null => process.env.NEXT_PUBLIC_META_PIXEL_ID || null;

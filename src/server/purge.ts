@@ -12,6 +12,7 @@ import { journalErreur } from "./journal";
 import { purgerLesLecturesDesLots } from "./lots";
 import { purgerLOAuth } from "./mcp/acces";
 import { NAVIGATEUR_GARDE_JOURS } from "./navigateur";
+import { PUBS_META_GARDEES_JOURS } from "./pubs-meta";
 import { PRESENCES_GARDEES_JOURS, VISITES_GARDEES_JOURS } from "./visites";
 
 /*
@@ -30,6 +31,8 @@ import { PRESENCES_GARDEES_JOURS, VISITES_GARDEES_JOURS } from "./visites";
  * - pour /admin (src/server/visites.ts) : les signes des onglets et le fil du direct de plus de deux jours
  *   (PRESENCES_GARDEES_JOURS), les visites et les jalons du tunnel (appli par appli aussi) de plus de 90 jours (VISITES_GARDEES_JOURS), et le sel
  *   des empreintes dès le surlendemain : plus rien ne relie alors une empreinte à une connexion ;
+ * - les traces des pubs de Meta gardées sur un achat (achats.pubs_meta, src/server/pubs-meta.ts) de plus de 7 jours
+ *   (PUBS_META_GARDEES_JOURS) : un achat jamais payé ne les efface pas de lui-même ;
  * - les erreurs et les mesures de vitesse des navigateurs de plus de 30 jours (NAVIGATEUR_GARDE_JOURS, src/server/navigateur.ts) ;
  * - les accès de Claude à /admin (src/server/mcp/acces.ts) : les codes expirés, les accès dont le rafraîchissement a
  *   expiré, et les clients restés sans accès ;
@@ -106,6 +109,12 @@ export async function purger(maintenant = new Date()) {
       .where(lt(schema.evenementsMails.le, il_y_a(EVENEMENTS_MAILS_GARDES_JOURS)));
   });
   await etape("liste d’attente", () => purgerLaListe(maintenant));
+  await etape("traces des pubs de Meta", async () => {
+    await db()
+      .update(schema.achats)
+      .set({ pubsMeta: null })
+      .where(and(isNotNull(schema.achats.pubsMeta), lt(schema.achats.creeLe, il_y_a(PUBS_META_GARDEES_JOURS))));
+  });
   await etape("signes des onglets", async () => {
     await db()
       .delete(schema.presences)
