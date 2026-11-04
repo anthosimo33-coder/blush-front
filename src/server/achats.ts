@@ -4,6 +4,7 @@ import { alerteSobre } from "@prompts/lib/titres";
 import { bullesDeLAvance, CATALOGUE, RAPPORT_D_AVANCE, RAPPORTS_SEULS } from "@/contenu/offres";
 import { bullesDuLot, DUREE_DU_SECOND_GAGNE_MS, lotSAppliqueA, prixAvecLot } from "@/contenu/roue";
 import type { GenreVendu, OffreId } from "@/types";
+import type { TraceMeta } from "@/lib/pubs";
 import type { AchatDuCompte } from "@/types/api";
 import { alerter } from "./alertes";
 import type { Utilisateur } from "./auth";
@@ -20,6 +21,7 @@ import { offreValable } from "./offres-uniques";
 import { recompenserLeParrainage, reprendreLeParrainage } from "./parrainage";
 import { reparerLaChaine } from "./pipeline";
 import { rangerLAchat } from "./population";
+import { envoyerAchatAMeta } from "./pubs-meta";
 import { lotValable } from "./roue";
 import { noterAchatAuFil } from "./visites";
 
@@ -69,7 +71,8 @@ const EN_ATTENTE_MAX = 10;
  * roue gagné et encore valable (src/server/roue.ts) : son prix (prixAvecLot) et ses bulles (bullesDuLot), figés eux
  * aussi, et le lot noté sur l’achat, pris à la livraison. `renonciation` : la renonciation au délai de rétractation
  * donnée avec la commande (sa version et son heure), gardée avec l’achat. `vente` : la carte du chat d’où il se paie
- * (src/server/vente.ts), notée avec lui pour /admin. Rend l’achat, ou le refus.
+ * (src/server/vente.ts), notée avec lui pour /admin. `pubs` : ce que Meta saura relier à une pub, avec l’accord de la
+ * personne (src/server/pubs-meta.ts, traceDe), gardé jusqu’au paiement. Rend l’achat, ou le refus.
  */
 export async function commander(
   compte: Pick<Utilisateur, "id" | "email">,
@@ -79,7 +82,8 @@ export async function commander(
     fournisseur,
     renonciation,
     vente = null,
-  }: { storyId?: string | null; fournisseur: FournisseurPaiement; renonciation?: Consentement; vente?: GenreVendu | null },
+    pubs = null,
+  }: { storyId?: string | null; fournisseur: FournisseurPaiement; renonciation?: Consentement; vente?: GenreVendu | null; pubs?: TraceMeta | null },
 ): Promise<Achat | RefusDeCommande> {
   const c = CATALOGUE[offre];
   /* Un onglet ouvert avant la grille du 23 octobre peut encore l’envoyer (z.enum(OFFRES) l’accepte : les achats passés la portent) */
@@ -128,6 +132,7 @@ export async function commander(
       renonciationVersion: renonciation?.version ?? null,
       renonciationLe: renonciation?.le ?? null,
       vente,
+      pubsMeta: pubs,
     })
     .returning();
   return achat!;
@@ -244,6 +249,8 @@ export async function livrer(achatId: string, paiement: Paiement = {}): Promise<
    * ne peut pas faire échouer un paiement. En échec, le passage des 5 minutes le range
    */
   if (r.effet === "livre" && r.achat) await auMieux(rangerLAchat(r.achat.id), "achat non rangé", { offre: r.achat.offre });
+  /* Chez Meta, rangé (seul un vrai client y part), et commandé avec l’accord des pubs (src/server/pubs-meta.ts) */
+  if (r.effet === "livre" && r.achat) await auMieux(envoyerAchatAMeta(r.achat.id), "achat non envoyé à Meta", { offre: r.achat.offre });
   /* Au fil du direct d’/admin : la ville de son paiement ouvert, l’offre (jamais le compte) */
   if (r.effet === "livre" && r.achat) await noterAchatAuFil(r.achat);
   if (r.debloquee && r.achat) await relancerLaChaine(r.achat, "rapport non relancé après la livraison");

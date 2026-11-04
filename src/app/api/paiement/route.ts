@@ -3,6 +3,7 @@ import { livreeAuPaiement } from "@/contenu/offres";
 import { erreur, lireCorps, repondre, route } from "@/server/http";
 import { commencerPaiement } from "@/server/paiement/commande";
 import { renonciationPaiement } from "@/server/juridique";
+import { traceDe } from "@/server/pubs-meta";
 import { garde, sousLaLimiteDuCompte } from "@/server/requete";
 import { noterAuFil } from "@/server/visites";
 import { ROUTES } from "@/types/api";
@@ -35,6 +36,7 @@ export const POST = route("POST /api/paiement", async (req: Request) => {
     jeton: corps.jeton ?? null,
     geste: corps.geste === true,
     vente: corps.vente ?? null,
+    pubs: traceDe(req),
   });
   if (typeof r === "string") return erreur(r);
   /* Au fil du direct, avec la ville de la connexion : l’achat payé la reprendra (le webhook n’a pas de connexion à situer) */

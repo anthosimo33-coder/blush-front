@@ -184,6 +184,22 @@ export const Env = z.object({
     .regex(/^phc_\w+$/, "une clé de projet PostHog (phc_…), jamais une clé personnelle")
     .optional(),
   /**
+   * L’ensemble de données de Meta (son « pixel », un nombre), écrit dans les pages au build (NEXT_PUBLIC_, lu par le
+   * navigateur dans src/lib/publique.ts : le bandeau des pubs ne s’ouvre qu’avec lui) et relu par le serveur, qui y
+   * envoie les événements des pubs (src/server/pubs-meta.ts). Sans lui, ni bandeau, ni rien chez Meta.
+   */
+  NEXT_PUBLIC_META_PIXEL_ID: z
+    .string()
+    .regex(/^\d{10,20}$/, "l’identifiant de l’ensemble de données de Meta (des chiffres)")
+    .optional(),
+  /** La clé de l’API Conversions de Meta (secrète), générée dans les paramètres de l’ensemble de données : sans elle, rien ne part. */
+  META_CAPI_TOKEN: z.string().min(20).optional(),
+  /** Le code de « Tester les événements » (Gestionnaire d’événements de Meta) : avec lui, les événements n’y comptent qu’en test. */
+  META_TEST_EVENT_CODE: z
+    .string()
+    .regex(/^TEST\w+$/)
+    .optional(),
+  /**
    * Le montage des appels qui lisent la conv (le verdict, le rapport, la création de la mémoire) : « separe » (le défaut),
    * chacun son système et son format imposé ; « partage » (une proposition, prompts/lib/contextes.ts), le socle seul en
    * système, la conv en cache une fois pour les trois, la consigne de la tâche après elle ; et le vocal, qui y relit le

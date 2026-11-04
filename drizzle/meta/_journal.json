@@ -274,6 +274,13 @@
       "when": 1793722475888,
       "tag": "0038_page_d_arrivee",
       "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1793797292368,
+      "tag": "0039_pubs_meta",
+      "breakpoints": true
     }
   ]
 }
