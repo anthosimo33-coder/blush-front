@@ -1,8 +1,10 @@
 import { gzipSync } from "node:zlib";
 import { describe, expect, it } from "vitest";
-import { blocAjout, cleDuMessage, inserer, messagesDeLExport, messagesDesCaptures, numeroter, remplacer, type Heure, type Lu } from "@prompts/lib/ajouts";
+import { blocAjout, inserer, messagesDeLExport, messagesDesCaptures, numeroter, remplacer } from "@prompts/lib/ajouts";
+import { cleDuMessage, heureLue, type Heure, type Lu } from "@prompts/lib/reconnaitre";
+import { versTexteCaptures } from "@prompts/lib/captures";
 import { lire, type Histoire, type Message } from "@prompts/lib/conv";
-import { ligneMessage, TETE_DU_RAPPEL } from "@prompts/lib/ligne";
+import { JOUR_INCONNU, ligneMessage, lireLigne, TETE_DU_RAPPEL } from "@prompts/lib/ligne";
 import { rendreNouveau } from "@prompts/lib/memoire";
 import type { Captures } from "@prompts/lib/schemas";
 import { lireExport, resumeConvInstagram } from "@prompts/lib/export";
@@ -669,6 +671,30 @@ describe("un export ajouté : ce qui est déjà lu, à l’heure près (H1, H5)"
     expect([r.repris.length, r.fin]).toEqual([3, Date.UTC(2026, 9, 31, 10, 2)]);
   });
 
+  it("une conv de captures sans aucune date, puis l’export : sans curseur, ce qu’elles montraient est reconnu, tout le reste est nouveau", () => {
+    /* Ce que la conv a lu : trois messages « au plus tard » le jour de l’import (heureLue), et pas de curseur (src/server/ajouts.ts, curseurDe) */
+    const deja = [
+      lu("autre", "tu fais quoi ce soir", "2026-10-31 00:00:00", "auPlusTard"),
+      lu("toi", "rien de ouf et toi", "2026-10-31 00:00:00", "auPlusTard"),
+      lu("autre", "je regarde une série", "2026-10-31 00:00:00", "auPlusTard"),
+    ];
+    const r = lireExport_(
+      ios([
+        ["01/09/2026 21:00:00", "Léa", "salut toi"],
+        ["01/09/2026 21:02:00", "Tom", "hey"],
+        ["10/09/2026 21:02:10", "Léa", "tu fais quoi ce soir"],
+        ["10/09/2026 21:40:33", "Tom", "rien de ouf et toi"],
+        ["10/09/2026 22:58:03", "Léa", "je regarde une série"],
+        ["20/10/2026 10:02:00", "Léa", "bien dormi ?"],
+      ]),
+      -Infinity,
+      deja,
+    );
+    expect(textes(r.nouveaux)).toEqual(["salut toi", "hey", "bien dormi ?"]);
+    /* Le curseur que la conv prend dès lors : le dernier message de l’export, fini */
+    expect([r.repris.length, r.fin]).toEqual([3, Date.UTC(2026, 9, 20, 10, 2)]);
+  });
+
   it("l’export après deux envois de captures : il ne relit pas ce qu’elles ont apporté, et garde ce qu’elles ne montraient pas", () => {
     const deja = [
       lu("autre", "bonne nuit", "2026-11-01 22:00:00"),
@@ -891,5 +917,194 @@ describe("le jour et l’heure du téléphone (H7, C7)", () => {
     expect(await depuisPaquet(paquet("America/Sao_Paulo"), { fuseau: "Europe/Paris" })).toMatchObject({ texte: "[01/10/2026 02:30:00] Ana: oi", fuseau: "Europe/Paris" });
     /* Un navigateur d’avant le fuseau : Paris, sans fuseau gardé (fuseauDe le redonne) */
     expect((await depuisPaquet(paquet())).fuseau).toBeUndefined();
+  });
+});
+
+describe("le jour deviné et les appels décrochés (PR 5)", () => {
+  it("le haut sans date et des captures sans aucune date valent « au plus tard » ; renvoyées, même le lendemain, elles sont reconnues", () => {
+    const cas: [Captures, Heure[]][] = [
+      [
+        capture(
+          {
+            date: null,
+            messages: [
+              ["autre", "bonne nuit 😘"],
+              ["moi", "dors bien"],
+            ],
+          },
+          { date: "2026-10-31", heure: "09:50", messages: [["autre", "bien dormi ?"]] },
+        ),
+        ["auPlusTard", "auPlusTard", "repere"],
+      ],
+      [
+        capture({
+          date: null,
+          messages: [
+            ["autre", "on se voit quand pour le ciné"],
+            ["moi", "samedi ?"],
+            ["autre", "ok"],
+          ],
+        }),
+        ["auPlusTard", "auPlusTard", "auPlusTard"],
+      ],
+    ];
+    for (const [c, heures] of cas) {
+      const t = versTexteCaptures(c, { moi: "Moi", autre: "Elle", aujourdhui: "2026-10-31" });
+      const { messages } = lire(t.texte, { utilisateur: { ...H.utilisateur, nomExport: "Moi" }, autre: { ...H.autre, nomExport: "Elle" }, format: "captures" });
+      /* Ce que la conv garde à l’import (src/server/analyse.ts, contexteDuCode) */
+      const lus: Lu[] = messages.map((m) => ({ cle: cleDuMessage(m), ...heureLue(m) }));
+      expect(lus.map((e) => e.heure)).toEqual(heures);
+      for (const aujourdhui of ["2026-10-31", "2026-11-01"]) {
+        const r = messagesDesCaptures(c, H, { aujourdhui, apres: Math.max(...lus.map((e) => e.t)), lus });
+        expect([r.dejaLus, r.nouveaux]).toEqual([true, []]);
+      }
+    }
+  });
+
+  it("des captures sans aucune date envoyées dans le chat : leurs lignes disent le jour inconnu, et elles restent nouvelles", () => {
+    const hier = lu("autre", "bonne nuit", "2026-10-30 23:10:00");
+    const r = messagesDesCaptures(
+      capture({
+        date: null,
+        messages: [
+          ["autre", "t’as vu mon message ?"],
+          ["moi", "pas encore"],
+        ],
+      }),
+      H,
+      { aujourdhui: "2026-10-31", apres: hier.t, lus: [hier] },
+    );
+    expect(textes(r.nouveaux)).toEqual(["t’as vu mon message ?", "pas encore"]);
+    const { lignes } = numeroter(r.nouveaux, [], H, { debut: 1000, aujourdhui: "2026-10-31" });
+    expect(lignes.map((l) => lireLigne(l)?.jour)).toEqual([JOUR_INCONNU, JOUR_INCONNU]);
+  });
+
+  it("un appel décroché n’est pas distinctif (deux appels de 12 min, deux soirs de suite, sont deux appels), ni la cible de la réponse", () => {
+    /* Hier soir, un appel de 12 min, lu dans un export */
+    const hier = lu("autre", "Appel vocal, 12 min", "2026-10-30 21:00:00");
+    const c = captures({
+      autre: "Léa",
+      blocs: [
+        {
+          repere: { date: "2026-10-31", heure: "20:00" },
+          messages: [
+            msg("autre", "Appel vocal · 12 min", { media: "appel" }),
+            msg("moi", "trop bien de t’entendre"),
+            msg("autre", "pareil"),
+            msg("autre", "Appel vocal · 5 min", { media: "appel" }),
+          ],
+        },
+      ],
+    });
+    const r = messagesDesCaptures(c, H, { aujourdhui: "2026-10-31", apres: hier.t, lus: [hier] });
+    expect(textes(r.nouveaux)).toEqual(["Appel vocal, 12\u00a0min", "trop bien de t’entendre", "pareil", "Appel vocal, 5\u00a0min"]);
+    expect(numeroter(r.nouveaux, [], H, { debut: 501, aujourdhui: "2026-10-31" }).cibles).toEqual(["m0503"]);
+  });
+  it("une proposition tapée (« facetime 21h ») reste un message, et la cible de la réponse", () => {
+    const hier = lu("toi", "t’es dispo ce soir ?", "2026-10-31 18:00:00", "repere");
+    const c = captures({ autre: "Léa", blocs: [{ repere: { date: "2026-10-31", heure: "18:00" }, messages: [msg("moi", "t’es dispo ce soir ?"), msg("autre", "facetime 21h")] }] });
+    const r = messagesDesCaptures(c, H, { aujourdhui: "2026-10-31", apres: hier.t, lus: [hier] });
+    expect(textes(r.nouveaux)).toEqual(["facetime 21h"]);
+    expect(numeroter(r.nouveaux, [], H, { debut: 501, aujourdhui: "2026-10-31" }).cibles).toEqual(["m0501"]);
+  });
+});
+
+describe("les messages lus depuis la PR 4 (en ligne le 2 novembre 2026) : un appel décroché et une réponse à une story, lus alors comme un média", () => {
+  /* Le soir du 2 novembre, sous le repère de 21:00 : ce que la conv a noté à l’import, avant la PR 5 */
+  const A_21H = Date.parse("2026-11-02T21:00:00Z");
+  /* La clé du serveur (cleSecrete, src/server/ajouts.ts) : une empreinte de cleDuMessage ; ici, une clé qui ne la laisse pas lire */
+  const secrete = (m: Message) => `secret:${[...cleDuMessage(m)].reverse().join("")}`;
+  /** Les lus d’une conv importée avant la PR 5 : ses messages sous le repère de 21:00, l’appel et la réponse à une story en média. */
+  const commeAvant = (cle: (m: Message) => string, messages: [role: "toi" | "autre", texte: string, media?: Message["media"]][]): Lu[] =>
+    messages.map(([role, texte, media]) => ({
+      cle: cle({ id: "", t: A_21H, nom: "", role, texte, approx: "heure", ligne: 0, ...(media ? { media } : {}) }),
+      t: A_21H,
+      heure: "repere",
+    }));
+  const renvoi = (messages: ReturnType<typeof msg>[], heure = "21:00") => captures({ autre: "Léa", blocs: [{ repere: { date: "2026-11-02", heure }, messages }] });
+
+  it("une capture qui commence par l’appel décroché, puis deux messages lus et deux neufs : deux nouveaux, même avec la clé du serveur", () => {
+    for (const cle of [cleDuMessage, secrete]) {
+      /* Avant la PR 5, l’appel s’écrivait « Appel vocal manqué » : un média, la clé « role|# » */
+      const lus = commeAvant(cle, [
+        ["toi", "on s’appelle ce soir ?"],
+        ["autre", "", "appel manqué"],
+        ["toi", "trop bien de t’entendre"],
+        ["autre", "pareil à demain alors"],
+      ]);
+      const c = renvoi([
+        msg("autre", "Appel vocal · 23 min", { media: "appel" }),
+        msg("moi", "trop bien de t’entendre"),
+        msg("autre", "pareil à demain alors"),
+        msg("moi", "tu fais quoi demain soir"),
+        msg("autre", "rien de prévu et toi"),
+      ]);
+      const r = messagesDesCaptures(c, H, { aujourdhui: "2026-11-03", apres: A_21H, lus, cle });
+      expect(textes(r.nouveaux)).toEqual(["tu fais quoi demain soir", "rien de prévu et toi"]);
+      /* Ce que la conv note : leur clé d’aujourd’hui */
+      expect(r.aNoter.map((e) => e.cle)).toEqual(r.nouveaux.map(cle));
+    }
+  });
+
+  it("une capture qui commence par la réponse à une story, ou par une réaction : la même chose", () => {
+    for (const reponse of ["trop belle cette photo 😍", "A réagi 😍 à votre story"]) {
+      /* Avant la PR 5, toute réponse à une story s’écrivait « A répondu à ta story » : un média */
+      const lus = commeAvant(cleDuMessage, [
+        ["toi", "regarde ma story"],
+        ["autre", "", "réponse à ta story"],
+        ["toi", "merci t’es mignonne toi"],
+        ["autre", "on se voit quand alors"],
+      ]);
+      const c = renvoi([
+        msg("autre", reponse, { media: "story" }),
+        msg("moi", "merci t’es mignonne toi"),
+        msg("autre", "on se voit quand alors"),
+        msg("moi", "samedi soir ça te va"),
+        msg("autre", "parfait à samedi"),
+      ]);
+      const r = messagesDesCaptures(c, H, { aujourdhui: "2026-11-03", apres: A_21H, lus });
+      expect(textes(r.nouveaux), reponse).toEqual(["samedi soir ça te va", "parfait à samedi"]);
+    }
+  });
+
+  it("reconnue par sa clé d’avant, une réponse à une story n’est pas distinctive : une neuve, sous un autre repère, ne passe pas pour sa photo déjà lue", () => {
+    const lus = commeAvant(cleDuMessage, [
+      ["toi", "je t’envoie la photo du resto"],
+      ["autre", "", "photo"],
+    ]);
+    const r = messagesDesCaptures(renvoi([msg("autre", "trop belle cette photo 😍", { media: "story" }), msg("moi", "merci toi")], "22:30"), H, {
+      aujourdhui: "2026-11-03",
+      apres: A_21H,
+      lus,
+    });
+    expect(textes(r.nouveaux)).toEqual(["trop belle cette photo 😍 [réponse à une story]", "merci toi"]);
+  });
+
+  it("un appel décroché ou une réponse à une story neufs en tête d’une capture, après une photo d’elle lue le même jour : jamais pris pour elle", () => {
+    /* La fin de ce qui est lu le 2 novembre, une photo d’elle : par un export (à la minute, 21:10), ou par des captures sous la pastille « Aujourd’hui » (le jour seul) */
+    const parExport = [lu("toi", "regarde ce que je t’envoie", "2026-11-02 21:09:00"), lu("autre", "", "2026-11-02 21:10:00", "exacte", "photo")];
+    const parCaptures = [lu("toi", "regarde ce que je t’envoie", "2026-11-02 00:00:00", "jour"), lu("autre", "", "2026-11-02 00:00:00", "jour", "photo")];
+    const tetes = [msg("autre", "Appel vocal · 12 min", { media: "appel" }), msg("autre", "trop belle ta story de ce soir 😍", { media: "story" })];
+    for (const [quoi, lus] of [
+      ["un export", parExport],
+      ["des captures", parCaptures],
+    ] as const)
+      for (const tete of tetes) {
+        /* Plus tard le même soir, sous la pastille « Aujourd’hui » (sans heure) : lui en tête, puis deux messages neufs */
+        const c = captures({
+          autre: "Léa",
+          blocs: [{ repere: { date: "2026-11-02", heure: null }, messages: [tete, msg("autre", "c’était trop bien de t’entendre ce soir"), msg("moi", "pareil, à demain alors")] }],
+        });
+        const r = messagesDesCaptures(c, H, { aujourdhui: "2026-11-02", apres: lus[1]!.t, lus });
+        expect(
+          r.nouveaux.map((m) => m.texte.replace(/^\u200e/, "")),
+          `${quoi} · ${tete.texte}`,
+        ).toEqual([
+          tete.media === "appel" ? "Appel vocal, 12\u00a0min" : "trop belle ta story de ce soir 😍 [réponse à une story]",
+          "c’était trop bien de t’entendre ce soir",
+          "pareil, à demain alors",
+        ]);
+        expect(r.ancre, `${quoi} · ${tete.texte}`).toBeNull();
+      }
   });
 });

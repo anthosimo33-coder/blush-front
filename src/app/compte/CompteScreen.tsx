@@ -67,7 +67,8 @@ function texteDuTournage(rappel: RappelDuTournage): { titre: string; sous: strin
 
 /** La feuille des bulles ouverte : « C’est quoi une bulle ? », ou la recharge. */
 type FeuilleDesBulles = "bulle" | "recharge" | null;
-export type NomsDuCompte = { me: Person; other: Person; period: string };
+/** `period` : absente pour des captures qui ne montrent aucune date (Story.period). */
+export type NomsDuCompte = { me: Person; other: Person; period?: string };
 
 /**
  * `convs` : toutes les convs du compte, quand il y en a plusieurs (sinon, celle de `noms`).

@@ -32,12 +32,18 @@ export type DonneesMemoire = { etat: MemoireFaite; lignes: [string, string][]; s
  * captures aussi) ; `lus` : ses derniers messages lus, leur empreinte (cleSecrete : jamais leur texte, la conv brute
  * effacée) et leur heure à la minute (ecrireLus, src/server/ajouts.ts). Ces deux-là manquent à une conv lue avant le 2 novembre 2026. `trouvailles` : ce que
  * la lecture montre (ecrans/trouvailles.ts). `accroche` : le titre du haut de son paywall (src/contenu/haut-du-paywall.ts),
- * compté avec son achat dans /admin ; absent avant le 17 octobre.
+ * compté avec son achat dans /admin ; absent avant le 17 octobre. `sansDate` : la conv lue ne montre aucune date
+ * (Rendu.sansDate) : `fin` n’est que le jour de l’import, la mémoire du chat le dit, et un export ajouté n’a pas de
+ * curseur tant qu’aucun export n’est lu (curseurDe, src/server/ajouts.ts) ; `finSansDate` : elle finit par des messages
+ * sans date (Rendu.finSansDate) : `fin` et `dernier` sont ceux de son dernier message daté, la mémoire du chat le dit.
+ * Ces deux-là manquent à une conv lue avant la PR 5 du chantier lecture.
  */
 export type Contexte = {
   chiffres: string;
   style: string;
   fin: string;
+  sansDate?: true;
+  finSansDate?: true;
   dernier: number;
   vuJusqua?: number;
   lus?: string;

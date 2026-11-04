@@ -1,4 +1,4 @@
-import { estLigneProfil, lireLigne } from "@prompts/lib/ligne";
+import { estLigneProfil, JOUR_INCONNU, lireLigne } from "@prompts/lib/ligne";
 import type { MemoireFaite } from "@prompts/lib/memoire";
 import type { Fiche, FicheFact, Person } from "@/types";
 
@@ -8,19 +8,26 @@ const MOIS = ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août"
 
 /**
  * Les infos de sa fiche, chacune avec sa source (« votre conv · 12 sept. », « votre conv · 2 mars 2024 » quand ce n’est
- * pas l’année du dernier message, ou « d’après toi »).
+ * pas l’année du dernier message, « votre conv » sans date pour une preuve au jour inconnu, ou « d’après toi »).
  */
 export function faitsAffiches(etat: Pick<MemoireFaite, "fiche">, lignes: Map<string, string>, fin = ""): FicheFact[] {
-  /* Le jour du dernier message de la conv (`fin`), ou d’une ligne plus récente ; pas d’une ligne de son profil, datée du jour où on l’a ajoutée */
+  /*
+   * Le jour du dernier message de la conv (`fin`), ou d’une ligne plus récente ; pas d’une ligne de son profil, datée du
+   * jour où on l’a ajoutée, ni d’une ligne au jour inconnu (des captures sans date)
+   */
   const derniere = [...lignes.values()].reduce((a, ligne) => {
     const l = lireLigne(ligne);
-    return l && !l.profil && l.jour > a ? l.jour : a;
+    return l && !l.profil && l.jour !== JOUR_INCONNU && l.jour > a ? l.jour : a;
   }, fin);
   const source = (ids: string[]) => {
     const brute = ids.map((id) => lignes.get(id)).find(Boolean);
     const l = brute ? lireLigne(brute) : null;
-    const annee = l && l.jour.slice(0, 4) !== derniere.slice(0, 4) ? ` ${l.jour.slice(0, 4)}` : "";
-    return l ? `${l.profil ? "son profil" : "votre conv"} · ${+l.jour.slice(8, 10)} ${MOIS[+l.jour.slice(5, 7) - 1]}${annee}` : "d’après toi";
+    if (!l) return "d’après toi";
+    const ou = l.profil ? "son profil" : "votre conv";
+    /* Un jour inconnu (des captures sans date) : la source, sans date */
+    if (l.jour === JOUR_INCONNU) return ou;
+    const annee = l.jour.slice(0, 4) !== derniere.slice(0, 4) ? ` ${l.jour.slice(0, 4)}` : "";
+    return `${ou} · ${+l.jour.slice(8, 10)} ${MOIS[+l.jour.slice(5, 7) - 1]}${annee}`;
   };
   const genre = (ids: string[]) => (!ids.length ? "note" : ids.some((id) => estLigneProfil(lignes.get(id) ?? "")) ? "capture" : "conv");
   return etat.fiche.faits.map((f, k) => ({ id: `f${k}`, section: f.section, text: f.texte, sourceLabel: source(f.preuves), sources: [genre(f.preuves)] }));

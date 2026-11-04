@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { chiffrer, lire, rendre, type Histoire } from "@prompts/lib/conv";
+import { chiffrer, lire, rendre, type Histoire, type Message } from "@prompts/lib/conv";
 import { profil } from "@prompts/lib/style";
 import { titreNettoye } from "@prompts/lib/titres";
 import { accorde, vocauxOuMedias } from "@/lib/format";
@@ -311,5 +311,102 @@ describe("le profil d’écriture donné au chat (F1, F2)", () => {
       ["bb", 2],
       ["ma vie", 2],
     ]);
+  });
+});
+
+describe("une conv sans date, une conv coupée (PR 5)", () => {
+  const sansDate = (m: Partial<Meta> = {}) =>
+    meta({
+      format: "captures",
+      appli: "instagram",
+      fichier: "2 captures",
+      captures: 2,
+      resume: { debut: "2026-10-31", fin: "2026-10-31", total: 30, vocaux: 0, sansDate: true },
+      ...m,
+    });
+
+  it("des captures sans aucune date : ni période ni durée, sur la source comme sur l’histoire", () => {
+    const story = storyAffichee("c", sansDate());
+    expect([story.period, story.durationLabel, story.sources[0]!.period]).toEqual([undefined, undefined, undefined]);
+    expect(story.sources[0]!.label).toBe("Instagram · 2 captures");
+    expect(story.totalMessages).toBe(30);
+    /* Les mêmes, datées du jour de l’import (une conv d’avant la PR 5) : la période et la durée de ce jour-là */
+    const datee = storyAffichee("c", sansDate({ resume: { debut: "2026-10-31", fin: "2026-10-31", total: 30, vocaux: 0 } }));
+    expect([datee.period, datee.durationLabel]).toEqual(["31 oct.", "1\u00a0jour"]);
+  });
+
+  it("une conv coupée : son début manque ; en morceaux, seulement si le plus ancien est coupé", () => {
+    expect(storyAffichee("c", meta({ coupe: true })).startMissing).toBe(true);
+    expect(storyAffichee("c", meta()).startMissing).toBeUndefined();
+    const exportCoupe = { appli: "whatsapp" as const, fichier: "WhatsApp Chat - Léa.zip", coupe: true, resume: { debut: "2026-09-01", fin: "2026-10-15", total: 400, vocaux: 0 } };
+    const capturesDu = (debut: string, fin: string) => ({ appli: "instagram" as const, fichier: "2 captures", captures: 2, resume: { debut, fin, total: 24, vocaux: 0 } });
+    expect(storyAffichee("c", meta({ coupe: true, morceaux: [exportCoupe, capturesDu("2026-10-20", "2026-10-22")] })).startMissing).toBe(true);
+    /* Des captures plus anciennes, importées en second : le plus ancien morceau n’est pas coupé */
+    expect(storyAffichee("c", meta({ coupe: true, morceaux: [capturesDu("2026-06-01", "2026-06-03"), exportCoupe] })).startMissing).toBeUndefined();
+  });
+
+  it("les preuves d’un jour inconnu : le nom seul sous la bulle ; l’année des autres ne change pas", () => {
+    const lignes = new Map([
+      ["m0002", "m0002 ????-??-?? ??? --:-- Léa : on se voit quand ?"],
+      ["m0003", "m0003 ????-??-?? ??? --:-- Tom : demain ?"],
+      ["m0412", "m0412 2025-03-02 dim. 23:41 Léa : t’es où"],
+    ]);
+    const bulles = messagesAffiches(lignes, "Tom", { fin: "2025-03-10" });
+    expect(bulles.get("m0002")!.caption).toBe("Léa");
+    expect(bulles.get("m0003")!.caption).toBe("Toi");
+    /* Sans la garde, « ???? » passait devant tous les jours : l’année de référence, et toutes les autres preuves la prenaient */
+    expect(bulles.get("m0412")!.caption).toBe("Léa · 02/03 23:41");
+  });
+
+  it("sa fiche : une info prouvée par un message au jour inconnu vient de « votre conv », sans date", () => {
+    const lignes = new Map([
+      ["m0002", "m0002 ????-??-?? ??? --:-- Léa : j’adore le libanais"],
+      ["m0412", "m0412 2025-03-02 dim. 23:41 Léa : ce soir libanais ?"],
+    ]);
+    const etat = memoire({
+      fiche: {
+        faits: [
+          { section: "aime", texte: "le libanais", preuves: ["m0002"], statut: "garde" },
+          { section: "aime", texte: "sortir le soir", preuves: ["m0412"], statut: "garde" },
+        ],
+      },
+    });
+    const faits = ficheAffichee({ id: "p-autre", name: "Léa", initial: "L" }, etat, lignes, undefined, "2025-03-10").facts;
+    expect(faits.map((f) => f.sourceLabel)).toEqual(["votre conv", "votre conv · 2 mars"]);
+  });
+
+  it("resumeDe : les bornes des messages datés ; aucun daté, le jour écrit, sans date", () => {
+    const m = (k: number, iso: string, jourDevine?: Message["jourDevine"]): Message => ({
+      id: `m000${k}`,
+      t: Date.parse(`${iso}T00:00:00Z`),
+      nom: k % 2 ? "Léa" : "Moi",
+      role: k % 2 ? "autre" : "toi",
+      texte: `message ${k}`,
+      approx: "jour",
+      ...(jourDevine ? { jourDevine } : {}),
+      ligne: k,
+    });
+    /* Un dernier message sans date : la fin est le dernier jour daté, et le résumé le dit (la ligne des morceaux : « puis sans date ») */
+    expect(resumeDe([m(1, "2026-09-01"), m(2, "2026-09-03"), m(3, "2026-10-31", "inconnu")])).toEqual({
+      debut: "2026-09-01",
+      fin: "2026-09-03",
+      total: 3,
+      vocaux: 0,
+      finSansDate: true,
+    });
+    expect(resumeDe([m(1, "2026-09-01"), m(3, "2026-10-31", "inconnu"), m(2, "2026-09-03")])).toEqual({ debut: "2026-09-01", fin: "2026-09-03", total: 3, vocaux: 0 });
+    expect(resumeDe([m(1, "2026-10-31", "inconnu"), m(2, "2026-10-31", "inconnu"), m(3, "2026-10-31", "inconnu")])).toEqual({
+      debut: "2026-10-31",
+      fin: "2026-10-31",
+      total: 3,
+      vocaux: 0,
+      sansDate: true,
+    });
+    /* Un jour emprunté (« au plus tard ») est une borne juste : il compte ; pas celui que la réunion a recalé d’un autre jour (tLu) */
+    expect(resumeDe([m(1, "2026-09-01", "auPlusTard"), m(2, "2026-09-01")]).sansDate).toBeUndefined();
+    expect(resumeDe([{ ...m(1, "2026-09-01", "auPlusTard"), tLu: Date.parse("2026-10-31T00:00:00Z") }, m(2, "2026-09-02")])).toMatchObject({
+      debut: "2026-09-02",
+      fin: "2026-09-02",
+    });
   });
 });

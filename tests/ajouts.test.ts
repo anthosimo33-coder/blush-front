@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import { blocAjout, messagesDeLExport, messagesDesCaptures, numeroter, type Ajout } from "@prompts/lib/ajouts";
-import type { Message } from "@prompts/lib/conv";
+import { lire, type Message } from "@prompts/lib/conv";
 import type { Requete } from "@prompts/lib/contextes";
 import { estLigneProfil } from "@prompts/lib/ligne";
 
@@ -8,7 +8,7 @@ import { estLigneProfil } from "@prompts/lib/ligne";
 const apres = vi.hoisted(() => [] as (() => unknown)[]);
 vi.mock("next/server", async (original) => ({ ...(await original<typeof import("next/server")>()), after: (f: () => unknown) => apres.push(f) }));
 
-import { ajouterALaFiche, depuisCaptures, depuisExport, lireLus, majEnCours, resumeAjout } from "@/server/ajouts";
+import { ajouterALaFiche, cleSecrete, depuisCaptures, depuisExport, ecrireLus, lireLus, majEnCours, resumeAjout } from "@/server/ajouts";
 import { retenir, sansAttendre } from "@/server/memoire-groupee";
 import { repondre } from "@/server/chat";
 import { historique } from "@/server/historique";
@@ -365,6 +365,53 @@ describe("le curseur des ajouts", () => {
   it("une conv lue avant le 2 novembre dont un export ajouté a posé le curseur (à la seconde) : il est gardé", async () => {
     const id = await convDAvant(Date.UTC(2026, 2, 15, 9, 10, 42));
     await expect(depuisExport(await ligneEnBase(id), (await memoireDe(id))!, { appli: "whatsapp", texte: `${texte01}\n${suite}` })).rejects.toMatchObject({ code: "rien_de_neuf" });
+  });
+
+  /**
+   * Une conv lue comme des captures où l’on ne voit aucune date (Contexte.sansDate) : son dernier jour, celui de l’import
+   * (le 15 mars), et ce qu’elle a lu, trois messages de la fin de la conv 01, « au plus tard » ce jour-là. Aucun curseur.
+   */
+  const convSansDate = async () => {
+    const id = await convLue();
+    const fin = lire(texte01, { ...h, format: "whatsapp-ios" }, { autresEnTexte: true }).messages.slice(-3);
+    const sansDate = {
+      ...contexteDe(await ligneEnBase(id))!,
+      sansDate: true as const,
+      fin: "2026-03-15",
+      dernier: Date.UTC(2026, 2, 15),
+      lus: ecrireLus(fin.map((m) => ({ cle: cleSecrete(m), t: Date.UTC(2026, 2, 15), heure: "auPlusTard" as const }))),
+    };
+    delete sansDate.vuJusqua;
+    await db()
+      .update(schema.stories)
+      .set({ context: coffre.ecrire("stories.context", sansDate) })
+      .where(eq(schema.stories.id, id));
+    return id;
+  };
+
+  it("une conv de captures sans date : l’export d’après se lit en entier, ses jumeaux reconnus, au plus 400, puis la conv a un curseur", async () => {
+    const id = await convSansDate();
+    const total = lire(`${texte01}\n${suite}`, { ...h, format: "whatsapp-ios" }, { autresEnTexte: true }).messages.length;
+    const exporte = await depuisExport(await ligneEnBase(id), (await memoireDe(id))!, { appli: "whatsapp", texte: `${texte01}\n${suite}` });
+    /* Tout l’export, sauf les trois messages que les captures montraient ; les plus récents d’abord gardés */
+    expect(exporte.messages).toBe(Math.min(400, total - 3));
+    expect(exporte.ignores).toBe(total - 3 - exporte.messages);
+    await repondre(await ligneEnBase(id), (await memoireDe(id))!, "", { ajout: exporte, affiche: resumeAjout(exporte, "export", 1) });
+    /* Le curseur, désormais : le dernier message de l’export */
+    expect(contexteDe(await ligneEnBase(id))!.dernier).toBe(Date.UTC(2026, 2, 14, 18, 40, 30));
+    await expect(depuisExport(await ligneEnBase(id), (await memoireDe(id))!, { appli: "whatsapp", texte: `${texte01}\n${suite}` })).rejects.toMatchObject({
+      code: "rien_de_neuf",
+    });
+  });
+
+  it("des captures envoyées sur une conv sans date n’écrivent jamais un curseur infini", async () => {
+    const id = await convSansDate();
+    const ajout = await avecFactice(lireCapture15, async () => depuisCaptures(await ligneEnBase(id), (await memoireDe(id))!, [image]));
+    await repondre(await ligneEnBase(id), (await memoireDe(id))!, "", { ajout, affiche: resumeAjout(ajout, "captures", 1) });
+    /* Le coffre relit le contexte (un curseur −∞ s’écrirait null, qu’il refuse) : le curseur n’a pas bougé */
+    const c = contexteDe(await ligneEnBase(id))!;
+    expect(c.dernier).toBe(Date.UTC(2026, 2, 15));
+    expect(c.sansDate).toBe(true);
   });
 
   it("un export sans rien de neuf (des captures avaient tout apporté) est noté quand même : son curseur, ses messages à la minute", async () => {

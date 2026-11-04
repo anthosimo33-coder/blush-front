@@ -3,11 +3,12 @@ import { describe, expect, it, vi } from "vitest";
 /* Lire des captures lit la session (le compte qui paie la lecture, src/server/budget.ts) : ici, sans compte */
 vi.mock("next/headers", () => ({ cookies: async () => ({ get: () => undefined, has: () => false }), headers: async () => new Headers() }));
 import { versTexteCaptures } from "@prompts/lib/captures";
+import { ecrireLeContexte } from "@/server/analyse";
 import { lireCaptures } from "@/server/captures";
 import { db, schema } from "@/server/db";
 import { storyAffichee } from "@/server/conv-affichee";
 import { ErreurTache } from "@/server/erreurs";
-import { definirQui, histoireDe, importerCaptures, metaDe } from "@/server/histoires";
+import { contexteDe, definirQui, histoireDe, importerCaptures, metaDe } from "@/server/histoires";
 import { ErreurImport } from "@/server/import";
 import { refusFactice, REFUS_FACTICE } from "@/server/ia/factice";
 import { FACTICE } from "@/server/ia/factice-valeurs";
@@ -34,6 +35,30 @@ describe("des captures à l’histoire", () => {
     const ligne = (await db().select().from(schema.stories).where(eq(schema.stories.id, id)))[0]!;
     expect(metaDe(ligne).format).toBe("captures");
     await db().delete(schema.stories).where(eq(schema.stories.id, id));
+  });
+
+  it("des captures sans aucune date : la meta le dit, l’écran n’a ni période ni durée, le contexte le garde", async () => {
+    const t = versTexteCaptures(
+      captures({ autre: "Léa", blocs: [{ repere: null, messages: Array.from({ length: 24 }, (_, k) => msg(k % 2 ? "autre" : "moi", `on se dit des choses ${k}`)) }] }),
+      { aujourdhui: "2026-10-31" },
+    );
+    const { id, meta } = await importerCaptures({ appli: "instagram", t, consentement: accordDeTest() });
+    try {
+      expect(meta.resume).toMatchObject({ debut: "2026-10-31", fin: "2026-10-31", total: 24, sansDate: true });
+      const story = storyAffichee(id, meta);
+      expect([story.period, story.durationLabel, story.sources[0]!.period]).toEqual([undefined, undefined, undefined]);
+      await definirQui(id, { moi: 0, pronom: "il", devinette: "parle", objectif: "comprendre", prenom: "Tom" });
+      await ecrireLeContexte(id);
+      const c = contexteDe((await db().select().from(schema.stories).where(eq(schema.stories.id, id)))[0]!)!;
+      /* Son dernier jour n’est que celui de l’import : le chat le sait, et un export ajouté n’aura pas de curseur */
+      expect(c).toMatchObject({ sansDate: true, fin: "2026-10-31", dernier: Date.UTC(2026, 9, 31) });
+      expect(c.finSansDate).toBeUndefined();
+      /* La lecture ne montre aucune durée : « 24 messages », seul */
+      expect(c.trouvailles).toContain("24\u00a0messages");
+      expect(c.trouvailles.join(" ")).not.toMatch(/messages en /);
+    } finally {
+      await db().delete(schema.stories).where(eq(schema.stories.id, id));
+    }
   });
 
   it("le prénom de l’autre, demandé par « Qui es-tu ? », ne remplace que le nom que la lecture n’a pas lu", async () => {
@@ -78,7 +103,7 @@ describe("des captures à l’histoire", () => {
       ],
     });
     expect(versTexteCaptures(c, { aujourdhui: "2026-09-13" }).texte).toBe(
-      "# captures · autre · 1 captures\n== 2026-09-08 ==\nLéo le vrai: salut\n== 2026-09-08 ==\nMoi: audio omis",
+      "# captures · autre · 1 captures · haut sans date\n== 2026-09-08 ==\nLéo le vrai: salut\n== 2026-09-08 ==\nMoi: audio omis",
     );
   });
 });

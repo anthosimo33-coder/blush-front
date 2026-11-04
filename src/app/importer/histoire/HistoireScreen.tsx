@@ -50,7 +50,8 @@ export function HistoireScreen({ story, ajout }: { story: Story; ajout: boolean 
           <div className="flex flex-wrap items-baseline gap-x-2">
             <span className="text-chiffre font-black leading-none tracking-[-0.035em] tabular-nums">{formatCount(story.totalMessages)}</span>
             <span className="text-corps font-black text-soft">
-              messages · {story.durationLabel} · {story.sources.length} morceaux
+              {/* Aucune date sur ses captures : pas de durée */}
+              messages{story.durationLabel ? ` · ${story.durationLabel}` : ""} · {story.sources.length} morceaux
             </span>
           </div>
         </>
@@ -85,9 +86,13 @@ export function HistoireScreen({ story, ajout }: { story: Story; ajout: boolean 
               /* data-prive : son prénom et la période, masqués dans l’enregistrement des visites */
               sub={
                 <span data-prive="">
-                  {/* Une vidéo : le nombre d’écrans tirés ne dit rien à qui l’a filmée */}
-                  {s.mode === "captures" ? (s.video ? "" : `${s.screenshotCount} capture${(s.screenshotCount ?? 0) > 1 ? "s" : ""} · `) : autre ? `Avec ${autre.name} · ` : ""}
-                  {s.period}
+                  {/* Une vidéo : le nombre d’écrans tirés ne dit rien à qui l’a filmée ; des captures sans date : pas de période (ni de « · » qui traîne) */}
+                  {[
+                    s.mode === "captures" ? (s.video ? null : `${s.screenshotCount} capture${(s.screenshotCount ?? 0) > 1 ? "s" : ""}`) : autre ? `Avec ${autre.name}` : null,
+                    s.period,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
                 </span>
               }
               trailing={

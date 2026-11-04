@@ -31,7 +31,8 @@ const Appli = AppliCaptures;
  * (ErreurCaptures), un import refusé : leur code ; le modèle : refus ou panne (l’enveloppe `route`, src/server/http.ts).
  * `mode=add` : un morceau de plus pour la conv qu’on importe (src/server/morceaux.ts), lu puis ajouté à son brouillon,
  * une seule fois par envoi (unSeulAjout). Sans brouillon où l’ajouter (ni en mode tournage) : 404 `aucune` ; des
- * captures avec quelqu’un d’autre : 422 `autre_conv` ; rien de nouveau : 422 `rien_de_neuf` ; un morceau de trop : 429 `trop`.
+ * captures avec quelqu’un d’autre : 422 `autre_conv` ; rien de nouveau : 422 `rien_de_neuf` ; des captures où l’on ne
+ * voit aucune date, sans message en commun avec la conv : 422 `sans_date` ; un morceau de trop : 429 `trop`.
  */
 async function traiter(req: Request) {
   const g = await garde(req, { session: "aucune" });

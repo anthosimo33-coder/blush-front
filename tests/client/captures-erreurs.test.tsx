@@ -3,8 +3,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { CapturesScreen } from "@/app/importer/captures/CapturesScreen";
 import { CASE_IMPORT } from "@/contenu/consentements";
 import { VIDEO_A_L_IMPORT } from "@/lib/limites";
-import { SOUFFLE } from "@/lib/messages-erreur";
-import { prechargerVideo, uploadScreenshots } from "@/services/api";
+import { SANS_DATE_VIDEO, SOUFFLE } from "@/lib/messages-erreur";
+import { prechargerVideo, uploadRecording, uploadScreenshots } from "@/services/api";
 import { ErreurApi, type CodeApi } from "@/types/erreurs-api";
 import { HISTOIRE } from "../aide/rapport-exemple";
 
@@ -18,13 +18,14 @@ import { HISTOIRE } from "../aide/rapport-exemple";
  */
 const routeur = { push: vi.fn(), replace: vi.fn(), prefetch: vi.fn(), back: vi.fn() };
 vi.mock("next/navigation", () => ({ useRouter: () => routeur, usePathname: () => "/importer/captures", useSearchParams: () => new URLSearchParams() }));
-vi.mock("@/services/api", async (vrai) => ({ ...(await vrai<typeof import("@/services/api")>()), uploadScreenshots: vi.fn(), prechargerVideo: vi.fn() }));
+vi.mock("@/services/api", async (vrai) => ({ ...(await vrai<typeof import("@/services/api")>()), uploadScreenshots: vi.fn(), uploadRecording: vi.fn(), prechargerVideo: vi.fn() }));
 vi.mock("@/services/preparer-captures", () => ({ prereduire: vi.fn(), vignette: vi.fn(async () => null) }));
 const envoi = vi.mocked(uploadScreenshots);
 
 beforeEach(() => {
   for (const f of Object.values(routeur)) f.mockReset();
   envoi.mockReset();
+  vi.mocked(uploadRecording).mockReset();
   vi.mocked(prechargerVideo).mockReset();
   /* La barre de la lecture s’anime (BarreLecture) ; happy-dom rejette la promesse d’une animation annulée, que personne n’attend */
   vi.spyOn(HTMLElement.prototype, "animate").mockImplementation(() => new Animation());
@@ -109,6 +110,31 @@ describe("l’import de captures en échec", () => {
     });
     expect(envoi).toHaveBeenCalledTimes(1);
     expect(envoi.mock.calls[0]?.[1]).toMatchObject({ consentement: CASE_IMPORT.version });
+  });
+
+  it("des captures ajoutées où l’on ne voit aucune date (« sans_date ») : en ajouter une datée", async () => {
+    envoi.mockRejectedValue(erreur("sans_date", 422));
+    render(<CapturesScreen app="hinge" addMode />);
+    const png = (nom: string) => new File(["png"], nom, { type: "image/png" });
+    fireEvent.change(screen.getByLabelText("Captures d’écran de la conversation"), { target: { files: [png("1.png"), png("2.png")] } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Continuer" }));
+    });
+    expect(routeur.replace).not.toHaveBeenCalled();
+    expect(screen.getByText("On ne voit aucune date sur ces captures : ajoute aussi celle où l’on voit le jour.")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Capture 2 sur 2" })).toBeTruthy();
+  });
+
+  /* Y ajouter une capture remplacerait la vidéo : elle est à refilmer. Seulement avec la vidéo à l’import (VIDEO_A_L_IMPORT) */
+  it.runIf(VIDEO_A_L_IMPORT)("un enregistrement ajouté où l’on ne voit aucune date (« sans_date ») : le refilmer", async () => {
+    vi.mocked(uploadRecording).mockRejectedValue(erreur("sans_date", 422));
+    render(<CapturesScreen app="imessage" addMode />);
+    fireEvent.change(screen.getByLabelText("Enregistrement d’écran de la conversation"), { target: { files: [new File(["mp4"], "ecran.mp4", { type: "video/mp4" })] } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Continuer" }));
+    });
+    expect(uploadRecording).toHaveBeenCalledTimes(1);
+    expect(screen.getByText(SANS_DATE_VIDEO.replace(/\u00a0/g, " "))).toBeTruthy();
   });
 
   it("sans session (401) : la connexion, puis retour sur les captures", async () => {

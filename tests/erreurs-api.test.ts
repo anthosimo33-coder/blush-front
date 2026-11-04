@@ -1,7 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { describe, expect, it, vi } from "vitest";
 import { AIDE_SANS_BULLES, URGENCES } from "@/contenu/aide";
-import { codeDe, erreurDeParcours, messageAjoutFiche, messageErreur, problemeAjout, SOUFFLE } from "@/lib/messages-erreur";
+import { codeDe, erreurDeParcours, messageAjoutFiche, messageErreur, problemeAjout, SANS_DATE_VIDEO, SOUFFLE } from "@/lib/messages-erreur";
 import { codeImprevu, echecDe, ErreurTache, estRefus } from "@/server/erreurs";
 import { erreur, route } from "@/server/http";
 import { codePublic, ERREURS_API, ErreurApi, type CodeErreur } from "@/types/erreurs-api";
@@ -52,6 +52,7 @@ describe("le serveur", () => {
       capture: 422,
       autre_conv: 422,
       rien_de_neuf: 422,
+      sans_date: 422,
       vocal: 422,
       vocal_vide: 422,
       vocal_illisible: 422,
@@ -166,6 +167,15 @@ describe("les écrans", () => {
     expect(messageErreur("question", api("souffle"))).toBe("je souffle un peu, réessaie demain");
     expect(problemeAjout(api("souffle"))).toBe("souffle");
     expect(messageAjoutFiche("souffle", "ta capture", "Inès")).toEqual({ title: "BLUSH souffle un peu", detail: "Réessaie demain." });
+  });
+
+  it("des captures sans date qu’on ne sait où ranger : le texte décidé, sous les captures ; une vidéo, la refilmer", () => {
+    expect(messageErreur("captures", api("sans_date"))).toBe("On ne voit aucune date sur ces captures\u00a0: ajoute aussi celle où l’on voit le jour.");
+    expect(erreurDeParcours("captures", api("sans_date"))).toBeNull();
+    /* CapturesScreen le choisit quand l’envoi est un enregistrement d’écran : y ajouter une capture le remplacerait */
+    expect(SANS_DATE_VIDEO).toBe("On ne voit aucune date dans cette vidéo\u00a0: filme-la à nouveau en remontant jusqu’à une date.");
+    /* Un export n’est jamais refusé ainsi : rien pour lui */
+    expect(messageErreur("export", api("sans_date"))).toBe("Ta conv n’a pas pu partir. Vérifie ta connexion et réessaie.");
   });
 
   it("l’import de captures arrêté par le budget du jour le dit, sans prendre les captures pour illisibles", () => {

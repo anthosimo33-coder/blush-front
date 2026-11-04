@@ -5,7 +5,8 @@ import type { Fiche, Report } from "@/types";
 export type HomeContact = {
   report: Pick<Report, "verdict" | "level" | "trend" | "nextStep">;
   fiche: Pick<Fiche, "person" | "summaryShort">;
-  period: string;
+  /** Absente : des captures qui ne montrent aucune date (Story.period). */
+  period?: string;
   /** Où mène sa fiche (l’aperçu a la sienne). */
   ficheHref?: Route;
 };

@@ -290,7 +290,8 @@ export type Source = {
   screenshotCount?: number;
   /** Libellé de la période (« Le match · 2 sept. »). */
   label: string;
-  period: string;
+  /** « 2 sept. → 4 sept. » ; absent : des captures qui ne montrent aucune date (Meta.resume.sansDate). */
+  period?: string;
   messageCount: number;
   voiceCount?: number;
   /** Ses médias que l’export ne nomme pas (« <Médias omis> » d’Android) : l’écran les montre à la place de « 0 vocal » (vocauxOuMedias). */
@@ -325,9 +326,14 @@ export type Story = {
   voiceCount: number;
   /** Ses médias que l’export ne nomme pas (Source.mediaCount). */
   mediaCount?: number;
-  /** « 14 déc. → 12 mars », « 3 févr. 2024 → 12 oct. 2025 » */
-  period: string;
-  durationLabel: string;
+  /** « 14 déc. → 12 mars », « 3 févr. 2024 → 12 oct. 2025 » ; absents (avec la durée) : aucune date sur ses captures (Meta.resume.sansDate). */
+  period?: string;
+  durationLabel?: string;
+  /**
+   * Son début n’a pas été importé (un export trop long, ou arrêté par WhatsApp à ses derniers messages : Meta.coupe ; en
+   * morceaux, le plus ancien) : le verdict dit « les plus récents », pas « du premier au dernier », comme le modèle le lit.
+   */
+  startMissing?: true;
   /** Le jour où BLUSH l’a lue (« aujourd’hui », « lun. », « 12 mars ») : posé par la page du rapport (getLuLe). */
   updatedLabel?: string;
   /** Qui est l’utilisateur (une fois « Qui es-tu ? » rempli). Sans, l’écran se fie au parcours de l’onglet. */
@@ -363,8 +369,10 @@ export type SignalDuPaywall = { id: "ouvre" | "reprend" | "relance" | "delai" | 
 /**
  * Ses messages ont chuté, et ne sont pas remontés depuis (src/server/ecrans/tendance.ts). `depuis` : le premier jour de
  * la chute (AAAA-MM-JJ) ; `avant` et `apres` : ses messages par jour, avant et depuis ; `semaines` : ses messages par
- * jour, semaine par semaine (la courbe), et `coupure` la place de la première semaine de la chute ; `delai` : son délai
- * de réponse médian avant et depuis, en millisecondes, quand il a nettement grandi.
+ * jour, semaine par semaine (la courbe), et `coupure` la place de la première semaine de la chute ; `debuts` : le premier
+ * jour de chacune (AAAA-MM-JJ), qui ne se suivent pas de 7 en 7 jours quand une conv en morceaux saute le trou entre deux
+ * d’entre eux (absent, dans les exemples de la galerie : des semaines qui se suivent) ; `delai` : son délai de réponse
+ * médian avant et depuis, en millisecondes, quand il a nettement grandi.
  */
 export type TendanceDuPaywall = {
   depuis: string;
@@ -372,6 +380,7 @@ export type TendanceDuPaywall = {
   apres: number;
   semaines: number[];
   coupure: number;
+  debuts?: string[];
   delai: { avant: number; apres: number } | null;
 };
 

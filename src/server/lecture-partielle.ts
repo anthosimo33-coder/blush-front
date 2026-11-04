@@ -7,7 +7,7 @@ import { genreDuHaut, type GenreDuHaut } from "@/contenu/haut-du-paywall";
 import { LECTEURS_DE_LOTS } from "@/lib/limites";
 import type { BrasDeLaLecture, Contrefactuel } from "@/types";
 import { apercuDuPaywall } from "./ecrans/haut-du-paywall";
-import { SEMAINES_DE_REFERENCE, semainesAvantLaChute } from "./ecrans/tendance";
+import { messagesDates, SEMAINES_DE_REFERENCE, semainesAvantLaChute, UN_MORCEAU_CONTINU } from "./ecrans/tendance";
 import { env } from "./env";
 import { MOI } from "./morceaux";
 import { fusionnerLots } from "./video";
@@ -89,7 +89,8 @@ export type OuEnEst = { restants: number; ecrans: number; appli: string; jour: s
  *   ferait une conv « courte », qui demanderait un morceau de plus, quand toute la vidéo n’en demanderait pas) ;
  * - une chute trouvée : « assez » avec ses huit semaines de référence (les mêmes chiffres que sur toute la conv), sinon
  *   « encore » (elle serait mal datée) ;
- * - aucun message daté à l’heure : « assez » (une tendance est impossible sur toute la vidéo, la même appli) ;
+ * - aucun jour lu sur un repère (des captures sans aucune date ; un repère sans heure compte son jour, comme pour la
+ *   tendance : messagesDates) : « assez » (une tendance est impossible sur toute la vidéo, la même appli) ;
  * - 24 semaines datées lues : « assez ». Une chute plus ancienne (il en faut 4 avant elle dans la partie lue, soit plus
  *   d’une vingtaine de semaines avant l’import), que tendance() trouverait sur toute la conv, est alors perdue : le titre
  *   devient « Sans assez de chiffres ». Le cas des longues convs qui se sont refroidies, celles des ex : le contrefactuel
@@ -110,11 +111,16 @@ export function decider(lus: Captures[], o: OuEnEst): "assez" | "encore" | "tout
   if (messages.length < MIN_MESSAGES_CAPTURES) return "tout";
   const k = semainesAvantLaChute(messages);
   if (k !== null) return k >= SEMAINES_DE_REFERENCE ? "assez" : "encore";
-  const dates = messages.filter((m) => m.approx !== "jour");
-  const [premier] = dates;
-  const dernier = dates.at(-1);
-  if (!premier || !dernier) return "assez";
-  const jours = (dernier.t - premier.t) / J;
+  /* Les jours que la tendance compte (messagesDates : une vidéo, d’un seul morceau) : un repère sans heure compte le sien, un jour deviné aucun */
+  const dates = messagesDates(messages);
+  if (!dates.length) return "assez";
+  let premier = Infinity;
+  let dernier = -Infinity;
+  for (const { j } of dates) {
+    premier = Math.min(premier, j);
+    dernier = Math.max(dernier, j);
+  }
+  const jours = dernier - premier;
   if (jours >= SEMAINES_ASSEZ * 7) return "assez";
   const ecransLus = Math.max(1, f.captures.length);
   if (jours * (o.ecrans / ecransLus) * MARGE_DUREE < SEMAINES_D_UNE_TENDANCE * 7) return "assez";
@@ -159,7 +165,7 @@ function lecture(c: Captures, jour: string): { messages: Message[]; autre: strin
 function hautDe(lots: Captures[], appli: string, jour: string): { genre: GenreDuHaut; depuis: string | null } {
   const { messages, autre } = lecture(fusionnerLots(lots, appli), jour);
   if (!messages.length) return { genre: "aucun", depuis: null };
-  const a = apercuDuPaywall(chiffrer({ utilisateur: personne(MOI), autre: personne(autre) }, messages), messages);
+  const a = apercuDuPaywall(chiffrer({ utilisateur: personne(MOI), autre: personne(autre) }, messages), messages, UN_MORCEAU_CONTINU);
   return { genre: genreDuHaut(a), depuis: a.tendance?.depuis ?? null };
 }
 

@@ -1,7 +1,7 @@
 import "server-only";
 import { eq, sql } from "drizzle-orm";
-import { heureDuMessage } from "@prompts/lib/ajouts";
-import { chiffrer as chiffresDe, lire, rendre } from "@prompts/lib/conv";
+import { heureLue } from "@prompts/lib/reconnaitre";
+import { chiffrer as chiffresDe, jourConnu, lire, rendre, type Lecture } from "@prompts/lib/conv";
 import { DEMANDE_PLAN, demandeMoitie, requeteMemoireCreation, requeteMemoireMaj, requeteRapport, requeteVerdict, requeteVocal } from "@prompts/lib/contextes";
 import { alerteRetenue, appliquerMaj, aTrancher, estFaite, rapportCourt, rendreNouveaux, reunirLesAlertes, type Echange } from "@prompts/lib/memoire";
 import { introuvables, preuvesChapitres, preuvesMaj, preuvesMemoire, preuvesPlan, preuvesRapport, preuvesVerdict, preuvesVocal } from "@prompts/lib/preuves";
@@ -18,9 +18,10 @@ import { donneesMemoire, donneesVerdict, ligneRapport, modifierMemoire } from ".
 import { compterLeHaut } from "./compteurs";
 import { dureeDeLaSuite, garderJusquALAchat, garderJusquALaLecture } from "./ecrans-gardes";
 import { noterLeTitre, noterLeTitreEntier } from "./imports";
-import { contexteDe, convDe, fuseauDe, histoireDe, metaDe, nomsDeToi, provenancesDe, type Ligne, type LigneComplete } from "./histoires";
+import { contexteDe, convDe, fuseauDe, histoireDe, metaDe, morceauxContinus, nomsDeToi, provenancesDe, type Ligne, type LigneComplete } from "./histoires";
 import { messagesAffiches } from "./ecrans/messages";
 import { apercuDuPaywall } from "./ecrans/haut-du-paywall";
+import { etendue } from "./ecrans/tendance";
 import { chapitresAffiches, lectureDe, scores, sobreAffiche } from "./ecrans/rapport";
 import { trouvailles } from "./ecrans/trouvailles";
 import { ErreurTache } from "./erreurs";
@@ -64,10 +65,22 @@ function relire(story: LigneComplete) {
   const h = { ...histoireDe(meta), aujourdhui: aujourdhuiDans(fuseauDe(meta), story.createdAt).iso };
   /*
    * Comme à l’import : un message collé d’un autre reste du texte. Plusieurs morceaux : réunis, « Moi » des captures
-   * étant celui qui importe (src/server/morceaux.ts), et le modèle lit d’où vient chacun (provenancesDe)
+   * étant celui qui importe (src/server/morceaux.ts), et le modèle lit d’où vient chacun (provenancesDe). Une conv d’un
+   * seul morceau dont le début n’a pas été importé (Meta.coupe) : le modèle le lit (rendre, `coupe`) ; en morceaux,
+   * provenancesDe dit lequel est coupé
    */
-  const lu = typeof conv === "string" ? lire(conv, h, { autresEnTexte: true }) : lectureReunie(conv, h, { k: meta.moi ?? 0, connu: true });
-  return { meta, h, lu, rendu: rendre(h, lu, { morceaux: provenancesDe(meta) }) };
+  const lu: Lecture & { parMorceau?: Lecture["messages"][] } =
+    typeof conv === "string" ? lire(conv, h, { autresEnTexte: true }) : lectureReunie(conv, h, { k: meta.moi ?? 0, connu: true });
+  return {
+    meta,
+    h,
+    lu,
+    rendu: rendre(h, lu, { morceaux: provenancesDe(meta), ...(meta.morceaux ? {} : { coupe: !!meta.coupe }) }),
+    /* Les morceaux que la tendance du haut du paywall compte : ses exports et ses vidéos, pas ses captures photo (morceauxContinus) */
+    continus: morceauxContinus(meta),
+    /* Et ce que chacun couvre, doublons compris (etendue : ses messages datés comme dans la conv réunie) ; aucune pour une conv d’un seul morceau */
+    etendues: lu.parMorceau?.map(etendue),
+  };
 }
 
 /* ———— Les étapes ———— */
@@ -99,22 +112,29 @@ const suivreAvance = (tacheId: string, calcul: (a: Avance) => number) => {
 
 /** Ce que le code sait d’une conv, sans le modèle : ses chiffres, son style, ses trouvailles (le contexte de la conv). */
 function contexteDuCode(story: LigneComplete) {
-  const { h, lu, rendu } = relire(story);
+  const { h, lu, rendu, continus, etendues } = relire(story);
   const chiffres = chiffresDe(h, lu.messages);
   const contexte: Contexte = {
     chiffres: rendu.chiffres,
     style: profil(h, lu.messages).bloc,
     fin: rendu.fin,
-    dernier: lu.messages.at(-1)!.t,
     /*
-     * Ses derniers messages, leur empreinte et leur heure (src/server/ajouts.ts) : une capture ou un export qui les
-     * reprend ne les relit pas, même quand leur heure n’était que celle d’un repère (une conv de captures)
+     * Aucune date sur ses captures, ou pas à sa fin : le chat le dit au lieu de son dernier jour, et une conv sans aucune
+     * date n’a pas de curseur d’export (curseurDe, src/server/ajouts.ts)
      */
-    lus: ecrireLus(lu.messages.slice(-LUS_MAX).map((m) => ({ cle: cleSecrete(m), t: m.t, heure: heureDuMessage(m) }))),
+    ...(rendu.sansDate ? { sansDate: true as const } : rendu.finSansDate ? { finSansDate: true as const } : {}),
+    /* Le dernier message daté : un export ajouté repart de lui, et retrouve les messages sans date d’après par `lus` */
+    dernier: (lu.messages.findLast(jourConnu) ?? lu.messages.at(-1)!).t,
+    /*
+     * Ses derniers messages, leur empreinte et l’heure lue sur leur capture (heureLue : avant que la réunion des morceaux
+     * ne la recale ; src/server/ajouts.ts) : une capture ou un export qui les reprend ne les relit pas, même quand leur
+     * heure n’était que celle d’un repère (une conv de captures)
+     */
+    lus: ecrireLus(lu.messages.slice(-LUS_MAX).map((m) => ({ cle: cleSecrete(m), ...heureLue(m) }))),
     trouvailles: trouvailles(chiffres, h, lu.messages),
-    accroche: genreDuHaut(apercuDuPaywall(chiffres, lu.messages)),
+    accroche: genreDuHaut(apercuDuPaywall(chiffres, lu.messages, continus, undefined, etendues)),
   };
-  return { h, rendu, chiffres, contexte, messages: lu.messages };
+  return { h, rendu, chiffres, contexte, messages: lu.messages, continus, etendues };
 }
 
 /**
@@ -155,14 +175,14 @@ export async function poserLeVerdict(storyId: string): Promise<"paiement" | "par
 
 /**
  * Ce que le haut du paywall montre d’une conv qui attend son paiement, calculé par le code sans aucun appel au modèle :
- * qui ouvre la journée, reprend, relance, répond vite, écrit long, et la chute de ses messages s’il y en a une
- * (src/server/ecrans/haut-du-paywall.ts). null : elle n’attend pas son paiement.
+ * qui ouvre la journée, reprend, relance, répond vite, écrit long, et la chute de ses messages s’il y en a une, sur ses
+ * exports et ses vidéos (src/server/ecrans/haut-du-paywall.ts). null : elle n’attend pas son paiement.
  */
 export async function apercuAvantPaiement(storyId: string): Promise<ApercuDuPaywall | null> {
   const [[story], { verdict }] = await Promise.all([db().select().from(schema.stories).where(eq(schema.stories.id, storyId)), etatDesTaches(storyId, ["verdict"])]);
   if (!story?.conv || verdict?.status !== "paiement") return null;
-  const { h, chiffres, messages } = contexteDuCode(story);
-  return apercuDuPaywall(chiffres, messages, h);
+  const { h, chiffres, messages, continus, etendues } = contexteDuCode(story);
+  return apercuDuPaywall(chiffres, messages, continus, h, etendues);
 }
 
 /**

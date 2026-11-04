@@ -1,6 +1,21 @@
 import { describe, expect, it } from "vitest";
 import { versTexteCaptures } from "@prompts/lib/captures";
-import { blocChiffres, chiffrer, lire, RECENT_J, SANS_REPONSE_H, SILENCE_REPRISE_H, SOIR, type Chiffres, type Format, type Recents } from "@prompts/lib/conv";
+import {
+  blocChiffres,
+  chiffrer,
+  jourCompte,
+  lire,
+  recents as recentsDe,
+  RECENT_J,
+  SANS_REPONSE_H,
+  SILENCE_REPRISE_H,
+  SOIR,
+  type Chiffres,
+  type Format,
+  type Message,
+  type Recents,
+} from "@prompts/lib/conv";
+import type { Captures } from "@prompts/lib/schemas";
 import { trouvailles } from "@/server/ecrans/trouvailles";
 import { captures, msg } from "../aide/fabriques";
 
@@ -151,6 +166,97 @@ describe("le bloc <chiffres>", () => {
     expect(silence({ toi: 1, autre: 1 })).toHaveLength(base);
     /* L’autre n’a jamais écrit : rien n’attend de réponse de lui */
     expect(silence({ toi: 3, autre: 0 }, { autre: null })).toHaveLength(base);
+  });
+
+  it("aucune date (des captures sans repère) : ni période, ni 21 derniers jours, ni dernier message duMois, jamais « 0 messages »", () => {
+    const sansDate = lignes(
+      blocChiffres(
+        chiffres({ debut: null, fin: null, joursActifs: 0, approx: NB }),
+        NB,
+        recents({ sansDate: true, n: 0, c: null, derniers: { toi: "inconnu", autre: "inconnu" } }),
+      ),
+    );
+    const datee = lignes(blocChiffres(chiffres({ approx: NB }), NB, recents({ n: 0, c: null })));
+    for (const l of sansDate) expect(l).not.toMatch(/\d{4}-\d{2}-\d{2}/);
+    expect(sansDate[1]).toMatch(new RegExp(`\\b${NB}\\b`));
+    const vingtEtUn = sansDate.find((l) => l.includes(`${RECENT_J}`))!;
+    expect(vingtEtUn).not.toMatch(/\b0\b/);
+    expect(sansDate.at(-2)).not.toMatch(/Tom le |Inès le /);
+    /* Une ligne pour une ligne : rien n’est ajouté ni retiré, seulement dit autrement */
+    expect(sansDate).toHaveLength(datee.length);
+  });
+
+  it("une conv coupée : la première ligne dit en plus que son début n’a pas été importé ; rien d’autre ne change", () => {
+    const entiere = lignes(blocChiffres(chiffres(), NB, recents()));
+    const coupee = lignes(blocChiffres(chiffres(), NB, recents(), { coupe: true }));
+    expect(coupee).toHaveLength(entiere.length);
+    expect(coupee.flatMap((l, k) => (l === entiere[k] ? [] : [k]))).toEqual([1]);
+    expect(coupee[1]).toMatch(new RegExp(`\\b${NB}\\b.*\\b23\\b`));
+    expect(coupee[1]).toContain("2026-09-30");
+    /* Le premier jour importé, dit deux fois : la période, puis ce qui manque d’avant lui */
+    expect(coupee[1]!.split("2026-08-20")).toHaveLength(3);
+  });
+
+  it("une conv qui finit sans date : ni « 0 messages » sur 21 jours, ni silence de plusieurs jours, ni « sans réponse » mesuré", () => {
+    const fin = (autres: Partial<Recents>) => lignes(blocChiffres(chiffres(), NB, recents({ n: 0, c: null, sansDateALaFin: 4, depuisSilence: { toi: 4, autre: 0 }, ...autres })));
+    /* Leurs derniers messages viennent tous deux des captures sans date */
+    const tous = fin({ derniers: { toi: "inconnu", autre: "inconnu" } });
+    const vingtEtUn = tous.find((l) => l.includes(`${RECENT_J}`))!;
+    expect(vingtEtUn).toMatch(/\b4\b/);
+    expect(vingtEtUn).not.toMatch(/\b0\b|\d{4}-\d{2}-\d{2}/);
+    expect(tous.some((l) => /il y a \d+ jours/.test(l))).toBe(false);
+    /* Dans l’ordre des captures, ses 4 messages restent sans réponse : la ligne reste, sans durée */
+    expect(tous.filter((l) => /\b4\b/.test(l) && l.includes("d’Inès") && l.includes("de Tom"))).toHaveLength(1);
+    /* Le dernier d’Inès est daté, ceux de Tom d’après ne le sont pas : son jour reste, mais aucun silence ne se mesure depuis */
+    const elle = fin({ derniers: { toi: "inconnu", autre: { date: "2026-09-15", jours: 16 } } });
+    expect(elle.at(-2)).toMatch(/Inès le 2026-09-15 /);
+    expect(elle.at(-2)).not.toMatch(/Tom le /);
+    expect(elle.some((l) => /\b4\b/.test(l) && l.includes("d’Inès") && l.includes("de Tom"))).toBe(false);
+    /* Les mesures des 21 derniers jours ne s’écrivent pas, même quand des messages duMois y tombent */
+    const mesures = fin({ n: 25, c: recents().c, derniers: { toi: "inconnu", autre: "inconnu" } });
+    for (const f of Object.values(RECENTES)) expect(place(mesures.join("\n"), f), f).toBe(-1);
+  });
+
+  it("chiffrer et recents : sans aucun message daté, ni début, ni fin, ni jours avec des messages ; leurs messages comptent toujours", () => {
+    const h = qui("Moi", "Inès", "captures");
+    const texte = versTexteCaptures(captures({ autre: "Inès", blocs: [{ repere: null, messages: fois(30, (k) => msg(k % 2 ? "autre" : "moi", `on se dit des trucs ${k}`)) }] }), {
+      aujourdhui: "2026-10-31",
+    }).texte;
+    const { messages } = lire(texte, h);
+    expect(messages.every((m) => m.jourDevine === "inconnu")).toBe(true);
+    const c = chiffrer(h, messages);
+    expect([c.debut, c.fin, c.joursActifs, c.total.toi + c.total.autre]).toEqual([null, null, 0, 30]);
+    const r = recentsDe({ ...h, aujourdhui: "2026-10-31" }, messages);
+    expect(r).toMatchObject({ sansDate: true, n: 0, c: null, derniers: { toi: "inconnu", autre: "inconnu" } });
+    expect(r.sansDateALaFin).toBeUndefined();
+    expect(trouvailles(c, h, messages).at(-1)).toBe("30\u00a0messages");
+  });
+
+  it("des messages sans date au bout d’une conv datée : la période et les jours viennent des duMois, les 21 jours et les derniers messages ne se mesurent pas", () => {
+    const h = qui("Tom", "Inès");
+    const texte = fois(60, (k) => {
+      const d = new Date(Date.UTC(2026, 8, 1, 9) + Math.floor((k * 15) / 60) * 86400e3 + (k % 4) * 3600e3);
+      return `[${pad(d.getUTCDate())}/${pad(d.getUTCMonth() + 1)}/2026 ${pad(d.getUTCHours())}:00:00] ${k % 2 ? "Inès" : "Tom"}: message ${k}`;
+    }).join("\n");
+    const duMois = lire(texte, h).messages;
+    const suite = fois(4, (k): Message => ({
+      ...duMois.at(-1)!,
+      id: "",
+      t: Date.parse("2026-10-31T00:00:00Z"),
+      role: k % 2 ? "autre" : "toi",
+      jourDevine: "inconnu",
+      approx: "jour",
+      ligne: 61 + k,
+    }));
+    const messages = [...duMois, ...suite];
+    const c = chiffrer(h, messages);
+    expect([c.debut, c.fin]).toEqual(["2026-09-01", "2026-09-15"]);
+    expect(c.joursActifs).toBe(chiffrer(h, duMois).joursActifs);
+    const r = recentsDe({ ...h, aujourdhui: "2026-10-31" }, messages);
+    expect(r.sansDate).toBeUndefined();
+    expect(r).toMatchObject({ sansDateALaFin: 4, n: 0, derniers: { toi: "inconnu", autre: "inconnu" } });
+    /* Sans les messages de la fin : le dernier jour daté, le 15 septembre, il y a plus de six semaines */
+    expect(recentsDe({ ...h, aujourdhui: "2026-10-31" }, duMois).derniers.autre).toMatchObject({ date: "2026-09-15", jours: 46 });
   });
 });
 
@@ -387,5 +493,55 @@ describe("les mots qui reviennent : ce qui reste un mot, ce qui se réunit", () 
     expect(en.trouvailles).toContain(motAVous("tacos", 12));
     const ailleurs = "também hoje acho tava minha ainda depois sempre coisa tambem ahora mañana creo cosa luego siempre manana".split(" ");
     expect(avecLibanais([...ailleurs, ...ailleurs]).c.recurrents).toEqual([["libanais", 5]]);
+  });
+});
+
+describe("le jour où compte un message (jourCompte)", () => {
+  /** Un message à `iso` (UTC, l’heure « naïve » de la conv), daté à la minute, au repère près, ou du jour seulement. */
+  const a = (iso: string, approx: Message["approx"]) => ({ t: Date.parse(iso), approx });
+
+  it("sa journée va de 5 h à 5 h ; un message daté du jour seulement (une pastille sans heure) compte le jour de sa pastille", () => {
+    expect([a("2026-10-20T00:00Z", "jour"), a("2026-10-20T01:30Z", false), a("2026-10-20T04:59Z", "heure"), a("2026-10-20T05:00Z", false)].map(jourCompte)).toEqual([
+      "2026-10-20",
+      "2026-10-19",
+      "2026-10-19",
+      "2026-10-20",
+    ]);
+  });
+
+  it("les jours avec des messages : une pastille sans heure n’est plus comptée la veille, un jour inconnu ne compte pas", () => {
+    const h = qui("Moi", "Léa", "captures");
+    const bloc = (n: number, prefixe: string, repere: Captures["blocs"][number]["repere"]) => ({
+      repere,
+      messages: fois(n, (k) => msg(k % 2 ? "autre" : "moi", `${prefixe} ${k}`)),
+    });
+    const jours = (blocs: Captures["blocs"]) => chiffrer(h, lire(versTexteCaptures(captures({ blocs }), { aujourdhui: "2026-10-31" }).texte, h).messages).joursActifs;
+    /* Le 19 à 21 h, puis les pastilles du 20 et du 21 : trois jours (avant, deux : la pastille du 20 comptait le 19) */
+    expect(
+      jours([bloc(4, "x", { date: "2026-10-19", heure: "21:00" }), bloc(4, "y", { date: "2026-10-20", heure: null }), bloc(4, "z", { date: "2026-10-21", heure: null })]),
+    ).toBe(3);
+    expect(jours([bloc(4, "x", { date: "2026-10-19", heure: "10:00" }), bloc(4, "y", { date: "2026-10-20", heure: null })])).toBe(2);
+    /* Le haut sans repère compte le jour qu’il emprunte (au plus tard ce jour-là) : un seul jour */
+    expect(jours([bloc(4, "x", null), bloc(4, "y", { date: "2024-02-21", heure: "09:05" })])).toBe(1);
+    /*
+     * Ce jour emprunté est celui du message daté qui le suit, déjà compté : un premier repère de la nuit (compté la
+     * veille) n’en fait pas deux pour une nuit, ni la ligne impossible « du 2026-09-08 au 2026-09-08, 2 jours »
+     */
+    for (const heure of ["01:30", "04:59", "05:00", "14:00", null])
+      expect(jours([bloc(2, "x", null), bloc(22, "y", { date: "2026-09-08", heure })]), heure ?? "sans heure").toBe(1);
+    const deNuit = lire(
+      versTexteCaptures(captures({ blocs: [bloc(2, "x", null), bloc(22, "y", { date: "2026-09-08", heure: "01:30" })] }), { aujourdhui: "2026-10-31" }).texte,
+      h,
+    ).messages;
+    expect(blocChiffres(chiffrer(h, deNuit), deNuit.length, recentsDe({ ...h, aujourdhui: "2026-10-31" }, deNuit))).toContain(
+      "sur toute la conv : 24 messages, du 2026-09-08 au 2026-09-08, 1 jours avec des messages",
+    );
+    /* Seulement des jours empruntés (un repère dont aucun message n’est lisible) : ils comptent, plutôt que zéro jour */
+    expect(chiffrer(h, deNuit.slice(0, 2)).joursActifs).toBe(1);
+    /* Aucune date sur les captures : aucun jour connu */
+    expect(jours([bloc(4, "x", null)])).toBe(0);
+    /* Un export à 1 h 30 le 20 compte la nuit du 19 ; une capture sous la pastille du 20 compte le 20 */
+    const nuit: Message = { id: "m0001", t: Date.parse("2026-10-20T01:30:00Z"), nom: "Léa", role: "autre", texte: "nuit", approx: false, ligne: 1 };
+    expect(chiffrer(h, [nuit, { ...nuit, id: "m0002", texte: "jour", t: Date.parse("2026-10-20T00:00:00Z"), approx: "jour", ligne: 2 }]).joursActifs).toBe(2);
   });
 });

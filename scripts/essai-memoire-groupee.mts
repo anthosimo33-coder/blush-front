@@ -117,6 +117,7 @@ async function jouer(mode: Mode) {
       aujourdhui: Date.parse(`${pas.jour}T00:00:00Z`),
       chiffres: rendu.chiffres,
       fin: rendu.fin,
+      dates: rendu,
       etat: m.etat,
       lignes,
       style: bloc,

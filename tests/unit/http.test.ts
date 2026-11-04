@@ -4,6 +4,7 @@ import { ErreurAjout } from "@/server/ajouts";
 import { ErreurCaptures, LectureRefusee } from "@/server/captures";
 import { ErreurPublique, ErreurTache } from "@/server/erreurs";
 import { ErreurImport } from "@/server/import";
+import { ErreurMorceau } from "@/server/morceaux";
 import { codeDErreur, memeOrigine, reponseAudio, reponseErreur, route } from "@/server/http";
 import { groupeIp, ipDe } from "@/server/limites";
 import { signalerUnePanne } from "@/server/pannes";
@@ -127,6 +128,7 @@ describe("reponseErreur", () => {
   it("une erreur publique répond son code, avec son statut", async () => {
     expect(await reponse(new ErreurImport("groupe"))).toEqual([422, { erreur: "groupe" }]);
     expect(await reponse(new ErreurAjout("rien_de_neuf"))).toEqual([422, { erreur: "rien_de_neuf" }]);
+    expect(await reponse(new ErreurMorceau("sans_date"))).toEqual([422, { erreur: "sans_date" }]);
     expect(await reponse(new ErreurCaptures())).toEqual([422, { erreur: "capture" }]);
     expect(await reponse(new LectureRefusee("connexion"))).toEqual([401, { erreur: "connexion" }]);
     expect(await reponse(new ErreurPartage("sobre"))).toEqual([409, { erreur: "sobre" }]);

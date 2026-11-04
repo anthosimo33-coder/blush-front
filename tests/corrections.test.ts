@@ -1,10 +1,12 @@
 import { and, eq, sql } from "drizzle-orm";
 import { beforeAll, describe, expect, it } from "vitest";
 import type { Requete } from "@prompts/lib/contextes";
+import { lire, rendre } from "@prompts/lib/conv";
 import type { Utilisateur } from "@/server/auth";
+import * as coffre from "@/server/coffre";
 import { db, schema } from "@/server/db";
 import { ETAPES_DU_RAPPORT, rapportDe, relancer } from "@/server/donnees";
-import { histoireOuverte } from "@/server/histoires";
+import { contexteDe, convDe, histoireDe, histoireOuverte, metaDe } from "@/server/histoires";
 import { fournisseurFactice } from "@/server/ia/factice";
 import { executerChaine } from "@/server/pipeline";
 import { ESSAIS_MAX, planifier, reprendre } from "@/server/taches";
@@ -37,6 +39,37 @@ describe("le jour de la lecture", () => {
     const texte = verdict!.blocs.map((b) => ("texte" in b ? b.texte : "")).join("\n");
     expect(texte).toContain("aujourd’hui : 2026-10-06");
     expect(texte).not.toContain("aujourd’hui : 2026-10-03");
+  });
+});
+
+describe("une conv dont le début n’a pas été importé (Meta.coupe)", () => {
+  it("la demande du verdict ouvre <conversation> par la ligne du début, et <chiffres> par la partie importée ; le contexte aussi", async () => {
+    requetes.length = 0;
+    const id = await lue("04-ghosting.txt", {
+      /* Coupée : un export trop long, ou arrêté par WhatsApp à ses derniers messages (src/server/histoires.ts, exportLu) */
+      avant: async (id) => {
+        const l = await ligneEnBase(id);
+        await db()
+          .update(schema.stories)
+          .set({ meta: coffre.ecrire("stories.meta", { ...metaDe(l), coupe: true }) })
+          .where(eq(schema.stories.id, id));
+      },
+    });
+    const story = await ligneEnBase(id);
+    const h = histoireDe(metaDe(story));
+    const conv = convDe(story);
+    if (typeof conv !== "string") throw new Error("une conv d’un seul morceau, encore en base");
+    const lu = lire(conv, h, { autresEnTexte: true });
+    /* Ce que le modèle doit lire, calculé (jamais recopié) : les deux lignes que la coupe change */
+    const [coupee, entiere] = [rendre(h, lu, { coupe: true }), rendre(h, lu)];
+    const ligneDuDebut = coupee.conversation.split("\n")[1]!;
+    const partieImportee = coupee.chiffres.split("\n")[1]!;
+    expect([ligneDuDebut, partieImportee]).not.toEqual([entiere.conversation.split("\n")[1], entiere.chiffres.split("\n")[1]]);
+    const verdict = requetes.find((r) => r.tache === "04-verdict");
+    const texte = verdict!.blocs.map((b) => ("texte" in b ? b.texte : "")).join("\n");
+    expect(texte).toContain(`">\n${ligneDuDebut}\n`);
+    expect(texte).toContain(`<chiffres>\n${partieImportee}\n`);
+    expect(contexteDe(story)!.chiffres.split("\n")[1]).toBe(partieImportee);
   });
 });
 

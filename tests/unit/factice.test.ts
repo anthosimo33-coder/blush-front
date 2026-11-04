@@ -102,6 +102,21 @@ describe("le modèle factice : des sorties qui passent leur schéma", () => {
     expect(lues.profil).toEqual([FACTICE.profil]);
   });
 
+  it("des captures qui portent FACTICE.sansDate : les mêmes messages, sans aucun repère", () => {
+    const lire = (octets: string) =>
+      Sortie01.parse(
+        fournisseurFactice({
+          tache: "01-captures",
+          blocs: [{ texte: "aujourd’hui : mer. 2026-09-09" }, { image: { media: "image/png", base64: Buffer.from(octets).toString("base64") } }],
+        }),
+      );
+    const sansDate = lire(`xx${FACTICE.sansDate}xx`);
+    expect(sansDate.blocs.every((b) => b.repere === null)).toBe(true);
+    expect(sansDate.blocs.flatMap((b) => b.messages)).toHaveLength(FACTICE.messagesCaptures);
+    /* Une image sans la marque garde ses deux repères */
+    expect(lire("xxxx").blocs.map((b) => b.repere?.date)).toEqual(["2026-09-07", "2026-09-08"]);
+  });
+
   it("le verdict titre les sept chapitres fermés (FACTICE.titres), celui de l’autre à son prénom ; avec une alerte, aucun", () => {
     expect(Sortie04.parse(fournisseurFactice(requete("04-verdict"))).titres).toEqual(FACTICE.titres("Inès"));
     expect(Sortie04.parse(fournisseurFactice(requete("04-verdict", "La demande.", `${CONV}\n${FACTICE.alerte}`))).titres).toBeNull();

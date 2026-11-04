@@ -282,8 +282,8 @@ describe("un nouvel export après le rapport (messagesDeLExport)", () => {
 
 describe("relier un morceau : les surnoms et les deux Léa (relier)", () => {
   const exporte = (noms: [string, string], texte: string): Morceau => ({ format: "whatsapp-ios", texte, noms, empreinte: noms.join("|") });
-  const capturees = (autre: string, messages: { de: "moi" | "autre"; texte: string }[], date = "2026-09-20"): MorceauRecu => {
-    const t = versTexteCaptures(captures({ autre, blocs: [{ repere: { date, heure: "21:00" }, messages: messages.map((m) => msg(m.de, m.texte)) }] }), {
+  const capturees = (autre: string, messages: { de: "moi" | "autre"; texte: string }[], date = "2026-09-20", heure = "21:00"): MorceauRecu => {
+    const t = versTexteCaptures(captures({ autre, blocs: [{ repere: { date, heure }, messages: messages.map((m) => msg(m.de, m.texte)) }] }), {
       aujourdhui: "2026-10-22",
     });
     return { format: "captures", texte: t.texte, noms: ["Moi", t.autre], empreinte: `captures-${autre}-${date}` };
@@ -339,11 +339,11 @@ describe("relier un morceau : les surnoms et les deux Léa (relier)", () => {
   });
 
   it("deux Léa : le prénom ne désigne personne, les messages en commun rangent les captures", () => {
-    /* La fin de l’export : Léa Martin (l’utilisatrice) puis Léa Dubois, repris par les captures */
+    /* La fin de l’export : Léa Martin (l’utilisatrice) puis Léa Dubois, repris par les captures (sous un repère de 10:30 : des messages courts ne se reprennent qu’après leur repère, le même jour) */
     const texte = exportIos("Léa Martin", "Léa Dubois", 40);
     const conv: ConvEnMorceaux = { morceaux: [exporte(["Léa Martin", "Léa Dubois"], texte)] };
     const reprises = Array.from({ length: 6 }, (_, k) => ({ de: (34 + k) % 2 ? ("autre" as const) : ("moi" as const), texte: `message ${34 + k}` }));
-    const r = relier(conv, { noms: ["Léa Martin", "Léa Dubois"] }, capturees("Léa", reprises, "2026-10-01"));
+    const r = relier(conv, { noms: ["Léa Martin", "Léa Dubois"] }, capturees("Léa", reprises, "2026-10-01", "10:30"));
     /* « Moi » est Léa Martin (le participant 0), et rien ne dit encore qui est l’autre */
     expect(r.morceaux[1]!.noms).toEqual(["Moi", "Léa"]);
     expect(r.identite.contact).toBeUndefined();

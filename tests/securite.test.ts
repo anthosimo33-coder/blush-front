@@ -82,6 +82,7 @@ import { effacerSession, poserChoisie, poserSession } from "@/server/cookies";
 import { cleDeLimiteDuCompte, emailCanonique } from "@/server/email-canonique";
 import { nomDuCookie, NOMS_DE_SESSION } from "@/lib/noms-cookies";
 import { db, schema } from "@/server/db";
+import { storyAffichee } from "@/server/conv-affichee";
 import { convDe, importer, type Meta } from "@/server/histoires";
 import { depuisFichier } from "@/server/import";
 import { LIMITES, plafondsDesMails } from "@/server/limites";
@@ -253,6 +254,33 @@ describe("le journal de l’import : une ligne marquée qu’aucune règle ne li
     expect(lignes).toHaveLength(1);
     expect(JSON.parse(lignes[0]!)).toMatchObject({ format: "whatsapp-android", lignes: 2, forme: "Aaaaaaaa aa aaaaaaaa Aaa" });
     for (const mot of ["Bulletin", "salaire", "Contrato", "alquiler", "Tom", "Durand", "archivo"]) expect(lignes.join("\n")).not.toContain(mot);
+  });
+
+  it("un export WhatsApp de 40 000 messages : coupé, « BLUSH lit vos N derniers mois » ; une ligne au journal, des nombres seulement", async () => {
+    /* `n` messages de Léa et Tom, un toutes les 13 minutes à partir du 1er novembre 2025 : 40 000 couvrent un an */
+    const exporter = (n: number) =>
+      Array.from({ length: n }, (_, k) => {
+        const d = new Date(Date.UTC(2025, 10, 1, 8) + k * 13 * 60e3);
+        const p2 = (x: number) => String(x).padStart(2, "0");
+        return `[${p2(d.getUTCDate())}/${p2(d.getUTCMonth() + 1)}/${d.getUTCFullYear()} ${p2(d.getUTCHours())}:${p2(d.getUTCMinutes())}:00] ${k % 2 ? "Tom" : "Léa"}: on se voit samedi ? ${k}`;
+      }).join("\n");
+    const lignes: string[] = [];
+    vi.spyOn(console, "info").mockImplementation((...l: unknown[]) => void lignes.push(l.join(" ")));
+    const coupee = await importer({ nom: "WhatsApp Chat - Léa.txt", appli: "whatsapp", texte: exporter(40_000) }, accordDeTest());
+    const entiere = await importer({ nom: "WhatsApp Chat - Léa.txt", appli: "whatsapp", texte: exporter(39_000) }, accordDeTest());
+    await db()
+      .delete(schema.stories)
+      .where(inArray(schema.stories.id, [coupee.id, entiere.id]));
+    expect(coupee.meta.coupe).toBe(true);
+    expect(storyAffichee(coupee.id, coupee.meta).sources[0]!.moisLus).toBe(12);
+    expect(storyAffichee(coupee.id, coupee.meta).startMissing).toBe(true);
+    expect(entiere.meta.coupe).toBeUndefined();
+    const longs = lignes.filter((l) => l.includes("export WhatsApp long")).map((l) => JSON.parse(l) as Record<string, unknown>);
+    expect(longs).toEqual([
+      expect.objectContaining({ ou: "import", entetes: 40_000, plafond: 40_000, coupe: false }),
+      expect.objectContaining({ ou: "import", entetes: 39_000, plafond: null, coupe: false }),
+    ]);
+    for (const mot of ["Léa", "Tom", "samedi"]) expect(lignes.join("\n")).not.toContain(mot);
   });
 });
 

@@ -19,18 +19,24 @@ const jour = (k: number) => new Date(Date.UTC(2026, 2, 1) + k * J).toISOString()
 /** Un jour de conv : combien de messages de l’autre, et de toi, ce jour-là. */
 type Jour = { k: number; autre: number; moi?: number; heure?: boolean };
 
-/** Un lot lu : un bloc par jour (le repère du jour, à 21 h ou sans heure), et `ecrans` captures. */
-function lot(jours: Jour[], ecrans = 12): Captures {
+/**
+ * Un lot lu : un bloc par jour (le repère du jour, à 21 h ou sans heure), et `ecrans` captures ; `haut` : des messages
+ * au-dessus de son premier repère (un haut sans date).
+ */
+function lot(jours: Jour[], ecrans = 12, haut = 0): Captures {
   return captures({
     autre: "Léa",
     captures: Array.from({ length: ecrans }, (_, i) => ({ numero: i + 1, place: i + 1, hors_sujet: false })),
-    blocs: jours.map(({ k, autre, moi = 1, heure = true }) => ({
-      repere: { date: jour(k), heure: heure ? "21:00" : null },
-      messages: [
-        ...Array.from({ length: autre }, (_, j) => msg("autre", `jour ${k} elle message ${j}`)),
-        ...Array.from({ length: moi }, (_, j) => msg("moi", `jour ${k} toi message ${j}`)),
-      ],
-    })),
+    blocs: [
+      ...(haut ? [{ repere: null, messages: Array.from({ length: haut }, (_, j) => msg(j % 2 ? "autre" : "moi", `haut message ${j}`)) }] : []),
+      ...jours.map(({ k, autre, moi = 1, heure = true }) => ({
+        repere: { date: jour(k), heure: heure ? "21:00" : null },
+        messages: [
+          ...Array.from({ length: autre }, (_, j) => msg("autre", `jour ${k} elle message ${j}`)),
+          ...Array.from({ length: moi }, (_, j) => msg("moi", `jour ${k} toi message ${j}`)),
+        ],
+      })),
+    ],
   });
 }
 
@@ -81,9 +87,26 @@ describe("la règle d’arrêt de la lecture partielle", () => {
     expect(decider(enLots(longue, 5), ou(10))).toBe("assez");
   });
 
-  it("des repères sans heure : une tendance est impossible, assez", () => {
+  it("des repères sans heure comptent le jour de leur repère, comme à 21 h : la conv clairsemée sur des semaines lit encore", () => {
     const sansHeure = Array.from({ length: 10 }, (_, w) => ({ k: 7 * w, autre: 2, heure: false }));
-    expect(decider(enLots(sansHeure, 5), ou(10))).toBe("assez");
+    expect(decider(enLots(sansHeure, 5), ou(10))).toBe("encore");
+  });
+
+  it("une chute sur des repères sans heure : assez avec ses huit semaines de référence, encore avec moins", () => {
+    expect(decider(enLots([...jours(0, 56, 4, false), ...jours(56, 84, 1, false)], 5), ou(10))).toBe("assez");
+    expect(decider(enLots([...jours(0, 28, 4, false), ...jours(28, 56, 1, false)], 5), ou(10))).toBe("encore");
+  });
+
+  it("des captures sans aucune date (leur jour deviné) : une tendance est impossible, assez", () => {
+    expect(
+      decider([captures({ autre: "Léa", blocs: [{ repere: null, messages: Array.from({ length: 40 }, (_, j) => msg(j % 2 ? "autre" : "moi", `message ${j}`)) }] })], ou(10)),
+    ).toBe("assez");
+  });
+
+  it("un haut sans date ne compte pas : 26 semaines stables sans heure lisent assez, avec ou sans 150 messages au-dessus du premier repère", () => {
+    const stable = jours(0, 182, 2, false);
+    expect(decider([lot(stable.slice(0, 37), 12, 150), ...enLots(stable.slice(37), 4)], ou(10))).toBe("assez");
+    expect(decider(enLots(stable, 5), ou(10))).toBe("assez");
   });
 
   it("une chute avec ses huit semaines de référence : assez ; avec moins : encore (elle serait mal datée)", () => {

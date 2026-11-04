@@ -210,15 +210,23 @@ function morceau(type: string, donnees: Buffer): Buffer {
   somme.writeUInt32BE(crc32(corps));
   return Buffer.concat([taille, corps, somme]);
 }
-/** Un PNG uni de `largeur` × `hauteur` pixels, de la couleur [r, v, b]. */
-function png(largeur: number, hauteur: number, [r, v, b]: [number, number, number]): Buffer {
+/** Un PNG uni de `largeur` × `hauteur` pixels, de la couleur [r, v, b] ; avec `texte`, dans un bloc de texte (tEXt) qu’il porte. */
+function png(largeur: number, hauteur: number, [r, v, b]: [number, number, number], texte?: string): Buffer {
   const entete = Buffer.alloc(13);
   entete.writeUInt32BE(largeur, 0);
   entete.writeUInt32BE(hauteur, 4);
   entete.set([8, 2, 0, 0, 0], 8); // 8 bits par couleur, en RVB, sans entrelacement
   const ligne = Buffer.concat([Buffer.from([0]), Buffer.from(Array.from({ length: largeur }, () => [r, v, b]).flat())]);
   const pixels = deflateSync(Buffer.concat(Array.from({ length: hauteur }, () => ligne)));
-  return Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), morceau("IHDR", entete), morceau("IDAT", pixels), morceau("IEND", Buffer.alloc(0))]);
+  /* Un bloc de texte : son mot-clé, un octet nul, puis le texte */
+  const commentaire = texte === undefined ? [] : [morceau("tEXt", Buffer.from(`Comment\u0000${texte}`, "latin1"))];
+  return Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    morceau("IHDR", entete),
+    morceau("IDAT", pixels),
+    ...commentaire,
+    morceau("IEND", Buffer.alloc(0)),
+  ]);
 }
 
 /* Le numéro de chaque appel à capturesPng dans un test : chaque lot a son dossier */
@@ -229,10 +237,13 @@ const lots = new WeakMap<TestInfo, number>();
  * capture-N.png vaut 240 − 10 × (N − 1), de quoi reconnaître jusqu’à 20 captures (la limite du serveur) dans une
  * vignette (ordreAffiche, aide/instagram-captures.ts). Leur contenu ne compte pas : le modèle factice rend toujours la
  * même conv lue (src/server/ia/factice.ts). Chaque appel écrit dans un dossier à lui : réécrire un fichier qu’un
- * <input type=file> a déjà pris le rendrait illisible au navigateur. Renvoie leurs chemins.
+ * <input type=file> a déjà pris le rendrait illisible au navigateur. Renvoie leurs chemins. `marque` : un texte que
+ * chaque PNG porte (un déclencheur du modèle factice, FACTICE.sansDate).
  */
-export function capturesPng(testInfo: TestInfo, n = 1): string[] {
+export function capturesPng(testInfo: TestInfo, n = 1, { marque }: { marque?: string } = {}): string[] {
   const lot = (lots.get(testInfo) ?? 0) + 1;
   lots.set(testInfo, lot);
-  return Array.from({ length: n }, (_, k) => ecrire(testInfo.outputPath("captures", `lot-${lot}`, `capture-${k + 1}.png`), png(39, 84, [240 - k * 10, 230, 225 + (k % 3) * 10])));
+  return Array.from({ length: n }, (_, k) =>
+    ecrire(testInfo.outputPath("captures", `lot-${lot}`, `capture-${k + 1}.png`), png(39, 84, [240 - k * 10, 230, 225 + (k % 3) * 10], marque)),
+  );
 }

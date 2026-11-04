@@ -146,7 +146,7 @@ export async function getChat(): Promise<HistoriqueChat & { introAt?: number }> 
 }
 
 /** Toi et elle, pour « Mon compte ». */
-export async function getNomsDuCompte(): Promise<{ me: Story["participants"][number]; other: Story["participants"][number]; period: string } | null> {
+export async function getNomsDuCompte(): Promise<{ me: Story["participants"][number]; other: Story["participants"][number]; period?: string } | null> {
   const { utilisateur, story } = await contexte();
   if (!utilisateur || !story) return null;
   const affichee = storyAffichee(story.id, metaDe(story));
