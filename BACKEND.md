@@ -379,7 +379,7 @@ npm run e2e:build                        # le build des tests, après chaque cha
 npm run e2e                              # ou : npm run e2e -- --project=webkit-iphone, npm run e2e:ui
 ```
 
-- Plusieurs suites en même temps : `E2E_PORT=3500 E2E_DB=blush_e2e_b npm run e2e` (le port suivant sert la bêta fermée). `E2E_WORKERS` change le nombre de workers (3 en local, 2 en CI).
+- Une autre copie de travail : `E2E_PORT=3500 E2E_DB=blush_e2e_b npm run e2e` (le port suivant sert la bêta fermée). Deux suites ne tournent pas en même temps pour autant : la file d’attente du poste (`scripts/file-d-attente.mjs`, AGENTS.md) les fait passer l’une après l’autre, sauf avec `BLUSH_FILE_PLACES=2`. `E2E_WORKERS` change le nombre de workers (3 en local, 2 en CI).
 - Les fichiers `*.beta.spec.ts` tournent sur ce second serveur, en bêta fermée (`BLUSH_BETA_FERMEE=1`).
 - Les tests s’écrivent avec `tests/e2e/aide`, et importent tout de `./aide` (`test`, `expect` et les réglages des serveurs compris) : des exports fictifs, la boîte à mails, les gestes du parcours (`jusquAuCode`, `seConnecter`, `saisirLeCodeRecu`), la base. Jamais une vraie conv.
 - Le décor d’un test (un compte, sa conv lue) se prépare par les routes /api : `lectureFaite` (un compte gratuit), `lectureComplete` (un invité, de l’équipe : toute la chaîne écrite). Un compte gratuit se débloque une conv ou reçoit des bulles par la base (`debloquerLaConv`, `donnerDesBulles`, `aide/base.ts`), comme l’outil de l’équipe ; ou il paie, au faux Whop des serveurs des tests (`BLUSH_PAIEMENT_FACTICE=1` : `payer`, `rejouerWebhook`, `rembourser`, `aide/paiement.ts`). Le parcours à l’écran a ses propres tests (`parcours-temoin`, `import*`).

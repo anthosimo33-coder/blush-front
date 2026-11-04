@@ -4,20 +4,35 @@
  * tests/unit/declarations-scripts.test.ts vérifie que les deux exportent les mêmes noms.
  */
 
-/** Ce que la file garde d’une place ou d’un ticket : le processus, son heure, sa commande, sa copie de travail. */
-type Entree = { pid: number; depuis: number; quoi: string; ou: string; nom: string };
+/**
+ * Ce que la file garde d’une place ou d’un ticket (son jeton, son processus, sa commande, sa copie de travail, son
+ * heure d’arrivée), et ce qu’on en voit : son fichier, la date de son dernier battement et son état. Un fichier
+ * illisible n’a que les trois premiers.
+ */
+type Entree = {
+  nom: string;
+  chemin: string;
+  battu: number;
+  etat: "vivante" | "orpheline" | "silencieuse" | "morte" | "illisible";
+  jeton?: string;
+  pid?: number;
+  quoi?: string;
+  ou?: string;
+  depuis?: number;
+};
 
-/** Le dossier commun de la file, le même pour toutes les copies de travail et toutes les sessions du poste. */
-export const DOSSIER_PAR_DEFAUT: string;
+/** Une place : en plus, le numéro de la suite lancée, sa tenue (la somme de ses battements, sans veille ni Ctrl-Z) et son plafond, en ms, et si elle compte parmi les prises. */
+type Place = Entree & { enfant?: number | null; tenue?: number; plafond?: number; compte: boolean };
 
-/** Au-delà, une place ou un ticket est repris même si son processus semble vivant (un numéro réutilisé après un redémarrage). */
-export const PLACE_MAX_MS: number;
+/** Un ticket : en plus, son rang d’arrivée. */
+type Ticket = Entree & { rang?: number };
 
-/** Qui tourne et qui attend, dans l’ordre des tickets. */
-export function etatDeLaFile(options?: { dossier?: string }): { places: Entree[]; tickets: Entree[] };
+/** Le dossier versionné de la file, sous sa racine (BLUSH_FILE_DOSSIER, ou /tmp/blush-suites-lourdes). */
+export function dossierDeLaFile(racine?: string): string;
 
 /**
- * Attend une place dans la file, puis la rend par la fonction retournée (à appeler une fois, à la fin). `dire` reçoit
- * les messages pour la personne qui attend (qui tourne, depuis quand), au premier regard puis une fois par minute.
+ * Qui tourne et qui attend, sans rien changer (ni dossier créé, ni mort effacé) : les places et les tickets de la file
+ * de `dossier` (sa racine), chacun avec son état (juger), la date de son dernier battement et, pour une place, si elle
+ * compte parmi les prises. Les places dans l’ordre où elles ont été prises, les tickets dans l’ordre d’arrivée.
  */
-export function prendrePlace(options?: { dossier?: string; places?: number; quoi?: string; ou?: string; pid?: number; dire?: (message: string) => void }): Promise<() => void>;
+export function etatDeLaFile(options?: { dossier?: string }): { places: Place[]; tickets: Ticket[] };

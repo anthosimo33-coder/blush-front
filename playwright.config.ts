@@ -6,7 +6,8 @@ import { ADMIN, ADMINS_DU_TOURNAGE, BOITE_MAILS, CLE, CRON_SECRET, DATABASE_URL,
  * Les tests de bout en bout (tests/e2e) : les vrais parcours, dans un vrai navigateur, contre le back-end, avec le
  * modèle factice, une base Postgres recréée à chaque lancement et la boîte à mails des tests.
  *   npm run e2e:build   le build du back-end, une fois puis après chaque changement de l’appli
- *   npm run e2e         E2E_PORT (3400) et E2E_DB (blush_e2e) pour lancer plusieurs suites en même temps
+ *   npm run e2e         par la file d’attente du poste (scripts/file-d-attente.mjs, une suite lourde à la fois) ;
+ *                       E2E_PORT (3400) et E2E_DB (blush_e2e) pour une autre copie de travail
  *   npm run e2e:visuel  les captures de référence des écrans (tests/e2e/visuel.spec.ts), avec E2E_VISUEL_DIR
  *   npm run galerie     la galerie des écrans (scripts/galerie), avec BLUSH_GALERIE=1 (posé par la commande)
  * Chromium sur ordinateur, et WebKit en iPhone (le moteur de Safari, là où BLUSH se teste à la main).
