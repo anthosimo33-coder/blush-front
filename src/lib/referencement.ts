@@ -4,6 +4,7 @@ import type { Article, Genre, Jour } from "@/contenu/articles/types";
 import { CONDITIONS } from "@/contenu/conditions";
 import { CONFIDENTIALITE_MISE_A_JOUR } from "@/contenu/confidentialite";
 import { MENTIONS } from "@/contenu/mentions-legales";
+import { A_PROPOS, METHODE, PAGE_AIDE } from "@/contenu/pages-de-confiance";
 
 /*
  * Ce que les moteurs de recherche voient de BLUSH. Le site entier est hors des moteurs par défaut (src/app/layout.tsx) :
@@ -22,13 +23,17 @@ const LANDING_MISE_A_JOUR: Jour = "2026-11-03";
 
 /**
  * Les pages fixes à indexer : leur chemin, leur nom (/llms.txt), leur poids dans le plan du site, et le jour de leur
- * dernier changement de fond (celui que la page affiche, pour les pages légales).
+ * dernier changement de fond (celui que la page affiche, pour les pages légales et les pages de confiance).
  */
 export const PAGES_PUBLIQUES = [
   { chemin: "/", nom: "Accueil", priorite: 1, misAJourLe: LANDING_MISE_A_JOUR },
   { chemin: "/confidentialite", nom: "Confidentialité", priorite: 0.5, misAJourLe: CONFIDENTIALITE_MISE_A_JOUR },
   { chemin: "/conditions", nom: "Conditions d’utilisation et de vente", priorite: 0.3, misAJourLe: CONDITIONS.misAJourLe },
   { chemin: "/mentions-legales", nom: "Mentions légales", priorite: 0.2, misAJourLe: MENTIONS.misAJourLe },
+  /* Les pages de confiance (src/contenu/pages-de-confiance.ts) : qui est BLUSH, comment ses guides sont faits, les numéros d’aide */
+  { chemin: "/a-propos", nom: A_PROPOS.titre, priorite: 0.4, misAJourLe: A_PROPOS.misAJourLe },
+  { chemin: "/methode", nom: METHODE.titre, priorite: 0.4, misAJourLe: METHODE.misAJourLe },
+  { chemin: "/aide", nom: PAGE_AIDE.court, priorite: 0.3, misAJourLe: PAGE_AIDE.misAJourLe },
 ] as const satisfies readonly { chemin: `/${string}`; nom: string; priorite: number; misAJourLe: Jour }[];
 
 /** Le chemin d’une page publique : une page fixe, un hub (/guides, /lexique), ou un article du registre. */

@@ -67,7 +67,12 @@ export const SECTIONS = [
   {
     id: "guides",
     title: "Guides et lexique",
-    sub: "Le gabarit des articles (/guides, /lexique), sur deux exemples inventés des aperçus (/apercu/guide, /apercu/lexique)\u00a0: aucun article n’est encore publié",
+    sub: "Le gabarit des articles (/guides, /lexique) et le sommaire des guides\u00a0: les guides du registre, et des exemples inventés des aperçus (/apercu/guide, ses zones, /apercu/lexique)",
+  },
+  {
+    id: "confiance",
+    title: "Pages de confiance",
+    sub: "/a-propos, /methode et /aide (plan SEO, semaine 2), dans l’habit des guides («\u00a0Magazine\u00a0»)\u00a0: ce qu’elles disent de BLUSH vient du code, tel quel",
   },
   { id: "parcours", title: "Entrée", sub: "De l’appli choisie à la lecture de ta conv (écrans 01 à 08), avec une conv importée pour de vrai" },
   {
@@ -349,14 +354,44 @@ export const STATES = [
 
   /* ———— Guides et lexique ———— */
   {
+    id: "G0",
+    section: "guides",
+    title: "Les guides",
+    state: "Le sommaire (/guides), sur les guides du registre",
+    route: "/guides",
+    full: true,
+    note: "Une une de magazine\u00a0: «\u00a0Guides\u00a0» dans la bulle rose de la landing, le guide le plus récent à la une (à date égale, le premier du registre\u00a0; son titre aux mots surlignés, sa couverture\u00a0: le téléphone de sa conv et une bulle de BLUSH, toute la une à un clic), les autres en cartes (l’image\u00a0: la fin d’une mini-conv et la bulle de BLUSH), puis la fin rose de la landing (le bouton blanc, le prix lu dans le code).",
+    changement: "Nouveau design\u00a0: la piste «\u00a0Magazine\u00a0», retenue le 4 novembre 2026.",
+  },
+  {
     id: "G1",
     section: "guides",
     title: "Guide",
     state: "Un guide d’exemple (zone verte)",
     route: "/apercu/guide",
     full: true,
-    note: "Le gabarit de la charte (plan SEO, section 9)\u00a0: le titre, la signature, «\u00a0La réponse courte\u00a0», les sections en questions, les mini-convs «\u00a0exemple inventé\u00a0», les bulles de BLUSH, «\u00a0Ce que BLUSH regarde\u00a0», «\u00a0Les pièges\u00a0», la FAQ, le bouton tiré du code, les sources. Texte d’exemple, jamais publié.",
-    changement: "Nouveau\u00a0: le gabarit des guides.",
+    note: "Le gabarit de la charte (plan SEO, section 9), en magazine\u00a0: le thème, le titre en deux temps (la situation dans la bulle rose, l’action dans la bleue\u00a0: le champ surligne), la signature («\u00a0Par l’équipe BLUSH\u00a0», sans aucun nom\u00a0; en zone rouge, l’expert), la couverture (ordinateur), «\u00a0La réponse courte\u00a0», «\u00a0Dans ce guide\u00a0» (après la réponse au téléphone, collé à gauche sur ordinateur, la section lue allumée), les sections numérotées, les mini-convs en deux volets «\u00a0La conv\u00a0» et «\u00a0Ce que ça montre\u00a0» (iMessage, Instagram, WhatsApp tour à tour\u00a0; dans un téléphone sur ordinateur), les bulles de BLUSH, «\u00a0Ce que BLUSH regarde\u00a0» (un écran de l’appli sur ordinateur), «\u00a0Les pièges\u00a0», la FAQ, «\u00a0La fiche du guide\u00a0», la fin rose. Texte d’exemple, jamais publié.",
+    changement: "Nouveau design\u00a0: la piste «\u00a0Magazine\u00a0», retenue le 4 novembre 2026.",
+  },
+  {
+    id: "G3",
+    section: "guides",
+    title: "Guide orange",
+    state: "Le guide d’exemple en zone orange (son bloc d’aide)",
+    route: "/apercu/guide?zone=orange",
+    full: true,
+    note: "Le même gabarit, en zone orange\u00a0: le bloc d’aide au bout de la dernière section, dans l’habit de /aide (le 17, le 112 et le 3114 en grands boutons bleus, le 114 par SMS, puis l’écoute et les lignes par situation), chaque numéro de src/contenu/aide.ts à un toucher, puis la fin rose. Texte d’exemple, jamais publié.",
+    changement: "Nouveau\u00a0: un aperçu de la zone orange.",
+  },
+  {
+    id: "G4",
+    section: "guides",
+    title: "Guide rouge",
+    state: "Le guide d’exemple en zone rouge (l’aide en tête, un simple lien)",
+    route: "/apercu/guide?zone=rouge",
+    full: true,
+    note: "La zone rouge, sobre partout\u00a0: le titre à l’encre (sans bulle), ni couverture, les bulles de BLUSH blanches et droites\u00a0; l’expert dans la signature (un nom de place), le bloc d’aide en tête, à droite du titre sur un ordinateur, sous lui au téléphone (les trois numéros d’urgence dans le premier écran)\u00a0; ni bouton dans la barre, ni bloc rose, ni prix\u00a0: un simple lien vers l’import, et le pied sur le papier. L’habit sobre est à valider. Texte d’exemple, jamais publié.",
+    changement: "Nouveau\u00a0: un aperçu de la zone rouge.",
   },
   {
     id: "G2",
@@ -365,8 +400,37 @@ export const STATES = [
     state: "Une entrée d’exemple (zone orange, son bloc d’aide)",
     route: "/apercu/lexique",
     full: true,
-    note: "Le même gabarit, en zone orange\u00a0: le bloc d’aide avec les numéros de src/contenu/aide.ts tels qu’ils sont, puis le bouton. Texte d’exemple, jamais publié.",
-    changement: "Nouveau\u00a0: le gabarit du lexique.",
+    note: "La version courte du gabarit, sur une colonne\u00a0: le thème et le temps de lecture, le titre surligné, la signature, la réponse courte, les sections sans numéro, les mini-convs à plat, le bloc d’aide (zone orange), la FAQ, la fiche, la fin rose. Texte d’exemple, jamais publié.",
+    changement: "Nouveau design\u00a0: la piste «\u00a0Magazine\u00a0», en version courte.",
+  },
+
+  /* ———— Pages de confiance ———— */
+  {
+    id: "PC1",
+    section: "confiance",
+    title: "À propos",
+    route: "/a-propos",
+    full: true,
+    note: "Le titre surligné («\u00a0BLUSH\u00a0» dans la bulle rose), le chapeau et la signature, puis BLUSH en bref (sa phrase, telle quelle, en tête comme une réponse courte), «\u00a0Une lecture, pas un conseil\u00a0» et «\u00a0Dès 15 ans\u00a0» repris des conditions, cinq promesses sur la conv reprises des écrans, l’éditeur tiré des mentions légales (en fiche), l’email et le compte Instagram, les pages voisines en lignes dans une carte, et la fin rose. Le sommaire collé à gauche sur un ordinateur. Aucune histoire, aucun chiffre\u00a0: à valider.",
+    changement: "Nouveau design\u00a0: l’habit «\u00a0Magazine\u00a0» des guides.",
+  },
+  {
+    id: "PC2",
+    section: "confiance",
+    title: "Notre méthode",
+    route: "/methode",
+    full: true,
+    note: "Comment un guide (ou une entrée du lexique) est fait, chaque règle comme une section de guide (son numéro, son intertitre, sa première phrase en attaque)\u00a0: les sujets, les exemples inventés, les sources datées, la relecture et la validation avant publication (sous la responsabilité du directeur de la publication, sans le nommer), les dates, ce qu’on n’écrit jamais (en croix\u00a0; surveiller quelqu’un\u00a0: la règle des conditions, citée telle quelle), signaler une erreur, puis la fin rose. Rien sur les avis. À faire relire par l’avocat avant toute fusion.",
+    changement: "Nouveau design\u00a0: l’habit «\u00a0Magazine\u00a0» des guides.",
+  },
+  {
+    id: "PC3",
+    section: "confiance",
+    title: "Numéros d’aide",
+    route: "/aide",
+    full: true,
+    note: "Tous les numéros de src/contenu/aide.ts, à un toucher, en France\u00a0: les urgences d’abord (leur phrase, un grand bouton bleu par numéro, puis le 114 par SMS), les lignes d’écoute, puis «\u00a0Selon ta situation\u00a0» (le 119, le 3919, le 3018 à appeler ou en tchat, commentonsaime.fr). Les trois numéros d’urgence dans le premier écran d’un téléphone. Rien à vendre\u00a0: ni bouton, ni prix, ni fin rose.",
+    changement: "Nouveau design\u00a0: l’habit «\u00a0Magazine\u00a0», les urgences en tête.",
   },
 
   /* ———— Entrée ———— */

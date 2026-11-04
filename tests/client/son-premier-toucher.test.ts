@@ -80,7 +80,7 @@ async function sonSur(chemin: string) {
 }
 
 describe("le premier toucher ne crée plus le son", () => {
-  it.each(["/", "/v/abc123", "/conditions", "/confidentialite", "/mentions-legales"])(
+  it.each(["/", "/v/abc123", "/conditions", "/confidentialite", "/mentions-legales", "/a-propos", "/methode", "/aide"])(
     "%s, une page sans son : aucun contexte audio, ni au repos, ni au toucher",
     async (chemin) => {
       await sonSur(chemin);

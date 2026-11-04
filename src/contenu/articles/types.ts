@@ -16,12 +16,12 @@ export type Genre = "guide" | "lexique";
  * contrôle, le harcèlement, la détresse, les mineurs (le bloc d’aide en tête, que la page pose elle-même sous la
  * signature, aucune vanne, un expert nommé qui relit).
  */
-export type Zone = "verte" | "orange" | "rouge";
+type Zone = "verte" | "orange" | "rouge";
 
 /** Un jour du calendrier, « AAAA-MM-JJ » (un jour de Paris). */
 export type Jour = `${number}-${number}-${number}`;
 
-/** Une vraie personne, nommée : son prénom et son nom, et son rôle (« fondateur de BLUSH », « psychologue »). Jamais un personnage inventé. */
+/** Une vraie personne, nommée : son prénom et son nom, et son rôle (« psychologue », « juriste d’une association d’aide »). Jamais un personnage inventé. */
 export type Personne = { nom: string; role: string };
 
 /** Une source citée : son titre, son adresse, et le jour où on l’a lue (une source sans date ne compte pas). */
@@ -63,13 +63,28 @@ type SectionArticle = { question: string; blocs: readonly BlocArticle[] };
 /** Une question de la FAQ, tirée de ce qu’on tape dans les moteurs, et sa réponse en deux ou trois phrases (en texte, sans balisage FAQPage). */
 type QuestionFaq = { question: string; reponse: string };
 
+/**
+ * Les deux morceaux du titre que le gabarit surligne, comme le titre de la landing : la situation dans la bulle rose (ce
+ * qui t’arrive, « ne répond plus »), l’action dans la bulle bleue (ce que tu vas faire, « ce soir »). Chacun est un
+ * morceau exact du titre, une seule fois, en mots entiers, court (il tient sur une ligne du téléphone), sans les
+ * deux-points : les garde-fous le vérifient (tests/aide/articles.ts). Une décision de mise en page, pas un texte : le
+ * titre ne change pas, et les moteurs le lisent entier.
+ */
+type Surligne = { situation: string; action: string };
+
 /** Un article du registre (./index.ts). Les garde-fous de tests/unit/articles.test.ts vérifient chaque champ. */
 export type Article = {
   /** Son adresse, courte, en minuscules et tirets : /guides/<slug> ou /lexique/<slug>. Unique dans tout le registre. */
   slug: string;
   genre: Genre;
+  /**
+   * Le thème, en deux ou trois mots (« Les silences », « Les délais ») : le surtitre de la page, au-dessus du titre, et
+   * celui de sa carte dans les sommaires. Pas une page à lui : il n’entre pas dans le fil d’Ariane.
+   */
+  theme: string;
   /** Le H1, la requête telle qu’on la tape (« Il met du temps à répondre : … »). Aussi le titre de la page et de son aperçu. */
   titre: string;
+  surligne: Surligne;
   /** La description pour les moteurs et les aperçus : une ou deux phrases. */
   description: string;
   /** Le mot-clé principal, un seul article par mot-clé (sinon les deux pages se gênent dans les moteurs). */
@@ -80,9 +95,15 @@ export type Article = {
   misAJourLe: Jour;
   /** Les changements de fond, datés, la publication comprise. */
   changements: readonly Changement[];
-  /** Qui a relu et signé (« relu par … ») : exigé, une vraie personne. */
-  relecteur: Personne;
-  /** L’expert qui a relu aussi (un psychologue, une association) : exigé en zone rouge. */
+  /**
+   * Le jour où le directeur de la publication a validé le texte final : sa signature, donnée par écrit pendant la
+   * rédaction, obligatoire avant tout push (le dépôt est public), au plus tard le jour de `misAJourLe` (on valide, puis
+   * on publie), et après le changement de fond précédent : chaque changement de fond se valide à nouveau. Seul le jour
+   * s’écrit, jamais son nom : la page dit « Par l’équipe BLUSH », et lui répond des guides depuis les mentions légales.
+   * Les données structurées le reprennent (`lastReviewed`).
+   */
+  valideLe: Jour;
+  /** L’expert qui a relu aussi (un psychologue, une association) : exigé en zone rouge, nommé sous le titre (« relu par … »). */
   expert?: Personne;
   /** Les sources, datées : deux au moins, cinq au plus. */
   sources: readonly Source[];

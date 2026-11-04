@@ -109,11 +109,11 @@ function remplirLaPiece(c: Chain) {
 }
 
 /*
- * Les pages qui ne jouent aucun son : la landing, un verdict partagé, les pages légales. Ni contexte audio ni réveil :
- * le tout premier contexte de la visite bloque le fil principal 0,1 à 0,2 s (le navigateur démarre sa sortie audio),
- * et c’est le premier toucher de la page qui l’aurait payé.
+ * Les pages qui ne jouent aucun son : la landing, un verdict partagé, les pages légales et celles de confiance (/a-propos,
+ * /methode, /aide). Ni contexte audio ni réveil : le tout premier contexte de la visite bloque le fil principal 0,1 à
+ * 0,2 s (le navigateur démarre sa sortie audio), et c’est le premier toucher de la page qui l’aurait payé.
  */
-const SANS_SON = /^\/(?:v\/.*|conditions|confidentialite|mentions-legales)?$/;
+const SANS_SON = /^\/(?:v\/.*|conditions|confidentialite|mentions-legales|a-propos|methode|aide)?$/;
 /* La page joue-t-elle des sons ? Posé par SoundBoot à chaque page ; rien tant qu’il ne l’a pas dit */
 let avecSons = false;
 /* La préparation au repos en attente (une seule à la fois) */

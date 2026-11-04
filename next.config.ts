@@ -70,7 +70,7 @@ const SITE = "https://www.askblush.com";
  * leur (src/proxy.ts). tests/unit/referencement.test.ts vérifie que chaque page publique y passe, et rien d’autre.
  */
 export const BARRE_FINALE = {
-  source: "/:chemin((?:confidentialite|conditions|mentions-legales|guides|lexique)(?:/[a-z0-9-]+)?)/",
+  source: "/:chemin((?:confidentialite|conditions|mentions-legales|a-propos|methode|aide|guides|lexique)(?:/[a-z0-9-]+)?)/",
   destination: "/:chemin",
   permanent: true,
 };

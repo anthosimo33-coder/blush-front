@@ -9,7 +9,9 @@ import type { Bloc } from "@/contenu/conditions";
 /*
  * Les morceaux des pages légales (les conditions, les mentions légales), rendus sur le serveur comme la page
  * Confidentialité : l’en-tête, une section de texte en carte blanche, et les liens d’une page légale à l’autre, posés
- * aussi au pied de « Mon compte » et de la confidentialité.
+ * aussi au pied de « Mon compte », de la confidentialité, des guides et des pages de confiance. Les pages de confiance
+ * (/a-propos, /methode, /aide) ont l’habit des guides, leurs pièces et leurs liens à part (./confiance.tsx) : « Mon
+ * compte » est rendu dans le navigateur, et ce fichier n’y emporte rien de leurs textes.
  */
 
 /** L’en-tête d’une page légale : son icône dans un rond noir, son titre, sa phrase. */

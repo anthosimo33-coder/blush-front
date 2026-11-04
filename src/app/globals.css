@@ -129,6 +129,12 @@
 
   --breakpoint-md: 768px;
   --breakpoint-lg: 1024px;
+  /* L’ordinateur des guides, du lexique et des pages de confiance (src/components/article, /a-propos, /methode, /aide,
+     src/components/juridique/confiance.tsx et urgences.tsx), à la place de lg: : le même seuil (64rem, 1024 px), en rem
+     comme sm, xl et 2xl. Tailwind range ses points de rupture par unité, puis par taille : md et lg, en px, passent avant
+     sm dans la feuille, et un sm: l’emporte sur le lg: du même élément sur un ordinateur. ordi: passe après sm:, et le
+     reste du site garde ses md: et lg: tels qu’ils s’affichent. */
+  --breakpoint-ordi: 64rem;
 }
 
 @layer base {
@@ -1940,5 +1946,98 @@ html[data-pied-en-vue] body {
   [data-beat="doux"]::after {
     animation: none !important;
     opacity: 0;
+  }
+}
+
+/*
+ * Le sommaire d’un guide, sur un ordinateur (src/components/article/pieces.tsx, DansCeGuide) : la section qu’on lit s’y
+ * allume, sans script. Chaque section ([data-section], le n-ième intertitre) est une frise de défilement nommée, vue
+ * dans une bande d’un pixel à 30 % du haut de l’écran ; le n-ième lien du sommaire s’allume tant que sa section passe
+ * dans la bande (`cover`), et une seule y passe à la fois. La colonne de lecture ([data-lecture]) les partage avec le
+ * sommaire (timeline-scope). Un navigateur qui ne connaît pas ces frises garde le sommaire tel quel. Dix au plus : un
+ * guide a de trois à cinq sections, et la FAQ ; /methode, neuf règles ; /a-propos, sept blocs.
+ */
+@keyframes sommaire-actif {
+  from,
+  to {
+    color: var(--ink);
+    border-left-color: var(--elle);
+  }
+}
+@supports (animation-timeline: view()) and (timeline-scope: --a) {
+  [data-lecture] {
+    timeline-scope: --section-1, --section-2, --section-3, --section-4, --section-5, --section-6, --section-7, --section-8, --section-9, --section-10;
+  }
+  [data-section] {
+    view-timeline-inset: 30% calc(70% - 1px);
+  }
+  [data-section="1"] {
+    view-timeline-name: --section-1;
+  }
+  [data-section="2"] {
+    view-timeline-name: --section-2;
+  }
+  [data-section="3"] {
+    view-timeline-name: --section-3;
+  }
+  [data-section="4"] {
+    view-timeline-name: --section-4;
+  }
+  [data-section="5"] {
+    view-timeline-name: --section-5;
+  }
+  [data-section="6"] {
+    view-timeline-name: --section-6;
+  }
+  [data-section="7"] {
+    view-timeline-name: --section-7;
+  }
+  [data-section="8"] {
+    view-timeline-name: --section-8;
+  }
+  [data-section="9"] {
+    view-timeline-name: --section-9;
+  }
+  [data-section="10"] {
+    view-timeline-name: --section-10;
+  }
+  @media (min-width: 1024px) {
+    [data-sommaire] > li > a {
+      animation-name: sommaire-actif;
+      animation-duration: auto;
+      animation-timing-function: linear;
+      animation-fill-mode: none;
+      animation-range: cover;
+    }
+    [data-sommaire] > li:nth-child(1) > a {
+      animation-timeline: --section-1;
+    }
+    [data-sommaire] > li:nth-child(2) > a {
+      animation-timeline: --section-2;
+    }
+    [data-sommaire] > li:nth-child(3) > a {
+      animation-timeline: --section-3;
+    }
+    [data-sommaire] > li:nth-child(4) > a {
+      animation-timeline: --section-4;
+    }
+    [data-sommaire] > li:nth-child(5) > a {
+      animation-timeline: --section-5;
+    }
+    [data-sommaire] > li:nth-child(6) > a {
+      animation-timeline: --section-6;
+    }
+    [data-sommaire] > li:nth-child(7) > a {
+      animation-timeline: --section-7;
+    }
+    [data-sommaire] > li:nth-child(8) > a {
+      animation-timeline: --section-8;
+    }
+    [data-sommaire] > li:nth-child(9) > a {
+      animation-timeline: --section-9;
+    }
+    [data-sommaire] > li:nth-child(10) > a {
+      animation-timeline: --section-10;
+    }
   }
 }

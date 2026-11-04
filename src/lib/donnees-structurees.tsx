@@ -1,6 +1,7 @@
 import { cheminDe, RUBRIQUES } from "@/contenu/articles";
 import type { Article, Genre, Personne } from "@/contenu/articles/types";
-import { PHRASE_D_IDENTITE } from "@/contenu/identite";
+import { COMPTES_OFFICIELS, PHRASE_D_IDENTITE } from "@/contenu/identite";
+import { EDITEUR } from "@/contenu/mentions-legales";
 
 /*
  * Ce que les moteurs comprennent de BLUSH et de ses pages publiques : des données structurées schema.org, en JSON-LD,
@@ -10,20 +11,27 @@ import { PHRASE_D_IDENTITE } from "@/contenu/identite";
  * aggregateRating (la note des avis, tant que la page ne dit pas comment ils ont été recueillis).
  */
 
-/**
- * Les comptes officiels de BLUSH (`sameAs`) : seulement ceux qu’on sait être à nous.
- * TODO(produit): le compte TikTok officiel et les autres (YouTube, Snapchat…), quand leur adresse exacte est confirmée :
- * jamais une adresse devinée, elle relierait BLUSH au compte de quelqu’un d’autre.
- */
-const COMPTES_OFFICIELS = ["https://www.instagram.com/askblush_/"];
-
 /** L’@id de l’éditeur (l’Organization) : le même sur toutes les pages. */
 const idEditeur = (site: string) => `${site}/#editeur`;
 /** L’@id du site (le WebSite) : le même sur toutes les pages. */
 const idSite = (site: string) => `${site}/#site`;
 
-/** L’éditeur : BLUSH, son adresse, son logo et ses comptes officiels. */
-const editeur = (site: string) => ({ "@type": "Organization", "@id": idEditeur(site), name: "BLUSH", url: site, logo: `${site}/icon.svg`, sameAs: COMPTES_OFFICIELS });
+/**
+ * L’éditeur : BLUSH, l’entreprise qui l’édite et son email (`legalName`, `email` : les mentions légales, comme /a-propos
+ * les montre), son adresse, son logo, ses comptes officiels (src/contenu/identite.ts, `sameAs`), et la page qui dit
+ * comment ses guides sont faits (`publishingPrinciples`, /methode).
+ */
+const editeur = (site: string) => ({
+  "@type": "Organization",
+  "@id": idEditeur(site),
+  name: "BLUSH",
+  legalName: EDITEUR.nom,
+  email: EDITEUR.email,
+  url: site,
+  logo: `${site}/icon.svg`,
+  sameAs: COMPTES_OFFICIELS.map((c) => c.url),
+  publishingPrinciples: `${site}/methode`,
+});
 
 /**
  * Le site, avec les noms sous lesquels on le cherche (`alternateName`) : Google en tire le nom qu’il montre au-dessus
@@ -39,7 +47,7 @@ const leSite = (site: string) => ({
   publisher: { "@id": idEditeur(site) },
 });
 
-/** Une personne qui relit : son nom et son rôle. */
+/** L’expert qui relit un article de la zone rouge (un psychologue, une association) : son nom et son rôle. */
 const personne = ({ nom, role }: Personne) => ({ "@type": "Person", name: nom, jobTitle: role });
 
 /** Le fil d’Ariane d’une page : ses étapes, de la landing à elle, chacune son nom et son adresse. */
@@ -93,9 +101,41 @@ export function donneesDuHub(genre: Genre, site: string) {
 }
 
 /**
- * Les données d’un article : l’article, écrit par l’éditeur (l’équipe BLUSH, jamais une personne inventée), avec ses
- * dates et son image ; sa page, relue par son relecteur (et son expert) : `reviewedBy` est une propriété de la page dans
- * schema.org, pas de l’article ; et son fil d’Ariane.
+ * Les données d’une page de confiance (/a-propos, /methode, /aide) : la page, de son genre schema.org (`genre` : AboutPage
+ * pour /a-propos, qui parle de l’éditeur, `about` ; WebPage sinon), dans le site, et son fil d’Ariane, celui que sa
+ * barre du haut affiche (« blush | À propos », le cadre des guides) : la landing, puis elle, sous son nom court (`court`).
+ */
+export function donneesDUnePage({ genre, chemin, nom, court }: { genre: "AboutPage" | "WebPage"; chemin: `/${string}`; nom: string; court: string }, site: string) {
+  const url = `${site}${chemin}`;
+  return {
+    "@context": "https://schema.org",
+    "@graph": [
+      editeur(site),
+      leSite(site),
+      {
+        "@type": genre,
+        "@id": url,
+        url,
+        name: nom,
+        inLanguage: "fr",
+        isPartOf: { "@id": idSite(site) },
+        ...(genre === "AboutPage" ? { about: { "@id": idEditeur(site) } } : {}),
+        breadcrumb: { "@id": `${url}#fil` },
+      },
+      filDAriane(`${url}#fil`, [
+        { nom: "BLUSH", url: site },
+        { nom: court, url },
+      ]),
+    ],
+  };
+}
+
+/**
+ * Les données d’un article : l’article, écrit et publié par l’éditeur (l’Organization BLUSH, jamais une personne), avec
+ * ses dates et son image ; sa page, avec le jour où son texte a été validé (`lastReviewed`, `valideLe`) et, en zone
+ * rouge, l’expert qui l’a relue (`reviewedBy`, une propriété de la page dans schema.org, pas de l’article) : aucun autre
+ * nom, celui du directeur de la publication ne vit que dans les mentions légales ; son thème (`articleSection`, le
+ * surtitre de la page, pas une page à lui) ; et son fil d’Ariane.
  */
 export function donneesDeLArticle(article: Article, site: string) {
   const url = `${site}${cheminDe(article)}`;
@@ -114,8 +154,8 @@ export function donneesDeLArticle(article: Article, site: string) {
         isPartOf: { "@id": idSite(site) },
         breadcrumb: { "@id": `${url}#fil` },
         mainEntity: { "@id": `${url}#article` },
-        reviewedBy: [article.relecteur, ...(article.expert ? [article.expert] : [])].map(personne),
-        lastReviewed: article.misAJourLe,
+        ...(article.expert ? { reviewedBy: personne(article.expert) } : {}),
+        lastReviewed: article.valideLe,
       },
       {
         "@type": "Article",
@@ -128,6 +168,7 @@ export function donneesDeLArticle(article: Article, site: string) {
         author: { "@id": idEditeur(site) },
         publisher: { "@id": idEditeur(site) },
         image: `${url}/image`,
+        articleSection: article.theme,
         keywords: article.motCle,
         mainEntityOfPage: { "@id": url },
       },
