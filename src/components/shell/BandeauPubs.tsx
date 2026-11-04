@@ -4,13 +4,13 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSyncExternalStore } from "react";
 import { Button } from "@/components/ui/Button";
-import { NBSP } from "@/lib/format";
 import { etapeDe } from "@/lib/presence";
 import { pixelMeta } from "@/lib/publique";
 import { CHOIX_PUBS_S, COOKIE_CHOIX_PUBS, COOKIE_FBC, COOKIE_FBP, fbcDe, fbclidDe, fbpDe, TRACES_META_S, type ChoixPubs } from "@/lib/pubs";
 
 /*
- * Le bandeau des pubs de Meta : l’accord, ou le refus, avant que BLUSH dise quoi que ce soit à Meta (src/server/pubs-meta.ts).
+ * Le bandeau des pubs de Meta, court comme un bandeau de cookies (le détail est sur la page de confidentialité) : l’accord,
+ * ou le refus, avant que BLUSH dise quoi que ce soit à Meta (src/server/pubs-meta.ts).
  * Refuser se fait d’un geste, comme accepter, avec un bouton du même poids (la CNIL le demande) ; le choix se garde six
  * mois (blush-pubs), et se change sur la page de confidentialité (ChoixDesPubs). Accepter pose les deux cookies que Meta
  * sait lire : _fbp (ce navigateur, tiré au hasard) et _fbc (le clic de la pub, si la page d’arrivée portait son fbclid,
@@ -75,31 +75,27 @@ export function BandeauPubs() {
   const etat = useSyncExternalStore(sAbonner, etatDuNavigateur, etatDuServeur);
   const ici = !!pixelMeta() && etapeDe(chemin) !== null && !chemin.startsWith("/tournage");
   if (!ici || (etat !== "aucun" && etat !== "rouvert")) return null;
+  const bouton = "lift lift-sm h-10 flex-1 rounded-full bg-white px-4 text-note font-black text-ink shadow-soft sm:flex-none";
   return (
     <div
       role="dialog"
-      aria-labelledby="bandeau-pubs-titre"
-      className="fixed inset-x-3 bottom-[calc(12px+env(safe-area-inset-bottom))] z-50 mx-auto max-w-[440px] rounded-card bg-white p-4 shadow-card"
+      aria-label="Cookies des pubs"
+      className="fixed inset-x-3 bottom-[calc(12px+env(safe-area-inset-bottom))] z-50 mx-auto flex max-w-[560px] flex-col gap-2.5 rounded-card bg-white p-3.5 shadow-card sm:flex-row sm:items-center sm:gap-4"
     >
-      <p id="bandeau-pubs-titre" className="m-0 text-accent font-black">
-        Les pubs de BLUSH sur Insta et Facebook
-      </p>
-      <p className="m-0 mt-1.5 text-note font-extrabold leading-[1.45] text-soft">
-        Si tu acceptes, on dit à Meta quand quelqu’un venu d’une de nos pubs importe une conv ou paie, pour qu’il les montre aux bonnes personnes. Jamais ta conv, ni ce que BLUSH
-        en dit.{" "}
+      <p className="m-0 flex-1 text-note font-extrabold leading-[1.4] text-soft">
+        Des cookies pour mesurer nos pubs Insta et Facebook. Jamais ta conv.{" "}
         <Link href="/confidentialite#pubs" className="text-toi-ink">
           En savoir plus
         </Link>
       </p>
-      <div className="mt-3 flex gap-2">
-        <Button variant="secondary" size="md" onClick={() => choisir("non")}>
+      <div className="flex gap-2">
+        <button type="button" className={bouton} onClick={() => choisir("non")}>
           Refuser
-        </Button>
-        <Button variant="secondary" size="md" onClick={() => choisir("oui")}>
+        </button>
+        <button type="button" className={bouton} onClick={() => choisir("oui")}>
           Accepter
-        </Button>
+        </button>
       </div>
-      <span className="sr-only">Ton choix se garde six mois{NBSP}; tu le changes sur la page de confidentialité.</span>
     </div>
   );
 }
