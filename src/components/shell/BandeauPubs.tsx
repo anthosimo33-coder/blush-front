@@ -83,7 +83,7 @@ export function BandeauPubs() {
       className="fixed inset-x-3 bottom-[calc(12px+env(safe-area-inset-bottom))] z-50 mx-auto flex max-w-[560px] flex-col gap-2.5 rounded-card bg-white p-3.5 shadow-card sm:flex-row sm:items-center sm:gap-4"
     >
       <p className="m-0 flex-1 text-note font-extrabold leading-[1.4] text-soft">
-        Des cookies pour mesurer nos pubs Insta et Facebook. Jamais ta conv.{" "}
+        On utilise des cookies pour la pub.{" "}
         <Link href="/confidentialite#pubs" className="text-toi-ink">
           En savoir plus
         </Link>
