@@ -391,6 +391,8 @@ export function VerdictReveal({ initial, story, rendu }: { initial: ReportPayloa
               {card.quote && (
                 <span
                   data-rise=""
+                  /* Son dernier message : masqué dans l’enregistrement des visites (src/lib/secrets.ts) */
+                  data-prive=""
                   style={delai(0.15)}
                   className="mt-5 max-w-[86%] -rotate-2 self-start rounded-[20px] rounded-bl-[6px] bg-white/10 px-4 py-2.5 font-message text-corps font-bold leading-[1.3] text-white/85"
                 >
@@ -591,6 +593,8 @@ function Replay({ message, at }: { message: Message; at: number }) {
       </span>
       <span
         data-msg=""
+        /* Un message de la conv : masqué dans l’enregistrement des visites (src/lib/secrets.ts) */
+        data-prive=""
         style={delai(at + 0.7)}
         className={cn(
           "max-w-[84%] rounded-[22px] px-4 py-2.5 font-message text-accent font-bold leading-[1.3]",

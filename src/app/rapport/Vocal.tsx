@@ -358,8 +358,6 @@ function Story({
       aria-modal="true"
       aria-label="Le vocal de BLUSH"
       data-vocal-story=""
-      /* Un portail sur body, hors de la page (privée) : son texte masqué dans l’enregistrement des visites */
-      data-prive=""
       /* La story vit hors du rapport (portail) : elle pose elle-même Figtree, pour les messages cités */
       className={cn("fixed inset-0 z-[80] flex flex-col text-white", figtree.variable)}
       style={{
@@ -431,6 +429,8 @@ function Story({
                 {recu && (
                   <div key={cleRecu} data-vocal-pop="" className={cn("flex flex-col gap-1", recu.from === "toi" ? "items-end" : "items-start")}>
                     <span
+                      /* Un message de la conv : masqué dans l’enregistrement des visites (src/lib/secrets.ts) */
+                      data-prive=""
                       className={cn(
                         "max-w-[260px] rounded-[19px] px-3.5 py-[9px] font-message text-accent font-medium leading-[1.3] [@media(max-height:700px)]:py-[7px] [@media(max-height:700px)]:text-detail",
                         recu.from === "toi" ? "bg-bubble-me" : "bg-[#2A2A30]",

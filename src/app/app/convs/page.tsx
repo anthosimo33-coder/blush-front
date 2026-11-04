@@ -16,8 +16,7 @@ export default async function Page() {
   if (convs.length < 2) redirect("/app");
   return (
     <ViewTransition enter={{ "nav-back": "pop-in", default: "none" }} exit={{ "nav-forward": "push-out", default: "none" }} default="none">
-      {/* data-prive : tout son texte masqué dans l’enregistrement des visites (src/lib/secrets.ts) */}
-      <div data-prive="" className="[background:var(--paper-light)]">
+      <div className="[background:var(--paper-light)]">
         <ConvsScreen convs={convs} />
       </div>
     </ViewTransition>

@@ -2,9 +2,10 @@
 
 /*
  * Ce que l’enregistrement des visites ne lit jamais (src/lib/analytique.ts, maskTextFn) : le texte des zones privées
- * (`data-prive` : le chat, le rapport, la fiche, la lecture, le haut du paywall, les avatars…), et partout ailleurs les
- * secrets de la page (les prénoms de la conv ouverte, l’email du compte : retenirSecrets) et tout email. Sans import :
- * le client de l’API (src/services/api.ts) et les écrans y retiennent leurs secrets sans rien charger de PostHog.
+ * (`data-prive` : les messages, ceux de la conv cités (Bubble) comme les tiens à BLUSH, les réponses à envoyer, les infos
+ * de la fiche, les avatars, un nom de fichier…), et partout ailleurs les secrets de la page (les prénoms de la conv
+ * ouverte, l’email du compte : retenirSecrets) et tout email. Sans import : le client de l’API (src/services/api.ts) et
+ * les écrans y retiennent leurs secrets sans rien charger de PostHog.
  */
 
 /* Les secrets de la page : gardés le temps de la page, jamais envoyés ; ils ne servent qu’à masquer leur texte */

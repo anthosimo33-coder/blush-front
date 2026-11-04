@@ -25,11 +25,8 @@ export default async function Page({ searchParams }: PageProps<"/rapport">) {
   if (!initial) redirect("/lecture");
   return (
     <PageDeConv rendu={rendu}>
-      {/* data-prive : tout son texte masqué dans l’enregistrement des visites (src/lib/secrets.ts) */}
-      <div data-prive="" className="contents">
-        {/* Le jour de la lecture sous la période (« 14 déc. → 12 mars · lun. ») */}
-        <ReportScreen initial={initial} story={luLe ? { ...story, updatedLabel: luLe } : story} openPaywall={paiement === "1"} rendu={rendu} />
-      </div>
+      {/* Le jour de la lecture sous la période (« 14 déc. → 12 mars · lun. ») */}
+      <ReportScreen initial={initial} story={luLe ? { ...story, updatedLabel: luLe } : story} openPaywall={paiement === "1"} rendu={rendu} />
     </PageDeConv>
   );
 }

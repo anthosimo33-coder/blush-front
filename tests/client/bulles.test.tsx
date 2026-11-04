@@ -6,6 +6,7 @@ import type { HomeContact } from "@/app/app/accueil/contact";
 import type { Msg } from "@/app/app/accueil/conv/modele";
 import { MotionContext } from "@/app/app/accueil/mouvement/contexte";
 import { copyText } from "@/lib/hooks";
+import { masquerTexte } from "@/lib/secrets";
 
 /*
  * Les bulles de la conv de l’accueil (src/app/app/accueil/bulles.tsx), sans l’accueil autour : ce que chaque message
@@ -129,6 +130,30 @@ describe("les bulles de la conv de l’accueil", () => {
 
     fireEvent.click(within(fil).getByRole("button", { name: "Partager" }));
     expect(props.partager).toHaveBeenCalledExactlyOnceWith(1);
+  });
+
+  it("l’enregistrement des visites : tes messages, ceux de la conv qu’il cite et la réponse à envoyer masqués ; BLUSH se lit", () => {
+    const { fil } = monter([
+      { type: "texte", id: 1, from: "toi", text: "je lui dis quoi ?", at: A },
+      {
+        type: "reponse",
+        id: 2,
+        from: "blush",
+        result: {
+          kind: "bubbles",
+          incoming: [{ from: "elle", text: "dispo ce soir ?" }],
+          bubbles: [{ text: "il attend que tu relances", messages: [{ from: "elle", text: "on verra" }] }],
+          send: ["t’es dispo jeudi ?"],
+          why: "Court et léger.",
+        },
+        at: A,
+      },
+    ]);
+    /* Ce que l’enregistreur lit d’un texte du fil (maskTextFn, src/lib/analytique.ts) */
+    const enregistre = (texte: string) => masquerTexte(texte, within(fil).getByText(texte));
+    const etoiles = (texte: string) => texte.replace(/\S/g, "*");
+    for (const prive of ["je lui dis quoi ?", "dispo ce soir ?", "on verra", "t’es dispo jeudi ?"]) expect(enregistre(prive)).toBe(etoiles(prive));
+    for (const lisible of ["il attend que tu relances", "Court et léger.", "Ta meilleure réponse"]) expect(enregistre(lisible)).toBe(lisible);
   });
 
   it("une copie refusée par le navigateur : la pastille ne dit pas « Copié »", async () => {

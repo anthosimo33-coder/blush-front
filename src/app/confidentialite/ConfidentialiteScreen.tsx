@@ -27,6 +27,9 @@ import { derniereMiseAJour, NBSP } from "@/lib/format";
  * demande d’accord) : sa phrase dans « Les visites, sans cookie » et la ligne de PostHog, à relire, puis le PDF de Whop.
  * Le 20 octobre, l’interface s’y lit (tout masqué ne servait à rien) ; la conv, les prénoms, l’email, les saisies et les
  * images restent masqués (src/lib/secrets.ts) : la phrase le dit, à relire.
+ * TODO(produit): le 4 novembre 2026, à la demande de l’utilisateur, seuls les messages restent masqués (ceux de la conv,
+ * cités, et ceux que tu envoies à BLUSH), avec les prénoms, la fiche, l’email, les saisies et les images : les réponses
+ * de BLUSH et le rapport s’y lisent. La phrase le dit (« ses réponses et ton rapport compris »), à relire, puis le PDF de Whop.
  * Le 3 novembre 2026, la page d’arrivée (visites.arrivee, users.arrivee : le chemin de la première page, sans requête
  * ni identifiant, src/lib/chemins.ts) entre dans « Les visites, sans cookie » (« et par quelle page », « et ta page
  * d’arrivée ») : phrase validée par l’utilisateur ce jour-là, date de la page dans CONFIDENTIALITE_MISE_A_JOUR.
@@ -93,9 +96,9 @@ export function ConfidentialiteScreen() {
           visites sans cookie{NBSP}: ton adresse IP sert à faire un code anonyme qui change chaque jour, et n’est gardée nulle part. La ville de ta connexion et l’écran où tu es
           restent deux jours, sans ton nom. Avec ce même code, on compte jusqu’où tu vas (ton fichier choisi, le paiement ouvert…), une fois par jour, sans rien de ta conv{NBSP}:
           90 jours au plus. Ces pages vues et ces étapes partent aussi chez PostHog, notre outil de mesure, en Allemagne{NBSP}: sans cookie, sans ton nom ni ton email, et sans rien
-          de ta conv. PostHog enregistre aussi comment tu te sers du site (où tu touches, jusqu’où tu fais défiler, les écrans de BLUSH tels qu’ils s’affichent), jamais ta conv
-          {NBSP}: ses messages, ton rapport, le chat, les prénoms, ton email, ce que tu tapes et les images y restent masqués. Si tu crées un compte, il garde seulement d’où tu es
-          venu et ta page d’arrivée.
+          de ta conv. PostHog enregistre aussi comment tu te sers du site (où tu touches, jusqu’où tu fais défiler, les écrans de BLUSH tels qu’ils s’affichent, ses réponses et ton
+          rapport compris), jamais ta conv{NBSP}: ses messages, ceux que tu envoies à BLUSH, vos prénoms, les infos de sa fiche, ton email, ce que tu tapes et les images y restent
+          masqués. Si tu crées un compte, il garde seulement d’où tu es venu et ta page d’arrivée.
         </Ligne>
         {/* Les pubs de Meta (src/server/pubs-meta.ts, src/components/shell/BandeauPubs.tsx) : seulement avec l’accord du bandeau ; TODO(produit): à relire par un juriste, puis le PDF de Whop */}
         <Ligne icone="link" titre="Les pubs sur Insta et Facebook, si tu acceptes" id="pubs">

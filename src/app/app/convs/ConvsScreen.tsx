@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/cn";
 import { changerDeConv } from "@/lib/requetes";
+import { retenirSecrets } from "@/lib/secrets";
 import { sensDeTendance } from "@/lib/tendance";
 import { IconButton } from "@/components/ui/Button";
 import { ContactRing } from "@/components/ui/contact";
@@ -20,6 +21,8 @@ import type { ConvSummary } from "@/types";
  * « Mon compte » passe ici : sur l’accueil, sa place sert à revenir à cette liste.
  */
 export function ConvsScreen({ convs }: { convs: ConvSummary[] }) {
+  /* Les prénoms de toutes tes convs : masqués dans l’enregistrement des visites (src/lib/secrets.ts), la liste s’y lit */
+  retenirSecrets(convs.map((c) => c.person.name));
   return (
     <AppScreen
       aside={null}

@@ -180,7 +180,7 @@ function ExampleReport({ conv, retour, titreId, onClose }: { conv: LandingConv; 
           <span className="text-legende font-black text-grey">La preuve</span>
           <ConfidenceLine level={conv.confidence}>{conv.proofs} preuves</ConfidenceLine>
         </div>
-        <Bubble from="elle" caption={conv.proof.caption}>
+        <Bubble from="elle" caption={conv.proof.caption} prive={false}>
           {conv.proof.text}
         </Bubble>
       </div>

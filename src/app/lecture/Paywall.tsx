@@ -137,8 +137,7 @@ export function Paywall({
           <AvatarPair me={moi.initial} other={autre.initial} size={26} />
         </div>
         <div className="flex flex-col gap-3 lg:grid lg:grid-cols-[minmax(0,1fr)_420px] lg:items-start lg:gap-14">
-          {/* data-prive : le haut, tiré de la conv (son titre, ses chiffres, la bulle), masqué dans l’enregistrement des visites */}
-          <section data-prive="" className="flex flex-col gap-3 lg:gap-6">
+          <section className="flex flex-col gap-3 lg:gap-6">
             <div className="flex flex-col gap-1.5 pt-1 lg:gap-3">
               {/* Sur téléphone, le nombre de messages lus et la note des avis passent dans l’en-tête des aperçus du rapport (moins de lignes au-dessus du titre) */}
               <span className="text-legende font-black text-grey max-lg:hidden lg:text-note">{PAYWALL.conv(formatCount(story.totalMessages))}</span>
