@@ -1,4 +1,4 @@
-import type { EtapeVisite, GenreVendu, OffreId, Population, SourceVisite, TypeDImport } from "@/types";
+import type { AppKind, EtapeVisite, GenreVendu, OffreId, Population, SourceVisite, TypeDImport } from "@/types";
 import { CATALOGUE, prixDe } from "./offres";
 
 /*
@@ -81,6 +81,16 @@ export const NOMS_DES_POPULATIONS: Record<Population, string> = {
 /** Le nom de chaque type d’import (src/server/imports.ts), dans /admin « L’IA avant l’achat » et le serveur MCP. */
 export const NOMS_DES_TYPES_D_IMPORT: Record<TypeDImport, string> = { export: "Export", captures: "Captures", video: "Vidéo" };
 
+/**
+ * Le jour où l’enregistrement d’écran a quitté l’import (VIDEO_A_L_IMPORT, src/lib/limites.ts), au format AAAA-MM-JJ.
+ * /admin et le serveur MCP l’écrivent sous la vidéo de « L’IA avant l’achat » et sous les applis qu’il a changées
+ * (APPLIS_SANS_VIDEO) : l’avant et l’après se lisent sans A/B.
+ */
+export const VIDEO_RETIREE_LE = "2026-11-03";
+
+/** Les applis de l’import que le retrait de la vidéo a changées : iMessage (filmé jusque-là) et la tuile des captures (« Captures ou vidéo »). */
+export const APPLIS_SANS_VIDEO: readonly AppKind[] = ["imessage", "autre"];
+
 /** Le nom de chaque carte d’achat du chat (src/server/vente.ts), dans /admin. */
 export const NOMS_DES_VENTES: Record<GenreVendu, string> = {
   bulles: "Recharge",
@@ -90,17 +100,57 @@ export const NOMS_DES_VENTES: Record<GenreVendu, string> = {
   reimport: "Le réimport (ancien doux)",
 };
 
-/** Le nom d’une source de visiteurs ; null : un acheteur venu avant que les visites se comptent. */
+/**
+ * Le nom d’une source de visiteurs ; null (SOURCE_INCONNUE) : un acheteur venu avant que les visites se comptent. Le
+ * même nom dit une page d’arrivée inconnue (« Pages d’arrivée ») : une visite d’avant qu’on la note (le 3 novembre
+ * 2026), ou un acheteur dont la visite n’a pas été retrouvée.
+ */
 export const NOMS_DES_SOURCES: Record<SourceVisite, string> = {
   tiktok: "TikTok",
   instagram: "Instagram",
   snapchat: "Snapchat",
   partage: "Verdicts partagés",
   google: "Google",
+  moteurs: "Autres moteurs",
+  assistants: "Assistants IA",
+  mail: "Mail",
   autre: "Autres sites",
   direct: "Direct",
 };
 export const SOURCE_INCONNUE = "Avant le suivi";
+
+/**
+ * Les pages d’arrivée des visiteurs (visites.arrivee, users.arrivee), réunies pour « Pages d’arrivée » : la landing, les
+ * guides et le lexique, les verdicts partagés, le parrainage, les pages légales, et tout le reste (le parcours, le
+ * compte, une page qui n’existe pas). /p/<code> mène à la landing (src/app/p/[code]/route.ts) : ses visites y arrivent,
+ * et ses clics se comptent à part (le compteur des liens de parrainage) ; le groupe attend une page qui resterait sur /p/.
+ * TODO(produit): « Parrainage » reste à 0 tant que /p/<code> mène à « / » ; soit le lien garde une adresse à lui (une
+ * marque lue par la page d’arrivée, tests/parrainage.test.ts et tests/e2e/parrainage.spec.ts à revoir), soit la ligne
+ * part et le compteur des liens de parrainage suffit.
+ */
+export const GROUPES_D_ARRIVEE = ["landing", "guides", "partage", "parrainage", "legales", "autres"] as const;
+export type GroupeDArrivee = (typeof GROUPES_D_ARRIVEE)[number];
+export const NOMS_DES_ARRIVEES: Record<GroupeDArrivee, string> = {
+  landing: "Landing",
+  guides: "Guides et lexique",
+  partage: "Verdicts partagés",
+  parrainage: "Parrainage",
+  legales: "Pages légales",
+  autres: "Autres",
+};
+/** Les pages légales : celles de leur pied commun (src/components/juridique/pages.tsx, LiensJuridiques). */
+const PAGES_LEGALES = new Set(["/conditions", "/confidentialite", "/mentions-legales"]);
+
+/** Le groupe d’une page d’arrivée (un chemin nettoyé, src/lib/chemins.ts). */
+export function groupeDArrivee(chemin: string): GroupeDArrivee {
+  const premier = chemin.split("/")[1] ?? "";
+  if (chemin === "/") return "landing";
+  if (premier === "guides" || premier === "lexique") return "guides";
+  if (premier === "v") return "partage";
+  if (premier === "p") return "parrainage";
+  if (PAGES_LEGALES.has(chemin)) return "legales";
+  return "autres";
+}
 
 /** Celui qui importe et la personne dont il parle, d’après leurs pronoms (« Qui importe », src/server/stats.ts). */
 export const PAIRES = ["fille_garcon", "garcon_fille", "deux_filles", "deux_garcons"] as const;
@@ -118,6 +168,7 @@ export const NOMS_DES_GENRES: Record<"elle" | "il" | "inconnu", string> = { elle
 export const NOMS_DES_ETAPES: Record<EtapeVisite, string> = {
   accueil: "Sur l’accueil",
   partage: "Sur un verdict partagé",
+  guides: "Lisent un guide",
   import: "Importent",
   verdict: "Lisent leur verdict",
   rapport: "Lisent leur rapport",

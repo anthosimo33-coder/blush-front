@@ -20,6 +20,14 @@ export type AideDuPilotage = {
   siCaBouge: string;
 };
 
+/**
+ * Le jour où « Autres moteurs », « Assistants IA », « Mail » et les pages d’arrivée commencent à se compter, dit dans les
+ * « ? » des sources et des pages d’arrivée (et par l’outil MCP definitions).
+ * C’est le jour de sa mise en ligne, le même que la « Dernière mise à jour » de la page de confidentialité
+ * (CONFIDENTIALITE_MISE_A_JOUR, src/contenu/confidentialite.ts).
+ */
+const DEBUT_DE_LA_MESURE = "3\u00a0novembre 2026";
+
 export const AIDES_DU_PILOTAGE = {
   ca: {
     titre: "Chiffre d’affaires",
@@ -163,10 +171,19 @@ export const AIDES_DU_PILOTAGE = {
     titre: "D’où ils viennent",
     de: "les sources",
     quoi: "Le canal par lequel les visiteurs arrivent, et ce que ses vrais clients ont payé.",
-    calcul:
-      "Le lien d’une créatrice (utm_source), sinon un verdict partagé, sinon le site d’avant, sinon l’appli qui a ouvert le lien, sinon «\u00a0Direct\u00a0». Les acheteurs se rangent d’après le canal de leur compte\u00a0; «\u00a0Avant le suivi\u00a0»\u00a0: des comptes venus avant qu’on compte les visites.",
+    calcul: `Le lien d’une créatrice ou d’un mail (utm_source), sinon un verdict partagé, sinon le site d’avant (ou l’appli Android d’avant), sinon l’appli qui a ouvert le lien, sinon «\u00a0Direct\u00a0». «\u00a0Google\u00a0»\u00a0: la recherche Google seule (le site et l’appli Google, Discover). «\u00a0Autres moteurs\u00a0»\u00a0: Bing, DuckDuckGo, Qwant, Ecosia, Yahoo, Brave Search, Yandex, Startpage… «\u00a0Assistants IA\u00a0»\u00a0: ChatGPT, Perplexity, Gemini, Claude, Copilot, Le Chat, Meta AI…, par le site d’avant ou par leur utm_source (ChatGPT ajoute «\u00a0chatgpt.com\u00a0» à ses liens). «\u00a0Mail\u00a0»\u00a0: Gmail, Outlook, Yahoo Mail et les autres messageries, et les liens de nos mails (utm_source=email). Ces trois-là depuis le ${DEBUT_DE_LA_MESURE}\u00a0: avant, les moteurs et les assistants comptaient dans «\u00a0Autres sites\u00a0», Gemini et Gmail dans «\u00a0Google\u00a0». Les acheteurs se rangent d’après le canal de leur compte\u00a0; «\u00a0Avant le suivi\u00a0»\u00a0: des comptes venus avant qu’on compte les visites.`,
     repere: "Juge un canal sur son taux d’achat et ce qu’il rapporte, jamais sur ses visiteurs seuls. Le «\u00a0meilleur taux\u00a0» ne se donne qu’à partir de 30\u00a0visiteurs.",
     siCaBouge: "Mets plus de vidéos sur le canal qui achète le mieux, et retravaille l’accroche de celui qui achète le moins.",
+  },
+  arrivees: {
+    titre: "Pages d’arrivée",
+    de: "les pages d’arrivée",
+    quoi: "La première page que les visiteurs voient sur BLUSH, par groupe, et ce que ses vrais clients ont payé\u00a0: ce que rapportent les guides et le lexique face à la landing.",
+    calcul: `La page de la visite du jour, notée avec sa source\u00a0: son chemin seul, sans requête ni identifiant (un verdict partagé devient /v/:id). «\u00a0Guides et lexique\u00a0»\u00a0: /guides/… et /lexique/…\u00a0; «\u00a0Pages légales\u00a0»\u00a0: les conditions, la confidentialité, les mentions légales\u00a0; «\u00a0Autres\u00a0»\u00a0: le parcours, le compte, une page qui n’existe pas. Le lien de parrainage mène à la landing\u00a0: ses visites y arrivent. Les acheteurs se rangent d’après la page d’arrivée de leur compte, comme les sources\u00a0; «\u00a0Avant le suivi\u00a0»\u00a0: les visites et les comptes d’avant le ${DEBUT_DE_LA_MESURE}, sans taux d’achat (ses visiteurs et ses acheteurs ne sont pas les mêmes personnes).`,
+    repere:
+      "Compare le taux d’achat des guides à celui de la landing\u00a0: un guide amène des gens qui ne connaissent pas encore BLUSH, il achète moins vite. Ne juge un groupe qu’à partir de 30\u00a0visiteurs.",
+    siCaBouge:
+      "Des guides lus et aucun achat\u00a0: regarde où ils mènent (le bouton, les liens vers les autres pages). Pour une page précise, l’outil MCP «\u00a0pilotage\u00a0» détaille les chemins de chaque groupe.",
   },
   mix: {
     titre: "Ce qui se vend",
@@ -198,7 +215,7 @@ export const AIDES_DU_PILOTAGE = {
   avantLAchat: {
     titre: "L’IA avant l’achat",
     de: "l’IA avant l’achat",
-    quoi: "Ce que coûte la lecture d’une conv avant que la personne paie, selon comment elle est arrivée\u00a0: un export (rien n’est lu avant l’achat), des captures (une lecture) ou un enregistrement d’écran (lu par lots).",
+    quoi: "Ce que coûte la lecture d’une conv avant que la personne paie, selon comment elle est arrivée\u00a0: un export (rien n’est lu avant l’achat), des captures (une lecture) ou un enregistrement d’écran (lu par lots, retiré de l’import le 3\u00a0novembre 2026\u00a0: ce qui en vient ensuite sort d’onglets ouverts avant).",
     calcul:
       "Chaque conv importée sur la période (sans les prises du mode tournage, ni les tests et les invités\u00a0: une conv dont une lecture est rangée équipe, tournage ou invité, par la règle de «\u00a0Ce que coûte l’IA\u00a0») garde son type, son appli, ses écrans et ses lots lus, sans rien de son contenu. Ses lectures (des captures, les lots d’une vidéo, ceux d’un morceau ajouté avant «\u00a0Qui es-tu\u00a0?\u00a0» compris, et ceux qu’un nouvel essai de la même vidéo a repris sans les relire) sont notées sous l’empreinte de son envoi, en dollars comme sur la facture, une lecture arrêtée en route comprise. Jusqu’au paywall\u00a0: le temps médian de sa première lecture (son import, pour un export) au paywall. Paywall\u00a0: sa lecture lancée, comme le tunnel. Paient\u00a0: un achat payé pour cette conv, même remboursé depuis (une conv effacée depuis n’y compte plus). IA par acheteur\u00a0: tout ce que le type a coûté avant l’achat, lu pour rien compris, divisé par les convs payées. Lu pour rien\u00a0: des lectures d’avant l’import qui n’ont mené à aucune conv (un enregistrement abandonné, des captures refusées, une lecture ratée).",
     repere:

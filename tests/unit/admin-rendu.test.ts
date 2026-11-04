@@ -5,6 +5,8 @@ import { PageEnDirect } from "@/app/admin/PageEnDirect";
 import { Pilotage } from "@/app/admin/Pilotage";
 import { directDExemple, statsDExemple } from "@/app/apercu/admin/exemple";
 import { AIDES_DU_PILOTAGE } from "@/contenu/aide-pilotage";
+import { VIDEO_RETIREE_LE } from "@/contenu/pilotage";
+import { jourEnLettres } from "@/lib/format";
 import type { Periode } from "@/server/stats";
 
 /*
@@ -47,17 +49,28 @@ describe("le pilotage, rendu", () => {
     expect(t).toMatch(/\d+\u00a0envois ratés/);
     /* Sous « Choisissent leur fichier », appli par appli : ses deux nombres et son taux, « — » sous les 30 personnes */
     expect(html).toContain('aria-label="De l’appli au fichier, appli par appli"');
-    for (const appli of ["WhatsApp", "Instagram", "Captures ou vidéo"]) expect(t).toMatch(new RegExp(`${appli} [\\d\u202f]+ → [\\d\u202f]+ \\d+\u00a0%`));
+    /* iMessage et la tuile des captures disent, sous leur nom, le jour où la vidéo de l’écran en est partie */
+    const sansVideo = `captures seules depuis le ${jourEnLettres(VIDEO_RETIREE_LE)} `;
+    for (const appli of ["WhatsApp", "Instagram", "Captures d’écran"]) expect(t).toMatch(new RegExp(`${appli} (${sansVideo})?[\\d\u202f]+ → [\\d\u202f]+ \\d+\u00a0%`));
+    expect(t).toContain(`Captures d’écran ${sansVideo}`);
+    expect(t).not.toContain(`WhatsApp ${sansVideo}`);
+    /* La vidéo, dans « L’IA avant l’achat » : le jour où elle a quitté l’import */
+    expect(t).toContain(`Vidéo retirée de l’import le ${jourEnLettres(VIDEO_RETIREE_LE)}`);
     if (jours === 1) {
-      expect(t).toMatch(/iMessage \d+ → \d+ — Instagram/);
+      expect(t).toMatch(new RegExp(`iMessage ${sansVideo}\\d+ → \\d+ — Instagram`));
       expect(t).toContain("«\u00a0—\u00a0»\u00a0: moins de 30\u00a0personnes, trop peu pour un taux.");
     }
     /* Qui importe : celui qui importe, puis la paire, chaque ligne avec sa part, et l’autre, dont ceux devinés */
     for (const titre of ["Qui importe", "Des filles", "Des garçons", "Pas encore dit", "Et sur qui", "Une fille sur un garçon", "Deux garçons"]) expect(t, titre).toContain(titre);
     expect(t).toMatch(/L’autre\u00a0: [\d\u202f]+\u00a0garçons, [\d\u202f]+\u00a0filles, dont [\d\u202f]+\u00a0devinés/);
     if (jours === 1) expect(t).toContain("«\u00a0—\u00a0»\u00a0: moins de 30\u00a0convs, trop peu pour un taux.");
-    for (const titre of ["D’où ils viennent", "Ce qui se vend", "Les coups de pouce", "Ce que coûte l’IA", "Santé", "Outils", "Bêta", "Les derniers gestes"])
+    for (const titre of ["D’où ils viennent", "Pages d’arrivée", "Ce qui se vend", "Les coups de pouce", "Ce que coûte l’IA", "Santé", "Outils", "Bêta", "Les derniers gestes"])
       expect(t, titre).toContain(titre);
+    /* Les pages d’arrivée : chaque groupe dans son ordre, même vide (le parrainage), avec ses visiteurs, son taux et son payé */
+    expect(t).toMatch(
+      /Landing [\d\u202f]+ [\d,]+\u00a0% [\d\u202f]+\u00a0€ Guides et lexique [\d\u202f]+ [\d,]+\u00a0% [\d\u202f]+\u00a0€ Verdicts partagés .* Parrainage 0 — 0\u00a0€ Pages légales .* Autres /,
+    );
+    for (const source of ["Assistants IA", "Autres moteurs", "Mail"]) expect(t, source).toContain(source);
     expect(t).toContain("Que des nombres\u00a0: aucune conv, aucun message, aucun email ne sort d’ici.");
     /* Un « ? » par carte et par chiffre clé, chacun nommé */
     for (const cle of [
@@ -72,6 +85,7 @@ describe("le pilotage, rendu", () => {
       "paywall",
       "quiImporte",
       "sources",
+      "arrivees",
       "mix",
       "coups",
       "couts",
@@ -95,6 +109,13 @@ describe("le pilotage, rendu", () => {
     expect(t).toContain("Aujourd’hui\u00a0: 1\u00a0panne du serveur.");
     const calme = texte(renderToStaticMarkup(createElement(Pilotage, { s: statsDExemple(7, { calme: true }), direct: null, base: "/apercu/admin", sonder: false })));
     expect(calme).toContain("Aujourd’hui\u00a0: 0\u00a0panne du serveur.");
+  });
+
+  it("les pages d’arrivée : « Avant le suivi » dit ses visites et son payé, jamais un taux (deux populations sans rapport)", () => {
+    const s = statsDExemple(7);
+    s.pilotage.arrivees = [...s.pilotage.arrivees.filter((a) => a.groupe !== null), { groupe: null, visiteurs: 40, acheteurs: 3, centimes: 5970, chemins: [] }];
+    const t = texte(renderToStaticMarkup(createElement(Pilotage, { s, direct: null, base: "/apercu/admin", sonder: false })));
+    expect(t).toMatch(/Avant le suivi 40 — 60\u00a0€/);
   });
 
   it("sans visites comptées : « — » à la place de ce qui en dépend, et la carte qui le dit", () => {
@@ -134,6 +155,7 @@ describe("le pilotage, rendu", () => {
       dollars: zero,
       tunnel: { visiteurs: 0, imports: 0, paywall: 0, acheteurs: 0, racheteurs: 0 },
       sources: [],
+      arrivees: s.pilotage.arrivees.filter((a) => a.groupe !== null).map((a) => ({ ...a, visiteurs: 0, acheteurs: 0, centimes: 0, chemins: [] })),
       quiImporte: { importees: personne, payees: personne },
       mix: s.pilotage.mix.map((m) => ({ ...m, n: 0, centimes: 0 })),
       iaDuJour: { dollars: 0, budget: 30, sansCompte: { dollars: 0, budget: 50 } },
@@ -154,6 +176,7 @@ describe("le pilotage, rendu", () => {
     const t = texte(renderToStaticMarkup(createElement(Pilotage, { s, direct: vide, base: "/admin", sonder: false })));
     expect(t).not.toMatch(SALE);
     expect(t).toContain("Ni visite ni vente sur la période.");
+    expect(t).toContain("Aucune visite sur la période.");
     expect(t).toContain("Aucune conv importée sur la période.");
     expect(t).toContain("Aucun appel au modèle sur la période.");
     expect(t).toContain("Pas encore de fuite à comparer");

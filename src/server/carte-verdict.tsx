@@ -4,6 +4,7 @@ import { join } from "node:path";
 import type { CSSProperties, ReactElement, ReactNode } from "react";
 import { ImageResponse } from "next/og";
 import { BLEU, DEGRADE_ROSE, DOUX, ENCRE, FOND_IMAGE, GRIS, SITE_AFFICHE } from "./marque";
+import type { Article } from "@/contenu/articles/types";
 import type { VerdictPartage } from "./partages";
 
 /*
@@ -12,7 +13,8 @@ import type { VerdictPartage } from "./partages";
  * l’encre en Nunito 900, BLUSH qui parle dans des bulles roses, et la réponse de celui qui regarde, en bleu.
  * Rien d’autre que le verdict : ni prénom, ni message. Textes relus le 8 octobre (voix de BLUSH).
  * Le cadre des stories (cadreStory), la marque et le dessin (dessiner) servent aussi à « Partager en image »
- * (src/server/carte-partage.tsx) ; les couleurs sont celles de la marque (src/server/marque.ts).
+ * (src/server/carte-partage.tsx) ; les couleurs sont celles de la marque (src/server/marque.ts). Le même habit dessine
+ * l’aperçu du site (carteDuSite) et celui de chaque guide ou entrée du lexique (carteDArticle).
  */
 
 const TAILLES = { carte: { width: 1200, height: 630 }, story: { width: 1080, height: 1920 } } as const;
@@ -244,6 +246,47 @@ export async function carteDuSite(): Promise<ImageResponse> {
         </span>
         <span style={{ fontSize: 30, fontWeight: 800, lineHeight: 1.32, color: DOUX, maxWidth: 900 }}>
           Ce qui se passe vraiment entre vous, messages à l’appui, et quoi lui répondre.
+        </span>
+      </div>
+      <div style={{ display: "flex", justifyContent: "flex-end" }}>
+        <Bulle moi taille={28} angle={1.5}>
+          {ACCROCHE}
+        </Bulle>
+      </div>
+    </div>,
+    "carte",
+    "public, max-age=86400",
+  );
+}
+
+/**
+ * L’image d’aperçu d’un guide ou d’une entrée du lexique (src/contenu/articles) : la marque, la rubrique dans une bulle
+ * rose, le titre de l’article en grand, et la réponse de celui qui regarde. Dessinée au build, la même pour tous, gardée
+ * par le CDN.
+ */
+export async function carteDArticle({ genre, titre }: Pick<Article, "genre" | "titre">): Promise<ImageResponse> {
+  return dessiner(
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "space-between",
+        width: "100%",
+        height: "100%",
+        padding: "46px 60px 44px",
+        background: FOND_IMAGE,
+        fontFamily: "Nunito",
+      }}
+    >
+      <Marque bulle={await imageBulle()} taille={72} police={40} ecart={13} />
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 12 }}>
+        <Bulle taille={30} angle={-1}>
+          {genre === "guide" ? "le guide 📖" : "le lexique 💬"}
+        </Bulle>
+        <span
+          style={{ fontSize: taille(titre, 80), fontWeight: 900, lineHeight: 1.06, letterSpacing: "-0.035em", color: ENCRE, marginTop: 16, maxWidth: 1060, textWrap: "balance" }}
+        >
+          {titre}
         </span>
       </div>
       <div style={{ display: "flex", justifyContent: "flex-end" }}>

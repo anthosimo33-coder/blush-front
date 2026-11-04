@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Landing } from "@/components/landing/Landing";
 import { CATALOGUE } from "@/contenu/offres";
+import { DonneesStructurees, donneesDuSite } from "@/lib/donnees-structurees";
 import { pagePublique } from "@/lib/referencement";
 import { URL_SITE } from "@/server/env";
 
@@ -15,33 +16,17 @@ export const metadata: Metadata = pagePublique("/", {
 });
 
 /**
- * Ce que les moteurs comprennent de BLUSH (données structurées schema.org) : une appli web, son éditeur, son prix de
- * départ (le rapport). Lu par Google pour ses résultats enrichis ; rien d’affiché.
+ * Ce que les moteurs comprennent de BLUSH (données structurées schema.org, src/lib/donnees-structurees.tsx) : son
+ * éditeur et ses comptes officiels, le site et les noms qu’on tape pour le trouver, et l’appli web, avec son prix de
+ * départ (le rapport). Lu par Google pour ses résultats ; rien d’affiché.
  */
-const DONNEES_STRUCTUREES = {
-  "@context": "https://schema.org",
-  "@graph": [
-    { "@type": "Organization", "@id": `${URL_SITE}/#editeur`, name: "BLUSH", url: URL_SITE, logo: `${URL_SITE}/icon.svg` },
-    {
-      "@type": "WebApplication",
-      name: "BLUSH",
-      url: URL_SITE,
-      inLanguage: "fr",
-      applicationCategory: "LifestyleApplication",
-      operatingSystem: "Web, iOS, Android",
-      description: "BLUSH lit ta conv WhatsApp ou Instagram et te dit ce qui se passe vraiment entre vous, messages à l’appui, et quoi lui répondre.",
-      publisher: { "@id": `${URL_SITE}/#editeur` },
-      offers: { "@type": "Offer", price: (CATALOGUE.rapport.centimes / 100).toFixed(2), priceCurrency: "EUR" },
-    },
-  ],
-};
+const DONNEES_STRUCTUREES = donneesDuSite(URL_SITE, (CATALOGUE.rapport.centimes / 100).toFixed(2));
 
 /* La landing : son bouton « Analyser ma conv » mène au parcours (/commencer). Qui revient connecté voit src/app/retour. */
 export default function Home() {
   return (
     <>
-      {/* Du JSON écrit par nous, sans rien venir d’un visiteur ; « < » échappé pour qu’aucune balise ne s’y ferme */}
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(DONNEES_STRUCTUREES).replace(/</g, "\\u003c") }} />
+      <DonneesStructurees donnees={DONNEES_STRUCTUREES} />
       <Landing />
     </>
   );

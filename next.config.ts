@@ -55,11 +55,25 @@ export const METADONNEES_OAUTH = [
  * Le CAPTCHA (Turnstile) et Apple Pay ne connaissent que askblush.com : ailleurs, le widget ne rend aucun jeton (erreur
  * 110200, « domaine inconnu ») et un visiteur sans compte ne peut rien importer. Les routes /api et les fichiers de Next
  * y restent servis : un cron, un webhook ou une page déjà ouverte qui les appelle n’a pas à suivre une redirection.
- * Temporaire (307) : rien ne reste en cache chez le visiteur si une de ces adresses doit resservir.
+ * Pour de bon (308) : les moteurs reportent sur askblush.com ce qu’ils savaient de ces adresses (une redirection
+ * temporaire, ils gardaient l’ancienne). Le navigateur la garde en cache : ces adresses ne servent plus de pages.
  */
 export const ANCIENNES_ADRESSES = ["crush-front.vercel.app", "blush-front.vercel.app"];
 /** Le site, où mènent les anciennes adresses : SITE_EN_LIGNE de src/server/env.ts (que ce fichier ne peut pas importer). */
 const SITE = "https://www.askblush.com";
+
+/**
+ * La barre finale des pages publiques (« /conditions/ », « /guides/un-guide/ ») : vers la même adresse sans, pour de bon
+ * (308), comme Next le faisait seul avant skipTrailingSlashRedirect. Sans quoi chaque page publique répondait à deux
+ * adresses. Seulement elles (les pages fixes de src/lib/referencement.ts, les hubs et les articles) : les requêtes de
+ * PostHog (« /ingest/e/ »), les routes /api et les fichiers de Next gardent leur barre, et les pages du proxy ont la
+ * leur (src/proxy.ts). tests/unit/referencement.test.ts vérifie que chaque page publique y passe, et rien d’autre.
+ */
+export const BARRE_FINALE = {
+  source: "/:chemin((?:confidentialite|conditions|mentions-legales|guides|lexique)(?:/[a-z0-9-]+)?)/",
+  destination: "/:chemin",
+  permanent: true,
+};
 
 const nextConfig: NextConfig = {
   /* Les liens et les navigations (next/link, useRouter, redirect) ne visent qu’une route qui existe : tsc le vérifie */
@@ -67,7 +81,7 @@ const nextConfig: NextConfig = {
   /*
    * Les requêtes de PostHog finissent par « / » (« /ingest/e/ ») : Next les renverrait ailleurs (308) avant que le
    * proxy ne les relaie. Il ne le fait plus ; le proxy le fait à sa place pour les pages qu’il aiguille (src/proxy.ts),
-   * les autres s’ouvrent avec ou sans la barre
+   * et BARRE_FINALE pour les pages publiques ; les autres s’ouvrent avec ou sans la barre
    */
   skipTrailingSlashRedirect: true,
   async redirects() {
@@ -82,8 +96,9 @@ const nextConfig: NextConfig = {
         source: "/:chemin((?!api/|_next/).*)",
         has: [{ type: "host" as const, value }],
         destination: `${SITE}/:chemin`,
-        permanent: false,
+        permanent: true,
       })),
+      BARRE_FINALE,
     ];
   },
   /*

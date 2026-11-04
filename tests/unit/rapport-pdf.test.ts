@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { LIGNES_D_ECOUTE, LIGNES_PAR_SITUATION } from "@/contenu/aide";
 import { pdfDuRapport, type RapportEnPdf } from "@/server/rapport-pdf";
 import { lirePdf } from "../aide/pdf";
 import { HISTOIRE, rapportComplet, rapportGratuit, rapportSobre } from "../aide/rapport-exemple";
@@ -111,7 +112,7 @@ describe("le rapport en PDF", () => {
     expect(texte).not.toContain("Ton résumé vocal");
   });
 
-  it("du mode sobre : le rapport doux tel quel, ses lignes d’écoute, ni verdict ni chapitre", async () => {
+  it("du mode sobre : le rapport doux tel quel, ses lignes d’écoute puis les lignes par situation, ni verdict ni chapitre", async () => {
     const lu = await pdf(rapportSobre());
     const texte = plat(lu.texte);
     for (const morceau of [
@@ -123,6 +124,14 @@ describe("le rapport en PDF", () => {
       "SOS Amitié",
     ])
       expect(texte).toContain(morceau);
+    /* Chaque ligne d’aide entière (son nom, ce qu’on compose, sa situation, ce qu’elle promet), dans l’ordre de la feuille de l’appli */
+    const lignes = [...LIGNES_D_ECOUTE.map((h) => [`${h.name} · ${h.label}`, h.detail]), ...LIGNES_PAR_SITUATION.map((s) => [`${s.name} · ${s.label}`, s.pour, s.detail])];
+    for (const ligne of lignes) expect(texte).toContain(plat(ligne.join(" ")));
+    const places = lignes.map(([titre]) => texte.indexOf(plat(titre!)));
+    expect(places).toEqual([...places].sort((a, b) => a - b));
+    expect(texte.indexOf("Si tu veux lui écrire")).toBeLessThan(places[0]!);
+    /* Toute l’aide sur la même page */
+    expect(lu.pages.filter((p) => lignes.some(([titre]) => plat(p.texte).includes(plat(titre!))))).toHaveLength(1);
     expect(texte).not.toContain("Vous êtes à deux doigts.");
     expect(texte).not.toContain("Le verdict");
   });

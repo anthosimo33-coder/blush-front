@@ -7,7 +7,9 @@ import { NOMS_DES_MAILS } from "@/contenu/mails";
 import { NOTE_DU_RAPPORT, QUI_COINCE } from "@/contenu/mesures";
 import { CATALOGUE } from "@/contenu/offres";
 import {
+  APPLIS_SANS_VIDEO,
   CIBLE_DE_MARGE,
+  NOMS_DES_ARRIVEES,
   NOMS_DES_ETAPES,
   NOMS_DES_GENRES,
   NOMS_DES_GROUPES,
@@ -17,6 +19,7 @@ import {
   NOMS_DES_TYPES_D_IMPORT,
   PAIRES,
   SOURCE_INCONNUE,
+  VIDEO_RETIREE_LE,
 } from "@/contenu/pilotage";
 import type { SourceVisite } from "@/types";
 import { delivrabilite } from "../delivrabilite";
@@ -50,7 +53,7 @@ export const OUTILS: readonly OutilMcp[] = [
     name: "pilotage",
     title: "Pilotage",
     description:
-      "L’écran principal de /admin sur la période : « À regarder » (ce qui coince, les bonnes nouvelles), le chiffre d’affaires net (payé − remboursé − contesté), les visiteurs, les acheteurs, le taux d’achat, le revenu par acheteur (toutes les ventes sont celles des vrais clients : les achats de l’équipe, du tournage et des invités sont retirés, et dits à côté), la dépense de l’IA en deux (celle du produit, les clients et les prospects ; celle des tests, l’équipe et le tournage ; puis l’offert aux invités et le non classé) et la marge produit (les ventes des vrais clients face à l’IA du produit, cible comprise, et au pire : le non classé compté dans le produit), la note des rapports écrits (« Oui, grave », « Bof » et ses raisons, les avis laissés), le tunnel visiteurs → imports → paywall → acheteurs → racheteurs et sa plus grosse fuite, qui importe (des filles ou des garçons, sur un garçon ou une fille, et le taux d’achat de chacun), les sources, ce qui se vend, et la santé. Chaque chiffre avec celui de la période d’avant. À appeler en premier.",
+      "L’écran principal de /admin sur la période : « À regarder » (ce qui coince, les bonnes nouvelles), le chiffre d’affaires net (payé − remboursé − contesté), les visiteurs, les acheteurs, le taux d’achat, le revenu par acheteur (toutes les ventes sont celles des vrais clients : les achats de l’équipe, du tournage et des invités sont retirés, et dits à côté), la dépense de l’IA en deux (celle du produit, les clients et les prospects ; celle des tests, l’équipe et le tournage ; puis l’offert aux invités et le non classé) et la marge produit (les ventes des vrais clients face à l’IA du produit, cible comprise, et au pire : le non classé compté dans le produit), la note des rapports écrits (« Oui, grave », « Bof » et ses raisons, les avis laissés), le tunnel visiteurs → imports → paywall → acheteurs → racheteurs et sa plus grosse fuite, qui importe (des filles ou des garçons, sur un garçon ou une fille, et le taux d’achat de chacun), les sources (Google, autres moteurs, assistants IA, mail, réseaux, verdicts partagés, direct…), les pages d’arrivée (la première page vue, par groupe : landing, guides et lexique, verdicts partagés, parrainage, pages légales, autres ; avec leurs chemins nettoyés, sans requête ni identifiant), ce qui se vend, et la santé. Chaque chiffre avec celui de la période d’avant. À appeler en premier.",
     inputSchema: AVEC_JOURS,
   },
   {
@@ -64,7 +67,7 @@ export const OUTILS: readonly OutilMcp[] = [
     name: "tunnel",
     title: "Tunnel détaillé",
     description:
-      "Le tunnel écran par écran sur la période : les jalons de l’import (du choix de l’appli au lancement de la lecture), l’import appli par appli (WhatsApp, Instagram, iMessage, Captures ou vidéo : ceux qui ouvrent son écran, qui y choisissent un fichier, et le taux de passage à partir de 30 personnes, puis les convs bien reçues et les envois ratés), les jalons du paywall (de l’arrivée au paiement), « Qu’est-ce qui coince ? » (la question posée, et chaque réponse : trop cher, pas confiance, pas maintenant, ça a bugué), les titres du haut du paywall (vus, payés, et le jour où il a été compté la première fois, pour un titre arrivé en cours de période), les offres uniques (montrées, prises), les commandes des vrais clients (payées, échouées, en attente) et jusqu’où vont les convs importées.",
+      "Le tunnel écran par écran sur la période : les jalons de l’import (du choix de l’appli au lancement de la lecture), l’import appli par appli (WhatsApp, Instagram, iMessage, Captures d’écran : ceux qui ouvrent son écran, qui y choisissent un fichier, et le taux de passage à partir de 30 personnes, puis les convs bien reçues et les envois ratés ; iMessage et Captures d’écran disent depuis quel jour ils ne prennent plus que des captures, la vidéo de l’écran retirée de l’import), les jalons du paywall (de l’arrivée au paiement), « Qu’est-ce qui coince ? » (la question posée, et chaque réponse : trop cher, pas confiance, pas maintenant, ça a bugué), les titres du haut du paywall (vus, payés, et le jour où il a été compté la première fois, pour un titre arrivé en cours de période), les offres uniques (montrées, prises), les commandes des vrais clients (payées, échouées, en attente) et jusqu’où vont les convs importées.",
     inputSchema: AVEC_JOURS,
   },
   {
@@ -85,7 +88,7 @@ export const OUTILS: readonly OutilMcp[] = [
     name: "couts_ia",
     title: "Coûts de l’IA",
     description:
-      "Ce qu’a coûté l’IA sur la période et celle d’avant, en dollars, rangée par une seule règle « qui est qui » : le total (la facture), celle du produit (les clients et les prospects) et celle des tests (l’équipe et le tournage), chaque population (clients, prospects, invités, équipe, tournage, non classé), par acheteur, par rapport et par verdict (le produit seul, la même population en haut et en bas), par poste (en tout et pour le produit, avec le nombre d’appels), la dépense d’aujourd’hui face au budget du jour (et la part sans compte face à la sienne), et l’IA avant l’achat par type d’import (export, captures, vidéo, hors des tests et des invités : les convs importées, leurs écrans et leurs lots par import, l’IA par import, le temps médian jusqu’au paywall, la part au paywall et la part qui paie, à partir de 30 convs, l’IA par acheteur, et ce qui a été lu pour rien), et la lecture partielle des longues vidéos (l’A/B, hors des tests et des invités : pour chaque moitié, entière ou partielle, ses vidéos comptées dès leur plan, importées ou non, celles importées, la part au paywall et qui paie, celles payées plus de 24 h après l’import, l’IA avant l’achat par vidéo, la suite lue après par acheteur, l’IA de lecture par acheteur, le temps médian jusqu’au paywall, les écrans et les lots lus avant, les lots gardés et la part des vidéos coupées, la part du titre « Tendance », les suites lues, incomplètes ou perdues, les titres que la conv entière aurait changés une fois sa suite lue ; et le contrefactuel des vidéos lues en entier).",
+      "Ce qu’a coûté l’IA sur la période et celle d’avant, en dollars, rangée par une seule règle « qui est qui » : le total (la facture), celle du produit (les clients et les prospects) et celle des tests (l’équipe et le tournage), chaque population (clients, prospects, invités, équipe, tournage, non classé), par acheteur, par rapport et par verdict (le produit seul, la même population en haut et en bas), par poste (en tout et pour le produit, avec le nombre d’appels), la dépense d’aujourd’hui face au budget du jour (et la part sans compte face à la sienne), et l’IA avant l’achat par type d’import (export, captures, vidéo, hors des tests et des invités : les convs importées, leurs écrans et leurs lots par import, l’IA par import, le temps médian jusqu’au paywall, la part au paywall et la part qui paie, à partir de 30 convs, l’IA par acheteur, et ce qui a été lu pour rien ; la vidéo dit le jour où elle a été retirée de l’import), et la lecture partielle des longues vidéos (l’A/B, hors des tests et des invités : pour chaque moitié, entière ou partielle, ses vidéos comptées dès leur plan, importées ou non, celles importées, la part au paywall et qui paie, celles payées plus de 24 h après l’import, l’IA avant l’achat par vidéo, la suite lue après par acheteur, l’IA de lecture par acheteur, le temps médian jusqu’au paywall, les écrans et les lots lus avant, les lots gardés et la part des vidéos coupées, la part du titre « Tendance », les suites lues, incomplètes ou perdues, les titres que la conv entière aurait changés une fois sa suite lue ; et le contrefactuel des vidéos lues en entier).",
     inputSchema: AVEC_JOURS,
   },
   {
@@ -199,6 +202,14 @@ function pilotage(s: StatsAdmin) {
       : null,
     quiImporte: quiImporte(p.quiImporte),
     sources: p.sources.map((x) => ({ source: nomDeLaSource(x.source), visiteurs: x.visiteurs, acheteurs: x.acheteurs, payeEuros: euros(x.centimes) })),
+    /* Les pages d’arrivée par groupe, leurs pages les plus vues et toutes celles qui ont vendu : rattacher chaque vente à un guide précis */
+    pagesDArrivee: p.arrivees.map((a) => ({
+      groupe: a.groupe === null ? SOURCE_INCONNUE : NOMS_DES_ARRIVEES[a.groupe],
+      visiteurs: a.visiteurs,
+      acheteurs: a.acheteurs,
+      payeEuros: euros(a.centimes),
+      pages: a.chemins.map((c) => ({ chemin: c.chemin, visiteurs: c.visiteurs, acheteurs: c.acheteurs, payeEuros: euros(c.centimes) })),
+    })),
     ceQuiSeVend: p.mix.map((m) => ({ groupe: NOMS_DES_GROUPES[m.groupe], achats: m.n, payeEuros: euros(m.centimes) })),
     noteDuRapport: {
       ouiGrave: p.note.oui,
@@ -256,6 +267,8 @@ function tunnel(s: StatsAdmin) {
       const taux = tauxLisible(j.fichier, j.appli);
       return {
         appli: nomDeLAppli(appli),
+        /* iMessage et la tuile des captures : plus de vidéo de l’écran depuis ce jour (comme dans /admin) */
+        ...(APPLIS_SANS_VIDEO.includes(appli) && { capturesSeulesDepuis: VIDEO_RETIREE_LE }),
         ouvrentSonEcran: j.appli,
         choisissentLeurFichier: j.fichier,
         passentAuFichierPct: taux === null ? null : arrondi(taux * 100),
@@ -329,6 +342,8 @@ function coutsIA(s: StatsAdmin) {
       };
       return {
         type: NOMS_DES_TYPES_D_IMPORT[t.type],
+        /* La vidéo de l’écran, retirée de l’import ce jour-là (comme dans /admin) */
+        ...(t.type === "video" && { retireeLe: VIDEO_RETIREE_LE }),
         imports: t.imports,
         ecransParImport: arrondi(rapport(t.ecrans, t.imports)),
         lotsParImport: arrondi(rapport(t.lots, t.imports)),

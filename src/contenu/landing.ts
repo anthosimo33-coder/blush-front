@@ -64,7 +64,7 @@ export const LANDING_CONVS: LandingConv[] = [
   {
     id: "ines",
     name: "Inès",
-    label: "Ta situationship",
+    label: "Ton crush flou",
     app: "imessage",
     avatar: "initial",
     photo: "/convs/ines.webp",
@@ -396,7 +396,7 @@ export const TESTIMONIALS: Testimonial[] = [
   },
   {
     name: "Charlotte",
-    label: "Situationship",
+    label: "Ça traîne",
     teinte: "flou",
     vu: "qui relance sans réponse",
     citation: "Ça m’a fait mal de le voir noir sur blanc",
@@ -416,7 +416,7 @@ export const TESTIMONIALS: Testimonial[] = [
   },
   {
     name: "Maelys",
-    label: "Situationship",
+    label: "Ils se voient",
     teinte: "flou",
     vu: "des réponses en 3 mots depuis une semaine",
     citation: "BLUSH m’a sorti la phrase parfaite et depuis c’est niquel",

@@ -23,8 +23,13 @@ export function Hero({ retour, children }: { retour: Retour; children?: ReactNod
             <Said me>que tu crois</Said>.
           </span>
         </h1>
+        {/*
+         * Ce que BLUSH lit, en toutes lettres : la seule phrase visible de la landing qui le dit en entier (les logos des
+         * applis sont aria-hidden, et « Toutes tes applis, même par captures » vient bien plus bas), avec « ce qui se passe
+         * vraiment entre vous », comme le titre de la page. Pas plus longue : à 320 × 568, le bouton reste dans le premier écran
+         */}
         <p className="m-0 mt-6 max-w-[600px] text-carte font-extrabold leading-[1.5] text-soft [text-wrap:balance] lg:mt-8 lg:text-[21px]">
-          Importe-la. BLUSH te dit ce qui se passe vraiment entre vous, messages à l’appui, et quoi répondre.
+          Captures d’écran, export Instagram ou WhatsApp{NBSP}: BLUSH te dit ce qui se passe vraiment entre vous, et quoi répondre.
         </p>
         <CtaButton retour={retour} className="mt-8 lg:mt-10" />
         <SousLeBouton retour={retour} />

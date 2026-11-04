@@ -54,7 +54,8 @@ test("la relance : le mail « Ton rapport t’attend », son lien vers la feuill
   await test.step("le lien du mail rouvre la conv sur la feuille de paiement", async () => {
     const lien = /(https?:\/\/\S+\/ouvrir\/\S+)/.exec(mail.texte)![1]!;
     await page.goto(new URL(lien).pathname + new URL(lien).search);
-    await expect(page).toHaveURL(/\/rapport\?paiement=1$/);
+    /* Les utm_ du lien suivent jusqu’à la page où il mène : c’est elle qui compte la visite en « Mail » */
+    await expect(page).toHaveURL(/\/rapport\?paiement=1&utm_source=email&utm_campaign=relance$/);
   });
 
   await test.step("la désinscription, ouverte ailleurs (le mail lu sur un autre appareil) et au clavier : les relances sont coupées", async () => {

@@ -1,4 +1,4 @@
-import { PAIRES, type Paire } from "@/contenu/pilotage";
+import { PAIRES, type GroupeDArrivee, type Paire } from "@/contenu/pilotage";
 import type { CaseDuPilotage, Genres, Periode, Pilotage, StatsAdmin } from "@/server/stats";
 import type { AppKind } from "@/types";
 import type { Direct, GesteDuFil } from "@/types/api";
@@ -86,6 +86,66 @@ function quiImporteDe(imports: number): Pilotage["quiImporte"] {
   return { importees: genresDesPaires(importees, imports - somme(PAIRES, (x) => importees[x])), payees: genresDesPaires(payees, 0) };
 }
 
+/*
+ * Les pages d’arrivée, dans l’ordre de leurs groupes après la landing : une part des visiteurs, un taux d’achat, et les
+ * pages qui la font ; la landing prend le reste. Le parrainage reste vide (son lien mène à la landing), comme en vrai
+ */
+const PARTS_DES_ARRIVEES: [Exclude<GroupeDArrivee, "landing">, number, number, [string, number][]][] = [
+  [
+    "guides",
+    0.04,
+    0.02,
+    [
+      ["/guides/il-ne-repond-plus", 0.6],
+      ["/lexique/ghosting", 0.4],
+    ],
+  ],
+  ["partage", 0.085, 0.054, [["/v/:id", 1]]],
+  ["parrainage", 0, 0, []],
+  ["legales", 0.006, 0, [["/confidentialite", 1]]],
+  [
+    "autres",
+    0.06,
+    0.03,
+    [
+      ["/commencer", 0.5],
+      ["/rapport", 0.3],
+      ["/app", 0.2],
+    ],
+  ],
+];
+
+/** Les pages d’arrivée d’exemple, retombées sur les totaux ; sans visites comptées, tous les acheteurs sont « avant le suivi ». */
+function arriveesDe({
+  visiteurs,
+  acheteurs,
+  paye,
+  avantLeSuivi,
+  suivi,
+}: {
+  visiteurs: number;
+  acheteurs: number;
+  paye: number;
+  avantLeSuivi: number;
+  suivi: boolean;
+}): Pilotage["arrivees"] {
+  const autres = PARTS_DES_ARRIVEES.map(([groupe, part, taux, pages]) => {
+    const v = suivi ? Math.round(visiteurs * part) : 0;
+    const a = Math.round(v * taux);
+    const chemins = pages.map(([chemin, p]) => ({ chemin, visiteurs: Math.round(v * p), acheteurs: Math.round(a * p), centimes: Math.round(a * p) * 1650 }));
+    return { groupe, visiteurs: v, acheteurs: a, centimes: a * 1650, chemins };
+  });
+  const centimesAvant = suivi ? avantLeSuivi * 1990 : paye;
+  const accueil = {
+    visiteurs: suivi ? visiteurs - somme(autres, (g) => g.visiteurs) : 0,
+    acheteurs: acheteurs - avantLeSuivi - somme(autres, (g) => g.acheteurs),
+    centimes: paye - centimesAvant - somme(autres, (g) => g.centimes),
+  };
+  const landing = { groupe: "landing" as const, ...accueil, chemins: accueil.visiteurs ? [{ chemin: "/", ...accueil }] : [] };
+  const inconnue = avantLeSuivi ? [{ groupe: null, visiteurs: 0, acheteurs: avantLeSuivi, centimes: centimesAvant, chemins: [] }] : [];
+  return [landing, ...autres, ...inconnue];
+}
+
 /** Le pilotage d’exemple de la période. */
 function pilotageDe(jours: Periode, { calme = false, suivi = true }: Variante): Pilotage {
   const cases = casesDe(jours, suivi);
@@ -104,6 +164,9 @@ function pilotageDe(jours: Periode, { calme = false, suivi = true }: Variante): 
     ["snapchat", 0.06, 0.021],
     ["google", 0.025, 0.04],
     ["direct", 0.02, 0.04],
+    ["mail", 0.012, 0.045],
+    ["moteurs", 0.006, 0.03],
+    ["assistants", 0.004, 0.04],
   ];
   const avantLeSuivi = jours === 1 ? 0 : 2;
   const autres = parts.map(([source, part, taux]) => {
@@ -122,6 +185,7 @@ function pilotageDe(jours: Periode, { calme = false, suivi = true }: Variante): 
   const sources = suivi
     ? [tiktok, ...autres, ...(avantLeSuivi ? [{ source: null, visiteurs: 0, acheteurs: avantLeSuivi, centimes: avantLeSuivi * 1990 }] : [])].sort((a, b) => b.centimes - a.centimes)
     : [{ source: null, visiteurs: 0, acheteurs, centimes: paye }];
+  const arrivees = arriveesDe({ visiteurs, acheteurs, paye, avantLeSuivi: suivi ? avantLeSuivi : acheteurs, suivi });
   /* Ce qui se vend : Premium, le rapport et la suite à leur prix, les bulles prennent le reste */
   const premium = Math.round(acheteurs * 0.52);
   const rapport = Math.round(acheteurs * 0.31);
@@ -268,6 +332,7 @@ function pilotageDe(jours: Periode, { calme = false, suivi = true }: Variante): 
     jalonsParAppli,
     quiImporte: quiImporteDe(imports),
     sources,
+    arrivees,
     mix: [
       { groupe: "premium", n: premium, centimes: premium * 1990 },
       { groupe: "rapport", n: rapport, centimes: rapport * 990 },
@@ -485,6 +550,7 @@ export function directDExemple(): Direct {
     etapes: [
       { etape: "accueil", n: 7 },
       { etape: "partage", n: 1 },
+      { etape: "guides", n: 0 },
       { etape: "import", n: 5 },
       { etape: "verdict", n: 4 },
       { etape: "rapport", n: 1 },

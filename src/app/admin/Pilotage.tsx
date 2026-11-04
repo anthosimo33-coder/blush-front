@@ -6,8 +6,10 @@ import { NOMS_DES_MAILS } from "@/contenu/mails";
 import { NOTE_DU_RAPPORT } from "@/contenu/mesures";
 import { prixDe } from "@/contenu/offres";
 import {
+  APPLIS_SANS_VIDEO,
   CIBLE_DE_MARGE,
   EUROS_PAR_DOLLAR,
+  NOMS_DES_ARRIVEES,
   NOMS_DES_GENRES,
   NOMS_DES_GROUPES,
   NOMS_DES_PAIRES,
@@ -17,10 +19,11 @@ import {
   NOMS_DES_VENTES,
   PAIRES,
   SOURCE_INCONNUE,
+  VIDEO_RETIREE_LE,
   margeApresIA,
 } from "@/contenu/pilotage";
 import { cn } from "@/lib/cn";
-import { NBSP } from "@/lib/format";
+import { jourEnLettres, NBSP } from "@/lib/format";
 import { jourDeParisAvant } from "@/lib/jours";
 import type { Delivrabilite as ChiffresDeDelivrabilite } from "@/server/delivrabilite";
 import type { SanteDesNavigateurs } from "@/server/navigateur";
@@ -164,6 +167,7 @@ export function Pilotage({
             <Sources p={p} />
             <CeQuiSeVend s={s} />
           </div>
+          <PagesDArrivee p={p} />
 
           <IAAvantLAchat p={p} />
           <LecturePartielle p={p} />
@@ -645,7 +649,13 @@ function DuChoixAuFichier({ applis }: { applis: Chiffres["jalonsParAppli"] }) {
           const taux = tauxLisible(j.fichier, j.appli);
           return (
             <li key={appli} className="flex items-baseline justify-between gap-3 text-note font-bold text-soft">
-              <span className="min-w-0">{nomDeLAppli(appli)}</span>
+              <span className="min-w-0">
+                {nomDeLAppli(appli)}
+                {/* iMessage et la tuile des captures : la vidéo de l’écran en est partie ce jour-là, leurs chiffres changent de nature */}
+                {APPLIS_SANS_VIDEO.includes(appli) && (
+                  <span className="ml-1.5 text-micro font-black text-elle-ink">{`captures seules depuis le ${jourEnLettres(VIDEO_RETIREE_LE)}`}</span>
+                )}
+              </span>
               <span className="flex shrink-0 items-baseline gap-2 tabular-nums">
                 <span>{`${nombre(j.appli)} → ${nombre(j.fichier)}`}</span>
                 <span className="min-w-[44px] text-right font-black text-ink">{taux === null ? "—" : pourcent(taux * 100, 0)}</span>
@@ -1188,6 +1198,69 @@ function Sources({ p }: { p: Chiffres }) {
   );
 }
 
+/* ———— Les pages d’arrivée ———— */
+
+function PagesDArrivee({ p }: { p: Chiffres }) {
+  const maxVisiteurs = Math.max(1, ...p.arrivees.map((a) => a.visiteurs));
+  const visiteurs = p.arrivees.reduce((t, a) => t + a.visiteurs, 0);
+  const guides = p.arrivees.find((a) => a.groupe === "guides");
+  return (
+    <Bloc
+      id="arrivees"
+      titre="Pages d’arrivée"
+      sous="La première page vue, par groupe"
+      aide={{ cle: "arrivees", valeur: pluriel(guides?.visiteurs ?? 0, "visiteur"), contexte: "arrivés par un guide ou le lexique" }}
+    >
+      <div role="region" aria-label="Les pages d’arrivée, à faire défiler" tabIndex={0} className="-mx-2 mt-[18px] overflow-x-auto px-2">
+        <table className="w-full min-w-[520px] border-collapse text-left">
+          <caption className="sr-only">Les pages d’arrivée des visiteurs, par groupe</caption>
+          <thead>
+            <tr className="text-micro font-black uppercase tracking-[0.06em] text-grey">
+              <th scope="col" className="pb-2.5 font-black">
+                Page
+              </th>
+              <th scope="col" className="w-[40%] pb-2.5 font-black">
+                Visiteurs
+              </th>
+              <th scope="col" className="pb-2.5 text-right font-black">
+                Achètent
+              </th>
+              <th scope="col" className="pb-2.5 text-right font-black">
+                CA
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {p.arrivees.map((a) => {
+              /*
+               * « Avant le suivi » n’a pas de taux : ses visites (d’avant qu’on note la page) et ses acheteurs (des comptes
+               * d’avant, qui achètent encore) ne sont pas les mêmes personnes
+               */
+              const taux = a.groupe === null ? null : rapport(a.acheteurs, a.visiteurs);
+              return (
+                <tr key={a.groupe ?? "inconnue"} className="border-t border-sep text-detail font-extrabold">
+                  <th scope="row" className="py-3 pr-3 text-left font-extrabold">
+                    {a.groupe === null ? SOURCE_INCONNUE : NOMS_DES_ARRIVEES[a.groupe]}
+                  </th>
+                  <td className="py-3 pr-3">
+                    <span className="flex items-center gap-2.5">
+                      <Barre part={a.visiteurs / maxVisiteurs} couleur="var(--toi)" />
+                      <span className="min-w-[52px] text-right tabular-nums">{nombre(a.visiteurs)}</span>
+                    </span>
+                  </td>
+                  <td className="py-3 pr-3 text-right tabular-nums">{taux === null ? "—" : pourcent(taux * 100)}</td>
+                  <td className="py-3 text-right tabular-nums">{euros(a.centimes, 0)}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      {!visiteurs && <p className="m-0 mt-3 text-note font-bold text-grey">Aucune visite sur la période.</p>}
+    </Bloc>
+  );
+}
+
 /* ———— Ce qui se vend ———— */
 
 function CeQuiSeVend({ s }: { s: StatsAdmin }) {
@@ -1325,6 +1398,8 @@ function IAAvantLAchat({ p }: { p: Chiffres }) {
                   <tr key={x.type} className="border-t border-sep text-detail font-extrabold">
                     <th scope="row" className="py-3 pr-3 text-left font-extrabold">
                       <span className="block">{NOMS_DES_TYPES_D_IMPORT[x.type]}</span>
+                      {/* Retirée de l’import ce jour-là : ce qui en reste vient d’onglets ouverts avant */}
+                      {x.type === "video" && <span className="block text-micro font-black text-elle-ink">{`retirée de l’import le ${jourEnLettres(VIDEO_RETIREE_LE)}`}</span>}
                       {ecrans !== null && lots !== null && x.lots > 0 && (
                         <span className="block text-micro font-bold text-grey">{`${pluriel(moyenne(ecrans), "écran")}, ${pluriel(moyenne(lots), "lot")} par import`}</span>
                       )}

@@ -13,7 +13,7 @@ import { CLES_DES_MAILS } from "@/server/sequences";
 import { statsAdmin, type Genres } from "@/server/stats";
 import { attendreLePaiement } from "@/server/taches";
 import { aujourdhuiParis } from "@/server/temps";
-import { noterAchatAuFil, noterAuFil, noterJalon, noterLaSourceDuCompte, noterSigne, sourceDeLaVisite } from "@/server/visites";
+import { noterAchatAuFil, noterAuFil, noterJalon, noterLaSourceDuCompte, noterSigne, visiteDeLaConnexion } from "@/server/visites";
 import { CLES_DES_APPLIS, JALONS_PAR_APPLI, type AppKind, type JalonParAppli, type OffreId } from "@/types";
 import { accordDeTest, compteDeTest, convPrete, convRattachee, ligneEnBase } from "./aide/fixtures";
 
@@ -27,6 +27,14 @@ const TIKTOK = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebK
 const SAFARI = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Version/18.0 Mobile/15E148 Safari/604.1";
 /* Une adresse IP à ce test, jamais vue par un lancement d’avant */
 const ipNeuve = () => `10.${Math.floor(Math.random() * 250)}.${Math.floor(Math.random() * 250)}.${Math.floor(Math.random() * 250)}`;
+/*
+ * Un guide d’essai, jamais vu par un lancement d’avant, en lettres seules : six chiffres de suite font de l’adresse un
+ * identifiant (LONG_NOMBRE, src/lib/chemins.ts), « /guides/:id », et le test échouait une fois sur dix environ.
+ */
+const guideDEssai = () =>
+  `/guides/essai-${randomUUID()
+    .slice(0, 8)
+    .replace(/\d/g, (c) => "abcdefghij"[Number(c)]!)}`;
 const LYON = { "x-vercel-ip-city": "Lyon", "x-vercel-ip-country": "FR", "x-vercel-ip-latitude": "45.75", "x-vercel-ip-longitude": "4.85" };
 
 const requete = (ip: string, agent: string, entetes: Record<string, string> = {}, init: RequestInit = {}) =>
@@ -160,8 +168,8 @@ describe("la source d’un compte et le fil du direct", () => {
   it("un compte créé reprend la source de sa visite du jour ; une autre connexion n’en a pas", async () => {
     const ip = ipNeuve();
     await noterSigne(requete(ip, SAFARI), { onglet: randomUUID(), etape: "accueil", premier: true, utm: "instagram" });
-    expect(await sourceDeLaVisite(requete(ip, SAFARI))).toBe("instagram");
-    expect(await sourceDeLaVisite(requete(ipNeuve(), SAFARI))).toBeNull();
+    expect(await visiteDeLaConnexion(requete(ip, SAFARI))).toEqual({ source: "instagram", arrivee: null });
+    expect(await visiteDeLaConnexion(requete(ipNeuve(), SAFARI))).toBeNull();
     const u = await compteDeTest("pilotage-source");
     await noterLaSourceDuCompte(requete(ip, SAFARI), u.id);
     /* Une deuxième visite, d’ailleurs, ne change pas la source déjà notée */
@@ -249,6 +257,85 @@ describe("le pilotage (/admin)", () => {
     expect(heures.pas).toBe("heure");
     expect(heures.cases).toHaveLength(24);
     expect((await statsAdmin(30)).pilotage.cases).toHaveLength(30);
+  });
+});
+
+describe("la page d’arrivée et les nouvelles sources", () => {
+  const signe = (ip: string, corps: Record<string, unknown>) =>
+    postPresence(
+      requete(ip, SAFARI, {}, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ onglet: randomUUID(), premier: true, ...corps }) }),
+    );
+  const visiteDe = (ip: string) => visiteDeLaConnexion(requete(ip, SAFARI));
+
+  it("la visite garde sa page d’arrivée renettoyée par le serveur (le navigateur peut mentir), et la source d’un mail, d’un assistant ou d’une appli Android", async () => {
+    let ip = ipNeuve();
+    expect((await signe(ip, { etape: "partage", arrivee: "/v/Ab3dE9xYz?prenom=Lea#haut", utm: "email" })).status).toBe(200);
+    expect(await visiteDe(ip)).toEqual({ source: "mail", arrivee: "/v/:id" });
+    ip = ipNeuve();
+    await signe(ip, { etape: "autre", arrivee: "/lea.martin@exemple.fr", referent: "https://chatgpt.com" });
+    expect(await visiteDe(ip)).toEqual({ source: "assistants", arrivee: "/:id" });
+    ip = ipNeuve();
+    await signe(ip, { etape: "guides", arrivee: "/guides/il-ne-repond-plus", referent: "android-app://com.google.android.googlequicksearchbox" });
+    expect(await visiteDe(ip)).toEqual({ source: "google", arrivee: "/guides/il-ne-repond-plus" });
+    /* Pas un chemin, ou rien (un onglet d’avant cette version) : la visite compte, sans page d’arrivée */
+    ip = ipNeuve();
+    await signe(ip, { etape: "accueil", arrivee: "https://exemple.org/", referent: "https://www.bing.com" });
+    expect(await visiteDe(ip)).toEqual({ source: "moteurs", arrivee: null });
+    /* Une page d’arrivée trop longue est refusée, comme un signe mal formé */
+    expect((await signe(ipNeuve(), { etape: "accueil", arrivee: `/${"x".repeat(300)}` })).status).toBe(422);
+  });
+
+  it("un compte reprend la page d’arrivée de sa visite ; le pilotage range visiteurs, acheteurs et payé par groupe, et détaille les pages", async () => {
+    const lire = async () => {
+      const p = (await statsAdmin(7)).pilotage;
+      const groupe = (g: string | null) => p.arrivees.find((a) => a.groupe === g) ?? { visiteurs: 0, acheteurs: 0, centimes: 0, chemins: [] };
+      const page = (chemin: string) => groupe("guides").chemins.find((c) => c.chemin === chemin) ?? { visiteurs: 0, acheteurs: 0, centimes: 0 };
+      return { p, groupe, page };
+    };
+    const avant = await lire();
+    const chemin = guideDEssai();
+    const ip = ipNeuve();
+    await noterSigne(requete(ip, SAFARI), { onglet: randomUUID(), etape: "guides", premier: true, arrivee: `${chemin}?utm_source=x` });
+    await noterSigne(requete(ipNeuve(), SAFARI), { onglet: randomUUID(), etape: "accueil", premier: true, arrivee: "/" });
+    const u = await compteDeTest("pilotage-arrivee");
+    await noterLaSourceDuCompte(requete(ip, SAFARI), u.id);
+    const [l] = await db().select({ source: schema.users.source, arrivee: schema.users.arrivee }).from(schema.users).where(eq(schema.users.id, u.id));
+    expect(l).toEqual({ source: "direct", arrivee: chemin });
+    await db().insert(schema.achats).values({ userId: u.id, offre: "rapport", centimes: 990, bulles: 0, fournisseur: "factice", statut: "paye", payeLe: new Date() });
+    const apres = await lire();
+
+    const ecart = (f: (x: typeof avant) => { visiteurs: number; acheteurs: number; centimes: number }) => {
+      const [a, b] = [f(avant), f(apres)];
+      return { visiteurs: b.visiteurs - a.visiteurs, acheteurs: b.acheteurs - a.acheteurs, centimes: b.centimes - a.centimes };
+    };
+    expect(ecart((x) => x.groupe("guides"))).toEqual({ visiteurs: 1, acheteurs: 1, centimes: 990 });
+    expect(ecart((x) => x.groupe("landing"))).toEqual({ visiteurs: 1, acheteurs: 0, centimes: 0 });
+    expect(apres.page(chemin)).toEqual({ chemin, visiteurs: 1, acheteurs: 1, centimes: 990 });
+    /* Tous les groupes, dans leur ordre, même vides ; puis « avant le suivi » s’il a quelque chose */
+    expect(apres.p.arrivees.map((a) => a.groupe).filter((g) => g !== null)).toEqual(["landing", "guides", "partage", "parrainage", "legales", "autres"]);
+    expect(apres.p.arrivees.findIndex((a) => a.groupe === null)).not.toBe(0);
+  });
+
+  it("au-delà des dix pages les plus vues d’un groupe, le pilotage garde chaque page qui a vendu, même vue une seule fois", async () => {
+    const essai = guideDEssai();
+    /* Onze guides plus vus (deux visiteurs chacun), sans vente */
+    for (let k = 0; k < 11; k++)
+      for (const ip of [ipNeuve(), ipNeuve()]) await noterSigne(requete(ip, SAFARI), { onglet: randomUUID(), etape: "guides", premier: true, arrivee: `${essai}-${k}` });
+    /* Un guide vu une seule fois, qui vend */
+    const vendu = `${essai}-vendu`;
+    const ip = ipNeuve();
+    await noterSigne(requete(ip, SAFARI), { onglet: randomUUID(), etape: "guides", premier: true, arrivee: vendu });
+    const u = await compteDeTest("pilotage-arrivee-vendue");
+    await noterLaSourceDuCompte(requete(ip, SAFARI), u.id);
+    await db().insert(schema.achats).values({ userId: u.id, offre: "rapport", centimes: 990, bulles: 0, fournisseur: "factice", statut: "paye", payeLe: new Date() });
+    const guides = (await statsAdmin(7)).pilotage.arrivees.find((a) => a.groupe === "guides")!;
+
+    const rang = guides.chemins.findIndex((c) => c.chemin === vendu);
+    expect(guides.chemins[rang]).toEqual({ chemin: vendu, visiteurs: 1, acheteurs: 1, centimes: 990 });
+    /* Onze pages plus vues que lui : sans sa vente, il serait coupé ; avec, il vient après les dix plus vues (CHEMINS_PAR_GROUPE) */
+    expect(rang).toBeGreaterThanOrEqual(10);
+    /* Après les dix plus vues, ne restent que celles qui ont vendu */
+    expect(guides.chemins.slice(10).filter((c) => c.acheteurs === 0)).toEqual([]);
   });
 });
 

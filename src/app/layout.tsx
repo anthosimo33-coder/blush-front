@@ -14,7 +14,7 @@ import "./globals.css";
 
 /*
  * Les moteurs de recherche : seules les pages publiques s’indexent (la landing, les conditions, les mentions légales, la
- * confidentialité : PAGE_PUBLIQUE, src/lib/referencement.ts). Toutes les autres, privées (le parcours, le rapport, le
+ * confidentialité, les guides et le lexique : pagePublique, src/lib/referencement.ts). Toutes les autres, privées (le parcours, le rapport, le
  * chat, le compte) ou outils de l’équipe, restent hors des moteurs par défaut : une nouvelle page aussi, tant qu’elle ne
  * le demande pas. robots.txt (src/app/robots.ts) et le plan du site (src/app/sitemap.ts) disent la même chose.
  */

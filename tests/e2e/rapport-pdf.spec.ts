@@ -100,6 +100,16 @@ test("une alerte : le rapport doux, en PDF, tel quel", async ({ page }, testInfo
   await ecran.getByRole("button", { name: "Et maintenant ?" }).click();
   await telechargerDepuis(page, testInfo, ecran.getByRole("button", { name: /^Télécharger en PDF/ }), partages);
   const { texte } = await pdfDuCompte(page);
-  for (const morceau of ["Ce que tu vis n’est pas normal.", "Passe à autre chose, proprement.", "Fil Santé Jeunes"]) expect(texte).toContain(morceau);
+  for (const morceau of [
+    "Ce que tu vis n’est pas normal.",
+    "Passe à autre chose, proprement.",
+    "Fil Santé Jeunes",
+    "Urgence par SMS · 114",
+    "Enfance en danger · 119",
+    "Violences Femmes Info · 3919",
+    "Harcèlement en ligne · 3018",
+    "Comment on s’aime · commentonsaime.fr",
+  ])
+    expect(texte).toContain(morceau);
   expect(texte).not.toContain("Vous êtes à deux doigts.");
 });

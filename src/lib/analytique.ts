@@ -1,6 +1,7 @@
 "use client";
 
 import type { CaptureResult, PostHog, PostHogConfig, Properties } from "posthog-js";
+import { cheminSur } from "./chemins";
 import { etapeDe } from "./presence";
 import { masquerTexte } from "./secrets";
 import { cleDePostHog } from "./publique";
@@ -36,16 +37,6 @@ import { cleDePostHog } from "./publique";
 
 /** Les paramètres d’une adresse qu’on garde : ceux des liens des créatrices. */
 const UTM = /^utm_(source|medium|campaign|content|term)$/;
-/** Les pages dont le morceau d’après est un identifiant : un verdict partagé, un parrainage, un lien de mail, un lien de tournage. */
-const AVEC_IDENTIFIANT = new Set(["v", "p", "ouvrir", "tournage"]);
-/** Un identifiant ailleurs dans une adresse : un uuid. */
-const UUID = /^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/i;
-
-/** Un chemin de l’appli sans ses identifiants : « /v/:id », « /ouvrir/:id ». */
-export function cheminSur(chemin: string): string {
-  const morceaux = chemin.split("/");
-  return morceaux.map((m, k) => (m && ((k === 2 && AVEC_IDENTIFIANT.has(morceaux[1] ?? "")) || UUID.test(m)) ? ":id" : m)).join("/");
-}
 
 /**
  * Une adresse sans ce qui pourrait dire qui l’on est : sur BLUSH, son chemin sans identifiants et ses seuls utm_ ;

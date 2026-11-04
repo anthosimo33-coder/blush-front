@@ -64,6 +64,11 @@
 
 export const SECTIONS = [
   { id: "landing", title: "Landing", sub: "La page d’accueil du site (/), avant le parcours" },
+  {
+    id: "guides",
+    title: "Guides et lexique",
+    sub: "Le gabarit des articles (/guides, /lexique), sur deux exemples inventés des aperçus (/apercu/guide, /apercu/lexique)\u00a0: aucun article n’est encore publié",
+  },
   { id: "parcours", title: "Entrée", sub: "De l’appli choisie à la lecture de ta conv (écrans 01 à 08), avec une conv importée pour de vrai" },
   {
     id: "paywall",
@@ -340,6 +345,28 @@ export const STATES = [
       await page.waitForTimeout(900);
     },
     note: "Un couple dans chaque rangée (Mon cœur, Chéri, Julien), avec les verdicts en couple. Exemples fictifs, textes à valider.",
+  },
+
+  /* ———— Guides et lexique ———— */
+  {
+    id: "G1",
+    section: "guides",
+    title: "Guide",
+    state: "Un guide d’exemple (zone verte)",
+    route: "/apercu/guide",
+    full: true,
+    note: "Le gabarit de la charte (plan SEO, section 9)\u00a0: le titre, la signature, «\u00a0La réponse courte\u00a0», les sections en questions, les mini-convs «\u00a0exemple inventé\u00a0», les bulles de BLUSH, «\u00a0Ce que BLUSH regarde\u00a0», «\u00a0Les pièges\u00a0», la FAQ, le bouton tiré du code, les sources. Texte d’exemple, jamais publié.",
+    changement: "Nouveau\u00a0: le gabarit des guides.",
+  },
+  {
+    id: "G2",
+    section: "guides",
+    title: "Lexique",
+    state: "Une entrée d’exemple (zone orange, son bloc d’aide)",
+    route: "/apercu/lexique",
+    full: true,
+    note: "Le même gabarit, en zone orange\u00a0: le bloc d’aide avec les numéros de src/contenu/aide.ts tels qu’ils sont, puis le bouton. Texte d’exemple, jamais publié.",
+    changement: "Nouveau\u00a0: le gabarit du lexique.",
   },
 
   /* ———— Entrée ———— */
@@ -1074,6 +1101,8 @@ export const STATES = [
     steps: click("Besoin d’en parler à quelqu’un ?"),
     sheet: true,
     note: "Ressources d’aide à valider.",
+    changement:
+      "Nouveau (3 novembre 2026)\u00a0: sous les lignes d’écoute, les cinq lignes par situation (le 114 par SMS, le 119, le 3919, le 3018, le tchat de commentonsaime.fr), chacune avec sa situation, et le 3018 en deux gestes («\u00a0Appeler\u00a0», «\u00a0Écrire en tchat\u00a0»)\u00a0; sur ordinateur, la feuille s’arrête avant le bas de l’écran et défile.",
   },
 
   /* ———— Au quotidien ———— */

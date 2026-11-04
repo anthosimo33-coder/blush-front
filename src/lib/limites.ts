@@ -12,6 +12,15 @@ const MO = 1024 * 1024;
 export const CAPTURES_MAX = 20;
 
 /**
+ * L’enregistrement d’écran se propose-t-il à l’import (une première conv comme un morceau ajouté) ? Retiré le 3 novembre
+ * 2026 (VIDEO_RETIREE_LE, src/contenu/pilotage.ts) : il coûtait l’IA la plus chère avant l’achat (la plupart lue pour
+ * rien, des vidéos qui n’arrivaient jamais au bout) sans faire vendre. Éteint, l’écran des captures ne propose plus
+ * que des captures, iMessage compris, et ses tests de bout en bout se sautent. Le code de la vidéo reste (sa lecture par
+ * lots, la lecture partielle, les routes pour un onglet ouvert avant) : rallumé, tout revient.
+ */
+export const VIDEO_A_L_IMPORT = false;
+
+/**
  * Les écrans d’un lot d’enregistrement d’écran (tailleDesLots, src/services/preparer-video.ts) : six pour une courte
  * vidéo, lue en un seul tour, jusqu’à douze pour une longue. /api/captures/video borne les messages d’un lot en
  * conséquence, et /api/captures/lot les images d’un envoi (CAPTURES_MAX).
@@ -42,6 +51,12 @@ export const INVITATIONS_PAR_LOT = 50;
 
 /** Le nom d’une conv de tournage (/admin, POST /api/admin : sa campagne), en caractères (src/server/tournage.ts). */
 export const NOM_TOURNAGE_MAX = 80;
+
+/**
+ * La page d’arrivée d’une visite, en caractères : arriveeDe (src/lib/chemins.ts) n’en donne jamais plus, et POST
+ * /api/presence refuse au-delà (un corps forgé) ; sinon le premier signe d’un vrai onglet serait refusé, sa visite perdue.
+ */
+export const ARRIVEE_MAX = 200;
 
 /** Ce que propose le sélecteur de captures (l’import, le chat, la fiche) : des images, que le navigateur réduit avant l’envoi. */
 export const ACCEPT_IMAGES = "image/*";

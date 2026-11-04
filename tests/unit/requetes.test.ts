@@ -225,9 +225,11 @@ describe("le chat (prompt 10) : la mémoire à la place de la conv", () => {
     dit: "elle a relancé",
     ajout: ["  m0061 2026-10-01 jeu. 10:02 Léa : alors ?"],
     vocal: true,
+    heure: Date.UTC(2026, 9, 1, 10, 36),
+    dejaMontres: ["m0001"],
   });
 
-  it("le premier bloc, mis en cache, ne dépend que de l’histoire et de la mémoire : le fil, ce qu’il dit, un ajout ou le vocal n’y changent rien", () => {
+  it("le premier bloc, mis en cache, ne dépend que de l’histoire et de la mémoire : le fil, ce qu’il dit, un ajout, le vocal, l’heure ou les messages déjà montrés n’y changent rien", () => {
     const premier = chat();
     expect(premier.blocs[0]).toMatchObject({ cache: true });
     expect(suite.blocs[0]).toEqual(premier.blocs[0]);
@@ -269,7 +271,7 @@ describe("le chat (prompt 10) : la mémoire à la place de la conv", () => {
     expect(bloc(textes(chat({ etat: { ...etat, niveau: null } }))[0]!, "<histoire>", "</histoire>").at(-2)).toMatch(/ : mode sobre$/);
   });
 
-  it("ses blocs : l’histoire, les chiffres, la mémoire et l’aide, puis le style et le nouveau (instantané)", () => {
+  it("ses blocs : l’histoire, les chiffres, la mémoire et l’aide, puis le style, l’heure, les messages déjà montrés et le nouveau (instantané)", () => {
     expect({ premier: structure(chat()), suite: structure(suite) }).toMatchInlineSnapshot(`
       {
         "premier": {
@@ -312,11 +314,13 @@ describe("le chat (prompt 10) : la mémoire à la place de la conv", () => {
             {
               "balises": [
                 "style",
+                "heure",
+                "deja_montres",
                 "nouveau",
                 "vocal",
               ],
               "cache": false,
-              "messages": "m0060, m0061",
+              "messages": "m0001, m0060, m0061",
             },
           ],
           "tache": "10-chat",
@@ -424,13 +428,13 @@ describe("le chat d’une mémoire de secours : l’alerte du verdict est dans c
 
   /*
    * Sans alerte, la mémoire que lisent le chat et sa mise à jour reste celle d’avant la ligne de l’alerte, à l’octet :
-   * ces empreintes ont été prises sur main (8345105) avant elle.
+   * ces empreintes ont été prises sur main (8345105) avant elle, puis reprises le 3 novembre 2026 avec la ligne « sa vie ».
    */
   it("sans alerte : la mémoire que lisent le chat et sa mise à jour ne change pas d’un octet", () => {
     const sans = sansAlerte(cas.danger);
-    expect(empreinte(memoireDe(enChat(sans)).join("\n"))).toBe("6790117e23af6ae3");
-    expect(empreinte(memoireDe(enMaj(sans)).join("\n"))).toBe("ff45b1bb742a0f39");
-    expect(empreinte(memoireDe(enChat(sansAlerte(cas.mineur))).join("\n"))).toBe("5ecf96e36380c1f1");
+    expect(empreinte(memoireDe(enChat(sans)).join("\n"))).toBe("60225deeabec635b");
+    expect(empreinte(memoireDe(enMaj(sans)).join("\n"))).toBe("9b6e517a1cfe4df4");
+    expect(empreinte(memoireDe(enChat(sansAlerte(cas.mineur))).join("\n"))).toBe("498b5bcb118c2c8b");
   });
 });
 

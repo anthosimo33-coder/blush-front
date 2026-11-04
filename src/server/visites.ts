@@ -2,6 +2,7 @@ import "server-only";
 import { createHash, randomBytes } from "node:crypto";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { JALONS_PAR_APPLI, type AppKind, type EtapeVisite, type GenreFil, type Jalon, type JalonParAppli, type OffreId, type SourceVisite } from "@/types";
+import { arriveeDe } from "@/lib/chemins";
 import { NOMS_DU_TOURNAGE } from "@/lib/noms-cookies";
 import { db, schema } from "./db";
 import { auMieux } from "./journal";
@@ -13,6 +14,9 @@ import { aujourdhuiParis } from "./temps";
  * - un visiteur se compte une fois par jour (de Paris), par l’empreinte de sa connexion : son adresse IP et son navigateur
  *   mêlés au sel du jour, tiré au hasard et effacé le surlendemain. L’adresse IP ne s’écrit nulle part, et une fois le sel
  *   parti, plus rien ne relie une empreinte à une connexion. La même personne revenue un autre jour compte une fois de plus ;
+ * - la visite garde d’où elle vient (sourceDe) et sa page d’arrivée : le chemin de sa première page, nettoyé (ni
+ *   requête, ni identifiant : src/lib/chemins.ts) ; un compte créé reprend l’une et l’autre (les ventes par source et par
+ *   page d’arrivée d’/admin) ;
  * - chaque onglet ouvert fait signe toutes les 40 secondes tant qu’il est visible (src/lib/presence.ts) : l’écran où il
  *   est, d’où il vient, et la ville de sa connexion (celle que donne l’hébergeur, à la ville près) ;
  * - le fil du direct note une ville et un geste (une arrivée, un import, un paiement, un achat, un partage), jamais un
@@ -36,39 +40,73 @@ const APPLIS: [RegExp, SourceVisite][] = [
   [/instagram/i, "instagram"],
   [/snapchat/i, "snapchat"],
 ];
-/* Les sites d’où l’on arrive, par la fin de leur nom */
+/*
+ * Les sites d’où l’on arrive, par leur nom, dans l’ordre : le premier qui va l’emporte. Les assistants et les
+ * messageries passent avant Google et Yahoo (gemini.google.com, mail.google.com, mail.yahoo.com) ; « google » ne garde
+ * que la recherche (www.google.fr, google.com…), et ses autres sites (Docs, Maps) comptent « autre ». Copilot dans Bing
+ * (bing.com/chat) reste un moteur : le nom du site ne dit pas plus.
+ */
 const SITES: [RegExp, SourceVisite][] = [
   [/(^|\.)tiktok\.com$/, "tiktok"],
   [/(^|\.)instagram\.com$/, "instagram"],
   [/(^|\.)snapchat\.com$/, "snapchat"],
-  [/(^|\.)google\.[a-z.]+$/, "google"],
+  [/^(gemini|bard)\.google\.com$/, "assistants"],
+  [/(^|\.)(chatgpt\.com|openai\.com|perplexity\.ai|claude\.ai|meta\.ai|grok\.com|deepseek\.com|duck\.ai|poe\.com|you\.com|phind\.com)$/, "assistants"],
+  [/^copilot\.(microsoft\.com|cloud\.microsoft)$|^chat\.mistral\.ai$/, "assistants"],
+  [/(^|\.)(mail|webmail|messagerie)\d*\.|^outlook\.(live|office|office365)\.com$/, "mail"],
+  [/^(www\.)?google\.[a-z.]+$/, "google"],
+  [/(^|\.)(bing\.com|duckduckgo\.com|qwant\.com|ecosia\.org|yahoo\.com|startpage\.com|lilo\.org|kagi\.com|mojeek\.com|baidu\.com|naver\.com|seznam\.cz|ask\.com)$/, "moteurs"],
+  [/(^|\.)(yandex\.[a-z.]+|ya\.ru)$|^search\.(brave\.com|aol\.com)$/, "moteurs"],
 ];
-/* Ce que les créatrices écrivent dans utm_source */
+/*
+ * Les applis Android d’où l’on arrive (android-app://<paquet>, src/lib/presence.ts), par leur paquet. Un autre paquet
+ * (même de Google : YouTube n’est pas la recherche) compte « autre ».
+ */
+const PAQUETS: [RegExp, SourceVisite][] = [
+  [/^com\.zhiliaoapp\.musically$|^com\.ss\.android\.ugc\.trill$/, "tiktok"],
+  [/^com\.instagram\.android$/, "instagram"],
+  [/^com\.snapchat\.android$/, "snapchat"],
+  /* L’appli Google, et Discover qu’elle montre */
+  [/^com\.google\.android\.googlequicksearchbox$/, "google"],
+  [/^com\.microsoft\.bing$|^com\.duckduckgo\.mobile\.android$/, "moteurs"],
+  [/^com\.openai\.chatgpt$|^ai\.perplexity\.app\.android$|^com\.google\.android\.apps\.bard$|^com\.anthropic\.claude$|^com\.microsoft\.copilot$|^ai\.mistral\.chat$/, "assistants"],
+  /* Gmail, Outlook, Yahoo Mail */
+  [/^com\.google\.android\.gm$|^com\.microsoft\.office\.outlook$|^com\.yahoo\.mobile\.client\.android\.mail$/, "mail"],
+];
+/* Ce que les créatrices écrivent dans utm_source, ce que nos mails y mettent (src/server/email.ts), et le nom d’un assistant */
 const UTM: [RegExp, SourceVisite][] = [
   [/^(tiktok|tt|tik_tok)$/, "tiktok"],
   [/^(instagram|ig|insta)$/, "instagram"],
   [/^(snapchat|snap|sc)$/, "snapchat"],
   [/^google$/, "google"],
+  [/^email$/, "mail"],
+  [/^(chatgpt|perplexity|gemini|copilot|claude|mistral|le_?chat)$/, "assistants"],
 ];
 
 /**
- * D’où vient une visite : le lien d’une créatrice (utm_source), sinon un verdict partagé (/v/…), sinon le site d’avant
- * (le nôtre ne compte pas), sinon le navigateur intégré de l’appli qui l’a ouvert, sinon « direct ».
+ * D’où vient une visite : son utm_source (le lien d’une créatrice, d’un mail, ou le nom d’un site, comme
+ * « chatgpt.com » que ChatGPT ajoute à ses liens), sinon un verdict partagé (/v/…), sinon le site d’avant (le nôtre ne
+ * compte pas) ou l’appli Android d’avant, sinon le navigateur intégré de l’appli qui l’a ouvert, sinon « direct ».
  */
 export function sourceDe({ utm, referent, chemin, agent }: { utm?: string; referent?: string; chemin?: string; agent: string | null }): SourceVisite {
   const u = utm?.trim().toLowerCase();
-  if (u) return UTM.find(([re]) => re.test(u))?.[1] ?? "autre";
+  if (u) return UTM.find(([re]) => re.test(u))?.[1] ?? SITES.find(([re]) => re.test(u))?.[1] ?? "autre";
   if (chemin?.startsWith("/v/")) return "partage";
-  const hote = hoteDe(referent);
-  if (hote && !/(^|\.)askblush\.com$|^localhost$/.test(hote)) return SITES.find(([re]) => re.test(hote))?.[1] ?? "autre";
+  const avant = avantDe(referent);
+  if (avant?.paquet) return PAQUETS.find(([re]) => re.test(avant.paquet))?.[1] ?? "autre";
+  if (avant?.hote && !/(^|\.)askblush\.com$|^localhost$/.test(avant.hote)) return SITES.find(([re]) => re.test(avant.hote))?.[1] ?? "autre";
   if (agent) for (const [re, source] of APPLIS) if (re.test(agent)) return source;
   return "direct";
 }
 
-const hoteDe = (adresse: string | undefined): string | null => {
+/* Le site d’avant (son nom), ou l’appli Android d’avant (son paquet) ; null : pas une adresse */
+const avantDe = (adresse: string | undefined): { hote: string; paquet?: undefined } | { paquet: string; hote?: undefined } | null => {
   if (!adresse) return null;
   try {
-    return new URL(adresse).hostname.toLowerCase();
+    const u = new URL(adresse);
+    const nom = u.hostname.toLowerCase();
+    if (!nom) return null;
+    return u.protocol === "android-app:" ? { paquet: nom } : { hote: nom };
   } catch {
     return null;
   }
@@ -162,13 +200,17 @@ function signeAdmis(req: Request, maintenant = Date.now()): boolean {
  */
 const enModeTournage = (req: Request) => (req.headers.get("cookie") ?? "").split(";").some((c) => (NOMS_DU_TOURNAGE as readonly string[]).includes(c.split("=")[0]!.trim()));
 
-/** Le signe d’un onglet (POST /api/presence) : son identifiant, l’écran, et d’où il vient (son premier signe compte la visite). */
-export type Signe = { onglet: string; etape: EtapeVisite; premier: boolean; utm?: string; referent?: string };
+/**
+ * Le signe d’un onglet (POST /api/presence) : son identifiant, l’écran, d’où il vient, et à son premier signe (qui
+ * compte la visite) la page d’arrivée.
+ */
+export type Signe = { onglet: string; etape: EtapeVisite; premier: boolean; utm?: string; referent?: string; arrivee?: string };
 
 /**
  * Note le signe d’un onglet : sa ligne de la minute (en ligne maintenant, l’écran, la ville), et à son premier signe la
- * visite du jour (une par empreinte) ; une première visite du jour va au fil du direct (« arrive de TikTok »). Un
- * navigateur en mode tournage (une créatrice qui filme, src/server/tournage.ts) n’est ni une visite, ni dans le direct.
+ * visite du jour (une par empreinte, avec sa page d’arrivée renettoyée ici : le navigateur peut mentir) ; une première
+ * visite du jour va au fil du direct (« arrive de TikTok »). Un navigateur en mode tournage (une créatrice qui filme,
+ * src/server/tournage.ts) n’est ni une visite, ni dans le direct.
  */
 export async function noterSigne(req: Request, signe: Signe): Promise<void> {
   if (!signeAdmis(req) || enModeTournage(req)) return;
@@ -189,7 +231,7 @@ export async function noterSigne(req: Request, signe: Signe): Promise<void> {
         ...lieu,
       })
       .onConflictDoUpdate({ target: [p.onglet, p.minute], set: { vuLe: sql`now()`, etape: signe.etape } }),
-    signe.premier ? compterLaVisite(req, source, lieu.ville) : null,
+    signe.premier ? compterLaVisite(req, { source, arrivee: signe.arrivee ? arriveeDe(signe.arrivee) : null }, lieu.ville) : null,
   ]);
 }
 
@@ -216,19 +258,22 @@ export async function noterJalon(req: Request, jalon: Jalon, appli?: AppKind): P
   );
 }
 
+/** D’où vient une visite, et sa page d’arrivée (null : une visite d’avant qu’on la note, le 3 novembre 2026). */
+type Venue = { source: SourceVisite; arrivee: string | null };
+
 /** Compte la visite du jour de cette connexion, une fois ; la première du jour va au fil. */
-async function compterLaVisite(req: Request, source: SourceVisite, ville: string | null): Promise<void> {
+async function compterLaVisite(req: Request, { source, arrivee }: Venue, ville: string | null): Promise<void> {
   const jour = aujourdhuiParis().iso;
   const empreinte = await empreinteDe(req, jour);
-  const nouvelle = await db().insert(schema.visites).values({ jour, empreinte, source }).onConflictDoNothing().returning({ jour: schema.visites.jour });
+  const nouvelle = await db().insert(schema.visites).values({ jour, empreinte, source, arrivee }).onConflictDoNothing().returning({ jour: schema.visites.jour });
   if (nouvelle.length) await db().insert(schema.filDirect).values({ genre: "arrivee", ville, source });
 }
 
 /**
- * La source de la visite de cette connexion, aujourd’hui ou hier (le même appareil, le même réseau), ou null : pas de
- * visite retrouvée (un réseau mobile qui a changé d’adresse, une visite d’avant le suivi).
+ * La visite de cette connexion, aujourd’hui ou hier (le même appareil, le même réseau) : sa source et sa page
+ * d’arrivée ; ou null : pas de visite retrouvée (un réseau mobile qui a changé d’adresse, une visite d’avant le suivi).
  */
-export async function sourceDeLaVisite(req: Request): Promise<SourceVisite | null> {
+export async function visiteDeLaConnexion(req: Request): Promise<Venue | null> {
   const jour = aujourdhuiParis().iso;
   const jours = [jour, veilleDe(jour)];
   const t = schema.visites;
@@ -238,23 +283,26 @@ export async function sourceDeLaVisite(req: Request): Promise<SourceVisite | nul
   for (const j of jours) {
     if (!existants.has(j)) continue;
     const [v] = await db()
-      .select({ source: t.source })
+      .select({ source: t.source, arrivee: t.arrivee })
       .from(t)
       .where(and(eq(t.jour, j), eq(t.empreinte, await empreinteDe(req, j))));
-    if (v) return v.source;
+    if (v) return v;
   }
   return null;
 }
 
-/** Donne à un compte qui vient d’être créé la source de sa visite (une fois : un compte qui en a une la garde). */
+/**
+ * Donne à un compte qui vient d’être créé la source et la page d’arrivée de sa visite (une fois : un compte qui a déjà
+ * une source les garde).
+ */
 export async function noterLaSourceDuCompte(req: Request, userId: string): Promise<void> {
   await auMieux(async () => {
-    const source = await sourceDeLaVisite(req);
-    if (!source) return;
+    const visite = await visiteDeLaConnexion(req);
+    if (!visite) return;
     const u = schema.users;
     await db()
       .update(u)
-      .set({ source })
+      .set(visite)
       .where(and(eq(u.id, userId), sql`${u.source} is null`));
   }, "source du compte non notée");
 }

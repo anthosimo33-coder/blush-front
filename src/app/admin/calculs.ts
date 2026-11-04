@@ -215,7 +215,7 @@ export const PERSONNES_D_UN_TAUX = 30;
 /** Le passage d’une étape à la suivante (`vers` sur `depuis`), ou null avec moins de PERSONNES_D_UN_TAUX à l’étape d’avant. */
 export const tauxLisible = (vers: number, depuis: number): number | null => (depuis >= PERSONNES_D_UN_TAUX ? rapport(vers, depuis) : null);
 
-/** Le nom d’une appli dans le pilotage : celui de sa tuile au choix de l’appli (« Captures ou vidéo »), sinon le sien (« Hinge »). */
+/** Le nom d’une appli dans le pilotage : celui de sa tuile au choix de l’appli (« Captures d’écran »), sinon le sien (« Hinge »). */
 export const nomDeLAppli = (appli: AppKind): string => TUILES_IMPORT.find((t) => t.app === appli)?.title ?? APPLIS[appli];
 
 /**
@@ -258,6 +258,9 @@ function arrivee(source: SourceVisite): string {
   if (source === "direct") return "arrive en direct";
   if (source === "partage") return "arrive d’un verdict partagé";
   if (source === "autre") return "arrive d’un autre site";
+  if (source === "moteurs") return "arrive d’un autre moteur";
+  if (source === "assistants") return "arrive d’un assistant IA";
+  if (source === "mail") return "arrive d’un mail";
   const nom = NOMS_DES_SOURCES[source];
   return `arrive ${/^[aeiouyhéè]/i.test(nom) ? "d’" : "de "}${nom}`;
 }
@@ -279,8 +282,11 @@ export function texteDuGeste(g: GesteDuFil): { ville: string; quoi: string; prix
   }
 }
 
-/** Les écrans où sont les personnes en ligne : ceux qui ont du monde, au plus `max` (les plus peuplés), dans l’ordre du parcours. */
-export function etapesPeuplees(etapes: Direct["etapes"], max = 9): { etape: EtapeVisite; n: number }[] {
+/**
+ * Les écrans où sont les personnes en ligne : ceux qui ont du monde, au plus `max` (les plus peuplés ; sans `max`, tous),
+ * dans l’ordre du parcours.
+ */
+export function etapesPeuplees(etapes: Direct["etapes"], max: number = ETAPES_VISITE.length): { etape: EtapeVisite; n: number }[] {
   const gardees = new Set(
     etapes
       .filter((e) => e.n > 0)

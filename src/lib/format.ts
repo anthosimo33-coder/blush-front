@@ -25,7 +25,14 @@ const JOUR_COURT = new Intl.DateTimeFormat("fr-FR", { timeZone: "Europe/Paris", 
 
 /**
  * Un jour, à l’heure de Paris, en lettres : « 20 octobre », « 13 octobre 2027 » avec `annee`, « 20 oct. » `court` (une
- * place étroite, la souche d’un billet). La fin d’une offre, d’un avoir.
+ * place étroite, la souche d’un billet). La fin d’une offre, d’un avoir, la date d’une page légale ou d’un article. Le
+ * premier du mois s’écrit « 1er novembre », que l’Intl écrit « 1 novembre ».
  */
 export const jourEnLettres = (iso: string, { annee = false, court = false }: { annee?: boolean; court?: boolean } = {}) =>
-  (court ? JOUR_COURT : annee ? JOUR_ET_ANNEE : JOUR_EN_LETTRES).format(new Date(iso));
+  (court ? JOUR_COURT : annee ? JOUR_ET_ANNEE : JOUR_EN_LETTRES).format(new Date(iso)).replace(/^1(?=\s)/, "1er");
+
+/**
+ * La dernière ligne d’une page légale, d’après le jour de sa version (« AAAA-MM-JJ ») : « Dernière mise à jour : 26
+ * octobre 2026. ». Le même jour va au plan du site (src/lib/referencement.ts) : la page et les moteurs disent la même date.
+ */
+export const derniereMiseAJour = (jour: string) => `Dernière mise à jour\u00a0: ${jourEnLettres(jour, { annee: true })}.`;

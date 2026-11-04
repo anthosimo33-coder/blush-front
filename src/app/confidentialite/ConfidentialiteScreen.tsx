@@ -3,7 +3,8 @@ import { HeroHeader, InsetGroup, InsetRow, RowIcon } from "@/components/ui/inset
 import { Icon } from "@/components/ui/icons";
 import { MobileTopBar, Screen } from "@/components/shell/Screen";
 import { LiensJuridiques } from "@/components/juridique/pages";
-import { NBSP } from "@/lib/format";
+import { CONFIDENTIALITE_MISE_A_JOUR } from "@/contenu/confidentialite";
+import { derniereMiseAJour, NBSP } from "@/lib/format";
 
 /*
  * Ce que BLUSH fait de ta conv, en mots simples. Les faits suivent le code (src/server : chiffrement, purge,
@@ -25,6 +26,10 @@ import { NBSP } from "@/lib/format";
  * demande d’accord) : sa phrase dans « Les visites, sans cookie » et la ligne de PostHog, à relire, puis le PDF de Whop.
  * Le 20 octobre, l’interface s’y lit (tout masqué ne servait à rien) ; la conv, les prénoms, l’email, les saisies et les
  * images restent masqués (src/lib/secrets.ts) : la phrase le dit, à relire.
+ * Le 3 novembre 2026, la page d’arrivée (visites.arrivee, users.arrivee : le chemin de la première page, sans requête
+ * ni identifiant, src/lib/chemins.ts) entre dans « Les visites, sans cookie » (« et par quelle page », « et ta page
+ * d’arrivée ») : phrase validée par l’utilisateur ce jour-là, date de la page dans CONFIDENTIALITE_MISE_A_JOUR.
+ * TODO(produit): reporter cette phrase dans le PDF de confidentialité de Whop.
  */
 
 function Ligne({ icone, ton, titre, children }: { icone: Parameters<typeof RowIcon>[0]["icon"]; ton?: Parameters<typeof RowIcon>[0]["tone"]; titre: string; children: ReactNode }) {
@@ -51,20 +56,13 @@ export function ConfidentialiteScreen() {
           Ton export est ouvert sur ton appareil{NBSP}: seuls les messages partent. Les photos, les vidéos et les vocaux ne quittent jamais ton téléphone.
         </Ligne>
         {/*
-         * Les lots d’un enregistrement (src/server/lots.ts) : leur texte lu, gardé chiffré dix minutes en base (lectures_des_lots),
-         * pour qu’un nouvel essai ne les relise pas ; jamais les images.
-         * La lecture partielle des longues vidéos (src/server/lecture-partielle.ts, src/server/ecrans-gardes.ts) : les écrans
-         * les plus anciens gardés chiffrés tant que la conv peut être achetée (48 h avant « Qui es-tu ? », 11 jours après le
-         * paywall, le temps des relances), puis 7 jours au plus après le paiement le temps de leur lecture, et effacés ; ou
-         * effacés sans être lus. Les deux durées dites, celle d’avant le paiement et celle d’après.
-         * TODO(produit): la phrase sur les dix minutes et celle sur les longues vidéos (26 octobre), à valider avec le juriste ; le PDF de Whop à refaire
+         * Le 3 novembre 2026, l’enregistrement d’écran a quitté l’import (VIDEO_A_L_IMPORT, src/lib/limites.ts) : ses
+         * phrases (la vidéo qui reste sur le téléphone, le texte de ses lots gardé dix minutes, la lecture partielle des
+         * longues vidéos) sont parties avec lui. Rallumé, elles sont à remettre (le commit de ce jour-là les montre).
+         * TODO(produit): reporter le retrait dans le PDF de confidentialité de Whop.
          */}
-        <Ligne icone="photo" ton="elle" titre="Ou des captures, ou un enregistrement de l’écran">
-          Les captures sont lues une fois pour en tirer le texte, puis oubliées{NBSP}: on ne garde aucune image. Un enregistrement ne quitte pas ton téléphone{NBSP}: seuls les
-          écrans de la conv en partent, et ils sont lus puis oubliés de la même façon. Le texte lu de ces écrans attend dix minutes au plus, chiffré, le temps de rassembler ta conv
-          {NBSP}: si ta connexion coupe, rien n’est relu. Pour une longue vidéo, BLUSH peut lire d’abord les écrans les plus récents{NBSP}: les autres restent chiffrés, sans être
-          lus, le temps que tu puisses prendre ton rapport (11{NBSP}jours au plus), puis sont lus juste avant lui (7{NBSP}jours au plus après ton paiement) et effacés, ou effacés
-          sans avoir été lus.
+        <Ligne icone="photo" ton="elle" titre="Ou des captures d’écran">
+          Elles sont lues une fois pour en tirer le texte, puis oubliées{NBSP}: on ne garde aucune image.
         </Ligne>
         {/* Resend l’envoie (les mails) et Whop le reçoit (le reçu) : « il ne part que chez Whop » contredisait la liste des prestataires, plus bas */}
         <Ligne icone="mail" titre="Ton email">
@@ -76,14 +74,15 @@ export function ConfidentialiteScreen() {
           Si tu ouvres le paiement sans aller au bout, BLUSH peut t’envoyer un mail deux heures après, une seule fois. Rien de ta conv, aucun prénom, et un lien pour ne plus en
           recevoir.
         </Ligne>
-        {/* Le comptage des visites et le direct d’/admin (src/server/visites.ts) : sans cookie, l’adresse IP jamais écrite, gardés deux jours (la ville, l’écran) et 90 jours (la visite du jour, les jalons du tunnel) */}
+        {/* Le comptage des visites et le direct d’/admin (src/server/visites.ts) : sans cookie, l’adresse IP jamais écrite, gardés deux jours (la ville, l’écran) et 90 jours (la visite du jour et sa page d’arrivée, les jalons du tunnel) */}
         <Ligne icone="people" titre="Les visites, sans cookie">
-          Pour savoir combien de personnes passent sur BLUSH et d’où elles arrivent (TikTok, Instagram, un lien partagé…), on compte les visites sans cookie{NBSP}: ton adresse IP
-          sert à faire un code anonyme qui change chaque jour, et n’est gardée nulle part. La ville de ta connexion et l’écran où tu es restent deux jours, sans ton nom. Avec ce
-          même code, on compte jusqu’où tu vas (ton fichier choisi, le paiement ouvert…), une fois par jour, sans rien de ta conv{NBSP}: 90 jours au plus. Ces pages vues et ces
-          étapes partent aussi chez PostHog, notre outil de mesure, en Allemagne{NBSP}: sans cookie, sans ton nom ni ton email, et sans rien de ta conv. PostHog enregistre aussi
-          comment tu te sers du site (où tu touches, jusqu’où tu fais défiler, les écrans de BLUSH tels qu’ils s’affichent), jamais ta conv{NBSP}: ses messages, ton rapport, le
-          chat, les prénoms, ton email, ce que tu tapes et les images y restent masqués. Si tu crées un compte, il garde seulement d’où tu es venu.
+          Pour savoir combien de personnes passent sur BLUSH, d’où elles arrivent (TikTok, Instagram, un moteur de recherche, un lien partagé…) et par quelle page, on compte les
+          visites sans cookie{NBSP}: ton adresse IP sert à faire un code anonyme qui change chaque jour, et n’est gardée nulle part. La ville de ta connexion et l’écran où tu es
+          restent deux jours, sans ton nom. Avec ce même code, on compte jusqu’où tu vas (ton fichier choisi, le paiement ouvert…), une fois par jour, sans rien de ta conv{NBSP}:
+          90 jours au plus. Ces pages vues et ces étapes partent aussi chez PostHog, notre outil de mesure, en Allemagne{NBSP}: sans cookie, sans ton nom ni ton email, et sans rien
+          de ta conv. PostHog enregistre aussi comment tu te sers du site (où tu touches, jusqu’où tu fais défiler, les écrans de BLUSH tels qu’ils s’affichent), jamais ta conv
+          {NBSP}: ses messages, ton rapport, le chat, les prénoms, ton email, ce que tu tapes et les images y restent masqués. Si tu crées un compte, il garde seulement d’où tu es
+          venu et ta page d’arrivée.
         </Ligne>
         {/* La sentinelle (src/lib/sentinelle.tsx, src/server/navigateur.ts) : sans compte, ni adresse IP, ni adresse de page ; gardées 30 jours */}
         <Ligne icone="bolt" titre="Les erreurs et la vitesse de l’appli">
@@ -162,7 +161,7 @@ export function ConfidentialiteScreen() {
         </Ligne>
       </InsetGroup>
 
-      <InsetGroup title="Nos prestataires" id="prestataires" className="mt-6" footer={`BLUSH est ouvert dès 15 ans. Dernière mise à jour\u00a0: 22 octobre 2026.`}>
+      <InsetGroup title="Nos prestataires" id="prestataires" className="mt-6" footer={`BLUSH est ouvert dès 15 ans. ${derniereMiseAJour(CONFIDENTIALITE_MISE_A_JOUR)}`}>
         <InsetRow title="Vercel" sub="L’hébergement du site, à Francfort" />
         <InsetRow title="Neon" sub="La base de données, à Francfort" />
         <InsetRow title="Le prestataire qui fait tourner BLUSH" sub="Il lit ta conv pour BLUSH, aux États-Unis" />

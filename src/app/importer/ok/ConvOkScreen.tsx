@@ -99,13 +99,13 @@ export function ConvOkScreen({ story, source, ajout }: { story: Story; source: S
         <p className="m-0 flex items-start gap-2 rounded-[18px] bg-plaque px-3.5 py-3 text-note font-extrabold leading-[1.45] text-soft">
           <Icon name="clock" size={17} style={{ marginTop: 1 }} className="text-soft" />
           <span>
-            C’est encore court pour une lecture juste{NBSP}: il faut au moins {minimumDeMessages(story)} messages. Ajoute le début de votre histoire, en captures, en vidéo ou avec
-            un autre export.
+            C’est encore court pour une lecture juste{NBSP}: il faut au moins {minimumDeMessages(story)} messages. Ajoute le début de votre histoire, en captures ou avec un autre
+            export.
           </span>
         </p>
       )}
 
-      {ajout && <LigneMorceau titre={"Il manque un bout de votre histoire\u00a0?"} sous="Ajoute des captures, une vidéo ou un autre export." onClick={() => setFeuille(true)} />}
+      {ajout && <LigneMorceau titre={"Il manque un bout de votre histoire\u00a0?"} sous="Ajoute des captures ou un autre export." onClick={() => setFeuille(true)} />}
 
       <NotePrivee className="px-1 leading-[1.45]">
         {PROMESSE_CONV} <LienDiscret href="/confidentialite">Comment ça marche</LienDiscret>

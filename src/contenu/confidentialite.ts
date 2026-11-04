@@ -7,6 +7,12 @@ import { CODE_MINUTES } from "@/lib/limites";
  * TODO(produit): formulation unique à faire valider par un juriste, en même temps que la page Confidentialité.
  */
 
+/**
+ * Le jour de cette version de la page Confidentialité : elle le dit sous ses prestataires, le plan du site aussi
+ * (src/lib/referencement.ts). À changer avec un changement de fond de la page, pas pour une virgule.
+ */
+export const CONFIDENTIALITE_MISE_A_JOUR = "2026-11-03";
+
 /** Le sort de la conv brute, partout le même (la page : « La conv brute, effacée après ton rapport »). */
 export const PROMESSE_CONV = "Ta conv est chiffrée, lue par BLUSH, et effacée après ton rapport.";
 

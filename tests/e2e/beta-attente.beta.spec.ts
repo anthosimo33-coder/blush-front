@@ -51,7 +51,7 @@ test("/attente : la même confirmation pour tous ; le mail dit « Tu es sur la l
     expect(mail.texte).toContain("BLUSH est en bêta privée, sur invitation. Ton email est sur la liste d’attente\u00a0: on t’écrit dès que ta place est prête.");
     /* Le lien du mail, dans sa version texte comme dans le bouton du HTML : la page de retrait de ce serveur */
     const lien = lienDeRetrait(mail);
-    expect(lien).toMatch(new RegExp(`^${URL_BETA}/attente/retirer\\?id=[\\w-]+&cle=[\\w-]+$`));
+    expect(lien).toMatch(new RegExp(`^${URL_BETA}/attente/retirer\\?id=[\\w-]+&cle=[\\w-]+&utm_source=email&utm_campaign=attente$`));
     expect(mail.html).toContain(`href="${lien.replaceAll("&", "&amp;")}"`);
     expect(await placeSurLaListe(dehors)).toEqual({ source: "accueil" });
     expect(await compteDe(dehors)).toBeNull();
