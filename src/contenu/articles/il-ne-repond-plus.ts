@@ -13,9 +13,12 @@ export const IL_NE_REPOND_PLUS: Article = {
   motCle: "il ne répond plus à mes messages",
   zone: "verte",
   publieLe: "2026-11-04",
-  misAJourLe: "2026-11-04",
-  changements: [{ le: "2026-11-04", quoi: "Publication" }],
-  valideLe: "2026-11-04",
+  misAJourLe: "2026-11-05",
+  changements: [
+    { le: "2026-11-04", quoi: "Publication" },
+    { le: "2026-11-05", quoi: "Pour se voir, quand une fille écrit à un garçon\u00a0: une perche plutôt qu’une invitation" },
+  ],
+  valideLe: "2026-11-05",
   sources: [
     { titre: "Le Robert, définition de «\u00a0ghoster\u00a0»", url: "https://dictionnaire.lerobert.com/definition/ghoster", consulteLe: "2026-11-03" },
     { titre: "Fil Santé Jeunes, «\u00a0Le ghosting\u00a0»", url: "https://www.filsantejeunes.com/le-ghosting-20830", consulteLe: "2026-11-03" },
@@ -73,7 +76,7 @@ export const IL_NE_REPOND_PLUS: Article = {
         {
           type: "paragraphe",
           texte:
-            "Ce soir, écris une seule fois. Reconnais ta part s’il y en a une, en deux lignes, pas en pavé à 2\u00a0h du matin. Puis propose un moment pour en parler. La suite est entre ses mains.",
+            "Ce soir, écris une seule fois. Reconnais ta part s’il y en a une, en deux lignes, pas en pavé à 2\u00a0h du matin. Puis propose un appel pour en parler. La suite est entre ses mains.",
         },
         { type: "blush", bulles: ["un pavé d’excuses à 2h du mat, non", "un «\u00a0on s’appelle demain à 19h\u00a0?\u00a0», ça oui"] },
       ],
@@ -96,9 +99,9 @@ export const IL_NE_REPOND_PLUS: Article = {
           repliques: [
             { de: "moi", texte: "t’as passé une bonne semaine\u00a0?" },
             { de: "autre", texte: "ouais tranquille" },
-            { de: "moi", texte: "on se fait un ciné samedi\u00a0? 🎬" },
+            { de: "moi", texte: "le nouveau film de science-fiction sort samedi, il a l’air ouf 🎬" },
           ],
-          legende: "Deux mots, aucune question en retour, puis le silence après un plan. Un soir ne prouve rien\u00a0; si ça se répète, c’est une réponse.",
+          legende: "Deux mots, aucune question en retour, puis le silence après une idée de sortie. Un soir ne prouve rien\u00a0; si ça se répète, c’est une réponse.",
         },
         {
           type: "regarde",
@@ -130,7 +133,7 @@ export const IL_NE_REPOND_PLUS: Article = {
         {
           type: "paragraphe",
           texte:
-            "Un seul message, court, qui appelle un oui ou un non. Le plus simple, c’est une proposition avec un jour et une heure\u00a0: facile d’y répondre, et sa réponse, ou son silence, te dira où tu en es.",
+            "Un seul message, court, facile à saisir. Le plus simple, c’est une perche\u00a0: tu lui parles d’un endroit ou d’un projet, et tu le laisses proposer de se voir. Sa réponse, ou son silence, te dira où tu en es. Si vous êtes deux garçons, pas besoin de perche\u00a0: l’un ou l’autre propose, avec un jour et une heure.",
         },
         {
           type: "paragraphe",
@@ -139,10 +142,11 @@ export const IL_NE_REPOND_PLUS: Article = {
         {
           type: "conv",
           repliques: [
-            { de: "moi", texte: "hello\u00a0! toujours partant pour un verre mercredi à 18h\u00a0?" },
-            { de: "autre", texte: "vas-y, mercredi 18h ça me va 😊" },
+            { de: "moi", texte: "je suis passée devant le skatepark dont tu m’avais parlé, y avait un monde fou" },
+            { de: "autre", texte: "mercredi après le taf, on y passe\u00a0?" },
+            { de: "moi", texte: "18h, je t’attends à l’entrée 😊" },
           ],
-          legende: "Une relance précise\u00a0: s’il était juste débordé, elle lui donne une raison simple de répondre.",
+          legende: "Une perche plutôt qu’un plan\u00a0: s’il était juste débordé, elle lui donne une raison simple de répondre. Il propose le jour, tu fixes l’heure.",
         },
         {
           type: "paragraphe",
@@ -157,7 +161,7 @@ export const IL_NE_REPOND_PLUS: Article = {
             "Passer la soirée sur son profil à chercher un indice",
           ],
         },
-        { type: "blush", bulles: ["un message, un jour, une heure\u00a0: pas trois relances"] },
+        { type: "blush", bulles: ["une perche, et tu poses le tel\u00a0: pas trois relances"] },
       ],
     },
     {
@@ -198,7 +202,7 @@ export const IL_NE_REPOND_PLUS: Article = {
     {
       question: "Il ne répond plus à mes SMS ni à mes appels, que faire\u00a0?",
       reponse:
-        "La même chose que pour un message\u00a0: un seul texto clair, avec une proposition précise, puis tu t’arrêtes. Multiplier les appels ne lui donnera pas plus envie de répondre, et ça te laisse dans l’attente.",
+        "La même chose que pour un message\u00a0: si ton dernier texto attend encore, tu as déjà posé ta question, et tu t’arrêtes là. Multiplier les appels ne lui donnera pas plus envie de répondre, et ça te laisse dans l’attente.",
     },
     {
       question: "Il ne me répond plus mais regarde mes stories, pourquoi\u00a0?",
@@ -206,5 +210,5 @@ export const IL_NE_REPOND_PLUS: Article = {
         "Regarder une story ne demande aucun effort, répondre en demande un. Ce n’est pas un message pour toi, et ça ne dit rien de ce qu’il veut\u00a0: ne bâtis rien dessus.",
     },
   ],
-  lies: ["il-met-du-temps-a-repondre"],
+  lies: ["il-met-du-temps-a-repondre", "il-voit-mes-messages", "interesse-par-message", "ghosting"],
 };
