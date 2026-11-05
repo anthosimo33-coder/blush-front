@@ -137,5 +137,5 @@ export const GHOSTING: Article = {
         "En français, on dit «\u00a0faire le mort\u00a0». Le Robert donne aussi «\u00a0ghoster\u00a0», un anglicisme familier, avec l’exemple «\u00a0Je me suis fait ghoster\u00a0».",
     },
   ],
-  lies: ["il-ne-repond-plus", "il-voit-mes-messages", "il-met-du-temps-a-repondre"],
+  lies: ["il-ne-repond-plus", "il-voit-mes-messages", "il-met-du-temps-a-repondre", "breadcrumbing"],
 };
