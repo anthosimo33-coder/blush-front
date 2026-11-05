@@ -1,5 +1,8 @@
+import { GHOSTING } from "./ghosting";
 import { IL_MET_DU_TEMPS_A_REPONDRE } from "./il-met-du-temps-a-repondre";
 import { IL_NE_REPOND_PLUS } from "./il-ne-repond-plus";
+import { IL_VOIT_MES_MESSAGES } from "./il-voit-mes-messages";
+import { INTERESSE_PAR_MESSAGE } from "./interesse-par-message";
 import type { Article, Genre } from "./types";
 
 /*
@@ -16,7 +19,7 @@ import type { Article, Genre } from "./types";
  */
 
 /** Les articles publiés. */
-export const ARTICLES: readonly Article[] = [IL_NE_REPOND_PLUS, IL_MET_DU_TEMPS_A_REPONDRE];
+export const ARTICLES: readonly Article[] = [IL_NE_REPOND_PLUS, IL_MET_DU_TEMPS_A_REPONDRE, INTERESSE_PAR_MESSAGE, IL_VOIT_MES_MESSAGES, GHOSTING];
 
 /** Combien de sources datées cite un article (charte, règle 15) : les garde-fous l’exigent (tests/aide/articles.ts), /methode le dit. */
 export const SOURCES = { min: 2, max: 5 } as const;

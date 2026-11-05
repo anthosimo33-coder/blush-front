@@ -14,9 +14,12 @@ export const IL_MET_DU_TEMPS_A_REPONDRE: Article = {
   motCle: "il met du temps à répondre que faire",
   zone: "verte",
   publieLe: "2026-11-04",
-  misAJourLe: "2026-11-04",
-  changements: [{ le: "2026-11-04", quoi: "Publication" }],
-  valideLe: "2026-11-04",
+  misAJourLe: "2026-11-05",
+  changements: [
+    { le: "2026-11-04", quoi: "Publication" },
+    { le: "2026-11-05", quoi: "Pour se voir, quand une fille écrit à un garçon\u00a0: une perche plutôt qu’une invitation" },
+  ],
+  valideLe: "2026-11-05",
   sources: [
     {
       titre: "Kalman, Ravid, Raban et Rafaeli, «\u00a0Are you still waiting for an answer? The Chronemics of Asynchronous Written CMC\u00a0» (Open University of Israel)",
@@ -32,7 +35,7 @@ export const IL_MET_DU_TEMPS_A_REPONDRE: Article = {
     { titre: "Le Robert, «\u00a0ghoster\u00a0»", url: "https://dictionnaire.lerobert.com/definition/ghoster", consulteLe: "2026-11-03" },
   ],
   reponseCourte:
-    "Quand il met du temps à répondre, compare ce délai à son rythme à lui, pas à une règle\u00a0: chacun répond selon sa journée. Ça compte quand ses réponses ralentissent par rapport à ce rythme, raccourcissent, ou quand c’est toujours toi qui relances. Que faire\u00a0: pas de message pour combler, une seule proposition précise, puis de l’espace.",
+    "Quand il met du temps à répondre, compare ce délai à son rythme à lui, pas à une règle\u00a0: chacun répond selon sa journée. Ça compte quand ses réponses ralentissent par rapport à ce rythme, raccourcissent, ou quand c’est toujours toi qui relances. Que faire\u00a0: pas de message pour combler, une idée de sortie glissée une fois, puis de l’espace.",
   sections: [
     {
       question: "Combien de temps pour répondre, c’est normal\u00a0?",
@@ -82,7 +85,7 @@ export const IL_MET_DU_TEMPS_A_REPONDRE: Article = {
           repliques: [
             { de: "autre", texte: "désolé je sors juste du boulot 😩" },
             { de: "autre", texte: "j’ai vu ta photo du chat ce midi, j’ai rigolé tout seul dans le métro" },
-            { de: "autre", texte: "et du coup ton expo samedi, ça tient toujours\u00a0?" },
+            { de: "autre", texte: "et du coup ton expo samedi, je peux passer\u00a0?" },
           ],
           legende: "Quatre heures plus tard, mais une vraie réponse, un détail retenu et une question\u00a0: ici, le délai vient de sa journée.",
         },
@@ -144,20 +147,16 @@ export const IL_MET_DU_TEMPS_A_REPONDRE: Article = {
         {
           type: "paragraphe",
           texte:
-            "Ensuite, écris une seule fois\u00a0: quand il a répondu, ou si son silence dure bien plus que d’habitude. Propose alors quelque chose de précis. Un plan avec un jour et une heure appelle un oui, un non ou une autre date, et chacune de ces réponses t’apprend quelque chose.",
+            "Ensuite, écris une seule fois\u00a0: quand il a répondu, ou si son silence dure bien plus que d’habitude. Glisse-lui alors une perche\u00a0: un endroit ou un projet dont tu as envie, et à lui de proposer de se voir. Si vous êtes deux garçons, pas de détour\u00a0: propose toi-même, avec un jour et une heure.",
         },
         {
           type: "conv",
           repliques: [
-            { de: "moi", texte: "jeudi 19\u00a0h, ramen près de la fac\u00a0? 🍜" },
-            { de: "autre", texte: "jeudi je peux pas, vendredi même heure\u00a0?" },
+            { de: "moi", texte: "on a fini derniers au quiz d’hier soir, il me faut un vrai coéquipier 😩" },
+            { de: "autre", texte: "je suis ton homme. vendredi on prend notre revanche\u00a0?" },
+            { de: "moi", texte: "vendredi 20h, et interdit de chercher sur ton tel" },
           ],
-          legende: "Une proposition précise\u00a0: il en fait une autre, et tu sais où tu en es.",
-        },
-        {
-          type: "paragraphe",
-          texte:
-            "Si son rythme te pèse et que vous vous connaissez assez, dis-le en parlant de toi. «\u00a0J’aime bien quand on s’écrit le soir\u00a0» passe mieux qu’un reproche sur ses minutes, et ouvre une vraie discussion.",
+          legende: "Il saisit la perche et pose le jour, toi l’heure\u00a0: tu sais où tu en es.",
         },
         {
           type: "paragraphe",
@@ -171,7 +170,7 @@ export const IL_MET_DU_TEMPS_A_REPONDRE: Article = {
             "Te repasser ton dernier message en boucle, à chercher la faute",
           ],
         },
-        { type: "blush", bulles: ["un plan avec un jour et une heure, ça s’accepte ou ça se refuse", "dans les deux cas t’as ta réponse"] },
+        { type: "blush", bulles: ["une perche, il la saisit ou il la laisse passer", "dans les deux cas t’as ta réponse"] },
       ],
     },
   ],
@@ -194,8 +193,8 @@ export const IL_MET_DU_TEMPS_A_REPONDRE: Article = {
     {
       question: "Elle met du temps à répondre, c’est pareil\u00a0?",
       reponse:
-        "Oui, ça vaut quel que soit le genre de la personne. On compare son délai à son habitude, on regarde ce qu’il y a dans ses messages, et on propose quelque chose de précis.",
+        "Pour le délai, oui\u00a0: on le compare à son habitude, et on regarde ce qu’il y a dans ses messages. Pour se voir, quand tu écris à une fille, propose toi-même, avec un jour et une heure.",
     },
   ],
-  lies: ["il-ne-repond-plus"],
+  lies: ["il-ne-repond-plus", "il-voit-mes-messages", "interesse-par-message", "ghosting"],
 };
