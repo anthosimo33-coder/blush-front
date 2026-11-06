@@ -10,6 +10,13 @@ import { CATALOGUE, prixDe } from "./offres";
 export const CIBLE_DE_MARGE = 80;
 
 /**
+ * En dessous de ce nombre de ventes sur la période, la marge produit ne se lit pas : le chiffre d’affaires compte le jour
+ * du paiement, l’IA le jour où elle sert, et le chat des clients qui ont payé avant pèse alors sur une ou deux ventes
+ * (le 5 novembre : 54 % sur 24 h pour un seul rapport vendu, 72 % sur 7 jours).
+ */
+export const VENTES_D_UNE_MARGE = 3;
+
+/**
  * La TVA comprise dans les prix (TTC : Whop, vendeur en titre, la reverse). Celle de la France : un achat d’un autre pays
  * de l’Union en paie une autre, la marge reste une estimation.
  */

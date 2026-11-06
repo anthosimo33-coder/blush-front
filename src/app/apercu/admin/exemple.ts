@@ -409,6 +409,30 @@ function pilotageDe(jours: Periode, { calme = false, suivi = true }: Variante): 
 }
 
 /** Le tableau de bord d’exemple de la période (`?p=`), les anciens chiffres compris (l’écran d’avant, ?version=actuelle). */
+/**
+ * `&ventes=1` (ou 2) : la période ramenée à une ou deux ventes d’un rapport à 9,90 €, face à 4,45 $ d’IA du produit par
+ * vente (le 5 novembre sur 24 h), sans remboursement : la marge produit ne s’y lit pas. Un autre `n` rend les chiffres
+ * tels quels.
+ */
+export function avecPeuDeVentes(s: StatsAdmin, n: number): StatsAdmin {
+  if (n !== 1 && n !== 2) return s;
+  const centimes = n * 990;
+  const p = s.pilotage;
+  return {
+    ...s,
+    pilotage: {
+      ...p,
+      net: { ...p.net, valeur: centimes },
+      payes: { n, centimes },
+      rembourses: { n: 0, centimes: 0 },
+      contestes: { n: 0, centimes: 0 },
+      acheteurs: { ...p.acheteurs, valeur: n },
+      centimesPayes: { ...p.centimesPayes, valeur: centimes },
+    },
+    couts: { ...s.couts, produit: { ...s.couts.produit, valeur: 4.45 * n } },
+  };
+}
+
 export function statsDExemple(jours: Periode, variante: Variante = {}): StatsAdmin {
   const pilotage = pilotageDe(jours, variante);
   const nb = jours === 30 ? 30 : 14;

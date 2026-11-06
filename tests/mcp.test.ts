@@ -300,6 +300,9 @@ describe("les outils", () => {
     /* Le non classé, et la marge produit au pire (s’il était tout du produit) */
     expect(p).toHaveProperty("ia.nonClasseDollars");
     expect(p).toHaveProperty("margeProduitPct.auPire");
+    /* Sous 3 ventes, la marge ne se lit pas : combien de ventes, et si elle se lit */
+    expect(p).toHaveProperty("margeProduitPct.ventes");
+    expect(p).toHaveProperty("margeProduitPct.seLit");
     expect((p.ia as { parPopulation: { population: string }[] }).parPopulation.map((x) => x.population)).toEqual([
       "Clients",
       "Prospects",

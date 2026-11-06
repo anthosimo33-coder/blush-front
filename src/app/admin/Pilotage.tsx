@@ -30,7 +30,7 @@ import type { SanteDesNavigateurs } from "@/server/navigateur";
 import type { Periode, Pilotage as Chiffres, StatsAdmin } from "@/server/stats";
 import type { OffreUnique, Population } from "@/types";
 import type { Direct } from "@/types/api";
-import { aCoteDeLaMarge, aRegarder, margeProduit, meilleureSource, type CarteARegarder } from "./a-regarder";
+import { aCoteDeLaMarge, aRegarder, margeProduit, margeSurPeuDeVentes, meilleureSource, type CarteARegarder } from "./a-regarder";
 import { BoutonAide } from "./Aide";
 import { Beta, Journal, NOMS_OFFRES_UNIQUES } from "./AdminScreen";
 import {
@@ -388,15 +388,19 @@ function ChiffresCles({ s }: { s: StatsAdmin }) {
   const tauxAvant = rapport(p.acheteurs.avant, p.visiteurs.avant);
   const parAcheteur = rapport(p.centimesPayes.valeur, p.acheteurs.valeur);
   const parAcheteurAvant = rapport(p.centimesPayes.avant, p.acheteurs.avant);
-  /* La marge produit : les ventes des vrais clients face à l’IA du produit ; les tests et le non classé à part (margeProduit) */
+  /*
+   * La marge produit : les ventes des vrais clients face à l’IA du produit ; les tests et le non classé à part (margeProduit).
+   * Sur trop peu de ventes, elle ne se lit pas : en gris, sans flèche, et où la lire à la place de la cible.
+   */
   const m = margeProduit(s);
   const marge = m.valeur;
-  const sousLaCible = marge !== null && marge < CIBLE_DE_MARGE;
+  const peu = marge !== null && !m.seLit ? margeSurPeuDeVentes(m, s.jours) : null;
+  const sousLaCible = !peu && marge !== null && marge < CIBLE_DE_MARGE;
   const aCote = aCoteDeLaMarge(m);
   const ecartVisiteurs = suivi ? ecartRelatif(p.visiteurs.valeur, p.visiteurs.avant, nombre) : null;
   const ecartTaux = ecartEnPoints(taux === null ? null : taux * 100, tauxAvant === null ? null : tauxAvant * 100, "hausse", 2);
   const ecartPanier = ecartEnValeur(parAcheteur, parAcheteurAvant, (v) => euros(v));
-  const ecartMarge = ecartEnPoints(marge, m.avant);
+  const ecartMarge = peu ? null : ecartEnPoints(marge, m.avant);
   /* Le suivi des visites a commencé pendant la période : elle n’en a qu’une partie */
   const debut = jourDeParisAvant(s.jours, new Date(s.le));
   const depuis =
@@ -446,13 +450,17 @@ function ChiffresCles({ s }: { s: StatsAdmin }) {
         />
         <ChiffreCle
           titre="Marge produit"
-          aide={{ cle: "marge", valeur: marge === null ? "—" : pourcent(marge, 0), contexte: `cible ${pourcent(CIBLE_DE_MARGE, 0)}, ${aCote}` }}
+          aide={{
+            cle: "marge",
+            valeur: marge === null ? "—" : pourcent(marge, 0),
+            contexte: peu ? `sur ${peu.ventes}, ${peu.ouLire}` : `cible ${pourcent(CIBLE_DE_MARGE, 0)}, ${aCote}`,
+          }}
           valeur={marge === null ? "—" : pourcent(marge, 0)}
-          valeurClasse={sousLaCible ? "text-attente-ink" : undefined}
+          valeurClasse={peu ? "text-grey" : sousLaCible ? "text-attente-ink" : undefined}
           ecart={ecartMarge}
-          sous={`cible ${pourcent(CIBLE_DE_MARGE, 0)} · ${aCote}`}
+          sous={`${peu ? `${peu.ventes} · ${peu.ouLire}` : `cible ${pourcent(CIBLE_DE_MARGE, 0)}`} · ${aCote}`}
           courbe={pointsDeLaCourbe(cases.map((c) => margeApresIA(c.centimes, c.dollarsProduit)))}
-          couleur={sousLaCible ? ORANGE : VERT}
+          couleur={peu ? "var(--grey)" : sousLaCible ? ORANGE : VERT}
         />
       </div>
     </section>

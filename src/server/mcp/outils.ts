@@ -193,9 +193,16 @@ function pilotage(s: StatsAdmin) {
     },
     /*
      * La marge produit : les ventes des vrais clients face à l’IA du produit, les tests à part ; `auPire` : la même si
-     * toute l’IA non classée (`ia.nonClasseDollars`) était du produit
+     * toute l’IA non classée (`ia.nonClasseDollars`) était du produit ; `seLit` faux sous VENTES_D_UNE_MARGE ventes
      */
-    margeProduitPct: { valeur: arrondi(marge.valeur), avant: arrondi(marge.avant), auPire: arrondi(marge.plancher), cible: CIBLE_DE_MARGE },
+    margeProduitPct: {
+      valeur: arrondi(marge.valeur),
+      avant: arrondi(marge.avant),
+      auPire: arrondi(marge.plancher),
+      cible: CIBLE_DE_MARGE,
+      ventes: marge.ventes,
+      seLit: marge.seLit,
+    },
     tunnel: ETAPES_DU_TUNNEL.map(([cle, nom]) => ({ etape: nom, n: p.tunnel[cle] })),
     plusGrosseFuite: fuite
       ? { de: ETAPES_DU_TUNNEL[fuite.etape - 1]![1], vers: ETAPES_DU_TUNNEL[fuite.etape]![1], passentPct: arrondi(fuite.taux * 100), depuis: fuite.depuis, arrivent: fuite.vers }

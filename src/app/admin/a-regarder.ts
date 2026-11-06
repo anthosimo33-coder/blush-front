@@ -1,4 +1,4 @@
-import { CIBLE_DE_MARGE, NOMS_DES_SOURCES, margeApresIA } from "@/contenu/pilotage";
+import { CIBLE_DE_MARGE, NOMS_DES_SOURCES, VENTES_D_UNE_MARGE, margeApresIA } from "@/contenu/pilotage";
 import type { StatsAdmin } from "@/server/stats";
 import type { SourceVisite } from "@/types";
 import { dollars, euros, fuiteDuTunnel, pluriel, pourcent, rapport, texteDeLaFuite } from "./calculs";
@@ -44,9 +44,18 @@ export function meilleureSource(sources: StatsAdmin["pilotage"]["sources"]): { s
  * l’IA du produit (margeApresIA ; null sans vente). Les tests (l’équipe et le tournage, `tests`, en dollars) se disent à
  * côté, à part. Le non classé (`nonClasse` : une conv effacée avant sa note, une ligne d’avant la règle que rien ne
  * rattache, une ligne pas encore rangée) n’est ni du produit ni des tests : `plancher`, la marge s’il était tout du
- * produit, borne ce qu’il peut lui coûter. /admin, « À regarder » et le serveur MCP la lisent d’ici.
+ * produit, borne ce qu’il peut lui coûter. `ventes` : les achats payés des vrais clients ; en dessous de
+ * VENTES_D_UNE_MARGE, `seLit` est faux. /admin, « À regarder » et le serveur MCP la lisent d’ici.
  */
-export function margeProduit(s: StatsAdmin): { valeur: number | null; avant: number | null; plancher: number | null; tests: number; nonClasse: number } {
+export function margeProduit(s: StatsAdmin): {
+  valeur: number | null;
+  avant: number | null;
+  plancher: number | null;
+  tests: number;
+  nonClasse: number;
+  ventes: number;
+  seLit: boolean;
+} {
   const p = s.pilotage;
   const c = s.couts;
   const nonClasse = c.populations.find((x) => x.population === "inconnu")?.dollars ?? 0;
@@ -56,6 +65,16 @@ export function margeProduit(s: StatsAdmin): { valeur: number | null; avant: num
     plancher: margeApresIA(p.net.valeur, c.produit.valeur + nonClasse),
     tests: c.tests.valeur,
     nonClasse,
+    ventes: p.payes.n,
+    seLit: p.payes.n >= VENTES_D_UNE_MARGE,
+  };
+}
+
+/** Une marge sur trop peu de ventes : combien (« une seule vente », « 2 ventes »), et sur quelle période la lire à la place. */
+export function margeSurPeuDeVentes(m: ReturnType<typeof margeProduit>, jours: number): { ventes: string; ouLire: string } {
+  return {
+    ventes: m.ventes === 1 ? "une seule vente" : pluriel(m.ventes, "vente"),
+    ouLire: jours < 30 ? `lis-la sur ${jours === 1 ? 7 : 30}\u00a0jours` : "attends d’autres ventes pour la lire",
   };
 }
 
@@ -93,7 +112,10 @@ export function aRegarder(s: StatsAdmin): CarteARegarder[] {
   const fuite = fuiteDuTunnel(suivi ? p.tunnel : { ...p.tunnel, visiteurs: 0 });
   if (fuite && fuite.depuis >= PERSONNES_D_UNE_FUITE) mal.push({ ton: "mal", ...texteDeLaFuite(fuite), lien: { texte: "Voir le tunnel", ancre: "tunnel" } });
 
-  /* La marge produit, contre la cible : son poste le plus cher, puis les tests et le non classé, à part */
+  /*
+   * La marge produit, contre la cible : son poste le plus cher, puis les tests et le non classé, à part. Sur trop peu de
+   * ventes, ni alerte ni bonne nouvelle : une carte neutre dit pourquoi elle ne se lit pas, et où la lire.
+   */
   const produit = s.couts.produit.valeur;
   const m = margeProduit(s);
   const marge = m.valeur;
@@ -102,7 +124,15 @@ export function aRegarder(s: StatsAdmin): CarteARegarder[] {
     m.nonClasse >= 0.005
       ? ` L’IA non classée (${dollars(m.nonClasse)}) n’y compte pas${m.plancher === null ? "" : `\u00a0: comptée dans le produit, la marge serait de ${pourcent(m.plancher, 0)}`}.`
       : "";
-  if (marge !== null && marge < CIBLE_DE_MARGE) {
+  if (marge !== null && !m.seLit) {
+    const { ventes, ouLire } = margeSurPeuDeVentes(m, s.jours);
+    neutre.push({
+      ton: "neutre",
+      titre: `Marge produit\u00a0: ${pourcent(marge, 0)}, sur ${ventes}`,
+      texte: `Trop peu de ventes pour la lire\u00a0: le chiffre d’affaires compte le jour du paiement, l’IA le jour où elle sert, et le chat des clients qui ont payé avant pèse ici sur ${ventes}. ${ouLire.charAt(0).toUpperCase()}${ouLire.slice(1)}.`,
+      lien: { texte: "Voir les coûts", ancre: "couts" },
+    });
+  } else if (marge !== null && marge < CIBLE_DE_MARGE) {
     const [poste] = [...s.couts.postes].sort((a, b) => b.produit.dollars - a.produit.dollars);
     const part = poste ? rapport(poste.produit.dollars, produit) : null;
     mal.push({

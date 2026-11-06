@@ -215,8 +215,12 @@ test("connecté avec l’email de l’équipe, le pilotage s’ouvre : ses carte
       await expect(populations.filter({ hasText: /^Clients/ })).toHaveText(/^Clients\s*([3-9]|\d{2,}),\d{2}\s\$\s*\d+\s%$/);
       await expect(bloc.getByRole("heading", { level: 3, name: "Les postes du produit" })).toBeVisible();
       await expect(bloc.getByRole("list", { name: "Les ratios du produit" }).getByRole("listitem")).toHaveCount(3);
-      /* Les tests à part, puis le non classé (notre 1 $ au moins) et la marge au pire s’il y a des ventes */
-      await expect(page.getByText(/^cible 80\s% · tests\s: ([5-9]|\d{2,}),\d{2}\s\$ à part · non classé\s: ([1-9]|\d{2,}),\d{2}\s\$( \(au pire -?\d+\s%\))?$/)).toBeVisible();
+      /* Les tests à part, puis le non classé (notre 1 $ au moins) et la marge au pire s’il y a des ventes ; sous 3 ventes, où la lire à la place de la cible */
+      await expect(
+        page.getByText(
+          /^(cible 80\s%|(une seule vente|\d+\sventes) · lis-la sur 7\sjours) · tests\s: ([5-9]|\d{2,}),\d{2}\s\$ à part · non classé\s: ([1-9]|\d{2,}),\d{2}\s\$( \(au pire -?\d+\s%\))?$/,
+        ),
+      ).toBeVisible();
       await expect(bloc).not.toContainText(/NaN|Infinity|undefined/);
     } finally {
       await sql()`delete from ai_usage where task = ${tache}`;

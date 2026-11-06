@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { aCoteDeLaMarge, aRegarder, margeProduit, meilleureSource, VISITEURS_D_UNE_SOURCE, type CarteARegarder } from "@/app/admin/a-regarder";
 import { statsDExemple } from "@/app/apercu/admin/exemple";
-import { CIBLE_DE_MARGE, margeApresIA } from "@/contenu/pilotage";
-import type { Pilotage, StatsAdmin } from "@/server/stats";
+import { CIBLE_DE_MARGE, VENTES_D_UNE_MARGE, margeApresIA } from "@/contenu/pilotage";
+import type { Periode, Pilotage, StatsAdmin } from "@/server/stats";
 
 /*
  * « À regarder », en haut du pilotage (src/app/admin/a-regarder.ts) : trois cartes au plus, ce qui coince d’abord, les
@@ -204,5 +204,25 @@ describe("« À regarder »", () => {
     expect(avec(couts(10, 40, 15))).toBe(`tests${NB}: 40,00${NB}$ à part · non classé${NB}: 15,00${NB}$ (au pire 79${NB}%)`);
     /* Sans vente, pas de marge au pire */
     expect(avec(couts(10, 0, 15), 0)).toBe(`tests${NB}: 0,00${NB}$ à part · non classé${NB}: 15,00${NB}$`);
+  });
+
+  it("sous 3 ventes, la marge ne se lit pas : une carte neutre, ni alerte ni bonne nouvelle, qui dit où la lire", () => {
+    /* Le 5 novembre sur 24 h : un seul rapport à 9,90 € face à 4,45 $ d’IA du produit, 54 % */
+    const carte = (n: number, centimes: number, jours: Periode = 1, produit = 4.45) =>
+      aRegarder(stats({ net: { valeur: centimes, avant: 0 }, payes: { n, centimes } }, { jours, couts: couts(produit) })).find((x) => x.titre.startsWith("Marge"));
+    expect(carte(1, 990)).toMatchObject({ ton: "neutre", titre: `Marge produit${NB}: 54${NB}%, sur une seule vente`, lien: { ancre: "couts" } });
+    expect(carte(1, 990)?.texte).toBe(
+      `Trop peu de ventes pour la lire${NB}: le chiffre d’affaires compte le jour du paiement, l’IA le jour où elle sert, et le chat des clients qui ont payé avant pèse ici sur une seule vente. Lis-la sur 7${NB}jours.`,
+    );
+    /* Deux ventes sur 7 jours : à lire sur 30 ; sur 30 jours, plus de période plus longue */
+    expect(carte(2, 1980, 7)).toMatchObject({ ton: "neutre", titre: `Marge produit${NB}: 77${NB}%, sur 2${NB}ventes` });
+    expect(carte(2, 1980, 7)?.texte).toMatch(new RegExp(`Lis-la sur 30${NB}jours\\.$`));
+    expect(carte(2, 1980, 30)?.texte).toMatch(/Attends d’autres ventes pour la lire\.$/);
+    /* Au-dessus de la cible sur une seule vente : pas de bonne nouvelle non plus */
+    expect(carte(1, 12_000, 1, 1)).toMatchObject({ ton: "neutre", titre: `Marge produit${NB}: 99${NB}%, sur une seule vente` });
+    /* Dès 3 ventes, la règle d’avant : l’alerte sous la cible */
+    expect(carte(VENTES_D_UNE_MARGE, 990)).toMatchObject({ ton: "mal", titre: `Marge produit${NB}: 54${NB}%, sous ta cible de 80${NB}%` });
+    expect(margeProduit(stats({ payes: { n: 2, centimes: 1980 } }))).toMatchObject({ ventes: 2, seLit: false });
+    expect(margeProduit(stats({ payes: { n: VENTES_D_UNE_MARGE, centimes: 2970 } }))).toMatchObject({ ventes: VENTES_D_UNE_MARGE, seLit: true });
   });
 });
