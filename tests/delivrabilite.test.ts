@@ -85,6 +85,20 @@ describe("le webhook de Resend (POST /api/mails/resend)", () => {
     expect((await lignes())[0]!.compteId).toBeNull();
   });
 
+  it("une plainte vaut désinscription : le compte ne reçoit plus ni offres ni conseils, ce qui était coupé garde sa date ; un rebond, non", async () => {
+    const [plaignant, deja, rebond] = [await compteDeTest("plainte"), await compteDeTest("plainte-deja"), await compteDeTest("plainte-rebond")];
+    const avant = new Date("2026-10-01T10:00:00Z");
+    await db().update(schema.users).set({ relancesCoupeesLe: avant }).where(eq(schema.users.id, deja.id));
+    await poster(evenement("email.complained", { to: [plaignant.email.toUpperCase()], tags: { sorte: "sequence-s1_haut" } }));
+    await poster(evenement("email.complained", { to: [deja.email], tags: { sorte: "rapport" } }));
+    await poster(evenement("email.bounced", { to: [rebond.email], tags: { sorte: "sequence-s3_pas" } }));
+    const coupes = async (id: string) =>
+      (await db().select({ offres: schema.users.relancesCoupeesLe, conseils: schema.users.conseilsCoupesLe }).from(schema.users).where(eq(schema.users.id, id)))[0];
+    expect(await coupes(plaignant.id)).toEqual({ offres: expect.any(Date), conseils: expect.any(Date) });
+    expect(await coupes(deja.id)).toEqual({ offres: avant, conseils: expect.any(Date) });
+    expect(await coupes(rebond.id)).toEqual({ offres: null, conseils: null });
+  });
+
   it("une adresse sans compte, des tags en liste, une sorte mal formée ou absente : noté quand même, la sorte « inconnue » au besoin", async () => {
     await poster(evenement("email.sent", { tags: [{ name: "sorte", value: "relance" }] }), { id: "msg_liste" });
     await poster(evenement("email.sent", { tags: { sorte: "pas une sorte !" } }), { id: "msg_mal" });
@@ -223,6 +237,7 @@ describe("l’alerte d’un seuil franchi", () => {
     const texte = etat.alertes[0]!.lignes.join("\n");
     expect(texte).toContain("1 sur 40 mails remis");
     expect(texte).toContain("relance (0 rebond, 1 plainte)");
+    expect(texte).toContain("ne reçoivent plus ni offres ni conseils");
     expect(texte).not.toContain("@");
     /* Le même jour, une seconde fois : pas de seconde alerte */
     expect(await verifierLesSeuils()).toHaveLength(1);

@@ -28,5 +28,8 @@ export const BULLES_DE_LA_BETA: number;
 /** Le rattrapage des testeurs de la bêta, en une requête qui se rejoue sans effet : ce qu’il a servi (testeurs, convs). */
 export const RATTRAPAGE_BETA: string;
 
+/** Le rattrapage des plaintes pour spam d’avant leur coupure par le webhook, en une requête qui se rejoue sans effet : les comptes coupés. */
+export const RATTRAPAGE_PLAINTES: string;
+
 /** Passe les rattrapages sur une base déjà migrée (`client` : postgres.js), et dit ce qu’ils ont fait. */
-export function rattraper(client: { unsafe: (requete: string) => PromiseLike<readonly unknown[]> }): Promise<{ testeurs: number; convs: number }>;
+export function rattraper(client: { unsafe: (requete: string) => PromiseLike<readonly unknown[]> }): Promise<{ testeurs: number; convs: number; plaintes: number }>;

@@ -77,9 +77,28 @@ with testeurs as (
 )
 select (select count(*) from soldes)::int as testeurs, (select count(*) from convs)::int as convs`;
 
+/**
+ * Les plaintes pour spam reçues avant que le webhook de Resend coupe les mails du compte (src/server/delivrabilite.ts) :
+ * un compte qui s’est plaint ne reçoit plus ni offres ni conseils, depuis sa première plainte ; ce qui était déjà coupé
+ * garde sa date. Les événements des mails ne durent que 30 jours : ensuite, il ne trouve plus rien
+ * qui ne soit déjà coupé. Rend le nombre de comptes coupés.
+ */
+export const RATTRAPAGE_PLAINTES = `
+with coupes as (
+  update users u set
+    relances_coupees_le = coalesce(u.relances_coupees_le, p.le),
+    conseils_coupes_le = coalesce(u.conseils_coupes_le, p.le)
+  from (select compte_id, min(le) as le from evenements_mails where type = 'complained' and compte_id is not null group by compte_id) p
+  where u.id = p.compte_id and (u.relances_coupees_le is null or u.conseils_coupes_le is null)
+  returning u.id
+)
+select count(*)::int as comptes from coupes`;
+
 /** Passe les rattrapages sur une base déjà migrée (`client` : postgres.js), et dit ce qu’ils ont fait. */
 export async function rattraper(client) {
   const [{ testeurs, convs }] = await client.unsafe(RATTRAPAGE_BETA);
   if (testeurs) console.log(`rattrapages : ${testeurs} testeur(s) de la bêta, ${convs} conv(s) débloquée(s)`);
-  return { testeurs, convs };
+  const [{ comptes: plaintes }] = await client.unsafe(RATTRAPAGE_PLAINTES);
+  if (plaintes) console.log(`rattrapages : ${plaintes} compte(s) qui se sont plaints, offres et conseils coupés`);
+  return { testeurs, convs, plaintes };
 }
