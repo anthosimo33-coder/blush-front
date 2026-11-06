@@ -1416,8 +1416,14 @@ describe("le contexte du chat garde l’heure lue (Contexte.lus, heureLue)", () 
  * date) ; la conv de rituels, dont chaque rituel de la vidéo sans date cherche ses places dans toute la conv, 5,4 à 6,6
  * fois (7,7 sous la couverture) ; l’envoi forgé, arrêté par COMPARAISONS_MAX, 4,7 à 5 fois (6,7 sous la couverture). Sur la
  * petite machine de la CI, où les projets unit et client tournent en même temps, ces deux cas forgés ont pris 16 et 17 fois
- * l’export seul (2 s pour 122 ms, le 3 novembre) : leur borne laisse cette marge. Un appariement quadratique en coûterait
- * des centaines de fois.
+ * l’export seul (2 s pour 122 ms, le 3 novembre) : leur borne laisse cette marge. Un appariement quadratique (paire()
+ * essayée sur toutes les paires) coûte 9 fois l’export seul dans le premier cas, 13 et 29 fois dans les deux cas forgés
+ * (mesuré le 6 novembre) : seule la borne du premier cas, FOIS, l’attrape. Ne pas l’élargir ; les cas forgés, eux,
+ * gardent la lecture d’un envoi forgé sous COMPARAISONS_MAX.
+ * Chaque temps est le meilleur de MESURES réunions, chacune sur des messages neufs (les fiches se gardent par message,
+ * FICHES dans src/server/morceaux.ts : une réunion rejouée sur les mêmes irait plus vite), le texte des captures lu avant
+ * le chrono : un à-coup de la machine (le ramasse-miettes, l’autre projet) ne compte plus. Mesuré une seule fois, l’export
+ * et la vidéo avaient pris 4,2 fois l’export seul sur la CI (421 ms pour 101 ms, le 6 novembre).
  */
 describe("le temps", { timeout: 30_000 }, () => {
   const FOIS = 4;
@@ -1427,10 +1433,18 @@ describe("le temps", { timeout: 30_000 }, () => {
     const x = new Date(t0 + k * 13 * 60e3);
     return `${p2(x.getUTCDate())}/${p2(x.getUTCMonth() + 1)}/${x.getUTCFullYear()} ${p2(x.getUTCHours())}:${p2(x.getUTCMinutes())}:00`;
   };
-  const chrono = <T>(f: () => T): [T, number] => {
-    const d = performance.now();
-    const r = f();
-    return [r, performance.now() - d];
+  const MESURES = 3;
+  /** Réunit les morceaux que `morceaux` prépare, MESURES fois sur des copies neuves : le résultat, et le meilleur temps. */
+  const chrono = (morceaux: () => MorceauLu[]): [ReturnType<typeof reunir>, number] => {
+    let r: ReturnType<typeof reunir> | undefined;
+    let meilleur = Infinity;
+    for (let k = 0; k < MESURES; k++) {
+      const neufs = morceaux().map((l) => ({ ...l, messages: l.messages.map((m) => ({ ...m })) }));
+      const d = performance.now();
+      r = reunir(neufs);
+      meilleur = Math.min(meilleur, performance.now() - d);
+    }
+    return [r!, meilleur];
   };
   const MOTS = ["ok", "mdr", "ouais", "jsp", "bonne nuit", "haha"];
   const lignes: Ligne[] = Array.from({ length: 40_000 }, (_, k) => [date(k), k % 2 ? "Léa" : "Hugo", k % 3 ? MOTS[k % MOTS.length]! : `message numéro ${k}`]);
@@ -1438,8 +1452,7 @@ describe("le temps", { timeout: 30_000 }, () => {
   let seulMs = 0;
   beforeAll(() => {
     exp = exporte(lignes);
-    reunir([exp]);
-    seulMs = chrono(() => reunir([exp]))[1];
+    seulMs = chrono(() => [exp])[1];
   });
   const vite = (ms: number, fois: number) => expect(ms, `${Math.round(ms)} ms, pour ${Math.round(seulMs)} ms l’export seul`).toBeLessThan(fois * seulMs);
 
@@ -1455,19 +1468,17 @@ describe("le temps", { timeout: 30_000 }, () => {
       repere: { date: lendemain, heure: null },
       messages: Array.from({ length: 1700 }, (_, k) => msg(k % 2 ? "autre" : "moi", k % 3 ? MOTS[k % MOTS.length]! : `nouveau ${k}`)),
     });
-    const [r, ms] = chrono(() => reunir([exp, capturees(blocs, "2026-10-31")]));
+    const [r, ms] = chrono(() => [exp, capturees(blocs, "2026-10-31")]);
     expect(r).toMatchObject({ doublons: 300, gardes: [40_000, 1_700] });
     vite(ms, FOIS);
     /* Les mêmes, où l’on ne voit aucune date : elles s’ancrent quand même */
-    const [s, ms2] = chrono(() =>
-      reunir([
-        exp,
-        capturees(
-          blocs.map((b) => ({ ...b, repere: null })),
-          "2026-10-31",
-        ),
-      ]),
-    );
+    const [s, ms2] = chrono(() => [
+      exp,
+      capturees(
+        blocs.map((b) => ({ ...b, repere: null })),
+        "2026-10-31",
+      ),
+    ]);
     expect(s).toMatchObject({ doublons: 300, gardes: [40_000, 1_700] });
     vite(ms2, FOIS);
   });
@@ -1489,7 +1500,7 @@ describe("le temps", { timeout: 30_000 }, () => {
     const rituels = exporte(lignes.map(([d, n], k): Ligne => [d, n, texte(k, `message numéro ${k}`)]));
     const repris = rituels.messages.slice(-300).map((m) => msg(m.role === "toi" ? "moi" : "autre", m.texte));
     const neufs = Array.from({ length: 1700 }, (_, k) => msg(k % 2 ? "autre" : "moi", texte(k, `nouveau ${k}`)));
-    const [r, ms] = chrono(() => reunir([rituels, capturees([{ repere: null, messages: [...repris, ...neufs] }], "2026-10-31")]));
+    const [r, ms] = chrono(() => [rituels, capturees([{ repere: null, messages: [...repris, ...neufs] }], "2026-10-31")]);
     expect(r).toMatchObject({ doublons: 300, gardes: [40_000, 1_700] });
     vite(ms, FOIS_FORGE);
   });
@@ -1497,7 +1508,7 @@ describe("le temps", { timeout: 30_000 }, () => {
   it("un envoi forgé : le même rituel des milliers de fois des deux côtés, sans date", () => {
     const forge = exporte(lignes.map(([d], k): Ligne => [d, k % 2 ? "Léa" : "Hugo", k % 2 ? "toi aussi mon amour" : "bonne nuit mon cœur"]));
     const rituel = Array.from({ length: 2000 }, (_, k) => msg(k % 2 ? "autre" : "moi", k % 2 ? "toi aussi mon amour" : "bonne nuit mon cœur"));
-    const [, ms] = chrono(() => reunir([forge, capturees([{ repere: null, messages: rituel }], "2026-10-31")]));
+    const [, ms] = chrono(() => [forge, capturees([{ repere: null, messages: rituel }], "2026-10-31")]);
     vite(ms, FOIS_FORGE);
   });
 });
