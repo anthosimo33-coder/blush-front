@@ -1,5 +1,5 @@
 import { prixDe } from "./offres";
-import { CIBLE_DE_MARGE } from "./pilotage";
+import { CIBLE_DE_MARGE, VENTES_D_UNE_MARGE } from "./pilotage";
 
 /*
  * Les « ? » du pilotage (/admin) : comment lire chaque carte et chaque chiffre clé. Les textes reprennent la maquette du
@@ -80,7 +80,7 @@ export const AIDES_DU_PILOTAGE = {
     quoi: "Ce qu’il reste de ce que paient les vrais clients, hors taxes, une fois payée l’IA du produit. Les tests (l’équipe et le tournage) n’y comptent ni dans les ventes ni dans l’IA\u00a0: ils se lisent à côté.",
     calcul:
       "(Chiffre d’affaires net des vrais clients hors taxes − l’IA du produit, en euros) ÷ ce chiffre d’affaires. Les vrais clients\u00a0: les acheteurs qui ne sont ni de l’équipe, ni du tournage, ni des invités, rangés une fois pour toutes à l’heure de leur paiement (les achats d’essai de l’équipe sont retirés, même si son compte d’essai est effacé ensuite). L’IA du produit\u00a0: celle des clients et des prospects (ceux qui importent sans acheter\u00a0: ce qu’il en coûte pour faire des clients), chaque appel rangé par la même règle («\u00a0Ce que coûte l’IA\u00a0» la détaille). La TVA retirée est celle de la France (20\u00a0%), le dollar compté à son cours du 11 octobre. Hors frais Whop et hors créatrices\u00a0: c’est une estimation. La courbe\u00a0: le payé et l’IA du produit de chaque case.",
-    repere: `La cible\u00a0: ${CIBLE_DE_MARGE}\u00a0% ou plus. En dessous, la carte passe en orange. Ce que coûtent les tests s’écrit dessous, à part, et le non classé avec la marge au pire (s’il était tout du produit).`,
+    repere: `La cible\u00a0: ${CIBLE_DE_MARGE}\u00a0% ou plus. En dessous, la carte passe en orange. Ce que coûtent les tests s’écrit dessous, à part, et le non classé avec la marge au pire (s’il était tout du produit). Sous ${VENTES_D_UNE_MARGE}\u00a0ventes sur la période, elle ne se lit pas\u00a0: le chiffre d’affaires compte le jour du paiement, l’IA le jour où elle sert, et le chat des clients qui ont payé avant pèse alors sur une ou deux ventes. La carte passe en gris, sans flèche, et dit où la lire (sur 7\u00a0jours pour les dernières 24\u00a0h)\u00a0; «\u00a0À regarder\u00a0» n’en fait ni une alerte ni une bonne nouvelle.`,
     siCaBouge:
       "Si elle baisse\u00a0: le chat coûte trop par réponse, ou des bulles offertes partent en réponses. Regarde l’IA du produit, poste par poste. Des tests qui grimpent ne la touchent pas. Un appel «\u00a0non classé\u00a0» (une conv effacée avant sa note, une ligne d’avant la règle que rien ne rattache, une ligne pas encore rangée) n’y est pas non plus\u00a0: beaucoup de non classé, et la marge se lit trop belle, d’où la marge au pire écrite dessous. Juste après une mise en ligne, l’historique se range en quelques passages de 5\u00a0minutes\u00a0: lis la marge une fois le non classé retombé. Les lectures de captures d’avant le 26 octobre (sans conv ni envoi notés) sont rangées en prospect\u00a0: un essai de l’équipe sans compte peut s’y glisser.",
   },
