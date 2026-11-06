@@ -79,6 +79,15 @@ export const entetesDeDesinscription = (userId: string, quoi: Exclude<Desinscrip
  */
 export async function desinscrire(id: string, cle: string, quoi: Desinscription = "offres"): Promise<boolean> {
   if (!memeEmpreinte(`desinscription:${id}`, cle)) return false;
+  await couperLesMails(id, quoi);
+  return true;
+}
+
+/**
+ * Coupe ce genre de mails au compte, sans lien à vérifier : par sa désinscription, ou sa plainte pour spam (le webhook
+ * de Resend, src/server/delivrabilite.ts). Ce qui était déjà coupé garde sa date.
+ */
+export async function couperLesMails(id: string, quoi: Desinscription): Promise<void> {
   const u = schema.users;
   if (quoi !== "conseils")
     await db()
@@ -90,7 +99,6 @@ export async function desinscrire(id: string, cle: string, quoi: Desinscription 
       .update(u)
       .set({ conseilsCoupesLe: sql`now()` })
       .where(and(eq(u.id, id), isNull(u.conseilsCoupesLe)));
-  return true;
 }
 
 /** Une relance à envoyer : le compte, son email, et la conv à rouvrir. */

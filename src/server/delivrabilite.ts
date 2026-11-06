@@ -12,6 +12,7 @@ import { env } from "./env";
 import { auMieux, journal } from "./journal";
 import { LIMITES, sousLaLimite } from "./limites";
 import { verifierWebhookResend } from "./paiement/signature";
+import { couperLesMails } from "./relances";
 
 /*
  * La délivrabilité des mails : ce que Resend dit de chacun (parti, remis, refusé pour de bon, signalé comme spam,
@@ -24,6 +25,10 @@ import { verifierWebhookResend } from "./paiement/signature";
  * EVENEMENTS_MAILS_GARDES_JOURS (la purge de la nuit, src/server/purge.ts).
  * Un mail de code revenu (un rebond, ou l’adresse bloquée) le note aussi sur le code (noterLeRetourDuCode, dans
  * login_codes, qui a déjà l’adresse) : l’écran du code dit alors à la personne que son adresse n’existe pas.
+ * Une plainte vaut désinscription : le compte ne reçoit plus ni offres ni conseils (couperLesMails, src/server/relances.ts),
+ * comme par le lien du pied de ses mails. Resend bloque déjà l’adresse, pour tous nos domaines ; sans ça, les séquences
+ * continueraient de lui écrire (des mails « bloqués »), et la retirer de sa liste de suppression les rouvrirait.
+ * Les plaintes reçues avant ce code, son rattrapage les coupe (RATTRAPAGE_PLAINTES, scripts/base.mjs).
  */
 
 /** Combien de jours la purge garde les événements des mails. */
@@ -89,8 +94,8 @@ async function compteDeLAdresse(adresse: string | undefined): Promise<string | n
 /**
  * Reçoit un webhook de Resend : sa signature d’abord (refusée : « refuse », un 401 ; signée mais fausse ou trop vieille,
  * l’équipe le sait), puis l’événement noté une fois. Un événement qu’on ne garde pas, ou d’une forme qu’on ne lit pas,
- * répond « ok » quand même : sinon Resend le rejouerait des heures. Un rebond ou une plainte relit les seuils, après la
- * réponse (after). Sans RESEND_WEBHOOK_SECRET, tout est refusé.
+ * répond « ok » quand même : sinon Resend le rejouerait des heures. Une plainte coupe les offres et les conseils de son
+ * compte. Un rebond ou une plainte relit les seuils, après la réponse (after). Sans RESEND_WEBHOOK_SECRET, tout est refusé.
  */
 export async function recevoirEvenementResend(corps: string, entetes: Headers, maintenant = new Date()): Promise<"ok" | "refuse"> {
   const secrets = env().RESEND_WEBHOOK_SECRET;
@@ -126,14 +131,17 @@ export async function recevoirEvenementResend(corps: string, entetes: Headers, m
   if (!type) return "ok";
   const sorte = sorteDuTag(lu.data.data?.tags);
   const adresse = premierDestinataire(lu.data.data?.to);
+  const compteId = await compteDeLAdresse(adresse);
   const [note] = await db()
     .insert(schema.evenementsMails)
-    .values({ id: v.id, le: heureDe(lu.data.created_at, maintenant), type, sorte, compteId: await compteDeLAdresse(adresse) })
+    .values({ id: v.id, le: heureDe(lu.data.created_at, maintenant), type, sorte, compteId })
     .onConflictDoNothing()
     .returning({ id: schema.evenementsMails.id });
   /* Avant la réponse : l’écran du code le demande toutes les quelques secondes */
   if (note && adresse && (type === "bounced" || type === "suppressed") && SORTES_DU_CODE.has(sorte))
     await auMieux(noterLeRetourDuCode(adresse, maintenant), "retour du code non noté");
+  /* Avant la réponse aussi : le prochain passage des séquences ne doit plus rien lui envoyer */
+  if (compteId && type === "complained") await auMieux(couperLesMails(compteId, "tout"), "mails du compte plaignant non coupés");
   if (note && (type === "bounced" || type === "complained")) after(() => auMieux(verifierLesSeuils(maintenant), "seuils de la délivrabilité non relus"));
   return "ok";
 }
@@ -215,6 +223,10 @@ export async function delivrabilite(jours = 7): Promise<Delivrabilite> {
 /** Une part en pourcentage, « 0,12 % », pour une alerte. */
 const enPourcent = (n: number, sur: number) => `${((n / sur) * 100).toLocaleString("fr-FR", { maximumFractionDigits: 2 })}\u00a0%`;
 
+/** Ce que devient qui se plaint, dit dans l’alerte. */
+const PLAINTES_COUPEES =
+  "Les comptes qui se sont plaints ne reçoivent plus ni offres ni conseils. Resend bloque aussi leur adresse, codes et rapports compris (Resend, Suppressions).";
+
 /**
  * Relit les 7 derniers jours de tous les mails face aux seuils de Resend (SEUILS_DELIVRABILITE) : les rebonds (jugés à
  * partir de VOLUME_MIN_DES_REBONDS mails partis) et les plaintes (toujours : une seule compte, à notre volume). Un seuil
@@ -245,6 +257,7 @@ export async function verifierLesSeuils(maintenant = new Date()): Promise<string
       `En cause : ${enCause.join(", ")}.`,
       `Domaine principal (${d.domaines.principal}) : ${d.principal.rebonds} rebonds, ${d.principal.plaintes} plaintes ; relances (${d.domaines.relances}) : ${d.relances.rebonds} rebonds, ${d.relances.plaintes} plaintes.`,
       "Le détail est dans /admin, bloc « Délivrabilité » (sur 7 jours). Les plaintes de Gmail n’arrivent pas jusqu’à Resend : elles se lisent dans Google Postmaster Tools.",
+      ...(t.plaintes ? [PLAINTES_COUPEES] : []),
       `Relu le ${maintenant.toLocaleDateString("fr-FR", { timeZone: "Europe/Paris" })}. Prochaine alerte dans 24\u00a0h au plus tôt.`,
     ],
     { importante: true },

@@ -84,7 +84,8 @@ import { entetesDeDesinscription, lienDesinscription } from "./relances";
  *   avant de partir (deux passages en même temps n’en envoient qu’un) et effacé s’il ne part pas ;
  * - jamais à l’équipe, ni à qui la bêta fermée ne laisse pas entrer, ni sur une conv en alerte (le mode sobre), ni sans
  *   « Qui es-tu ? » rempli (ni prénom ni pronom à accorder) ;
- * - les conseils s’arrêtent à users.conseils_coupes_le, les offres à users.relances_coupees_le (le lien de leur pied) ;
+ * - les conseils s’arrêtent à users.conseils_coupes_le, les offres à users.relances_coupees_le (le lien de leur pied, ou
+ *   une plainte pour spam : src/server/delivrabilite.ts) ;
  * - un garde-fou de LIMITES.sequencesParJour (300) par 24 h, contre un envoi anormal (l’équipe prévenue), puis le quota
  *   des mails du prestataire (sorte « relance ») ; plus le plafond de la relance (décidé le 17 octobre : s’il en faut 60,
  *   il en part 60) ;
