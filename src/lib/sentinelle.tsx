@@ -18,8 +18,14 @@ import { etapeDe } from "./presence";
 const ERREURS_PAR_PAGE = 5;
 const signalees = new Set<string>();
 
-/** Le bruit connu, qui n’est pas un bug de l’appli : une erreur d’un script d’un autre site (opaque), ResizeObserver. */
-const BRUIT = /^(Script error\.?|ResizeObserver loop)/;
+/**
+ * Le bruit connu, qui n’est pas un bug de l’appli : une erreur d’un script d’un autre site (opaque), ResizeObserver, et
+ * les scripts qu’un navigateur ou une appli glisse dans chaque page, sans adresse de fichier (le filtre des scripts
+ * d’ailleurs ne les voit pas) : un portefeuille crypto (`window.ethereum`), le pont d’une appli iPhone
+ * (`webkit.messageHandlers`), le remplissage du navigateur de Facebook (`_AutofillCallbackHandler`), celui de Bing
+ * (`instantSearchSDKJSBridge…`), Chrome sur iPhone (`__gCrWeb`). L’appli n’emploie aucun de ces noms.
+ */
+const BRUIT = /^(Script error\.?|ResizeObserver loop)|\b(?:ethereum|webkit\.messageHandlers|_AutofillCallbackHandler|instantSearchSDKJSBridge\w*|__gCrWeb)\b/;
 
 /** Signale une erreur de l’appli à l’équipe (une fois par page pour la même, cinq par page au plus). */
 export function signalerErreur(e: unknown, source?: string): void {
