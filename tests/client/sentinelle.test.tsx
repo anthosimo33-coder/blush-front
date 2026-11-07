@@ -25,6 +25,12 @@ describe("la sentinelle", () => {
     erreur("x is undefined");
     erreur("ailleurs", "chrome-extension://abc/s.js");
     erreur("ResizeObserver loop completed with undelivered notifications.");
+    /* Les scripts glissés dans la page par le navigateur ou une appli : sans adresse de fichier */
+    erreur("undefined is not an object (evaluating 'window.ethereum.selectedAddress = undefined')", "");
+    erreur("undefined is not an object (evaluating 'window.webkit.messageHandlers.bridge')", "");
+    erreur("Can't find variable: _AutofillCallbackHandler", "");
+    erreur("Can't find variable: instantSearchSDKJSBridgeClearHighlight", "");
+    erreur("undefined is not an object (evaluating '__gCrWeb.message')", "");
     expect(signalees).toHaveBeenCalledTimes(1);
     expect(signalees).toHaveBeenCalledWith({ nom: "TypeError", message: "x is undefined", etape: "chat", source: `${window.location.origin}/_next/static/chunks/ab.js:1:9` });
   });
