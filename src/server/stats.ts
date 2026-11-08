@@ -212,10 +212,12 @@ export type Pilotage = {
    */
   jalonsParAppli: { appli: AppKind; jalons: Record<JalonParAppli, number> }[];
   /**
-   * Les sources : leurs visiteurs, et les vrais clients qui ont acheté (et leur payé) d’après la source de leur compte
+   * Les sources : leurs visiteurs ; ceux qui ont importé une conv, validé leur code (le compte créé) et vu le paywall,
+   * d’après la visite du même jour et de la même empreinte que leur jalon (une connexion qui change de réseau en route
+   * se perd : un minimum) ; et les vrais clients qui ont acheté (et leur payé) d’après la source de leur compte
    * (users.source). `source` null : les acheteurs dont le compte date d’avant le suivi des visites. Classées par payé.
    */
-  sources: { source: SourceVisite | null; visiteurs: number; acheteurs: number; centimes: number }[];
+  sources: { source: SourceVisite | null; visiteurs: number; importent: number; comptes: number; paywall: number; acheteurs: number; centimes: number }[];
   /**
    * Les pages d’arrivée, par groupe (GROUPES_D_ARRIVEE, groupeDArrivee) : leurs visiteurs (visites.arrivee), et les vrais
    * clients qui ont acheté (et leur payé) d’après la page d’arrivée de leur compte (users.arrivee), comme les sources.
@@ -734,6 +736,7 @@ async function pilotageDe(jours: Periode): Promise<Pilotage> {
     parAppli,
     visiteursParSource,
     achatsParSource,
+    jalonsParSource,
     visiteursParArrivee,
     achatsParArrivee,
     parOffre,
@@ -809,6 +812,11 @@ async function pilotageDe(jours: Periode): Promise<Pilotage> {
     lignes<{ source: SourceVisite | null; acheteurs: string; centimes: string }>(
       sql`select u.source, count(distinct a0.user_id) as acheteurs, sum(a0.centimes) as centimes
           from achats a0 left join users u on u.id = a0.user_id where ${W("a0.paye_le")} and ${ACHAT_DU_PRODUIT} group by u.source`,
+    ),
+    /* Le tunnel par source : chaque jalon rangé sous la source de la visite du même jour et de la même empreinte */
+    lignes<{ source: SourceVisite; jalon: Jalon; n: string }>(
+      sql`select v.source, j.jalon, count(*) as n from jalons j join visites v on v.jour = j.jour and v.empreinte = j.empreinte
+          where ${W("j.le")} and j.jalon in ('importee', 'code', 'paywall') group by v.source, j.jalon`,
     ),
     lignes<{ arrivee: string | null; n: string }>(sql`select arrivee, count(*) as n from visites where ${W("arrive_le")} group by arrivee`),
     lignes<{ arrivee: string | null; acheteurs: string; centimes: string }>(
@@ -959,9 +967,12 @@ async function pilotageDe(jours: Periode): Promise<Pilotage> {
 
   const m = (c: unknown) => n(c);
   const net = { valeur: m(argent.payes_c) - m(argent.remb_c) - m(argent.cont_c), avant: m(argent.payes_av_c) - m(argent.remb_av_c) - m(argent.cont_av_c) };
-  const parSource = new Map<SourceVisite | null, { visiteurs: number; acheteurs: number; centimes: number }>();
-  const ligneDe = (source: SourceVisite | null) => parSource.get(source) ?? parSource.set(source, { visiteurs: 0, acheteurs: 0, centimes: 0 }).get(source)!;
+  const parSource = new Map<SourceVisite | null, { visiteurs: number; importent: number; comptes: number; paywall: number; acheteurs: number; centimes: number }>();
+  const ligneDe = (source: SourceVisite | null) =>
+    parSource.get(source) ?? parSource.set(source, { visiteurs: 0, importent: 0, comptes: 0, paywall: 0, acheteurs: 0, centimes: 0 }).get(source)!;
   for (const v of visiteursParSource) ligneDe(v.source).visiteurs = n(v.n);
+  const ETAPES_PAR_SOURCE = { importee: "importent", code: "comptes", paywall: "paywall" } as const;
+  for (const j of jalonsParSource) if (j.jalon in ETAPES_PAR_SOURCE) ligneDe(j.source)[ETAPES_PAR_SOURCE[j.jalon as keyof typeof ETAPES_PAR_SOURCE]] = n(j.n);
   for (const a of achatsParSource) Object.assign(ligneDe(a.source), { acheteurs: n(a.acheteurs), centimes: n(a.centimes) });
   const groupes = new Map(GROUPES_D_OFFRES.map((g) => [g, { n: 0, centimes: 0 }]));
   for (const o of parOffre) {

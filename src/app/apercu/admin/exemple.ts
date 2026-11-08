@@ -170,22 +170,35 @@ function pilotageDe(jours: Periode, { calme = false, suivi = true }: Variante): 
     ["assistants", 0.004, 0.04],
   ];
   const avantLeSuivi = jours === 1 ? 0 : 2;
+  /* Le tunnel d’une source : un sixième de ses visiteurs importe, sept sur dix d’entre eux créent leur compte, presque tous voient le paywall */
+  const tunnelDe = (v: number, a: number) => {
+    const importent = Math.max(a, Math.round(v * 0.17));
+    const comptes = Math.max(a, Math.round(importent * 0.72));
+    return { importent, comptes, paywall: Math.max(a, Math.round(comptes * 0.95)) };
+  };
   const autres = parts.map(([source, part, taux]) => {
     const v = Math.round(visiteurs * part);
     const a = Math.round(v * taux);
-    return { source, visiteurs: v, acheteurs: a, centimes: a * 1650 };
+    return { source, visiteurs: v, ...tunnelDe(v, a), acheteurs: a, centimes: a * 1650 };
   });
+  const visiteursTiktok = visiteurs - somme(autres, (s) => s.visiteurs);
+  const acheteursTiktok = acheteurs - avantLeSuivi - somme(autres, (s) => s.acheteurs);
   const tiktok = {
     source: "tiktok" as const,
-    visiteurs: visiteurs - somme(autres, (s) => s.visiteurs),
-    acheteurs: acheteurs - avantLeSuivi - somme(autres, (s) => s.acheteurs),
+    visiteurs: visiteursTiktok,
+    ...tunnelDe(visiteursTiktok, acheteursTiktok),
+    acheteurs: acheteursTiktok,
     centimes: 0,
   };
   tiktok.centimes = paye - avantLeSuivi * 1990 - somme(autres, (s) => s.centimes);
   /* Sans visites comptées, aucun compte n’a de source : tous les acheteurs sont « avant le suivi » */
   const sources = suivi
-    ? [tiktok, ...autres, ...(avantLeSuivi ? [{ source: null, visiteurs: 0, acheteurs: avantLeSuivi, centimes: avantLeSuivi * 1990 }] : [])].sort((a, b) => b.centimes - a.centimes)
-    : [{ source: null, visiteurs: 0, acheteurs, centimes: paye }];
+    ? [
+        tiktok,
+        ...autres,
+        ...(avantLeSuivi ? [{ source: null, visiteurs: 0, importent: 0, comptes: 0, paywall: 0, acheteurs: avantLeSuivi, centimes: avantLeSuivi * 1990 }] : []),
+      ].sort((a, b) => b.centimes - a.centimes)
+    : [{ source: null, visiteurs: 0, importent: 0, comptes: 0, paywall: 0, acheteurs, centimes: paye }];
   const arrivees = arriveesDe({ visiteurs, acheteurs, paye, avantLeSuivi: suivi ? avantLeSuivi : acheteurs, suivi });
   /* Ce qui se vend : Premium, le rapport et la suite à leur prix, les bulles prennent le reste */
   const premium = Math.round(acheteurs * 0.52);
