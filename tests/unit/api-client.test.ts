@@ -123,8 +123,22 @@ describe("les bulles (sendToBlush, getAchats)", () => {
     repondre = () => Response.json({ erreur: "bulles", aide: AIDE_SANS_BULLES }, { status: 402 });
     const r = await sendToBlush({ text: "allô ?" });
     expect(r.plusDeBulles).toBe(true);
-    /* Les numéros d’aide, toujours : ce message n’est pas allé jusqu’au modèle (src/contenu/aide.ts) */
-    expect(r.bubbles.map((b) => b.text)).toEqual(["plus de bulles pour l’instant 🫧", "recharge, et je te réponds", URGENCES]);
+    /* Un message ordinaire : la réponse déjà écrite, sans les numéros d’urgence (src/lib/detresse.ts) */
+    expect(r.bubbles.map((b) => b.text)).toEqual([
+      "attends, ta réponse est déjà écrite 👀",
+      "il te manque juste des bulles pour la lire",
+      "recharge et elle s’affiche direct, ce serait bête de laisser passer le moment",
+    ]);
+  });
+
+  it("plus de bulles, un message qui fait penser à un danger : les numéros d’urgence suivent (il n’est pas allé jusqu’au modèle)", async () => {
+    repondre = () => Response.json({ erreur: "bulles", aide: AIDE_SANS_BULLES }, { status: 402 });
+    const r = await sendToBlush({ text: "il m’a frappée hier" });
+    expect(r.plusDeBulles).toBe(true);
+    expect(r.bubbles.map((b) => b.text).at(-1)).toBe(URGENCES);
+    /* Avec des captures, le mot qui les accompagne décide pareil */
+    const f = await sendToBlush({ text: "j’ai envie de mourir", files: [new File(["x"], "capture.png", { type: "image/png" })] });
+    expect(f.bubbles.map((b) => b.text).at(-1)).toBe(URGENCES);
   });
 
   it("une autre erreur : BLUSH la dit, sans recharge", async () => {

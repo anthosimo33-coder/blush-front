@@ -129,7 +129,7 @@ export function QuestionChat({ ideas, story, ferme = false }: { ideas: string[];
       setAsking(null);
       setDraft(q);
       const bulles = codeDe(e) === "bulles";
-      setSouci({ texte: souciQuestion(e), bulles });
+      setSouci({ texte: souciQuestion(e, q), bulles });
       play("non");
       /* Plus de bulles (une réponse verrouillée attend déjà) : la recharge s’ouvre, comme dans le chat */
       if (bulles && soldeAffiche(compteVu.current) !== null) setFeuille("recharge");

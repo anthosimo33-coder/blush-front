@@ -11,8 +11,9 @@
  * Aucune détection de la détresse ne tourne sur le serveur avant le modèle : c’est le modèle qui lève une alerte (le
  * mode sobre pour la règle de l’âge ; une réponse du chat en alerte se paie comme les autres depuis le 21 octobre
  * 2026, mais verrouillée, elle montre les numéros d’urgence). Un message envoyé sans bulles quand une réponse verrouillée attend déjà
- * n’arrive pas jusqu’à lui (402 « bulles ») : cette réponse, et ce que l’écran en dit, portent donc toujours les
- * numéros d’urgence (AIDE_SANS_BULLES), quoi qu’il ait écrit.
+ * n’arrive pas jusqu’à lui (402 « bulles ») : cette réponse porte toujours les numéros d’aide (AIDE_SANS_BULLES), et
+ * l’écran dit les numéros d’urgence seulement si ses mots font penser à un danger (detresseProbable, src/lib/detresse.ts ;
+ * décidé le 9 novembre 2026, avant ils suivaient chaque fois, « aucun rapport » avec la recharge).
  */
 
 /**

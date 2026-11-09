@@ -1,10 +1,10 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
-import { URGENCES } from "@/contenu/aide";
 import { useLayoutEffect } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { CoupureChat, getChatHistory, lireLaReponse, modeVocalChat, type SuiviChat } from "@/services/api";
 import type { BlushAnswer, BulleChat } from "@/types";
 import type { HistoriqueChat } from "@/types/api";
+import { LIRE_SANS_BULLES } from "@/lib/messages-erreur";
 import { ErreurApi } from "@/types/erreurs-api";
 import { nouvelId, useConversation, type Scene } from "@/app/app/accueil/conv/useConversation";
 import type { Devant } from "@/app/app/accueil/conv/useChargerAnciens";
@@ -379,7 +379,7 @@ describe("useConversation : une réponse verrouillée (écrite à 0 bulle)", () 
     await act(async () => void (lue = await result.current.lire(masquee.id, 41)));
     expect(lue).toBe(false);
     expect(result.current.msgs.at(-2)).toEqual(masquee);
-    expect(result.current.msgs.at(-1)).toMatchObject({ type: "mot", notice: `plus de bulles pour l’instant 🫧 recharge, et je te réponds ${URGENCES}` });
+    expect(result.current.msgs.at(-1)).toMatchObject({ type: "mot", notice: LIRE_SANS_BULLES });
     /* Et l’écran ouvre la recharge */
     expect(s.manqueDeBulles).toHaveBeenCalledOnce();
   });

@@ -4,6 +4,7 @@
  * l’import, avec leur action, sont dans src/lib/copie-erreur.ts.
  */
 import { URGENCES } from "@/contenu/aide";
+import { detresseProbable } from "@/lib/detresse";
 import type { FicheUpdate } from "@/types";
 import { ErreurApi, type CodeApi, type CodeErreur } from "@/types/erreurs-api";
 
@@ -23,14 +24,21 @@ const CHAT_ET_QUESTION = {
   pas_pret: "je finis d’écrire ton rapport, repasse dans deux minutes",
   /*
    * Plus de bulles : une réponse verrouillée attend déjà (src/server/bulles.ts), ou la lire en demande plus que le solde.
-   * Le message n’a pas atteint le modèle : s’il disait sa détresse, personne ne l’a lu. Les numéros d’urgence suivent
-   * donc toujours (URGENCES, la même source que les conditions et la réponse 402).
-   * TODO(produit): texte nouveau, sans maquette (le prototype des bulles n’a pas ce cas) ; la recharge viendra avec lui
+   * BLUSH ramène à cette réponse, déjà écrite : l’envie de la lire, sans fausse urgence (ni compte à rebours, ni offre
+   * qui expire). La recharge s’ouvre avec lui (HomeScreen). Le message n’a pas atteint le modèle : les numéros
+   * d’urgence le suivent seulement si ses mots font penser à un danger (avecLesUrgences). Décidé le 9 novembre 2026,
+   * à la place de « plus de bulles pour l’instant 🫧 · recharge, et je te réponds » suivi des numéros à chaque fois
    */
-  bulles: ["plus de bulles pour l’instant 🫧", "recharge, et je te réponds", URGENCES],
+  bulles: ["attends, ta réponse est déjà écrite 👀", "il te manque juste des bulles pour la lire", "recharge et elle s’affiche direct, ce serait bête de laisser passer le moment"],
   /* Le même message, déjà parti, s’écrit encore (« Réessayer » trop tôt). TODO(produit): texte nouveau, sans maquette */
   occupe: "je t’écris encore, deux secondes",
 } as const;
+
+/**
+ * « La lire » sans assez de bulles (POST /api/chat/debloquer, 402 « bulles ») : il sait déjà qu’elle est écrite, un mot
+ * suffit (la recharge s’ouvre avec lui). Aucun message n’est parti : pas de numéros d’urgence.
+ */
+export const LIRE_SANS_BULLES = "il te manque juste des bulles pour la lire, recharge et elle s’affiche direct";
 
 /** BLUSH n’a pas pu écouter son vocal (la transcription en panne, ou un format illisible) : qu’il écrive. */
 const ECOUTE_IMPOSSIBLE = "j’arrive pas à écouter ton vocal là, écris-moi";
@@ -159,8 +167,8 @@ const MESSAGES = {
   /* La question du rapport, qui passe par le chat : BLUSH le dit en une phrase, l’écran garde la question */
   question: {
     ...CHAT_ET_QUESTION,
-    /* TODO(produit): texte nouveau, sans maquette (voir CHAT_ET_QUESTION) */
-    bulles: `plus de bulles pour l’instant, recharge et je te réponds. ${URGENCES}`,
+    /* La réponse verrouillée qui attend est dans le chat (voir CHAT_ET_QUESTION) ; les numéros d’urgence : avecLesUrgences */
+    bulles: "une réponse t’attend déjà dans ton chat, il te manque juste des bulles pour la lire\u00a0: recharge et elle s’affiche direct",
     refus: "là-dessus je peux pas t’aider, reformule ta question",
     defaut: "j’ai eu un bug, renvoie-moi ta question",
   },
@@ -178,6 +186,16 @@ export function messageErreur<A extends Action>(action: A, e: unknown): TexteDe<
   const textes: { defaut: Texte } & Partial<Record<CodeApi, Texte>> = MESSAGES[action];
   const code = codeDe(e);
   return ((code && textes[code]) ?? textes.defaut) as TexteDe<A>;
+}
+
+/**
+ * Ce que BLUSH dit de l’erreur `e` d’un message (`envoye` : son texte), au chat en bulles, à la question en une phrase :
+ * refusé faute de bulles (402 « bulles »), il n’a atteint personne ; s’il fait penser à un danger ou à une détresse
+ * (detresseProbable, src/lib/detresse.ts), les numéros d’urgence suivent (URGENCES, une bulle de plus au chat).
+ */
+export function avecLesUrgences(action: "chat" | "question", e: unknown, envoye: string | undefined): readonly string[] {
+  const dit = [messageErreur(action, e)].flat();
+  return codeDe(e) === "bulles" && envoye && detresseProbable(envoye) ? [...dit, URGENCES] : dit;
 }
 
 /* ———— Les écrans d’erreur de l’import ———— */

@@ -184,7 +184,7 @@ describe("le reçu sous la réponse", () => {
 });
 
 describe("à 0 bulle", () => {
-  it("refusée (402 « bulles ») : la recharge s’ouvre ; fermée, le souci et ses numéros d’aide restent, même en réécrivant, et « Recharger » la rouvre", async () => {
+  it("refusée (402 « bulles ») : la recharge s’ouvre ; fermée, le souci ramène à la réponse prête (sans numéros, rien d’inquiétant) et reste, même en réécrivant, et « Recharger » la rouvre", async () => {
     await ecran(compte(0));
     expect(compteurs(0)).toHaveLength(2);
     poser.mockRejectedValueOnce(new ErreurApi("bulles", 402));
@@ -194,14 +194,23 @@ describe("à 0 bulle", () => {
     fireEvent(recharge, new Event("cancel", { cancelable: true }));
     expect(screen.queryByRole("dialog", { name: "Recharge tes bulles" })).toBeNull();
     const souci = screen.getByRole("alert");
-    expect(souci.textContent).toContain(URGENCES);
-    /* La question revient dans le champ ; la réécrire ne retire pas les numéros d’aide */
+    expect(souci.textContent).toContain("une réponse t’attend déjà dans ton chat");
+    expect(souci.textContent).not.toContain(URGENCES);
+    /* La question revient dans le champ ; la réécrire ne retire pas le souci */
     const champ = screen.getByRole("textbox", { name: "Ta question à BLUSH" }) as HTMLTextAreaElement;
     expect(champ.value).toBe("et là ?");
     fireEvent.change(champ, { target: { value: "et là, alors ?" } });
-    expect(screen.getByRole("alert").textContent).toContain(URGENCES);
+    expect(screen.getByRole("alert").textContent).toContain("une réponse t’attend déjà dans ton chat");
     await act(async () => fireEvent.click(within(screen.getByRole("alert")).getByRole("button", { name: "Recharger" })));
     expect(await payerLaRecharge(await screen.findByRole("dialog", { name: "Recharge tes bulles" }))).toMatchObject({ suite: "/rapport/question" });
+  });
+
+  it("refusée (402 « bulles »), une question qui fait penser à un danger : les numéros d’urgence suivent (elle n’a atteint personne)", async () => {
+    await ecran(compte(0));
+    poser.mockRejectedValueOnce(new ErreurApi("bulles", 402));
+    await envoyer("il me fait peur quand il boit");
+    fireEvent(await screen.findByRole("dialog", { name: "Recharge tes bulles" }), new Event("cancel", { cancelable: true }));
+    expect(screen.getByRole("alert").textContent).toContain(URGENCES);
   });
 
   it("un autre souci (le réseau) s’efface quand on réécrit, sans recharge", async () => {
