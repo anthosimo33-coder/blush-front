@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import { and, asc, eq, sql } from "drizzle-orm";
 import { describe, expect, it, vi } from "vitest";
 import { executerChaine } from "@/server/pipeline";
@@ -9,6 +10,7 @@ import { minuitDeParis, statsAdmin } from "@/server/stats";
 import { planifier } from "@/server/taches";
 import { definirPause } from "@/server/temps";
 import { compteDeTest, convRattachee, moiDans } from "./aide/fixtures";
+import { jourDeParis, jourDeParisAvant } from "@/lib/jours";
 import { midiDHier } from "./aide/jours";
 
 describe("les robots d’aperçu ne sont pas des visites", () => {
@@ -102,6 +104,19 @@ describe("le tableau de bord", () => {
     expect(typeof s.couts.total).toBe("number");
   });
 
+  it("une conv dont la meta ne se déchiffre plus ne fait pas tomber le tableau de bord : elle sort de « Qui importe »", async () => {
+    const avant = (await statsAdmin(1)).pilotage.quiImporte;
+    /* Les octets d’un chiffré de BLUSH (la version 1, puis du bruit) : la version passe, l’authentification échoue */
+    const illisible = Buffer.concat([Buffer.from([1]), randomBytes(48)]);
+    const { rows } = await db().execute<{ id: string }>(sql`insert into stories (message_count, meta) values (64, ${illisible}) returning id`);
+    try {
+      const apres = (await statsAdmin(1)).pilotage.quiImporte;
+      expect(apres.importees.convs).toBe(avant.importees.convs);
+    } finally {
+      await db().execute(sql`delete from stories where id = ${rows[0]!.id}`);
+    }
+  });
+
   it("l’activité par jour de Paris : les imports, les verdicts et les rapports du jour et de la veille, sans les prises du tournage", async () => {
     const u = await compteDeTest("stats-activite");
     const jour = (a: Awaited<ReturnType<typeof statsAdmin>>["activite"], k: number) => a.at(k)!;
@@ -126,6 +141,65 @@ describe("le tableau de bord", () => {
     });
     expect(d(-1)).toEqual({ imports: 1, verdicts: 1, rapports: 1 });
     expect(d(-2)).toEqual({ imports: 1, verdicts: 0, rapports: 0 });
+  });
+});
+
+describe("une période choisie au calendrier", () => {
+  const midi = (jour: string) => new Date(`${jour}T12:00:00Z`);
+
+  it("compte de minuit à minuit à Paris, contre la période d’avant de même durée, une case par jour", async () => {
+    const [aujourdhui, hier, avantHier, ilYa3Jours, ilYa4Jours] = [jourDeParis(), jourDeParisAvant(1), jourDeParisAvant(2), jourDeParisAvant(3), jourDeParisAvant(4)];
+    const plage = { du: avantHier, au: hier };
+    const avant = await statsAdmin(plage);
+    const u = await compteDeTest("stats-plage");
+    const achat = (centimes: number, jour: string) =>
+      db()
+        .insert(schema.achats)
+        .values({ userId: u.id, offre: "rapport", centimes, bulles: 3, fournisseur: "factice", statut: "paye", payeLe: midi(jour), creeLe: midi(jour) });
+    /* Dans la période : hier et avant-hier ; dans celle d’avant : il y a 3 et 4 jours ; hors des deux : aujourd’hui */
+    await achat(990, hier);
+    await achat(1990, avantHier);
+    await achat(690, ilYa3Jours);
+    await achat(490, ilYa4Jours);
+    await achat(1490, aujourdhui);
+    const apres = await statsAdmin(plage);
+
+    expect(apres.plage).toEqual(plage);
+    expect(apres.jours).toBe(7);
+    const p = apres.pilotage;
+    expect(p.centimesPayes.valeur - avant.pilotage.centimesPayes.valeur).toBe(990 + 1990);
+    expect(p.centimesPayes.avant - avant.pilotage.centimesPayes.avant).toBe(690 + 490);
+    /* Deux cases, deux jours de Paris : avant-hier, puis hier */
+    expect(p.pas).toBe("jour");
+    expect(p.cases.map((c) => jourDeParis(new Date(c.le)))).toEqual([avantHier, hier]);
+    expect(p.cases.map((c, k) => c.centimes - avant.pilotage.cases[k]!.centimes)).toEqual([1990, 990]);
+    /* La même période jusqu’à aujourd’hui : son achat entre, dans la dernière case */
+    const jusquIci = (await statsAdmin({ du: avantHier, au: aujourdhui })).pilotage;
+    expect(jusquIci.cases).toHaveLength(3);
+    expect(jusquIci.centimesPayes.valeur - p.centimesPayes.valeur).toBeGreaterThanOrEqual(1490);
+  });
+
+  it("un seul jour se lit heure par heure, et les compteurs suivent ses jours entiers", async () => {
+    const [aujourdhui, hier] = [jourDeParis(), jourDeParisAvant(1)];
+    const laVeille = await statsAdmin({ du: hier, au: hier });
+    expect(laVeille.jours).toBe(1);
+    expect(laVeille.pilotage.pas).toBe("heure");
+    /* 24 heures, 23 ou 25 les jours de changement d’heure ; toutes de la veille */
+    expect(laVeille.pilotage.cases.length).toBeGreaterThanOrEqual(23);
+    expect(laVeille.pilotage.cases.length).toBeLessThanOrEqual(25);
+    expect(new Set(laVeille.pilotage.cases.map((c) => jourDeParis(new Date(c.le))))).toEqual(new Set([hier]));
+    /* Aujourd’hui s’arrête à l’heure en cours */
+    const ceJour = await statsAdmin({ du: aujourdhui, au: aujourdhui });
+    expect(ceJour.pilotage.cases.length).toBeLessThanOrEqual(25);
+    expect(jourDeParis(new Date(ceJour.pilotage.cases.at(-1)!.le))).toBe(aujourdhui);
+    /* Un compteur d’aujourd’hui (un lien partagé vu) : dans la période d’aujourd’hui, pas dans celle de la veille */
+    await compter(CLES.lienVu);
+    expect((await statsAdmin({ du: aujourdhui, au: aujourdhui })).partage.visites).toBe(ceJour.partage.visites + 1);
+    expect((await statsAdmin({ du: hier, au: hier })).partage.visites).toBe(laVeille.partage.visites);
+  });
+
+  it("refuse une borne qui n’est pas un jour, même passée la lecture de l’adresse", async () => {
+    await expect(statsAdmin({ du: "2026-10-20'; select 1; --", au: "2026-10-21" })).rejects.toThrow();
   });
 });
 

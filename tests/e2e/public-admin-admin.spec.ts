@@ -168,6 +168,37 @@ test("connecté avec l’email de l’équipe, le pilotage s’ouvre : ses carte
     await expect(page.getByRole("table", { name: "Le payé par heure" }).getByRole("row")).toHaveCount(25);
   });
 
+  await test.step("des dates choisies au calendrier : hier et aujourd’hui, deux jours de Paris", async () => {
+    const periodes = page.getByRole("navigation", { name: "Période" });
+    await periodes.getByRole("button", { name: "Choisir des dates" }).click();
+    const panneau = page.getByRole("dialog", { name: "Choisir une période" });
+    /* Le calendrier d’un grand écran (deux mois) ou d’un téléphone (un seul) : celui qui se voit */
+    const aujourdhui = panneau.locator('[data-jour][aria-label$=", aujourd’hui"]:visible');
+    const jour = (await aujourdhui.getAttribute("data-jour"))!;
+    const d = (n: number) => new Date(Date.parse(`${jour}T00:00:00Z`) + n * 86400e3).toISOString().slice(0, 10);
+    /* Demain n’a pas de chiffres : s’il est dans le mois affiché, il ne se choisit pas */
+    const demain = panneau.locator(`[data-jour="${d(1)}"]:visible`);
+    if (await demain.count()) await expect(demain).toBeDisabled();
+    await aujourdhui.click();
+    /* Un seul bout posé : rien à appliquer encore */
+    await expect(panneau.getByRole("button", { name: "Appliquer" })).toBeDisabled();
+    /* La veille, dans le mois d’avant le premier du mois (un téléphone n’en montre qu’un) */
+    const hier = panneau.locator(`[data-jour="${d(-1)}"]:visible`);
+    if (!(await hier.count())) await panneau.getByRole("button", { name: "Mois précédent" }).click();
+    await hier.click();
+    await panneau.getByRole("button", { name: "Appliquer" }).click();
+    await expect(page).toHaveURL(new RegExp(`/admin\\?du=${d(-1)}&au=${jour}$`));
+    await expect(panneau).toBeHidden();
+    /* Plus aucune des trois périodes d’office n’est celle de la page ; le graphique a ses deux jours */
+    await expect(periodes.locator('a[aria-current="page"]')).toHaveCount(0);
+    await expect(periodes.getByRole("button", { name: /^Changer les dates/ })).toBeVisible();
+    await expect(page.getByText(/vs les 2\s+jours d’avant/).first()).toBeVisible();
+    await expect(page.getByRole("table", { name: "Le payé par jour" }).getByRole("row")).toHaveCount(3);
+    /* Une période mal écrite laisse les 7 jours */
+    await page.goto("/admin?du=2026-02-30&au=hier");
+    await expect(periodes.getByRole("link", { name: "7 jours" })).toHaveAttribute("aria-current", "page");
+  });
+
   await test.step("l’import appli par appli : des jalons notés sous Hinge se lisent sous « Choisissent leur fichier »", async () => {
     for (const jalon of ["appli", "fichier"]) {
       const r = await page.request.post("/api/jalon", { headers: origine(testInfo), data: { jalon, appli: "hinge" } });

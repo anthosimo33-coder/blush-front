@@ -1,5 +1,4 @@
 import type { ReactNode } from "react";
-import Link from "next/link";
 import { Icon } from "@/components/ui/icons";
 import { NOM_DU_GENRE } from "@/contenu/haut-du-paywall";
 import { NOMS_DES_MAILS } from "@/contenu/mails";
@@ -9,6 +8,7 @@ import {
   APPLIS_SANS_VIDEO,
   CIBLE_DE_MARGE,
   EUROS_PAR_DOLLAR,
+  LANCEMENT_LE,
   NOMS_DES_ARRIVEES,
   NOMS_DES_GENRES,
   NOMS_DES_GROUPES,
@@ -24,10 +24,10 @@ import {
 } from "@/contenu/pilotage";
 import { cn } from "@/lib/cn";
 import { jourEnLettres, NBSP } from "@/lib/format";
-import { jourDeParisAvant } from "@/lib/jours";
+import { jourDeParis, jourDeParisAvant } from "@/lib/jours";
 import type { Delivrabilite as ChiffresDeDelivrabilite } from "@/server/delivrabilite";
 import type { SanteDesNavigateurs } from "@/server/navigateur";
-import type { Periode, Pilotage as Chiffres, StatsAdmin } from "@/server/stats";
+import type { Pilotage as Chiffres, StatsAdmin } from "@/server/stats";
 import type { OffreUnique, Population } from "@/types";
 import type { Direct } from "@/types/api";
 import { aCoteDeLaMarge, aRegarder, margeProduit, margeSurPeuDeVentes, meilleureSource, type CarteARegarder } from "./a-regarder";
@@ -60,28 +60,23 @@ import {
   type Ecart,
 } from "./calculs";
 import { CarteEnDirect } from "./CarteEnDirect";
+import { ChoixDeLaPeriode } from "./ChoixDeLaPeriode";
 import { Delivrabilite } from "./Delivrabilite";
 import { EnTete, type BaseDeLAdmin } from "./EnTete";
 import { GestesDeLEquipe } from "./GestesDeLEquipe";
 import { Navigateurs } from "./Navigateurs";
 import { Barre, Bloc, PastilleEcart, type AideDuBloc } from "./morceaux";
+import { nomsDeLaPeriode, type NomsDeLaPeriode } from "./periodes";
 import { SondeDuDirect } from "./SondeDuDirect";
 
 /*
  * Le pilotage (/admin) : ce qui se passe sur la période, d’un coup d’œil. En haut, « À regarder » (ce qui coince, puis
  * les bonnes nouvelles) ; puis l’argent (le chiffre d’affaires net, case par case) à côté du direct ; les quatre chiffres
  * clés ; le tunnel, puis le détail de l’import et du paywall (leurs jalons), et qui importe ; les mails des séquences et leur délivrabilité ; d’où viennent les visiteurs et ce qui se vend ; l’IA avant l’achat (par type d’import) et la lecture partielle des longues vidéos (son A/B), ce que coûte l’IA et la santé ; enfin les outils de
- * l’équipe. Que des nombres : aucune conv, aucun message, aucun email. Chaque carte a son « ? » (src/contenu/aide-pilotage.ts).
+ * l’équipe. La période se choisit en haut à droite (ChoixDeLaPeriode : 24 h, 7 jours, 30 jours, ou des dates au calendrier). Que des nombres : aucune conv, aucun message, aucun email. Chaque carte a son « ? » (src/contenu/aide-pilotage.ts).
  * Maquette validée le 13 octobre ; l’écran d’avant reste à /admin?version=actuelle.
  * TODO(produit): textes du pilotage à valider.
  */
-
-/** Une période : le nom de son lien, « sur … » et « vs … » (contre quoi se lit l’écart). */
-const PERIODES: Record<Periode, { lien: string; sur: string; contre: string }> = {
-  1: { lien: "24 h", sur: "sur 24\u00a0h", contre: "vs les 24\u00a0h d’avant" },
-  7: { lien: "7 jours", sur: "sur 7\u00a0jours", contre: "vs les 7\u00a0jours d’avant" },
-  30: { lien: "30 jours", sur: "sur 30\u00a0jours", contre: "vs les 30\u00a0jours d’avant" },
-};
 
 /** Où et quand chaque coup de pouce se montre (src/server/offres-uniques.ts, src/server/relances.ts). */
 const MOMENTS_DES_COUPS: Record<OffreUnique, string> = {
@@ -118,6 +113,7 @@ export function Pilotage({
   delivrabilite = null,
   base = "/admin",
   sonder = true,
+  premierJour = LANCEMENT_LE,
 }: {
   s: StatsAdmin;
   direct: Direct | null;
@@ -127,14 +123,17 @@ export function Pilotage({
   delivrabilite?: ChiffresDeDelivrabilite | null;
   base?: BaseDeLAdmin;
   sonder?: boolean;
+  /** Le premier jour qu’une période choisie au calendrier peut couvrir : le lancement, ou celui de l’exemple. */
+  premierJour?: string;
 }) {
   const p = s.pilotage;
-  const periode = PERIODES[s.jours];
+  const periode = nomsDeLaPeriode(s);
+  const aujourdhui = jourDeParis(new Date(s.le));
   return (
     <SondeDuDirect initial={direct} sonder={sonder}>
       <main className="min-h-dvh pb-32 md:pb-16">
         <div className="mx-auto flex w-full max-w-[1240px] flex-col gap-4 px-4 pt-4 md:gap-6 md:px-8 md:pt-6">
-          <EnTete base={base} ici="pilotage" droite={<Periodes base={base} jours={s.jours} />} />
+          <EnTete base={base} ici="pilotage" droite={<ChoixDeLaPeriode base={base} jours={s.jours} plage={s.plage} aujourdhui={aujourdhui} premier={premierJour} />} />
 
           <div className="flex flex-col gap-1.5 md:mt-2">
             <h1 className="m-0 text-[34px] font-black leading-[1.05] tracking-[-0.035em] md:text-[44px]">Pilotage</h1>
@@ -146,19 +145,19 @@ export function Pilotage({
           <ARegarder cartes={aRegarder(s)} />
 
           <div className="flex flex-wrap gap-4 md:gap-6">
-            <ChiffreDAffaires p={p} jours={s.jours} />
+            <ChiffreDAffaires p={p} periode={periode} fini={!!s.plage && s.plage.au < aujourdhui} />
             <CarteEnDirect base={base} />
           </div>
 
           <ChiffresCles s={s} />
-          <Tunnel p={p} jours={s.jours} />
+          <Tunnel p={p} periode={periode} />
           <div className="flex flex-wrap gap-4 md:gap-6">
-            <ImportEcranParEcran p={p} jours={s.jours} />
-            <PaywallJusquAuPaiement p={p} jours={s.jours} />
+            <ImportEcranParEcran p={p} periode={periode} />
+            <PaywallJusquAuPaiement p={p} periode={periode} />
           </div>
-          <QuiImporte p={p} jours={s.jours} />
+          <QuiImporte p={p} periode={periode} />
           <HautsDuPaywall p={p} />
-          <NotesDuRapport p={p} jours={s.jours} />
+          <NotesDuRapport p={p} periode={periode} />
           <VentesDuChat p={p} />
           <MailsDesSequences p={p} />
           {delivrabilite && <Delivrabilite d={delivrabilite} />}
@@ -196,27 +195,6 @@ export function Pilotage({
         </div>
       </main>
     </SondeDuDirect>
-  );
-}
-
-/** La période, en liens (?p=) : 24 h, 7 jours, 30 jours. */
-function Periodes({ base, jours }: { base: BaseDeLAdmin; jours: Periode }) {
-  return (
-    <nav aria-label="Période" className="flex w-full rounded-full bg-segment p-1 md:w-auto">
-      {([1, 7, 30] as const).map((j) => (
-        <Link
-          key={j}
-          href={`${base}?p=${j}`}
-          aria-current={j === jours ? "page" : undefined}
-          className={cn(
-            "flex min-h-10 flex-1 items-center justify-center rounded-full px-4 text-detail font-black no-underline md:flex-none",
-            j === jours ? "bg-white text-ink shadow-[0_1px_2px_rgba(17,17,20,0.08),0_6px_14px_-8px_rgba(17,17,20,0.3)]" : "text-soft hover:text-ink",
-          )}
-        >
-          {PERIODES[j].lien}
-        </Link>
-      ))}
-    </nav>
   );
 }
 
@@ -266,22 +244,23 @@ function ARegarder({ cartes }: { cartes: CarteARegarder[] }) {
 
 /* ———— Le chiffre d’affaires ———— */
 
-function ChiffreDAffaires({ p, jours }: { p: Chiffres; jours: Periode }) {
+/** `fini` : une période choisie qui s’arrête avant aujourd’hui, sans case en cours. */
+function ChiffreDAffaires({ p, periode, fini = false }: { p: Chiffres; periode: NomsDeLaPeriode; fini?: boolean }) {
   const ecart = ecartRelatif(p.net.valeur, p.net.avant, (v) => euros(v));
   return (
     <Bloc
       id="chiffre-d-affaires"
       titre="Chiffre d’affaires"
       sous="Net, TTC, des vrais clients"
-      aide={{ cle: "ca", valeur: euros(p.net.valeur), contexte: `${PERIODES[jours].sur}, ${texteDeLEcart(ecart)} ${PERIODES[jours].contre}` }}
+      aide={{ cle: "ca", valeur: euros(p.net.valeur), contexte: `${periode.sur}, ${texteDeLEcart(ecart)} ${periode.contre}` }}
       className="grow-[999] basis-[560px]"
     >
       <p className="m-0 mt-[18px] flex flex-wrap items-baseline gap-x-3 gap-y-2">
         <span className="text-[44px] font-black leading-none tracking-[-0.035em] tabular-nums md:text-affiche">{euros(p.net.valeur)}</span>
         <PastilleEcart e={ecart} />
-        <span className="text-legende font-bold text-grey">{PERIODES[jours].contre}</span>
+        <span className="text-legende font-bold text-grey">{periode.contre}</span>
       </p>
-      <Colonnes p={p} />
+      <Colonnes p={p} fini={fini} />
       <p className="m-0 mt-[18px] flex flex-wrap gap-x-[18px] gap-y-1.5 border-t border-sep pt-4 text-note font-extrabold text-soft tabular-nums">
         <span>Payé {euros(p.payes.centimes)}</span>
         <span>Remboursé {p.rembourses.centimes ? `−${euros(p.rembourses.centimes)} (${nombre(p.rembourses.n)})` : euros(0)}</span>
@@ -292,25 +271,29 @@ function ChiffreDAffaires({ p, jours }: { p: Chiffres; jours: Periode }) {
             Achats d’essai retirés {euros(p.achatsRetires.centimes)} ({nombre(p.achatsRetires.n)})
           </span>
         )}
-        <span className="inline-flex items-center gap-1.5 text-grey md:ml-auto">
-          <span aria-hidden="true" className="size-2.5 rounded-[3px]" style={{ background: ROSE }} />
-          {p.pas === "heure" ? "cette heure, en cours" : "aujourd’hui, en cours"}
-        </span>
+        {!fini && (
+          <span className="inline-flex items-center gap-1.5 text-grey md:ml-auto">
+            <span aria-hidden="true" className="size-2.5 rounded-[3px]" style={{ background: ROSE }} />
+            {p.pas === "heure" ? "cette heure, en cours" : "aujourd’hui, en cours"}
+          </span>
+        )}
       </p>
     </Bloc>
   );
 }
 
 /** Le payé case par case : une colonne par heure ou par jour, la dernière (en cours) en rose, une info-bulle au survol. */
-function Colonnes({ p }: { p: Chiffres }) {
+function Colonnes({ p, fini }: { p: Chiffres; fini: boolean }) {
   const n = p.cases.length;
+  /* La case en cours (la dernière), s’il y en a une */
+  const enCours = fini ? -1 : n - 1;
   if (!n) return <p className="m-0 mt-6 text-note font-bold text-grey">Rien à montrer case par case pour l’instant.</p>;
   const { haut, marques } = graduations(Math.max(0, ...p.cases.map((c) => c.centimes)));
   const noms = p.cases.map((c) => nomsDeLaCase(c.le, p.pas, n));
   const plusHaut = p.cases.reduce((m, c, k) => (c.centimes > (p.cases[m]?.centimes ?? 0) ? k : m), 0);
   const unite = p.pas === "heure" ? "heure" : "jour";
   const derniere = p.cases[n - 1]?.centimes ?? 0;
-  const resume = `Le payé par ${unite}, sur ${pluriel(n, unite)}\u00a0: le plus haut ${euros(p.cases[plusHaut]?.centimes ?? 0, 0)} (${noms[plusHaut]?.complete ?? ""}), ${euros(derniere, 0)} pour ${p.pas === "heure" ? "l’heure" : "le jour"} en cours.`;
+  const resume = `Le payé par ${unite}, sur ${pluriel(n, unite)}\u00a0: le plus haut ${euros(p.cases[plusHaut]?.centimes ?? 0, 0)} (${noms[plusHaut]?.complete ?? ""})${fini ? "" : `, ${euros(derniere, 0)} pour ${p.pas === "heure" ? "l’heure" : "le jour"} en cours`}.`;
   return (
     <>
       <div role="img" aria-label={resume} className="relative mt-6 flex h-[180px] md:h-[220px]">
@@ -330,7 +313,7 @@ function Colonnes({ p }: { p: Chiffres }) {
               <div className="relative flex w-[70%] max-w-[26px] justify-center" style={{ height: c.centimes > 0 ? `${Math.max(1.5, (c.centimes / haut) * 100)}%` : "0%" }}>
                 <span
                   className="block h-full w-full rounded-t-[5px] transition-opacity duration-200 group-hover/plot:opacity-30 group-hover/col:opacity-100"
-                  style={{ background: k === n - 1 ? ROSE : "var(--ink)" }}
+                  style={{ background: k === enCours ? ROSE : "var(--ink)" }}
                 />
                 <span
                   className={cn(
@@ -339,7 +322,7 @@ function Colonnes({ p }: { p: Chiffres }) {
                   )}
                 >
                   {noms[k]?.longue} · {euros(c.centimes, 0)}
-                  {k === n - 1 && " (en cours)"}
+                  {k === enCours && " (en cours)"}
                 </span>
               </div>
             </div>
@@ -367,7 +350,7 @@ function Colonnes({ p }: { p: Chiffres }) {
             <tr key={c.le}>
               <th scope="row">
                 {noms[k]?.complete}
-                {k === n - 1 && " (en cours)"}
+                {k === enCours && " (en cours)"}
               </th>
               <td>{euros(c.centimes)}</td>
             </tr>
@@ -402,7 +385,7 @@ function ChiffresCles({ s }: { s: StatsAdmin }) {
   const ecartPanier = ecartEnValeur(parAcheteur, parAcheteurAvant, (v) => euros(v));
   const ecartMarge = peu ? null : ecartEnPoints(marge, m.avant);
   /* Le suivi des visites a commencé pendant la période : elle n’en a qu’une partie */
-  const debut = jourDeParisAvant(s.jours, new Date(s.le));
+  const debut = s.plage ? s.plage.du : jourDeParisAvant(s.jours, new Date(s.le));
   const depuis =
     p.suiviDepuis && p.suiviDepuis > debut
       ? `comptés depuis le ${new Date(`${p.suiviDepuis}T12:00:00Z`).toLocaleDateString("fr-FR", { day: "numeric", month: "long", timeZone: "UTC" })}`
@@ -418,7 +401,7 @@ function ChiffresCles({ s }: { s: StatsAdmin }) {
           aide={{
             cle: "visiteurs",
             valeur: suivi ? nombre(p.visiteurs.valeur) : "—",
-            contexte: suivi ? `${PERIODES[s.jours].sur}, ${texteDeLEcart(ecartVisiteurs)}` : "pas encore comptés",
+            contexte: suivi ? `${nomsDeLaPeriode(s).sur}, ${texteDeLEcart(ecartVisiteurs)}` : "pas encore comptés",
           }}
           valeur={suivi ? nombre(p.visiteurs.valeur) : "—"}
           ecart={ecartVisiteurs}
@@ -441,7 +424,7 @@ function ChiffresCles({ s }: { s: StatsAdmin }) {
         />
         <ChiffreCle
           titre="Revenu par acheteur"
-          aide={{ cle: "panier", valeur: parAcheteur === null ? "—" : euros(parAcheteur), contexte: `${PERIODES[s.jours].sur}, ${texteDeLEcart(ecartPanier)}` }}
+          aide={{ cle: "panier", valeur: parAcheteur === null ? "—" : euros(parAcheteur), contexte: `${nomsDeLaPeriode(s).sur}, ${texteDeLEcart(ecartPanier)}` }}
           valeur={parAcheteur === null ? "—" : euros(parAcheteur)}
           ecart={ecartPanier}
           sous="recharges comprises"
@@ -509,7 +492,7 @@ function ChiffreCle({
 
 /* ———— Le tunnel ———— */
 
-function Tunnel({ p, jours }: { p: Chiffres; jours: Periode }) {
+function Tunnel({ p, periode }: { p: Chiffres; periode: NomsDeLaPeriode }) {
   const t = p.tunnel;
   const suivi = p.suiviDepuis !== null;
   const fuite = fuiteDuTunnel(t);
@@ -521,7 +504,7 @@ function Tunnel({ p, jours }: { p: Chiffres; jours: Periode }) {
     <Bloc
       id="tunnel"
       titre="Le tunnel"
-      sous={`De l’arrivée sur le site au deuxième achat · ${PERIODES[jours].sur}`}
+      sous={`De l’arrivée sur le site au deuxième achat · ${periode.sur}`}
       aide={{ cle: "tunnel", valeur: achete === null ? "—" : pourcent(achete * 100, 2), contexte: "des visiteurs achètent" }}
     >
       <div role="region" aria-label="Le tunnel, étape par étape" tabIndex={0} className="-mx-2 overflow-x-auto px-2 pb-1">
@@ -679,7 +662,7 @@ function DuChoixAuFichier({ applis }: { applis: Chiffres["jalonsParAppli"] }) {
   );
 }
 
-function ImportEcranParEcran({ p, jours }: { p: Chiffres; jours: Periode }) {
+function ImportEcranParEcran({ p, periode }: { p: Chiffres; periode: NomsDeLaPeriode }) {
   const j = p.jalons;
   const etapes: EtapeDeLaSuite[] = [
     { cle: "visiteurs", nom: "Visiteurs", n: p.tunnel.visiteurs },
@@ -695,7 +678,7 @@ function ImportEcranParEcran({ p, jours }: { p: Chiffres; jours: Periode }) {
     <Bloc
       id="import"
       titre="L’import, écran par écran"
-      sous={`De l’arrivée à la lecture lancée · ${PERIODES[jours].sur}`}
+      sous={`De l’arrivée à la lecture lancée · ${periode.sur}`}
       aide={{ cle: "import", valeur: part(j.lecture, p.tunnel.visiteurs), contexte: "des visiteurs lancent la lecture" }}
       className="grow basis-[480px]"
     >
@@ -714,7 +697,7 @@ function ImportEcranParEcran({ p, jours }: { p: Chiffres; jours: Periode }) {
   );
 }
 
-function PaywallJusquAuPaiement({ p, jours }: { p: Chiffres; jours: Periode }) {
+function PaywallJusquAuPaiement({ p, periode }: { p: Chiffres; periode: NomsDeLaPeriode }) {
   const j = p.jalons;
   const etapes: EtapeDeLaSuite[] = JALONS_DU_PAYWALL.map(([cle, nom]) => ({ cle, nom, n: j[cle] }));
   const lignes: [string, ReactNode][] = [
@@ -731,7 +714,7 @@ function PaywallJusquAuPaiement({ p, jours }: { p: Chiffres; jours: Periode }) {
     <Bloc
       id="paywall"
       titre="Le paywall, jusqu’au paiement"
-      sous={`De l’arrivée au paywall au paiement · ${PERIODES[jours].sur}`}
+      sous={`De l’arrivée au paywall au paiement · ${periode.sur}`}
       aide={{ cle: "paywall", valeur: part(j.paye, j.paywall), contexte: "des arrivés au paywall paient" }}
       className="grow basis-[480px]"
     >
@@ -810,7 +793,7 @@ function TableDesGenres({ titre, lignes, total }: { titre: string; lignes: Ligne
   );
 }
 
-function QuiImporte({ p, jours }: { p: Chiffres; jours: Periode }) {
+function QuiImporte({ p, periode }: { p: Chiffres; periode: NomsDeLaPeriode }) {
   const { importees: i, payees: a } = p.quiImporte;
   /* Les convs où « Qui es-tu ? » est rempli : elles seules ont un genre, l’autre et sa paire */
   const dites = i.moi.elle + i.moi.il;
@@ -828,7 +811,7 @@ function QuiImporte({ p, jours }: { p: Chiffres; jours: Periode }) {
     <Bloc
       id="qui-importe"
       titre="Qui importe"
-      sous={`Les convs importées, et celles payées depuis · ${PERIODES[jours].sur}`}
+      sous={`Les convs importées, et celles payées depuis · ${periode.sur}`}
       aide={{
         cle: "quiImporte",
         valeur: filles === null ? "—" : `${pourcent(filles * 100, 0)} de filles`,
@@ -861,7 +844,7 @@ function QuiImporte({ p, jours }: { p: Chiffres; jours: Periode }) {
 /** Ce qui n’allait pas, en clair, dans l’ordre de RAISONS_DE_LA_NOTE (les textes des pastilles du rapport). */
 const NOM_DE_LA_RAISON = NOTE_DU_RAPPORT.raisons;
 
-function NotesDuRapport({ p, jours }: { p: Chiffres; jours: Periode }) {
+function NotesDuRapport({ p, periode }: { p: Chiffres; periode: NomsDeLaPeriode }) {
   const { oui, bof, avis, raisons } = p.note;
   const notes = oui + bof;
   const taux = tauxLisible(oui, notes);
@@ -870,7 +853,7 @@ function NotesDuRapport({ p, jours }: { p: Chiffres; jours: Periode }) {
     <Bloc
       id="note"
       titre={"Le rapport t’a parlé\u00a0?"}
-      sous={`La note en bas des rapports écrits, une par conv · ${PERIODES[jours].sur}`}
+      sous={`La note en bas des rapports écrits, une par conv · ${periode.sur}`}
       aide={{ cle: "note", valeur: taux === null ? "—" : pourcent(taux * 100, 0), contexte: "de «\u00a0Oui, grave\u00a0»" }}
     >
       {notes === 0 ? (

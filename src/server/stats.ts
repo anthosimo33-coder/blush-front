@@ -3,6 +3,7 @@ import { sql, type SQL } from "drizzle-orm";
 import type { Pronom } from "@prompts/lib/conv";
 import { GENRES_DU_HAUT, type GenreDuHaut } from "@/contenu/haut-du-paywall";
 import { CATALOGUE, RAPPORT_D_AVANCE } from "@/contenu/offres";
+import { joursDeLaPlage, plusJours, repereDe, type Plage } from "@/lib/jours";
 import { GROUPE_DE_L_OFFRE, GROUPES_D_ARRIVEE, GROUPES_D_OFFRES, PAIRES, groupeDArrivee, type GroupeDArrivee, type GroupeDOffres, type Paire } from "@/contenu/pilotage";
 import {
   CLES_DES_APPLIS,
@@ -42,6 +43,7 @@ import { metaDe, personnesDe, type Meta } from "./histoires";
 import { LOT_BLOQUE_S } from "./memoire-en-lot";
 import { achatDuProduit, comptesDesTests, duProduit } from "./population";
 import { PERIME_S } from "./taches";
+import { minuitDuJour } from "./temps";
 import { dansLaMoitieAvec, VENTE, type GroupeDeVente } from "./vente";
 
 /*
@@ -74,6 +76,11 @@ export type Bulles = { vendues: number; depensees: number; offertes: number; ren
 
 export type StatsAdmin = {
   jours: Periode;
+  /**
+   * Une période choisie au calendrier : des jours de Paris entiers, du premier au dernier compris (AAAA-MM-JJ). `jours`
+   * garde alors le repère le plus proche (repereDe : 1, 7 ou 30).
+   */
+  plage?: Plage;
   /** L’heure du calcul (ISO). */
   le: string;
   cles: { comptes: Chiffre; convs: Chiffre; verdicts: Chiffre; rapports: Chiffre; messages: Chiffre; actifs: Chiffre };
@@ -471,9 +478,58 @@ const VRAI_ECHEC = "coalesce(error, '') <> 'tournage'";
  */
 const BLOQUEE = `(status = 'en_cours' and heartbeat_at < now() - make_interval(secs => ${PERIME_S})) or (status = 'lot' and updated_at < now() - make_interval(secs => ${LOT_BLOQUE_S}))`;
 
-export async function statsAdmin(jours: Periode): Promise<StatsAdmin> {
+/** La période demandée : l’une des trois fenêtres qui glissent jusqu’à maintenant, ou des jours de Paris choisis au calendrier. */
+export type PeriodeDemandee = Periode | Plage;
+
+/**
+ * Les fenêtres d’une période, en SQL. `dans` : une colonne d’instants dans la période (k = 0) ou dans celle d’avant, de
+ * même durée (k = 1). `jours` : une colonne de jours (counters.day) dans la période, en jours entiers. `cases` : les
+ * cases des graphiques (leur début), des heures (`pas`) pour 24 h ou un seul jour, des jours de Paris sinon.
+ * Une fenêtre d’office glisse jusqu’à maintenant ; une période choisie va de minuit à minuit, à Paris (son dernier
+ * jour, s’il est aujourd’hui, est en cours).
+ */
+function fenetresDe(periode: PeriodeDemandee): { dans: (col: string, k?: number) => SQL; jours: (col: string) => SQL; cases: SQL; pas: Pilotage["pas"] } {
+  if (typeof periode === "number") {
+    const pas = periode === 1 ? "heure" : "jour";
+    return {
+      dans: (col, k = 0) => sql.raw(`${col} >= now() - make_interval(days => ${(k + 1) * periode}) and ${col} < now() - make_interval(days => ${k * periode})`),
+      jours: (col) => sql.raw(`${col} > (now() at time zone 'Europe/Paris')::date - ${periode}`),
+      pas,
+      cases:
+        pas === "heure"
+          ? sql.raw(`select generate_series(date_trunc('hour', now()) - interval '23 hours', date_trunc('hour', now()), interval '1 hour') as debut`)
+          : sql.raw(
+              `select (j::timestamp at time zone 'Europe/Paris') as debut from generate_series((now() at time zone 'Europe/Paris')::date - ${periode - 1}, (now() at time zone 'Europe/Paris')::date, interval '1 day') as j`,
+            ),
+    };
+  }
+  const { du, au } = periode;
+  const duree = joursDeLaPlage(periode);
+  const lendemain = plusJours(au, 1);
+  /* Les bornes s’écrivent dans la requête : minuitDuJour refuse tout ce qui n’est pas un jour */
+  const [debut, fin, debutDAvant] = [minuitDuJour(du), minuitDuJour(lendemain), minuitDuJour(plusJours(du, -duree))];
+  const pas = duree === 1 ? "heure" : "jour";
+  return {
+    dans: (col, k = 0) => sql.raw(k === 0 ? `${col} >= ${debut} and ${col} < ${fin}` : `${col} >= ${debutDAvant} and ${col} < ${debut}`),
+    jours: (col) => sql.raw(`(${col} >= '${du}'::date and ${col} <= '${au}'::date)`),
+    pas,
+    cases:
+      pas === "heure"
+        ? /* Les heures du jour, jusqu’à l’heure en cours si c’est aujourd’hui (23 ou 25 les jours de changement d’heure) */
+          sql.raw(`select generate_series(${debut}, least(${fin} - interval '1 hour', date_trunc('hour', now())), interval '1 hour') as debut`)
+        : sql.raw(`select (j::timestamp at time zone 'Europe/Paris') as debut from generate_series('${du}'::date, '${au}'::date, interval '1 day') as j`),
+  };
+}
+
+/**
+ * Les chiffres du tableau de bord, sur la période demandée : 1, 7 ou 30 (des jours jusqu’à maintenant), ou une période
+ * choisie au calendrier (déjà vérifiée : plageLue, src/lib/jours.ts).
+ */
+export async function statsAdmin(periode: PeriodeDemandee): Promise<StatsAdmin> {
+  const jours = typeof periode === "number" ? periode : repereDe(periode);
   /* La période (k = 0) et celle d’avant (k = 1), sur une colonne de date */
-  const dans = (col: string, k = 0) => sql.raw(`${col} >= now() - make_interval(days => ${(k + 1) * jours}) and ${col} < now() - make_interval(days => ${k * jours})`);
+  const F = fenetresDe(periode);
+  const dans = F.dans;
   const chiffre = async (table: string, col: string, ou = "true"): Promise<Chiffre> => {
     const r = await ligne<{ a: string; b: string }>(
       sql`select count(*) filter (where ${dans(col)}) as a, count(*) filter (where ${dans(col, 1)}) as b from ${sql.raw(table)} where ${sql.raw(ou)}`,
@@ -537,7 +593,7 @@ export async function statsAdmin(jours: Periode): Promise<StatsAdmin> {
           select to_char(j.jour, 'YYYY-MM-DD') as jour, coalesce(i.n, 0) as imports, coalesce(v.n, 0) as verdicts, coalesce(r.n, 0) as rapports
           from j left join i on i.jour = j.jour left join v on v.jour = j.jour left join r on r.jour = j.jour order by j.jour`,
     ),
-    lignes<{ key: string; total: string }>(sql`select key, sum(count) as total from counters where day > (now() at time zone 'Europe/Paris')::date - ${jours}::int group by key`),
+    lignes<{ key: string; total: string }>(sql`select key, sum(count) as total from counters where ${F.jours("day")} group by key`),
     ligne<{ n: string }>(sql`select count(*) as n from shares`),
     /* Une ligne pas encore rangée (le passage des 5 minutes la range) compte « inconnu » */
     lignes<{ task: string; population: Population; appels: string; micros: string }>(
@@ -615,6 +671,7 @@ export async function statsAdmin(jours: Periode): Promise<StatsAdmin> {
 
   return {
     jours,
+    ...(typeof periode === "number" ? {} : { plage: periode }),
     le: new Date().toISOString(),
     cles: { comptes, convs, verdicts, rapports, messages, actifs },
     parcours: { importees: n(parcours.importees), compte: n(parcours.compte), verdict: n(parcours.verdict), rapport: n(parcours.rapport), chat: n(parcours.chat) },
@@ -667,13 +724,9 @@ export async function statsAdmin(jours: Periode): Promise<StatsAdmin> {
     achats: { commandes: n(achats.commandes), comptes: n(achats.comptes), payees: n(achats.payees), echouees: n(achats.echouees), enAttente: n(achats.en_attente) },
     offresUniques: OFFRES_UNIQUES.map((offre) => ({ offre, montrees: n(ou.get(offre)?.montrees), prises: n(ou.get(offre)?.prises) })),
     actions,
-    pilotage: await pilotageDe(jours),
+    pilotage: await pilotageDe(F),
   };
 }
-
-/* Une fenêtre glissante de `jours` sur une colonne de date : la période (k = 0) ou celle d’avant (k = 1) */
-const fenetre = (col: string, jours: Periode, k = 0) =>
-  sql.raw(`${col} >= now() - make_interval(days => ${(k + 1) * jours}) and ${col} < now() - make_interval(days => ${k * jours})`);
 
 /** Les pages les plus vues d’un groupe d’arrivée que le pilotage détaille, en plus de celles qui ont vendu. */
 const CHEMINS_PAR_GROUPE = 10;
@@ -710,19 +763,16 @@ function arriveesDe(visiteurs: { arrivee: string | null; n: string }[], acheteur
 
 /**
  * Le pilotage de la période : l’argent, les visiteurs, le tunnel, les sources, ce qui se vend, l’IA et ce qui coince.
- * Les chiffres suivent la fenêtre glissante des autres (`jours` jusqu’à maintenant) ; les cases des graphiques, elles,
- * sont des heures pleines (24 h) ou des jours de Paris entiers (la première commence à minuit).
+ * Les chiffres suivent la fenêtre des autres (fenetresDe : des jours jusqu’à maintenant, ou une période choisie) ; les
+ * cases des graphiques, elles, sont des heures pleines (24 h, un seul jour) ou des jours de Paris entiers (la première
+ * commence à minuit).
  */
-async function pilotageDe(jours: Periode): Promise<Pilotage> {
-  const W = (col: string, k = 0) => fenetre(col, jours, k);
-  const pas = jours === 1 ? "heure" : "jour";
+async function pilotageDe(F: ReturnType<typeof fenetresDe>): Promise<Pilotage> {
+  const W = F.dans;
+  /* Les compteurs (un par jour de Paris) : sur la période en jours entiers */
+  const J = F.jours("day");
   /* Les cases : leur début, et la case d’une date (la même expression des deux côtés de la jointure) */
-  const cases =
-    pas === "heure"
-      ? sql.raw(`select generate_series(date_trunc('hour', now()) - interval '23 hours', date_trunc('hour', now()), interval '1 hour') as debut`)
-      : sql.raw(
-          `select (j::timestamp at time zone 'Europe/Paris') as debut from generate_series((now() at time zone 'Europe/Paris')::date - ${jours - 1}, (now() at time zone 'Europe/Paris')::date, interval '1 day') as j`,
-        );
+  const { cases, pas } = F;
   const caseDe = (col: string) => sql.raw(pas === "heure" ? `date_trunc('hour', ${col})` : `((${col} at time zone 'Europe/Paris')::date::timestamp at time zone 'Europe/Paris')`);
   const [
     parCase,
@@ -831,18 +881,18 @@ async function pilotageDe(jours: Periode): Promise<Pilotage> {
       sql`select (select count(*) from tasks where status = 'echec' and ${sql.raw(VRAI_ECHEC)} and ${W("updated_at")}) as echecs,
             (select count(*) from tasks where ${sql.raw(BLOQUEE)}) as bloquees,
             (select count(*) from achats where statut = 'echoue' and ${W("cree_le")}) as echoues,
-            (select coalesce(sum(count), 0) from counters where key = ${CLES.alerteChat} and day > (now() at time zone 'Europe/Paris')::date - ${jours}::int) as alertes`,
+            (select coalesce(sum(count), 0) from counters where key = ${CLES.alerteChat} and ${J}) as alertes`,
     ),
     ligne<{ periode: string | null; jour: string | null }>(
-      sql`select sum(count) filter (where day > (now() at time zone 'Europe/Paris')::date - ${jours}::int) as periode,
+      sql`select sum(count) filter (where ${J}) as periode,
             sum(count) filter (where day = (now() at time zone 'Europe/Paris')::date) as jour
           from counters where key like ${`${PANNE}%`}`,
     ),
     ligne<{ depuis: string | null }>(sql`select to_char(min(jour), 'YYYY-MM-DD') as depuis from visites`),
     /* Sur la période, et le premier jour où chaque titre a été compté quand il tombe dedans (un titre arrivé en cours de route) */
     lignes<{ key: string; n: string | null; depuis: string | null }>(
-      sql`select key, sum(count) filter (where day > (now() at time zone 'Europe/Paris')::date - ${jours}::int) as n,
-            case when min(day) > (now() at time zone 'Europe/Paris')::date - ${jours}::int then to_char(min(day), 'YYYY-MM-DD') end as depuis
+      sql`select key, sum(count) filter (where ${J}) as n,
+            case when ${F.jours("min(day)")} then to_char(min(day), 'YYYY-MM-DD') end as depuis
           from counters where key like ${`${HAUT}%`} group by key`,
     ),
     lignes<{ cle: string; envoyes: string; payes: string }>(
@@ -851,18 +901,14 @@ async function pilotageDe(jours: Periode): Promise<Pilotage> {
               and a.paye_le > e.envoye_le and a.paye_le <= e.envoye_le + interval '3 days')) as payes
           from envois_mails e where e.parti and ${W("e.envoye_le")} group by e.cle`,
     ),
-    lignes<{ key: string; n: string }>(
-      sql`select key, sum(count) as n from counters where key like ${`${MAIL}%`} and day > (now() at time zone 'Europe/Paris')::date - ${jours}::int group by key`,
-    ),
+    lignes<{ key: string; n: string }>(sql`select key, sum(count) as n from counters where key like ${`${MAIL}%`} and ${J} group by key`),
     lignes<{ temoin: boolean; n: string; payes: string }>(
       sql`select e.occasion like '%:temoin' as temoin, count(*) as n,
             count(*) filter (where exists (select 1 from achats a where a.user_id = e.user_id and a.statut = 'paye' and a.story_id is not null
               and ${achatDuProduit("a")} and a.paye_le > e.envoye_le and a.paye_le <= e.envoye_le + interval '3 days')) as payes
           from envois_mails e where e.cle = 's1_derniere' and (e.parti or e.occasion like '%:temoin') and ${W("e.envoye_le")} group by 1`,
     ),
-    lignes<{ key: string; n: string }>(
-      sql`select key, sum(count) as n from counters where key like ${`${VENTE}%`} and day > (now() at time zone 'Europe/Paris')::date - ${jours}::int group by key`,
-    ),
+    lignes<{ key: string; n: string }>(sql`select key, sum(count) as n from counters where key like ${`${VENTE}%`} and ${J} group by key`),
     lignes<{ vente: GenreVendu; n: string; centimes: string }>(
       sql`select a0.vente, count(*) as n, sum(a0.centimes) as centimes from achats a0
           where a0.vente is not null and a0.paye_le is not null and ${W("a0.paye_le")} and ${ACHAT_DU_PRODUIT} group by a0.vente`,
@@ -878,9 +924,7 @@ async function pilotageDe(jours: Periode): Promise<Pilotage> {
     lignes<{ meta: Buffer; payee: boolean }>(
       sql`select s.meta, ${PAYEE_S} as payee from stories s where ${W("s.created_at")} and ${sql.raw(VRAIE_CONV_S)} and ${convHorsDesTests()}`,
     ),
-    lignes<{ key: string; n: string }>(
-      sql`select key, sum(count) as n from counters where key like ${`${NOTE}%`} and day > (now() at time zone 'Europe/Paris')::date - ${jours}::int group by key`,
-    ),
+    lignes<{ key: string; n: string }>(sql`select key, sum(count) as n from counters where key like ${`${NOTE}%`} and ${J} group by key`),
     /*
      * Les imports de la période (hors des tests et des invités), ce qu’ont coûté leurs lectures (ai_usage, sous l’empreinte de leur
      * envoi), et le temps de leur première lecture (le début de son appel : sa fin moins sa durée ; l’import, pour un
@@ -980,7 +1024,17 @@ async function pilotageDe(jours: Periode): Promise<Pilotage> {
     g.n += n(o.n);
     g.centimes += n(o.centimes);
   }
-  const convs = convsDeLaPeriode.map((c) => ({ meta: metaDe(c), payee: c.payee }));
+  /*
+   * Une conv dont la meta ne se déchiffre plus (abîmée, chiffrée avec une autre clé) sort de « Qui importe » : une seule
+   * faisait tomber tout le tableau de bord, tant qu’elle restait dans la période
+   */
+  const convs = convsDeLaPeriode.flatMap((c) => {
+    try {
+      return [{ meta: metaDe(c), payee: c.payee }];
+    } catch {
+      return [];
+    }
+  });
 
   return {
     pas,

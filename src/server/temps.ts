@@ -1,6 +1,7 @@
 import "server-only";
 import { sql } from "drizzle-orm";
-import { jourDans, jourDeParis } from "@/lib/jours";
+import { estUnJour, jourDans, jourDeParis } from "@/lib/jours";
+import { ErreurInvariant } from "./erreurs";
 
 /** Le jour à Paris (AAAA-MM-JJ), et le même jour à minuit UTC : la date du jour que reçoit le modèle. */
 export function aujourdhuiParis(maintenant = new Date()): { iso: string; t: number } {
@@ -28,6 +29,15 @@ export function heureNaiveDans(fuseau: string, instant: Date): number {
   });
   const p = Object.fromEntries(format.formatToParts(instant).map((x) => [x.type, Number(x.value)]));
   return Date.UTC(p.year!, p.month! - 1, p.day!, p.hour!, p.minute!, p.second!);
+}
+
+/**
+ * Minuit à Paris au début d’un jour écrit (AAAA-MM-JJ), en SQL brut : la borne d’une période choisie au calendrier
+ * (src/server/stats.ts). Le jour s’écrit dans la requête : il est revérifié ici, même venu d’une adresse déjà lue.
+ */
+export function minuitDuJour(jour: string): string {
+  if (!estUnJour(jour)) throw new ErreurInvariant("jour:forme");
+  return `('${jour}'::date::timestamp at time zone 'Europe/Paris')`;
 }
 
 /**
