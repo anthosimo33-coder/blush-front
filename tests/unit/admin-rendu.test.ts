@@ -3,7 +3,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { PageEnDirect } from "@/app/admin/PageEnDirect";
 import { Pilotage } from "@/app/admin/Pilotage";
-import { directDExemple, statsDExemple } from "@/app/apercu/admin/exemple";
+import { PilotagePropre } from "@/app/admin/PilotagePropre";
+import { delivrabiliteDExemple, directDExemple, navigateursDExemple, statsDExemple } from "@/app/apercu/admin/exemple";
 import { AIDES_DU_PILOTAGE } from "@/contenu/aide-pilotage";
 import { VIDEO_RETIREE_LE } from "@/contenu/pilotage";
 import { jourEnLettres } from "@/lib/format";
@@ -28,6 +29,9 @@ const texte = (html: string) =>
     .replace(/[ \t\n\r]+/g, " ");
 
 const SALE = /NaN|Infinity|undefined|\[object/;
+
+/** Les liens d’une page rendue vers `adresse` (leur balise ouvrante entière), dans l’ordre. */
+const liensVers = (html: string, adresse: string) => [...html.matchAll(/<a\b[^>]*>/g)].map((m) => m[0]).filter((a) => a.includes(`href="${adresse.replace(/&/g, "&amp;")}"`));
 
 describe("le pilotage, rendu", () => {
   it.each<Periode>([1, 7, 30])("sur %i jour(s) : ses cartes, ses « ? », ses liens, et rien d’illisible", (jours) => {
@@ -191,6 +195,99 @@ describe("le pilotage, rendu", () => {
   });
 });
 
+describe("le pilotage rangé, rendu", () => {
+  const rendu = (vue: Parameters<typeof PilotagePropre>[0]["vue"], s = statsDExemple(7), changements: Parameters<typeof PilotagePropre>[0]["changements"] = []) =>
+    renderToStaticMarkup(
+      createElement(PilotagePropre, {
+        s,
+        vue,
+        direct: directDExemple(),
+        navigateurs: navigateursDExemple(),
+        delivrabilite: delivrabiliteDExemple(),
+        changements,
+        base: "/apercu/admin",
+        sonder: false,
+      }),
+    );
+
+  it.each([1, 7, 30] as const)("le résumé sur %i jour(s) : ses dates, ses cinq chiffres, « À décider », le tunnel et les canaux, sans rien d’illisible", (jours: Periode) => {
+    const html = rendu("resume", statsDExemple(jours));
+    const t = texte(html);
+    expect(t).not.toMatch(SALE);
+    expect(html).toMatch(/<h1[^>]*>Résumé<\/h1>/);
+    for (const titre of [
+      "Chiffre d’affaires net",
+      "Visiteurs",
+      "Taux d’achat",
+      "Revenu par acheteur",
+      "Marge produit",
+      "À décider",
+      "Le payé, jour par jour",
+      "Le tunnel",
+      "Où mettre l’effort",
+    ])
+      expect(t, titre).toContain(titre);
+    /* Les dates s’écrivent, avec la période d’avant et l’heure du calcul */
+    expect(t).toMatch(jours === 1 ? /Depuis hier \d{2}:\d{2}/ : /Du \S+ \d{1,2}(er)? \S+ à \d{2}:\d{2} jusqu’à maintenant/);
+    expect(t).toMatch(/· comparé aux /);
+    expect(t).toMatch(/· calculé à \d{2}:\d{2}/);
+    /* Chaque chiffre dit sa valeur d’avant */
+    expect(t.match(/ avant /g)?.length ?? 0).toBeGreaterThanOrEqual(4);
+  });
+
+  it("la santé : un bandeau en haut du résumé quand ça coince, rien sinon ; sa pastille dans le menu", () => {
+    const html = rendu("resume");
+    expect(texte(html)).toMatch(/Santé\s*: 3\u00a0tâches en échec, 1\u00a0tâche bloquée, 2\u00a0paiements refusés, 2\u00a0pannes du serveur/);
+    expect(texte(html)).toContain("4 à regarder");
+    const calme = texte(rendu("resume", statsDExemple(7, { calme: true })));
+    expect(calme).not.toContain("tâches en échec");
+    expect(calme).not.toContain("à regarder");
+  });
+
+  it("les changements du produit de la période se numérotent sur le graphique et se listent ; hors période, ils se taisent", () => {
+    const s = statsDExemple(7);
+    const dans = texte(
+      rendu("resume", s, [
+        { le: "2026-10-09", quoi: "Un changement d’exemple" },
+        { le: "2026-08-01", quoi: "Un changement d’avant" },
+      ]),
+    );
+    expect(dans).toMatch(/1 ven\. 9 octobre · Un changement d’exemple/);
+    expect(dans).not.toContain("Un changement d’avant");
+    expect(texte(rendu("resume", s))).toContain("Rien n’a changé dans le produit sur la période");
+  });
+
+  it.each([
+    ["acquisition", "Acquisition", ["D’où ils viennent", "Pages d’arrivée", "Qui importe"]],
+    ["tunnel", "Tunnel", ["Le tunnel", "L’import, écran par écran", "Le paywall, jusqu’au paiement", "Le haut du paywall"]],
+    ["ventes", "Ventes", ["Ce qui se vend", "La vente dans le chat", "Les mails des séquences"]],
+    ["couts", "Coûts et marge", ["Ce que coûte l’IA", "L’IA avant l’achat", "Archivé"]],
+    ["sante", "Santé", ["Navigateurs", "Délivrabilité", "Ne suit pas la période choisie"]],
+    ["outils", "Outils", ["Les gestes", "Donner des bulles", "Les derniers gestes"]],
+  ] as const)("la rubrique %s : son titre, ses cartes, ses dates, sans rien d’illisible", (vue, titre, cartes) => {
+    const html = rendu(vue);
+    const t = texte(html);
+    /* L’erreur d’exemple des navigateurs cite « properties of undefined » : c’est son message, pas un chiffre illisible */
+    expect(t.replace("properties of undefined", "")).not.toMatch(SALE);
+    expect(html).toContain(`>${titre}</h1>`);
+    for (const carte of cartes) expect(t, carte).toContain(carte);
+    expect(t).toMatch(/jusqu’à maintenant · comparé aux 7 jours d’avant/);
+    /* La rubrique est celle du menu, et le changement de période la garde */
+    const ici = liensVers(html, `/apercu/admin?vue=${vue}`);
+    expect(ici.length).toBeGreaterThan(0);
+    for (const lien of ici) expect(lien).toContain('aria-current="page"');
+    expect(html).toContain(`href="/apercu/admin?vue=${vue}&amp;p=30"`);
+  });
+
+  it("une période choisie au calendrier : des jours entiers, gardés dans les adresses du menu", () => {
+    const plage = { du: "2026-10-01", au: "2026-10-10" };
+    const html = rendu("tunnel", statsDExemple(7, {}, plage));
+    expect(texte(html)).toContain("Du jeu. 1er au sam. 10 octobre · comparé à la période du lun. 21 au mer. 30 sept.");
+    expect(html).toContain('href="/apercu/admin?vue=ventes&amp;du=2026-10-01&amp;au=2026-10-10"');
+    expect(html).toContain('href="/apercu/admin?du=2026-10-01&amp;au=2026-10-10"');
+  });
+});
+
 describe("le direct, rendu", () => {
   it("le bandeau, la carte, les écrans, les canaux et le fil, sans rien d’illisible", () => {
     const html = renderToStaticMarkup(createElement(PageEnDirect, { d: directDExemple(), base: "/apercu/admin", sonder: false }));
@@ -212,7 +309,9 @@ describe("le direct, rendu", () => {
     expect(t).toContain("il y a 8\u00a0s");
     expect(html).toMatch(/aria-label="Carte des personnes en ligne\u00a0: Paris 6, Lyon 3/);
     expect(html).toContain('aria-pressed="true"');
-    expect(html).toContain('href="/apercu/admin#outils"');
+    /* Le même menu que le pilotage : chaque rubrique à son adresse */
+    expect(html).toContain('href="/apercu/admin?vue=outils"');
+    for (const lien of liensVers(html, "/apercu/admin/direct")) expect(lien).toContain('aria-current="page"');
     expect(t).toContain("L’adresse IP n’est jamais gardée");
   });
 

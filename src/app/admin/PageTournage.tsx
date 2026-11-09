@@ -9,7 +9,7 @@ import { copyText } from "@/lib/hooks";
 import { NOM_TOURNAGE_MAX } from "@/lib/limites";
 import { gesteDeLEquipe } from "@/services/api";
 import type { ConvCandidate, Manque, TournageAffiche } from "@/server/tournage";
-import { EnTete } from "./EnTete";
+import { Cadre } from "./Rangement";
 import { CHAMP, Champ, Geste, issueDe, refus, type Issue } from "./GestesDeLEquipe";
 import { Bloc } from "./morceaux";
 import { SondeDuDirect } from "./SondeDuDirect";
@@ -38,10 +38,8 @@ export function PageTournage({ tournages, convs }: { tournages: TournageAffiche[
   const [nom, setNom] = useState("");
   return (
     <SondeDuDirect initial={null}>
-      <main className="min-h-dvh pb-32 md:pb-16">
-        <div className="mx-auto flex w-full max-w-[1240px] flex-col gap-4 px-4 pt-4 md:gap-6 md:px-8 md:pt-6">
-          <EnTete base="/admin" ici="tournage" />
-
+      <Cadre base="/admin" ici="tournage">
+        <div className="flex flex-col gap-4 pt-4 md:gap-5 lg:pt-6">
           <div className="flex flex-col gap-1.5 md:mt-2">
             <h1 className="m-0 text-[34px] font-black leading-[1.05] tracking-[-0.035em] md:text-[44px]">Tournage</h1>
             <p className="m-0 max-w-[720px] text-detail font-extrabold text-grey">
@@ -115,7 +113,7 @@ export function PageTournage({ tournages, convs }: { tournages: TournageAffiche[
             Ne supprime pas de ton compte une conv de tournage{NBSP}: son lien s’arrêterait. Chaque nouvelle prise d’une créatrice remplace la précédente.
           </p>
         </div>
-      </main>
+      </Cadre>
     </SondeDuDirect>
   );
 }

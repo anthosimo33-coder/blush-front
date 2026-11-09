@@ -74,7 +74,8 @@ import { SondeDuDirect } from "./SondeDuDirect";
  * les bonnes nouvelles) ; puis l’argent (le chiffre d’affaires net, case par case) à côté du direct ; les quatre chiffres
  * clés ; le tunnel, puis le détail de l’import et du paywall (leurs jalons), et qui importe ; les mails des séquences et leur délivrabilité ; d’où viennent les visiteurs et ce qui se vend ; l’IA avant l’achat (par type d’import) et la lecture partielle des longues vidéos (son A/B), ce que coûte l’IA et la santé ; enfin les outils de
  * l’équipe. La période se choisit en haut à droite (ChoixDeLaPeriode : 24 h, 7 jours, 30 jours, ou des dates au calendrier). Que des nombres : aucune conv, aucun message, aucun email. Chaque carte a son « ? » (src/contenu/aide-pilotage.ts).
- * Maquette validée le 13 octobre ; l’écran d’avant reste à /admin?version=actuelle.
+ * Maquette validée le 13 octobre ; depuis le 9 novembre, /admin ouvre le pilotage rangé (PilotagePropre.tsx), et cet
+ * écran reste à /admin?version=pilotage ; celui d’encore avant à /admin?version=actuelle.
  * TODO(produit): textes du pilotage à valider.
  */
 
@@ -114,6 +115,7 @@ export function Pilotage({
   base = "/admin",
   sonder = true,
   premierJour = LANCEMENT_LE,
+  garde,
 }: {
   s: StatsAdmin;
   direct: Direct | null;
@@ -125,6 +127,8 @@ export function Pilotage({
   sonder?: boolean;
   /** Le premier jour qu’une période choisie au calendrier peut couvrir : le lancement, ou celui de l’exemple. */
   premierJour?: string;
+  /** Ce que l’adresse garde en changeant de période (« version=pilotage » : cet écran, depuis qu’il n’est plus celui d’office). */
+  garde?: string;
 }) {
   const p = s.pilotage;
   const periode = nomsDeLaPeriode(s);
@@ -133,7 +137,11 @@ export function Pilotage({
     <SondeDuDirect initial={direct} sonder={sonder}>
       <main className="min-h-dvh pb-32 md:pb-16">
         <div className="mx-auto flex w-full max-w-[1240px] flex-col gap-4 px-4 pt-4 md:gap-6 md:px-8 md:pt-6">
-          <EnTete base={base} ici="pilotage" droite={<ChoixDeLaPeriode base={base} jours={s.jours} plage={s.plage} aujourdhui={aujourdhui} premier={premierJour} />} />
+          <EnTete
+            base={base}
+            ici="pilotage"
+            droite={<ChoixDeLaPeriode base={base} jours={s.jours} plage={s.plage} aujourdhui={aujourdhui} premier={premierJour} garde={garde} />}
+          />
 
           <div className="flex flex-col gap-1.5 md:mt-2">
             <h1 className="m-0 text-[34px] font-black leading-[1.05] tracking-[-0.035em] md:text-[44px]">Pilotage</h1>
@@ -283,7 +291,7 @@ function ChiffreDAffaires({ p, periode, fini = false }: { p: Chiffres; periode: 
 }
 
 /** Le payé case par case : une colonne par heure ou par jour, la dernière (en cours) en rose, une info-bulle au survol. */
-function Colonnes({ p, fini }: { p: Chiffres; fini: boolean }) {
+export function Colonnes({ p, fini, reperes }: { p: Chiffres; fini: boolean; reperes?: ReadonlyMap<number, number> }) {
   const n = p.cases.length;
   /* La case en cours (la dernière), s’il y en a une */
   const enCours = fini ? -1 : n - 1;
@@ -310,6 +318,13 @@ function Colonnes({ p, fini }: { p: Chiffres; fini: boolean }) {
           ))}
           {p.cases.map((c, k) => (
             <div key={c.le} className="group/col relative flex h-full min-w-0 flex-1 items-end justify-center">
+              {/* Un changement du produit ce jour-là : son numéro en haut de la colonne, et un trait jusqu’à elle */}
+              {reperes?.has(k) && (
+                <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-1/2 flex -translate-x-1/2 flex-col items-center">
+                  <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-toi text-[11px] font-black leading-none text-white">{reperes.get(k)}</span>
+                  <span className="w-0 flex-1 border-l-2 border-dashed border-toi/40" />
+                </span>
+              )}
               <div className="relative flex w-[70%] max-w-[26px] justify-center" style={{ height: c.centimes > 0 ? `${Math.max(1.5, (c.centimes / haut) * 100)}%` : "0%" }}>
                 <span
                   className="block h-full w-full rounded-t-[5px] transition-opacity duration-200 group-hover/plot:opacity-30 group-hover/col:opacity-100"
@@ -492,7 +507,7 @@ function ChiffreCle({
 
 /* ———— Le tunnel ———— */
 
-function Tunnel({ p, periode }: { p: Chiffres; periode: NomsDeLaPeriode }) {
+export function Tunnel({ p, periode }: { p: Chiffres; periode: NomsDeLaPeriode }) {
   const t = p.tunnel;
   const suivi = p.suiviDepuis !== null;
   const fuite = fuiteDuTunnel(t);
@@ -662,7 +677,7 @@ function DuChoixAuFichier({ applis }: { applis: Chiffres["jalonsParAppli"] }) {
   );
 }
 
-function ImportEcranParEcran({ p, periode }: { p: Chiffres; periode: NomsDeLaPeriode }) {
+export function ImportEcranParEcran({ p, periode }: { p: Chiffres; periode: NomsDeLaPeriode }) {
   const j = p.jalons;
   const etapes: EtapeDeLaSuite[] = [
     { cle: "visiteurs", nom: "Visiteurs", n: p.tunnel.visiteurs },
@@ -697,7 +712,7 @@ function ImportEcranParEcran({ p, periode }: { p: Chiffres; periode: NomsDeLaPer
   );
 }
 
-function PaywallJusquAuPaiement({ p, periode }: { p: Chiffres; periode: NomsDeLaPeriode }) {
+export function PaywallJusquAuPaiement({ p, periode }: { p: Chiffres; periode: NomsDeLaPeriode }) {
   const j = p.jalons;
   const etapes: EtapeDeLaSuite[] = JALONS_DU_PAYWALL.map(([cle, nom]) => ({ cle, nom, n: j[cle] }));
   const lignes: [string, ReactNode][] = [
@@ -793,7 +808,7 @@ function TableDesGenres({ titre, lignes, total }: { titre: string; lignes: Ligne
   );
 }
 
-function QuiImporte({ p, periode }: { p: Chiffres; periode: NomsDeLaPeriode }) {
+export function QuiImporte({ p, periode }: { p: Chiffres; periode: NomsDeLaPeriode }) {
   const { importees: i, payees: a } = p.quiImporte;
   /* Les convs où « Qui es-tu ? » est rempli : elles seules ont un genre, l’autre et sa paire */
   const dites = i.moi.elle + i.moi.il;
@@ -844,7 +859,7 @@ function QuiImporte({ p, periode }: { p: Chiffres; periode: NomsDeLaPeriode }) {
 /** Ce qui n’allait pas, en clair, dans l’ordre de RAISONS_DE_LA_NOTE (les textes des pastilles du rapport). */
 const NOM_DE_LA_RAISON = NOTE_DU_RAPPORT.raisons;
 
-function NotesDuRapport({ p, periode }: { p: Chiffres; periode: NomsDeLaPeriode }) {
+export function NotesDuRapport({ p, periode }: { p: Chiffres; periode: NomsDeLaPeriode }) {
   const { oui, bof, avis, raisons } = p.note;
   const notes = oui + bof;
   const taux = tauxLisible(oui, notes);
@@ -883,7 +898,7 @@ function NotesDuRapport({ p, periode }: { p: Chiffres; periode: NomsDeLaPeriode 
 
 /* ———— Le haut du paywall ———— */
 
-function HautsDuPaywall({ p }: { p: Chiffres }) {
+export function HautsDuPaywall({ p }: { p: Chiffres }) {
   const vus = p.hauts.reduce((t, h) => t + h.vus, 0);
   const lignes = p.hauts.filter((h) => h.vus || h.payes);
   const maxVus = Math.max(1, ...lignes.map((h) => h.vus));
@@ -951,7 +966,7 @@ function HautsDuPaywall({ p }: { p: Chiffres }) {
 
 /* ———— La vente dans le chat ———— */
 
-function VentesDuChat({ p }: { p: Chiffres }) {
+export function VentesDuChat({ p }: { p: Chiffres }) {
   const vues = p.ventesDuChat.reduce((t, v) => t + v.vues, 0);
   const lignes = p.ventesDuChat.filter((v) => v.vues || v.touchees || v.refusees || v.payees);
   const maxVues = Math.max(1, ...lignes.map((v) => v.vues));
@@ -1042,7 +1057,7 @@ function VentesDuChat({ p }: { p: Chiffres }) {
 
 /* ———— Les mails des séquences ———— */
 
-function MailsDesSequences({ p }: { p: Chiffres }) {
+export function MailsDesSequences({ p }: { p: Chiffres }) {
   const envoyes = p.mails.reduce((t, m) => t + m.envoyes, 0);
   const lignes = p.mails.filter((m) => m.envoyes || m.clics || m.payes);
   const maxEnvoyes = Math.max(1, ...lignes.map((m) => m.envoyes));
@@ -1124,7 +1139,7 @@ function ABDeLaDerniere({ ab }: { ab: Chiffres["abDerniere"] }) {
 
 /* ———— D’où ils viennent ———— */
 
-function Sources({ p }: { p: Chiffres }) {
+export function Sources({ p }: { p: Chiffres }) {
   const meilleure = meilleureSource(p.sources)?.source;
   const maxVisiteurs = Math.max(1, ...p.sources.map((s) => s.visiteurs));
   return (
@@ -1209,7 +1224,7 @@ function Sources({ p }: { p: Chiffres }) {
 
 /* ———— Les pages d’arrivée ———— */
 
-function PagesDArrivee({ p }: { p: Chiffres }) {
+export function PagesDArrivee({ p }: { p: Chiffres }) {
   const maxVisiteurs = Math.max(1, ...p.arrivees.map((a) => a.visiteurs));
   const visiteurs = p.arrivees.reduce((t, a) => t + a.visiteurs, 0);
   const guides = p.arrivees.find((a) => a.groupe === "guides");
@@ -1272,7 +1287,7 @@ function PagesDArrivee({ p }: { p: Chiffres }) {
 
 /* ———— Ce qui se vend ———— */
 
-function CeQuiSeVend({ s }: { s: StatsAdmin }) {
+export function CeQuiSeVend({ s }: { s: StatsAdmin }) {
   const mix = s.pilotage.mix;
   const total = mix.reduce((t, m) => t + m.centimes, 0);
   const part = (c: number) => rapport(c, total);
@@ -1352,7 +1367,7 @@ const duree = (secondes: number) => (secondes >= 60 ? `${Math.floor(secondes / 6
  * ce que leurs lectures ont coûté par import, le temps médian jusqu’au paywall, la part qui y arrive et celle qui paie (à
  * partir de PERSONNES_D_UN_TAUX convs), et ce que coûte un acheteur, lu pour rien compris.
  */
-function IAAvantLAchat({ p }: { p: Chiffres }) {
+export function IAAvantLAchat({ p }: { p: Chiffres }) {
   const types = p.importsParType;
   const total = types.reduce((t, x) => t + x.dollars + x.pourRien, 0);
   const pourRien = types.filter((x) => x.pourRien > 0);
@@ -1450,7 +1465,7 @@ function IAAvantLAchat({ p }: { p: Chiffres }) {
  * lisible qu’à partir de PERSONNES_D_UN_TAUX vidéos), en combien de temps elles arrivent au paywall, et le titre qu’elles y
  * montrent. Puis le contrefactuel des vidéos lues en entier : ce que la lecture partielle leur aurait changé.
  */
-function LecturePartielle({ p }: { p: Chiffres }) {
+export function LecturePartielle({ p }: { p: Chiffres }) {
   const { bras, contrefactuel: c } = p.lecturePartielle;
   const videos = bras.reduce((t, b) => t + b.videos, 0);
   const avant = bras.reduce((t, b) => t + b.dollarsAvant, 0);
@@ -1552,7 +1567,7 @@ const COULEURS_DES_POPULATIONS: Record<Population, string> = {
  * prospects), en grand, et celle des tests (l’équipe et le tournage) à côté ; puis chaque population, les postes du
  * produit, ses ratios (la même population en haut et en bas), et le budget du jour, qui compte tout.
  */
-function Couts({ s }: { s: StatsAdmin }) {
+export function Couts({ s }: { s: StatsAdmin }) {
   const c = s.couts;
   const p = s.pilotage;
   const parAcheteur = rapport(c.produit.valeur, p.acheteurs.valeur);
@@ -1684,7 +1699,7 @@ function Pastille({ valeur, nom }: { valeur: string; nom: string }) {
 
 /* ———— La santé ———— */
 
-function Sante({ s }: { s: StatsAdmin }) {
+export function Sante({ s }: { s: StatsAdmin }) {
   const x = s.pilotage.sante;
   /* Chaque ligne, et le détail qui l’accompagne quand elle s’allume : les codes des échecs, les lieux des pannes */
   const lignes: [string, number, { cle: string; n: number }[]][] = [
@@ -1742,7 +1757,7 @@ function Sante({ s }: { s: StatsAdmin }) {
 }
 
 /** Une carte dans la carte (les outils) : son titre (h3) et sa ligne de dessous. */
-function SousBloc({ id, titre, sous, children }: { id: string; titre: string; sous: string; children: ReactNode }) {
+export function SousBloc({ id, titre, sous, children }: { id: string; titre: string; sous: string; children: ReactNode }) {
   return (
     <section aria-labelledby={`${id}-titre`} className="flex flex-col gap-2 rounded-[18px] border-2 border-sep p-4">
       <div>

@@ -35,6 +35,8 @@ type Props = {
   aujourdhui: string;
   /** Le premier jour qu’on peut choisir (le lancement). */
   premier: string;
+  /** Ce que l’adresse garde en changeant de période (« vue=tunnel » : la rubrique du pilotage rangé). */
+  garde?: string;
 };
 
 const ROSE = "#e8358a";
@@ -104,7 +106,7 @@ function Coche() {
 
 /* ———— Le choix en cours : ce que le panneau montre avant « Appliquer » ———— */
 
-function useChoix({ base, jours, plage, aujourdhui, premier }: Props, bouton: RefObject<HTMLButtonElement | null>) {
+function useChoix({ base, jours, plage, aujourdhui, premier, garde }: Props, bouton: RefObject<HTMLButtonElement | null>) {
   const router = useRouter();
   const [enRoute, partir] = useTransition();
   const [ouvert, setOuvert] = useState(false);
@@ -133,7 +135,7 @@ function useChoix({ base, jours, plage, aujourdhui, premier }: Props, bouton: Re
   /* La page se recalcule sur le serveur : le segment bat le temps qu’elle arrive */
   const aller = (suite: string) => {
     fermer();
-    partir(() => router.push(`${base}?${suite}` as Route));
+    partir(() => router.push(`${base}?${garde ? `${garde}&` : ""}${suite}` as Route));
   };
   return {
     liste,
@@ -173,7 +175,7 @@ type Choix = ReturnType<typeof useChoix>;
 export function ChoixDeLaPeriode(props: Props) {
   const bouton = useRef<HTMLButtonElement>(null);
   const c = useChoix(props, bouton);
-  const { base, jours, plage, aujourdhui, premier } = props;
+  const { base, jours, plage, aujourdhui, premier, garde } = props;
   const perso = !!plage && !c.actif;
   const calendrier = (nb: 1 | 2) => (
     <Calendrier
@@ -195,7 +197,7 @@ export function ChoixDeLaPeriode(props: Props) {
         {([1, 7, 30] as const).map((j) => (
           <Link
             key={j}
-            href={`${base}?p=${j}`}
+            href={`${base}?${garde ? `${garde}&` : ""}p=${j}` as Route}
             aria-current={!plage && j === jours ? "page" : undefined}
             className={cn(CASE, "flex-1 whitespace-nowrap md:flex-none", plage ? "px-1.5 md:px-4" : "px-4", !plage && j === jours ? CASE_ICI : CASE_AILLEURS)}
           >
