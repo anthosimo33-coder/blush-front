@@ -316,6 +316,24 @@ describe("la page d’arrivée et les nouvelles sources", () => {
     expect(apres.p.arrivees.findIndex((a) => a.groupe === null)).not.toBe(0);
   });
 
+  it("le tunnel par source : l’import, le compte et le paywall rangés sous la source de la visite du même jour, sur la même connexion", async () => {
+    const facebook = async () => (await statsAdmin(1)).pilotage.sources.find((s) => s.source === "facebook") ?? { visiteurs: 0, importent: 0, comptes: 0, paywall: 0 };
+    const avant = await facebook();
+    const ip = ipNeuve();
+    await signe(ip, { etape: "accueil", arrivee: "/", utm: "facebook" });
+    for (const jalon of ["importee", "code", "paywall"] as const) await noterJalon(requete(ip, SAFARI), jalon);
+    /* Un import sans visite de Facebook (une autre connexion) ne compte pas sous Facebook */
+    await signe(ipNeuve(), { etape: "accueil", arrivee: "/", referent: "https://www.google.fr" });
+    await noterJalon(requete(ipNeuve(), SAFARI), "importee");
+    const apres = await facebook();
+    expect({
+      visiteurs: apres.visiteurs - avant.visiteurs,
+      importent: apres.importent - avant.importent,
+      comptes: apres.comptes - avant.comptes,
+      paywall: apres.paywall - avant.paywall,
+    }).toEqual({ visiteurs: 1, importent: 1, comptes: 1, paywall: 1 });
+  });
+
   it("au-delà des dix pages les plus vues d’un groupe, le pilotage garde chaque page qui a vendu, même vue une seule fois", async () => {
     const essai = guideDEssai();
     /* Onze guides plus vus (deux visiteurs chacun), sans vente */

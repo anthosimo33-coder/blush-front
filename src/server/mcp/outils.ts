@@ -53,7 +53,7 @@ export const OUTILS: readonly OutilMcp[] = [
     name: "pilotage",
     title: "Pilotage",
     description:
-      "L’écran principal de /admin sur la période : « À regarder » (ce qui coince, les bonnes nouvelles), le chiffre d’affaires net (payé − remboursé − contesté), les visiteurs, les acheteurs, le taux d’achat, le revenu par acheteur (toutes les ventes sont celles des vrais clients : les achats de l’équipe, du tournage et des invités sont retirés, et dits à côté), la dépense de l’IA en deux (celle du produit, les clients et les prospects ; celle des tests, l’équipe et le tournage ; puis l’offert aux invités et le non classé) et la marge produit (les ventes des vrais clients face à l’IA du produit, cible comprise, et au pire : le non classé compté dans le produit), la note des rapports écrits (« Oui, grave », « Bof » et ses raisons, les avis laissés), le tunnel visiteurs → imports → paywall → acheteurs → racheteurs et sa plus grosse fuite, qui importe (des filles ou des garçons, sur un garçon ou une fille, et le taux d’achat de chacun), les sources (Google, autres moteurs, assistants IA, mail, réseaux, verdicts partagés, direct…), les pages d’arrivée (la première page vue, par groupe : landing, guides et lexique, verdicts partagés, parrainage, pages légales, autres ; avec leurs chemins nettoyés, sans requête ni identifiant), ce qui se vend, et la santé. Chaque chiffre avec celui de la période d’avant. À appeler en premier.",
+      "L’écran principal de /admin sur la période : « À regarder » (ce qui coince, les bonnes nouvelles), le chiffre d’affaires net (payé − remboursé − contesté), les visiteurs, les acheteurs, le taux d’achat, le revenu par acheteur (toutes les ventes sont celles des vrais clients : les achats de l’équipe, du tournage et des invités sont retirés, et dits à côté), la dépense de l’IA en deux (celle du produit, les clients et les prospects ; celle des tests, l’équipe et le tournage ; puis l’offert aux invités et le non classé) et la marge produit (les ventes des vrais clients face à l’IA du produit, cible comprise, et au pire : le non classé compté dans le produit), la note des rapports écrits (« Oui, grave », « Bof » et ses raisons, les avis laissés), le tunnel visiteurs → imports → paywall → acheteurs → racheteurs et sa plus grosse fuite, qui importe (des filles ou des garçons, sur un garçon ou une fille, et le taux d’achat de chacun), les sources (Google, autres moteurs, assistants IA, mail, réseaux dont Facebook, verdicts partagés, direct… : leurs visiteurs, ceux qui importent, créent leur compte et voient le paywall le jour de leur visite, et leurs acheteurs), les pages d’arrivée (la première page vue, par groupe : landing, guides et lexique, verdicts partagés, parrainage, pages légales, autres ; avec leurs chemins nettoyés, sans requête ni identifiant), ce qui se vend, et la santé. Chaque chiffre avec celui de la période d’avant. À appeler en premier.",
     inputSchema: AVEC_JOURS,
   },
   {
@@ -208,7 +208,15 @@ function pilotage(s: StatsAdmin) {
       ? { de: ETAPES_DU_TUNNEL[fuite.etape - 1]![1], vers: ETAPES_DU_TUNNEL[fuite.etape]![1], passentPct: arrondi(fuite.taux * 100), depuis: fuite.depuis, arrivent: fuite.vers }
       : null,
     quiImporte: quiImporte(p.quiImporte),
-    sources: p.sources.map((x) => ({ source: nomDeLaSource(x.source), visiteurs: x.visiteurs, acheteurs: x.acheteurs, payeEuros: euros(x.centimes) })),
+    sources: p.sources.map((x) => ({
+      source: nomDeLaSource(x.source),
+      visiteurs: x.visiteurs,
+      importent: x.importent,
+      comptesCrees: x.comptes,
+      paywall: x.paywall,
+      acheteurs: x.acheteurs,
+      payeEuros: euros(x.centimes),
+    })),
     /* Les pages d’arrivée par groupe, leurs pages les plus vues et toutes celles qui ont vendu : rattacher chaque vente à un guide précis */
     pagesDArrivee: p.arrivees.map((a) => ({
       groupe: a.groupe === null ? SOURCE_INCONNUE : NOMS_DES_ARRIVEES[a.groupe],

@@ -1072,7 +1072,7 @@ function MailsDesSequences({ p }: { p: Chiffres }) {
     >
       {lignes.length ? (
         <div role="region" aria-label="Les mails des séquences, à faire défiler" tabIndex={0} className="-mx-2 mt-[18px] overflow-x-auto px-2">
-          <table className="w-full min-w-[560px] border-collapse text-left">
+          <table className="w-full min-w-[520px] border-collapse text-left">
             <caption className="sr-only">Les mails des séquences, leurs envois, leurs clics et les paiements qui ont suivi</caption>
             <thead>
               <tr className="text-micro font-black uppercase tracking-[0.06em] text-grey">
@@ -1161,10 +1161,16 @@ function Sources({ p }: { p: Chiffres }) {
                 <th scope="col" className="pb-2.5 font-black">
                   Canal
                 </th>
-                <th scope="col" className="w-[40%] pb-2.5 font-black">
+                <th scope="col" className="w-[22%] pb-2.5 pr-3 font-black">
                   Visiteurs
                 </th>
-                <th scope="col" className="pb-2.5 text-right font-black">
+                <th scope="col" className="pb-2.5 pr-3 text-right font-black">
+                  Importent
+                </th>
+                <th scope="col" className="pb-2.5 pr-3 text-right font-black">
+                  Comptes
+                </th>
+                <th scope="col" className="pb-2.5 pr-3 text-right font-black">
                   Achètent
                 </th>
                 <th scope="col" className="pb-2.5 text-right font-black">
@@ -1175,6 +1181,7 @@ function Sources({ p }: { p: Chiffres }) {
             <tbody>
               {p.sources.map((s) => {
                 const taux = rapport(s.acheteurs, s.visiteurs);
+                const importent = rapport(s.importent, s.visiteurs);
                 return (
                   <tr key={s.source ?? "inconnue"} className="border-t border-sep text-detail font-extrabold">
                     <th scope="row" className="py-3 pr-3 text-left font-extrabold">
@@ -1191,6 +1198,17 @@ function Sources({ p }: { p: Chiffres }) {
                         <span className="min-w-[52px] text-right tabular-nums">{s.source === null ? "—" : nombre(s.visiteurs)}</span>
                       </span>
                     </td>
+                    <td className="py-3 pr-3 text-right tabular-nums">
+                      {s.source === null ? (
+                        "—"
+                      ) : (
+                        <span className="flex flex-col items-end leading-tight">
+                          {nombre(s.importent)}
+                          {importent !== null && <span className="text-micro text-grey">{pourcent(importent * 100)}</span>}
+                        </span>
+                      )}
+                    </td>
+                    <td className="py-3 pr-3 text-right tabular-nums">{s.source === null ? "—" : nombre(s.comptes)}</td>
                     <td className="py-3 pr-3 text-right tabular-nums">{taux === null ? "—" : pourcent(taux * 100)}</td>
                     <td className="py-3 text-right tabular-nums">{euros(s.centimes, 0)}</td>
                   </tr>

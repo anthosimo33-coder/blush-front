@@ -121,13 +121,13 @@ describe("« À regarder »", () => {
 
   it("la meilleure source : au moins 30 visiteurs et un acheteur, jamais « Avant le suivi »", () => {
     const sources: Pilotage["sources"] = [
-      { source: "tiktok", visiteurs: 1000, acheteurs: 20, centimes: 28000 },
-      { source: "instagram", visiteurs: VISITEURS_D_UNE_SOURCE - 1, acheteurs: 10, centimes: 14000 },
-      { source: "google", visiteurs: VISITEURS_D_UNE_SOURCE, acheteurs: 3, centimes: 4000 },
-      { source: null, visiteurs: 0, acheteurs: 5, centimes: 7000 },
+      { source: "tiktok", visiteurs: 1000, importent: 0, comptes: 0, paywall: 0, acheteurs: 20, centimes: 28000 },
+      { source: "instagram", visiteurs: VISITEURS_D_UNE_SOURCE - 1, importent: 0, comptes: 0, paywall: 0, acheteurs: 10, centimes: 14000 },
+      { source: "google", visiteurs: VISITEURS_D_UNE_SOURCE, importent: 0, comptes: 0, paywall: 0, acheteurs: 3, centimes: 4000 },
+      { source: null, visiteurs: 0, importent: 0, comptes: 0, paywall: 0, acheteurs: 5, centimes: 7000 },
     ];
     expect(meilleureSource(sources)).toEqual({ source: "google", taux: 0.1, visiteurs: 30, acheteurs: 3 });
-    expect(meilleureSource([{ source: "snapchat", visiteurs: 500, acheteurs: 0, centimes: 0 }])).toBeNull();
+    expect(meilleureSource([{ source: "snapchat", visiteurs: 500, importent: 0, comptes: 0, paywall: 0, acheteurs: 0, centimes: 0 }])).toBeNull();
     expect(meilleureSource([])).toBeNull();
   });
 
