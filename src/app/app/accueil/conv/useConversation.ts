@@ -10,7 +10,7 @@
  */
 import { useEffect, useRef, useState } from "react";
 import { CoupureChat, lireLaReponse, modeVocalChat, type SuiviChat } from "@/services/api";
-import { codeDe, messageErreur } from "@/lib/messages-erreur";
+import { codeDe, LIRE_SANS_BULLES, messageErreur } from "@/lib/messages-erreur";
 import { noterEcriture } from "@/lib/query";
 import { tracer } from "@/lib/tracer";
 import type { BlushAnswer, BulleChat, LevelId } from "@/types";
@@ -368,8 +368,9 @@ export function useConversation({
         return true;
       } catch (e) {
         tracer("conv:lire", e);
-        direMot([messageErreur("chat", e)].flat().join(" "));
-        if (codeDe(e) === "bulles") ecran.current.manqueDeBulles?.();
+        const bulles = codeDe(e) === "bulles";
+        direMot(bulles ? LIRE_SANS_BULLES : [messageErreur("chat", e)].flat().join(" "));
+        if (bulles) ecran.current.manqueDeBulles?.();
         return false;
       } finally {
         noterEcriture("chat");

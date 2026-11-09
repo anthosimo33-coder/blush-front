@@ -1,7 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { describe, expect, it, vi } from "vitest";
 import { AIDE_SANS_BULLES, URGENCES } from "@/contenu/aide";
-import { codeDe, erreurDeParcours, messageAjoutFiche, messageErreur, problemeAjout, SANS_DATE_VIDEO, SOUFFLE } from "@/lib/messages-erreur";
+import { avecLesUrgences, codeDe, erreurDeParcours, messageAjoutFiche, messageErreur, problemeAjout, SANS_DATE_VIDEO, SOUFFLE } from "@/lib/messages-erreur";
 import { codeImprevu, echecDe, ErreurTache, estRefus } from "@/server/erreurs";
 import { erreur, route } from "@/server/http";
 import { codePublic, ERREURS_API, ErreurApi, type CodeErreur } from "@/types/erreurs-api";
@@ -150,9 +150,24 @@ describe("les écrans", () => {
     expect(messageErreur("question", api("panne"))).toBe("j’ai eu un bug, renvoie-moi ta question");
   });
 
-  it("plus de bulles : BLUSH le dit au chat en bulles, à la question en une phrase, et les numéros d’aide suivent toujours", () => {
-    expect(messageErreur("chat", api("bulles"))).toEqual(["plus de bulles pour l’instant 🫧", "recharge, et je te réponds", URGENCES]);
-    expect(messageErreur("question", api("bulles"))).toBe(`plus de bulles pour l’instant, recharge et je te réponds. ${URGENCES}`);
+  it("plus de bulles : BLUSH ramène à la réponse déjà écrite, au chat en bulles, à la question en une phrase", () => {
+    expect(messageErreur("chat", api("bulles"))).toEqual([
+      "attends, ta réponse est déjà écrite 👀",
+      "il te manque juste des bulles pour la lire",
+      "recharge et elle s’affiche direct, ce serait bête de laisser passer le moment",
+    ]);
+    expect(messageErreur("question", api("bulles"))).toBe(
+      "une réponse t’attend déjà dans ton chat, il te manque juste des bulles pour la lire\u00a0: recharge et elle s’affiche direct",
+    );
+  });
+
+  it("plus de bulles : les numéros d’urgence suivent seulement un message qui fait penser à un danger, et seulement faute de bulles", () => {
+    expect(avecLesUrgences("chat", api("bulles"), "et maintenant\u00a0?")).toEqual(messageErreur("chat", api("bulles")));
+    expect(avecLesUrgences("chat", api("bulles"), undefined)).toEqual(messageErreur("chat", api("bulles")));
+    expect(avecLesUrgences("chat", api("bulles"), "j’ai envie de mourir")).toEqual([...messageErreur("chat", api("bulles")), URGENCES]);
+    expect(avecLesUrgences("question", api("bulles"), "il me fait peur")).toEqual([messageErreur("question", api("bulles")), URGENCES]);
+    /* Une autre erreur : le message n’a pas été refusé faute de bulles, rien de plus */
+    expect(avecLesUrgences("chat", api("trop"), "j’ai envie de mourir")).toEqual([messageErreur("chat", api("trop"))]);
   });
 
   it("un vocal illisible dit le texte de la transcription en panne (qu’il écrive), pas celui d’un vocal vide (qu’il renvoie)", () => {

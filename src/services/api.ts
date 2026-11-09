@@ -55,7 +55,7 @@ import type {
 } from "@/types/api";
 import { ErreurApi } from "@/types/erreurs-api";
 import { CASE_RENONCIATION } from "@/contenu/consentements";
-import { codeDe, messageErreur, problemeAjout } from "@/lib/messages-erreur";
+import { avecLesUrgences, codeDe, problemeAjout } from "@/lib/messages-erreur";
 import { fuseauDuNavigateur, jourDeParis } from "@/lib/jours";
 import { ENVOI_IMAGES_MAX, ENVOIS_REPRIS_MAX, extensionAudio, LECTEURS_DE_LOTS } from "@/lib/limites";
 import { ENTETE_CAPTCHA } from "@/lib/captcha";
@@ -939,11 +939,11 @@ export async function sendToBlush(input: { text?: string; files?: File[]; about?
       if (mot) fd.append("texte", mot);
       if (cle) fd.append("cle", cle);
       return chat(fd, suivi);
-    });
+    }, mot);
   }
   const texte = input.text?.trim();
   if (!texte) return bulle("j’ai rien reçu, renvoie-moi ça");
-  return envoyerAuChat(() => chat({ texte: input.about ? `(à propos de «\u00a0${input.about}\u00a0») ${texte}` : texte, ...(cle ? { cle } : {}) }, suivi));
+  return envoyerAuChat(() => chat({ texte: input.about ? `(à propos de «\u00a0${input.about}\u00a0») ${texte}` : texte, ...(cle ? { cle } : {}) }, suivi), texte);
 }
 
 /** Un vocal pour BLUSH : transcrit côté serveur, puis lu par BLUSH comme un message. `cle` : voir sendToBlush. */
@@ -973,17 +973,24 @@ export async function noterUnGesteDeVente(evenement: "touchee" | "refusee", genr
 /* Une réponse de BLUSH en une ou quelques bulles (une erreur dite simplement) */
 const bulle = (texte: string | readonly string[]): BlushAnswer => ({ kind: "bubbles", bubbles: [texte].flat().map((text) => ({ text })) });
 
-/** Pourquoi une question n’a pas pu partir, dit par BLUSH, en une phrase (src/lib/messages-erreur.ts). */
-export const souciQuestion = (e: unknown): string => messageErreur("question", e);
+/**
+ * Pourquoi la question `question` n’a pas pu partir, dit par BLUSH, en une phrase (src/lib/messages-erreur.ts) : plus
+ * de bulles, les numéros d’urgence la suivent si elle fait penser à un danger (avecLesUrgences).
+ */
+export const souciQuestion = (e: unknown, question: string): string => avecLesUrgences("question", e, question).join(". ");
 
-async function envoyerAuChat(envoyer: () => Promise<BlushAnswer>): Promise<BlushAnswer> {
+/**
+ * Le message au chat (`envoyer`), et ce que BLUSH dit d’une erreur. `envoye` : son texte, s’il en a un, qui décide des
+ * numéros d’urgence quand il n’atteint personne faute de bulles (avecLesUrgences).
+ */
+async function envoyerAuChat(envoyer: () => Promise<BlushAnswer>, envoye?: string): Promise<BlushAnswer> {
   try {
     return await envoyer();
   } catch (e) {
     /* Le réseau a coupé en route : l’accueil garde les bulles reçues et propose de réessayer */
     if (e instanceof CoupureChat) throw e;
     /* Une erreur : BLUSH la dit dans sa voix (un refus de l’IA, sans parler de bug) ; plus de bulles, l’accueil ouvre la recharge */
-    return { ...bulle(messageErreur("chat", e)), ...(codeDe(e) === "bulles" ? { plusDeBulles: true as const } : {}) };
+    return { ...bulle(avecLesUrgences("chat", e, envoye)), ...(codeDe(e) === "bulles" ? { plusDeBulles: true as const } : {}) };
   }
 }
 

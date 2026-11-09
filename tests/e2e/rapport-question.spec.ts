@@ -284,7 +284,7 @@ test("à 0 bulle, l’écran de « Ta question » : la réponse est prête, sans
   });
 });
 
-test("à 0 bulle, une réponse prête attend déjà : la question est refusée (402 « bulles »), la recharge s’ouvre, et le souci garde ses numéros d’aide", async ({
+test("à 0 bulle, une réponse prête attend déjà : la question est refusée (402 « bulles »), la recharge s’ouvre, et le souci ramène à la réponse prête", async ({
   page,
 }, testInfo) => {
   const email = await compteDebloque(page, testInfo);
@@ -304,11 +304,12 @@ test("à 0 bulle, une réponse prête attend déjà : la question est refusée (
     await expect(recharge).toBeHidden();
   });
 
-  await test.step("le souci dit les numéros d’aide (le message n’a atteint personne) ; la question revient dans le champ ; réécrite, le souci reste", async () => {
-    await expect(souci).toContainText(URGENCES);
+  await test.step("le souci ramène à la réponse prête, sans les numéros d’urgence (rien d’inquiétant dans la question) ; la question revient dans le champ ; réécrite, le souci reste", async () => {
+    await expect(souci).toContainText("une réponse t’attend déjà dans ton chat");
+    await expect(souci).not.toContainText(URGENCES);
     await expect(champ).toHaveValue(QUESTION);
     await champ.fill("et dimanche, alors ?");
-    await expect(souci).toContainText(URGENCES);
+    await expect(souci).toContainText("une réponse t’attend déjà dans ton chat");
     expect(await messagesDuChat(email)).toHaveLength(2);
   });
 

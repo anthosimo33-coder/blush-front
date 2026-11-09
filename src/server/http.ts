@@ -28,7 +28,8 @@ export const repondre = <K extends CleJson>(_route: K, corps: Routes[K]["reponse
 /**
  * Une erreur de la liste (src/types/erreurs-api.ts), avec son statut : un code a toujours le même. « bulles » porte
  * toujours les numéros d’aide (AIDE_SANS_BULLES, src/contenu/aide.ts) : un message qui n’atteint pas le modèle faute de
- * bulles peut être un message de détresse, et aucune détection ne tourne avant lui.
+ * bulles peut être un message de détresse, et aucune détection ne tourne avant lui sur le serveur (l’écran, lui, dit les
+ * numéros d’urgence quand ses mots font penser à un danger : detresseProbable, src/lib/detresse.ts).
  */
 export const erreur = (code: CodeErreur, entetes: Record<string, string> = {}) =>
   json({ erreur: code, ...(code === "bulles" ? { aide: AIDE_SANS_BULLES } : {}) } satisfies ReponseErreur, ERREURS_API[code], entetes);

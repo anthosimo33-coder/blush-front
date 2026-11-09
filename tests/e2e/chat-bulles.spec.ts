@@ -134,7 +134,7 @@ test("un compte à 6 bulles parle jusqu’à 0 ; sa réponse prête, la lecture 
 
   await test.step("le message suivant : refusé (402 « bulles »), BLUSH le dit, et la recharge s’ouvre", async () => {
     expect(await ecrireABlush(page, "allô ?")).toBe(402);
-    await expect(fil.getByText("plus de bulles pour l’instant 🫧")).toBeVisible();
+    await expect(fil.getByText("attends, ta réponse est déjà écrite 👀")).toBeVisible();
     await expect(recharge).toBeVisible();
     await feuilleSurOrdinateur(page, recharge);
     await expect(recharge.getByText("Ta réponse à Maëlys s’affiche dès que c’est payé.")).toBeVisible();

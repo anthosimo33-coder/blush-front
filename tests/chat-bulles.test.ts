@@ -683,8 +683,13 @@ describe("le navigateur (api.ts)", () => {
     expect(q).toMatchObject({ question: "il pense à moi ?", title: "Ta réponse est prête", verrouillee: true });
     expect(q.message).toBeUndefined();
     const chat = await sendToBlush({ text: "et maintenant ?" });
-    /* Les numéros d’aide de l’appli, toujours : un message de détresse à 0 bulle n’a pas de réponse du modèle, il a l’aide */
-    expect(chat.bubbles.map((b) => b.text)).toEqual(["plus de bulles pour l’instant 🫧", "recharge, et je te réponds", URGENCES]);
+    /* La réponse déjà écrite ; les numéros d’urgence seulement pour un message qui fait penser à un danger (src/lib/detresse.ts) */
+    expect(chat.bubbles.map((b) => b.text)).toEqual([
+      "attends, ta réponse est déjà écrite 👀",
+      "il te manque juste des bulles pour la lire",
+      "recharge et elle s’affiche direct, ce serait bête de laisser passer le moment",
+    ]);
+    expect((await sendToBlush({ text: "il me fait peur" })).bubbles.map((b) => b.text).at(-1)).toBe(URGENCES);
     await expect(askQuestion("et là ?")).rejects.toMatchObject({ code: "bulles", status: 402 });
     const v = await derniereVerrouillee(u.id);
     await expect(lireLaReponse(v.id)).rejects.toMatchObject({ code: "bulles" });

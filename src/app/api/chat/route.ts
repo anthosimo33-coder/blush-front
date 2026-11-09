@@ -215,7 +215,7 @@ async function traiter(req: Request) {
     /* Rien ne part au modèle (une réponse verrouillée attend déjà, ou cet envoi est déjà fait) : le message du jour est rendu */
     await rendreAuCompte(utilisateur, "chat");
     if (fichiers) await rendreAuCompte(utilisateur, "ajout");
-    /* « bulles » porte toujours les numéros d’aide (erreur, src/server/http.ts) : ce message, personne ne l’a lu */
+    /* « bulles » porte toujours les numéros d’aide (erreur, src/server/http.ts) : ce message, personne ne l’a lu (l’écran les dit s’il fait penser à un danger) */
     return typeof paiement === "string" ? erreur(paiement) : dejaFait(utilisateur, paiement.deja);
   }
   try {
