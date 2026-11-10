@@ -180,7 +180,7 @@ test("le pilotage d’avant reste à ?version=pilotage : ses cartes, leurs « ? 
     /* Les quatre coups de pouce (③ porte aussi le nom de sa carte du chat, dans « La vente dans le chat »), les trois gestes de l’équipe */
     const coups = page.getByRole("list", { name: "Les coups de pouce" });
     for (const offre of [
-      "Le rapport à 6,90\u00a0€, offre unique de 5 minutes",
+      "Le rapport à 9,90\u00a0€, offre unique de 5 minutes",
       "Le mail «\u00a0Ton rapport t’attend\u00a0»",
       "Premium pour 6,90\u00a0€ de plus (80 bulles pour 5\u00a0€ avant le 23 octobre)",
       "+40 bulles, première recharge (arrêtée le 23 octobre)",

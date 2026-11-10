@@ -61,7 +61,7 @@ test("refusé dans la feuille (la banque dit non) : la feuille le dit, rien n’
   const email = emailLibre(testInfo, "refus-feuille");
   await lectureFaite(page, testInfo, email);
   const rapport = await ouvrirLeRapport(page);
-  await rapport.getByRole("button", { name: "Lire la suite · 9,90\u00a0€" }).click();
+  await rapport.getByRole("button", { name: "Lire la suite · 11,90\u00a0€" }).click();
   await page.getByRole("dialog", { name: PAIEMENT }).getByRole("button", { name: "Débloquer · 19,90\u00a0€" }).click();
   await payerParCarte(page, { refuser: true });
   const carte = page.getByRole("dialog", { name: CARTE });
@@ -100,7 +100,7 @@ test("l’offre ③ après le rapport seul : payée en un geste avec la carte ga
   await lectureFaite(page, testInfo, email);
   /* Le rapport payé dans la feuille, avec la carte de test : sa carte est gardée (pas une page de Whop, ouvrable par n’importe qui : SECA-3) */
   const rapport = await ouvrirLeRapport(page);
-  await rapport.getByRole("button", { name: "Lire la suite · 9,90\u00a0€" }).click();
+  await rapport.getByRole("button", { name: "Lire la suite · 11,90\u00a0€" }).click();
   const formule = page.getByRole("dialog", { name: PAIEMENT });
   await formule.getByRole("radio", { name: /^Le rapport/ }).click();
   await formule.getByRole("button", { name: /^Débloquer/ }).click();
@@ -117,7 +117,7 @@ test("l’offre ③ après le rapport seul : payée en un geste avec la carte ga
   });
 
   await test.step("un geste, sans page de paiement ni retour : « C’est débloqué » le dit sur place, avec 25 bulles", async () => {
-    await expect(offre.getByText("22 bulles en plus, comme en Premium. Premium coûte 10\u00a0€ de plus que le rapport\u00a0: ici, 6,90\u00a0€.")).toBeVisible();
+    await expect(offre.getByText("22 bulles en plus, comme en Premium. Premium coûte 8\u00a0€ de plus que le rapport\u00a0: ici, 6,90\u00a0€.")).toBeVisible();
     await offre.getByRole("button", { name: "Ajouter 22 bulles · 6,90\u00a0€" }).click();
     /* La page attend la livraison sans se quitter, puis le dit ; une offre prise ne mène à aucune autre */
     await expect(page.getByRole("status").filter({ hasText: "+22 bulles" })).toBeVisible({ timeout: RESEAU });

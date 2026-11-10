@@ -189,19 +189,19 @@ describe("le lot dans la commande, puis à la livraison", () => {
     expect(await soldeDe(u.id)).toBe(25);
   });
 
-  it("−15 % : Premium payé 16,92 € (arrondi au centime), le rapport 8,42 €", async () => {
+  it("−15 % : Premium payé 16,92 € (arrondi au centime), le rapport 10,12 €", async () => {
     await joueur("roue-moins15-premium");
     await jouer("tourner", caseDe("moins15"));
     expect(await payee("premium")).toMatchObject({ centimes: 1692, bulles: 25, lotRoue: "moins15" });
     await joueur("roue-moins15-rapport");
     await jouer("tourner", caseDe("moins15"));
-    expect(await payee("rapport")).toMatchObject({ centimes: 842, bulles: 3, lotRoue: "moins15" });
+    expect(await payee("rapport")).toMatchObject({ centimes: 1012, bulles: 3, lotRoue: "moins15" });
   });
 
-  it("+5 bulles sur le rapport : 9,90 € et 8 bulles", async () => {
+  it("+5 bulles sur le rapport : 11,90 € et 8 bulles", async () => {
     const { u } = await joueur("roue-bulles5");
     await jouer("tourner", caseDe("bulles5"));
-    expect(await payee("rapport")).toMatchObject({ centimes: 990, bulles: 8, lotRoue: "bulles5", statut: "paye" });
+    expect(await payee("rapport")).toMatchObject({ centimes: 1190, bulles: 8, lotRoue: "bulles5", statut: "paye" });
     expect(await soldeDe(u.id)).toBe(8);
   });
 
@@ -210,17 +210,17 @@ describe("le lot dans la commande, puis à la livraison", () => {
     await db()
       .insert(schema.roue)
       .values({ userId: u.id, caseTiree: 0, lot: "bulles20", expireLe: sql`now() + interval '10 minutes'` });
-    expect(await payee("rapport")).toMatchObject({ centimes: 990, bulles: 3 + 20, lotRoue: "bulles20", statut: "paye" });
+    expect(await payee("rapport")).toMatchObject({ centimes: 1190, bulles: 3 + 20, lotRoue: "bulles20", statut: "paye" });
     expect(await soldeDe(u.id)).toBe(23);
   });
 
-  it("Premium au prix du rapport : sur Premium (9,90 €, 25 bulles), jamais sur le rapport seul", async () => {
+  it("Premium au prix du rapport : sur Premium (11,90 €, 25 bulles), jamais sur le rapport seul", async () => {
     await joueur("roue-premium-rapport");
     await jouer("tourner", caseDe("premium_prix"));
-    expect(await payee("rapport")).toMatchObject({ centimes: 990, bulles: 3, lotRoue: null });
+    expect(await payee("rapport")).toMatchObject({ centimes: 1190, bulles: 3, lotRoue: null });
     const { u } = await joueur("roue-premium-premium");
     await jouer("tourner", caseDe("premium_prix"));
-    expect(await payee("premium")).toMatchObject({ centimes: 990, bulles: 25, lotRoue: "premium_prix" });
+    expect(await payee("premium")).toMatchObject({ centimes: 1190, bulles: 25, lotRoue: "premium_prix" });
     expect(await soldeDe(u.id)).toBe(25);
   });
 
@@ -237,7 +237,7 @@ describe("le lot dans la commande, puis à la livraison", () => {
   it("le 2e rapport à −50 % gagné : la formule à son prix, puis le −50 % gardé 30 jours pour une autre conv", async () => {
     const { u } = await joueur("roue-second");
     await jouer("tourner", caseDe("second50"));
-    expect(await payee("rapport")).toMatchObject({ centimes: 990, bulles: 3, lotRoue: "second50", statut: "paye" });
+    expect(await payee("rapport")).toMatchObject({ centimes: 1190, bulles: 3, lotRoue: "second50", statut: "paye" });
     const [garde] = await db()
       .select()
       .from(schema.offresUniques)

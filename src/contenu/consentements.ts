@@ -25,9 +25,10 @@ export const CASE_IMPORT = {
    * tromper » (il disait « Une IA peut se tromper »). Le 23 octobre : la grille de la marge à 80 % (le rapport à 3 bulles,
    * Premium à 19,90 € et 25 bulles, les recharges de 10, 25 et 60 bulles, Premium moins cher après le rapport à la place
    * du bonus de la première recharge, le repli de la roue à +3 bulles). Le 26 octobre : la carte gardée chez Whop ne se
-   * dit plus sous les boutons, les conditions ne renvoient plus à cette ligne
+   * dit plus sous les boutons, les conditions ne renvoient plus à cette ligne. Le 10 novembre : le rapport à 11,90 € (et
+   * le 2e rapport à 5,95 €, la moitié)
    */
-  version: "2026-10-26.1",
+  version: "2026-11-10.1",
   avant: "En continuant, tu acceptes les ",
   lien: "conditions",
   apres: " et que BLUSH lise toute ta conv.",

@@ -286,7 +286,7 @@ describe("l’offre ① et son compte à rebours", () => {
 });
 
 describe("le bas de l’aperçu gratuit", () => {
-  it("« Lire la suite · 9,90 € » ouvre la feuille, la ligne rose explique les bulles : deux boutons qui ouvrent une feuille", () => {
+  it("« Lire la suite · 11,90 € » ouvre la feuille, la ligne rose explique les bulles : deux boutons qui ouvrent une feuille", () => {
     const ouvrirPaiement = vi.fn();
     const expliquer = vi.fn();
     render(<PiedGratuit ouvrirPaiement={ouvrirPaiement} expliquer={expliquer} />);

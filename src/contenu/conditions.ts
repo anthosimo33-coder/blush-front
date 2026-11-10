@@ -41,7 +41,7 @@ export type Bloc = string | readonly string[];
 export type Section = { id: string; titre: string; blocs: readonly Bloc[] };
 
 /** Le jour de cette version des conditions : la page le dit (`maj`), le plan du site aussi (src/lib/referencement.ts). */
-const MIS_A_JOUR_LE = "2026-10-26";
+const MIS_A_JOUR_LE = "2026-11-10";
 
 /** L’en-tête de la page, le jour de sa version, et sa dernière ligne. */
 export const CONDITIONS = {

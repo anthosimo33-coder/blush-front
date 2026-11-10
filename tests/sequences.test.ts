@@ -375,7 +375,7 @@ describe("S6 · les offres gardées, S7 · après un 🧊", () => {
     await passer();
     const [m] = pour(u);
     expect(m!.sujet).toMatch(/^ton −50\u00a0% saute (lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche)$/);
-    expect(m!.html).toContain("4,95&nbsp;€");
+    expect(m!.html).toContain("5,95&nbsp;€");
     expect(m!.html).toContain(`/ouvrir/${conv}?m=s6_garde&amp;nouvelle=1"`);
     expect(m!.html).toContain("Plus d’offres comme ça");
   });
@@ -539,7 +539,7 @@ describe("S1, S2 · les prospects (éteints par défaut)", () => {
       await passer();
       const [m] = pour(avec.u);
       expect(m!.sujet).toBe("dernière fois que je t’en parle");
-      expect(m!.html).toContain("6,90&nbsp;€");
+      expect(m!.html).toContain(">9,90&nbsp;€");
       expect(m!.html).toContain(`/ouvrir/${avec.conv}?m=s1_derniere&amp;paywall=1&amp;offre=1`);
       const [suite] = await db()
         .select({ expireLe: schema.offresUniques.expireLe, storyId: schema.offresUniques.storyId })
