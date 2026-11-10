@@ -3,7 +3,8 @@ import { CASE_IMPORT } from "../../src/contenu/consentements";
 import { ADMIN, compteDe, emailLibre, expect, exportWhatsApp, INVITES, lectureFaite, origine, RESEAU, seConnecter, seConnecterAdmin, sql, test } from "./aide";
 
 /*
- * Le tableau de bord (/admin, le pilotage ; /admin/direct ; l’écran d’avant à ?version=actuelle) : réservé aux emails de
+ * Le tableau de bord (/admin, le pilotage rangé : le résumé et ses rubriques ; /admin/direct ; le pilotage d’avant à
+ * ?version=pilotage, et l’écran d’encore avant à ?version=actuelle) : réservé aux emails de
  * BLUSH_ADMINS. Pour tous les autres, il n’existe pas (une 404, pas un 403 : rien ne dit qu’il y a quelque chose à cette
  * adresse). Ses chiffres dépendent de toute la base (d’autres tests tournent en même temps) : on vérifie ses cartes et ce
  * qu’elles font, pas leurs valeurs.
@@ -23,8 +24,10 @@ test("/admin n’existe pas pour qui n’est pas de l’équipe : ni sans compte
     const reponse = await page.goto("/admin");
     expect(reponse?.status()).toBe(404);
     await expect(page.getByRole("heading", { level: 1, name: "Cette page n’existe pas." })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Pilotage" })).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: "Résumé" })).toHaveCount(0);
     expect((await page.goto("/admin/direct"))?.status()).toBe(404);
+    expect((await page.goto("/admin?vue=outils"))?.status()).toBe(404);
+    expect((await page.goto("/admin?version=pilotage"))?.status()).toBe(404);
     expect((await page.goto("/admin?version=actuelle"))?.status()).toBe(404);
     const direct = await page.request.get("/api/admin/direct");
     expect(direct.status()).toBe(404);
@@ -32,14 +35,120 @@ test("/admin n’existe pas pour qui n’est pas de l’équipe : ni sans compte
   });
 });
 
+test("connecté avec l’email de l’équipe, /admin ouvre le résumé : ses dates, ses chiffres, « À décider », puis chaque rubrique, la période gardée", async ({ page }) => {
+  await seConnecterAdmin(page);
+  const rubriques = page.getByRole("navigation", { name: "Rubriques" });
+  const periodes = page.getByRole("navigation", { name: "Période" });
+
+  await test.step("le résumé, sur les 7 derniers jours", async () => {
+    const reponse = await page.goto("/admin");
+    expect(reponse?.status()).toBe(200);
+    await expect(page).toHaveTitle("Admin · BLUSH");
+    await expect(page.getByRole("heading", { level: 1, name: "Résumé" })).toBeVisible();
+    /* Les dates, en toutes lettres : la fenêtre qui glisse, celle d’avant, l’heure du calcul */
+    await expect(
+      page.getByText(/^Du \S+ \d{1,2}(er)? \S+ à \d{2}:\d{2} jusqu’à maintenant · comparé aux 7 jours d’avant, depuis le \S+ \d{1,2}(er)? \S+ · calculé à \d{2}:\d{2}$/),
+    ).toBeVisible();
+    for (const titre of ["À décider", "Le payé, jour par jour", "Le tunnel", "Où mettre l’effort"]) {
+      await expect(page.getByRole("heading", { level: 2, name: titre, exact: true })).toBeVisible();
+    }
+    for (const titre of ["Chiffre d’affaires net", "Visiteurs", "Taux d’achat", "Revenu par acheteur", "Marge produit", "Ce qui a changé sur la période"]) {
+      await expect(page.getByRole("heading", { level: 3, name: titre, exact: true })).toBeVisible();
+    }
+    /* « À décider » : une ligne au moins, cinq au plus */
+    const lignes = page.getByRole("region", { name: "À décider", exact: true }).getByRole("listitem");
+    await expect(lignes.first()).toBeVisible();
+    expect(await lignes.count()).toBeLessThanOrEqual(5);
+    /* Le graphique du payé se décrit, et ses cases se lisent en tableau */
+    await expect(page.getByRole("img", { name: /^Le payé par jour, sur 7\s+jours/ })).toBeAttached();
+    await expect(page.getByRole("table", { name: "Le payé par jour" }).getByRole("row")).toHaveCount(8);
+    await expect(periodes.getByRole("link", { name: "7 jours" })).toHaveAttribute("aria-current", "page");
+    /* Les rubriques : le résumé ici, chacune à son adresse, le direct avec le nombre en ligne */
+    await expect(rubriques.getByRole("link", { name: "Résumé" })).toHaveAttribute("aria-current", "page");
+    for (const [nom, adresse] of [
+      ["Acquisition", "/admin?vue=acquisition"],
+      ["Tunnel", "/admin?vue=tunnel"],
+      ["Ventes", "/admin?vue=ventes"],
+      ["Coûts et marge", "/admin?vue=couts"],
+      ["Outils", "/admin?vue=outils"],
+      ["Tournage", "/admin/tournage"],
+    ] as const)
+      await expect(rubriques.getByRole("link", { name: nom, exact: true })).toHaveAttribute("href", adresse);
+    await expect(rubriques.getByRole("link", { name: /^Santé/ })).toHaveAttribute("href", "/admin?vue=sante");
+    const direct = rubriques.getByRole("link", { name: /^En direct/ });
+    await expect(direct).toHaveAttribute("href", "/admin/direct");
+    await expect(direct).toContainText(/^En direct\s*\d+\s*en ligne$/);
+    await expect(page.getByText("Que des nombres\u00a0: aucune conv, aucun message, aucun email ne sort d’ici.")).toBeVisible();
+    await expect(page.getByRole("main")).not.toContainText(/NaN|Infinity|undefined/);
+  });
+
+  await test.step("chaque rubrique : son titre, ses cartes, ses dates", async () => {
+    for (const [vue, titre, cartes] of [
+      ["acquisition", "Acquisition", ["D’où ils viennent", "Pages d’arrivée", "Qui importe"]],
+      ["tunnel", "Tunnel", ["Le tunnel", "L’import, écran par écran", "Le paywall, jusqu’au paiement", "Le haut du paywall"]],
+      ["ventes", "Ventes", ["Ce qui se vend", "La vente dans le chat", "Les mails des séquences"]],
+      ["couts", "Coûts et marge", ["Ce que coûte l’IA", "L’IA avant l’achat"]],
+      ["sante", "Santé", ["Santé", "Délivrabilité"]],
+      ["outils", "Outils", ["Les gestes"]],
+    ] as const) {
+      const reponse = await page.goto(`/admin?vue=${vue}`);
+      expect(reponse?.status(), vue).toBe(200);
+      await expect(page.getByRole("heading", { level: 1, name: titre, exact: true })).toBeVisible();
+      for (const carte of cartes) await expect(page.getByRole("heading", { level: 2, name: carte, exact: true })).toBeVisible();
+      await expect(rubriques.getByRole("link", { name: new RegExp(`^${titre}`) })).toHaveAttribute("aria-current", "page");
+      await expect(page.getByText(/jusqu’à maintenant · comparé aux 7 jours d’avant/)).toBeVisible();
+      await expect(page.getByRole("main")).not.toContainText(/NaN|Infinity|undefined/);
+    }
+    /* Les outils : les trois gestes de l’équipe */
+    for (const geste of ["Donner des bulles", "Débloquer une conv", "Inviter la liste d’attente"]) await expect(page.getByRole("form", { name: geste })).toBeVisible();
+  });
+
+  await test.step("ce qui ne suit pas la période le dit, et une mesure finie se replie", async () => {
+    await page.goto("/admin?vue=sante");
+    await expect(page.getByText("Ne suit pas la période choisie\u00a0: toujours les 7 derniers jours")).toBeVisible();
+    await page.goto("/admin?vue=couts");
+    const archive = page.getByRole("group").filter({ hasText: "Archivé" });
+    await expect(page.getByRole("heading", { level: 2, name: /^Longues vidéos/ })).toBeHidden();
+    await archive.locator("summary").click();
+    await expect(page.getByRole("heading", { level: 2, name: /^Longues vidéos/ })).toBeVisible();
+  });
+
+  await test.step("la période se garde d’une rubrique à l’autre, et la rubrique en changeant de période", async () => {
+    await page.goto("/admin?vue=tunnel");
+    await periodes.getByRole("link", { name: "30 jours" }).click();
+    await expect(page).toHaveURL(/\/admin\?vue=tunnel&p=30$/);
+    await expect(page.getByRole("heading", { level: 1, name: "Tunnel" })).toBeVisible();
+    await expect(page.getByText(/jusqu’à maintenant · comparé aux 30 jours d’avant/)).toBeVisible();
+    await expect(rubriques.getByRole("link", { name: "Ventes", exact: true })).toHaveAttribute("href", "/admin?vue=ventes&p=30");
+    await expect(rubriques.getByRole("link", { name: "Résumé" })).toHaveAttribute("href", "/admin?p=30");
+    await rubriques.getByRole("link", { name: "Résumé" }).click();
+    await expect(page).toHaveURL(/\/admin\?p=30$/);
+    await expect(page.getByRole("table", { name: "Le payé par jour" }).getByRole("row")).toHaveCount(31);
+  });
+
+  await test.step("des dates choisies au calendrier : des jours entiers, écrits", async () => {
+    await page.goto("/admin?vue=ventes");
+    await periodes.getByRole("button", { name: "Choisir des dates" }).click();
+    const panneau = page.getByRole("dialog", { name: "Choisir une période" });
+    await panneau.getByRole("button", { name: "Aujourd’hui", exact: true }).click();
+    await expect(page).toHaveURL(/\/admin\?vue=ventes&du=(\d{4}-\d{2}-\d{2})&au=\1$/);
+    await expect(page.getByText(/^Le \S+ \d{1,2}(er)? \S+, aujourd’hui en cours · comparé à la veille, /)).toBeVisible();
+  });
+
+  await test.step("une rubrique inconnue laisse le résumé", async () => {
+    await page.goto("/admin?vue=nimporte");
+    await expect(page.getByRole("heading", { level: 1, name: "Résumé" })).toBeVisible();
+  });
+});
+
 /** Le sous-titre du pilotage : « Mardi 13 octobre, 16:05 · sur 7 jours, vs les 7 jours d’avant », pour une durée (en regex). */
 const sousTitre = (duree: string) => new RegExp(`^\\S+ \\d{1,2} \\S+, \\d{2}:\\d{2} · sur ${duree}, vs les ${duree} d’avant$`);
 
-test("connecté avec l’email de l’équipe, le pilotage s’ouvre : ses cartes, leurs « ? », ses trois périodes, et l’écran d’avant", async ({ page }, testInfo) => {
+test("le pilotage d’avant reste à ?version=pilotage : ses cartes, leurs « ? », ses périodes, et l’écran d’encore avant", async ({ page }, testInfo) => {
   await seConnecterAdmin(page);
 
   await test.step("les 7 derniers jours, d’office", async () => {
-    const reponse = await page.goto("/admin");
+    const reponse = await page.goto("/admin?version=pilotage");
     expect(reponse?.status()).toBe(200);
     await expect(page).toHaveTitle("Admin · BLUSH");
     await expect(page.getByRole("heading", { level: 1, name: "Pilotage" })).toBeVisible();
@@ -152,7 +261,7 @@ test("connecté avec l’email de l’équipe, le pilotage s’ouvre : ses carte
   await test.step("« 30 jours » change la période", async () => {
     const periodes = page.getByRole("navigation", { name: "Période" });
     await periodes.getByRole("link", { name: "30 jours" }).click();
-    await expect(page).toHaveURL(/\/admin\?p=30$/);
+    await expect(page).toHaveURL(/\/admin\?version=pilotage&p=30$/);
     await expect(periodes.getByRole("link", { name: "30 jours" })).toHaveAttribute("aria-current", "page");
     await expect(periodes.getByRole("link", { name: "7 jours" })).not.toHaveAttribute("aria-current", "page");
     await expect(page.getByText(sousTitre("30\\s+jours"))).toBeVisible();
@@ -162,7 +271,7 @@ test("connecté avec l’email de l’équipe, le pilotage s’ouvre : ses carte
   await test.step("« 24 h » aussi : des heures", async () => {
     const periodes = page.getByRole("navigation", { name: "Période" });
     await periodes.getByRole("link", { name: "24 h" }).click();
-    await expect(page).toHaveURL(/\/admin\?p=1$/);
+    await expect(page).toHaveURL(/\/admin\?version=pilotage&p=1$/);
     await expect(periodes.getByRole("link", { name: "24 h" })).toHaveAttribute("aria-current", "page");
     await expect(page.getByText(sousTitre("24\\s+h"))).toBeVisible();
     await expect(page.getByRole("table", { name: "Le payé par heure" }).getByRole("row")).toHaveCount(25);
@@ -187,7 +296,7 @@ test("connecté avec l’email de l’équipe, le pilotage s’ouvre : ses carte
     if (!(await hier.count())) await panneau.getByRole("button", { name: "Mois précédent" }).click();
     await hier.click();
     await panneau.getByRole("button", { name: "Appliquer" }).click();
-    await expect(page).toHaveURL(new RegExp(`/admin\\?du=${d(-1)}&au=${jour}$`));
+    await expect(page).toHaveURL(new RegExp(`/admin\\?version=pilotage&du=${d(-1)}&au=${jour}$`));
     await expect(panneau).toBeHidden();
     /* Plus aucune des trois périodes d’office n’est celle de la page ; le graphique a ses deux jours */
     await expect(periodes.locator('a[aria-current="page"]')).toHaveCount(0);
@@ -195,7 +304,7 @@ test("connecté avec l’email de l’équipe, le pilotage s’ouvre : ses carte
     await expect(page.getByText(/vs les 2\s+jours d’avant/).first()).toBeVisible();
     await expect(page.getByRole("table", { name: "Le payé par jour" }).getByRole("row")).toHaveCount(3);
     /* Une période mal écrite laisse les 7 jours */
-    await page.goto("/admin?du=2026-02-30&au=hier");
+    await page.goto("/admin?version=pilotage&du=2026-02-30&au=hier");
     await expect(periodes.getByRole("link", { name: "7 jours" })).toHaveAttribute("aria-current", "page");
   });
 
@@ -217,7 +326,7 @@ test("connecté avec l’email de l’équipe, le pilotage s’ouvre : ses carte
       timeout: RESEAU,
     });
     expect(envoi.status()).toBe(200);
-    await page.goto("/admin?p=1");
+    await page.goto("/admin?version=pilotage&p=1");
     const bloc = page.getByRole("region", { name: "L’IA avant l’achat", exact: true });
     /* Ses imports, puis l’IA par import : rien (le modèle factice ne coûte rien, et rien n’est lu avant l’achat d’un export) */
     const cellules = bloc
@@ -234,7 +343,7 @@ test("connecté avec l’email de l’équipe, le pilotage s’ouvre : ses carte
     const tache = `e2e-population-${testInfo.project.name}-${Date.now()}`;
     await sql()`insert into ai_usage (task, model, cost_micros, population) values (${tache}, 'test', 5000000, 'equipe'), (${tache}, 'test', 3000000, 'client'), (${tache}, 'test', 1000000, 'inconnu')`;
     try {
-      await page.goto("/admin?p=1");
+      await page.goto("/admin?version=pilotage&p=1");
       const bloc = page.getByRole("region", { name: "Ce que coûte l’IA", exact: true });
       for (const nom of ["IA du produit", "IA des tests", "Les clients et les prospects", "L’équipe et le tournage"])
         await expect(bloc.getByText(nom, { exact: true })).toBeVisible();
@@ -293,7 +402,7 @@ test("le direct de l’équipe : qui est là, où, d’où, et le fil ; il se re
     /* Le nom accessible a ses espaces normalisés (l’insécable devient une espace) */
     await expect(page.getByRole("img", { name: /^Carte des personnes en ligne\s: / })).toBeAttached();
     await expect(page.getByRole("navigation", { name: "Rubriques" }).getByRole("link", { name: /^En direct/ })).toHaveAttribute("aria-current", "page");
-    await expect(page.getByRole("navigation", { name: "Rubriques" }).getByRole("link", { name: "Outils" })).toHaveAttribute("href", "/admin#outils");
+    await expect(page.getByRole("navigation", { name: "Rubriques" }).getByRole("link", { name: "Outils" })).toHaveAttribute("href", "/admin?vue=outils");
     await expect(page.getByRole("main")).not.toContainText(/NaN|Infinity|undefined/);
   });
 
@@ -323,7 +432,7 @@ test("les gestes de l’équipe : des bulles à un compte, puis le rapport de sa
   expect(await compteDe(email)).toMatchObject({ bulles: 0, debloquees: 0 });
   const admin = await autreAppareil();
   await seConnecterAdmin(admin);
-  await admin.goto("/admin");
+  await admin.goto("/admin?vue=outils");
 
   await test.step("un email sans compte : rien ne change, et l’écran le dit", async () => {
     const bulles = admin.getByRole("form", { name: "Donner des bulles" });

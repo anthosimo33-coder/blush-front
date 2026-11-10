@@ -12,6 +12,7 @@ import { contexte } from "@/server/requete";
 import { statsAdmin, type Periode, type PeriodeDemandee } from "@/server/stats";
 import { AdminScreen } from "./AdminScreen";
 import { Pilotage } from "./Pilotage";
+import { PilotagePropre, vueDe } from "./PilotagePropre";
 
 export const metadata: Metadata = { title: "Admin" };
 
@@ -30,7 +31,9 @@ async function chiffres(periode: PeriodeDemandee) {
 }
 
 /**
- * Le tableau de bord, réservé aux emails de BLUSH_ADMINS. Pour tous les autres, la page n’existe pas. Le pilotage
+ * Le tableau de bord, réservé aux emails de BLUSH_ADMINS. Pour tous les autres, la page n’existe pas. Le pilotage rangé :
+ * le résumé, ou une rubrique (`?vue=acquisition|tunnel|ventes|couts|sante|outils` ; une rubrique inconnue laisse le
+ * résumé) ; `?version=pilotage` : le pilotage d’avant, sur une seule page, gardé à côté. La période
  * (`?p=1|7|30`, 7 jours d’office ; ou `?du=&au=`, des jours de Paris choisis au calendrier, du lancement à aujourd’hui :
  * une période mal écrite ou hors de ces bornes laisse les 7 jours) ; `?version=actuelle` : l’écran d’avant, gardé
  * jusqu’à la décision (il ne connaît que les trois périodes d’office).
@@ -61,5 +64,6 @@ export default async function Page({ searchParams }: PageProps<"/admin">) {
       return null;
     }),
   ]);
-  return <Pilotage s={s} direct={d} navigateurs={n} delivrabilite={m} />;
+  if (q.version === "pilotage") return <Pilotage s={s} direct={d} navigateurs={n} delivrabilite={m} garde="version=pilotage" />;
+  return <PilotagePropre s={s} vue={vueDe(q.vue)} direct={d} navigateurs={n} delivrabilite={m} />;
 }
