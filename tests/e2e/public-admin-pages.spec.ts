@@ -280,6 +280,7 @@ test("les pages de l’équipe s’ouvrent hors de Vercel, et n’y montrent rie
     "/apercu/admin?p=1&suivi=0",
     "/apercu/admin?p=30&calme=1",
     "/apercu/admin?p=1&ventes=1",
+    "/apercu/admin?du=2026-09-21&au=2026-10-04",
     "/apercu/admin?version=actuelle",
     "/apercu/admin/direct",
     "/apercu/ecriture",

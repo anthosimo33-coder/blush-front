@@ -1,4 +1,5 @@
 import { PAIRES, type GroupeDArrivee, type Paire } from "@/contenu/pilotage";
+import { plageLue, type Plage } from "@/lib/jours";
 import type { CaseDuPilotage, Genres, Periode, Pilotage, StatsAdmin } from "@/server/stats";
 import type { AppKind } from "@/types";
 import type { Direct, GesteDuFil } from "@/types/api";
@@ -57,6 +58,52 @@ function casesDe(jours: Periode, suivi: boolean): CaseDuPilotage[] {
 }
 
 const somme = <T>(xs: readonly T[], f: (x: T) => number) => xs.reduce((t, x) => t + f(x), 0);
+
+/* ———— Une période choisie au calendrier ———— */
+
+/** Le jour de l’exemple, et le premier qu’on peut y choisir (son « lancement ») : des jours de Paris, tous en heure d’été. */
+const JOUR_D_EXEMPLE = "2026-10-13";
+export const PREMIER_JOUR_D_EXEMPLE = "2026-07-31";
+
+const JOUR = 86400e3;
+const rang = (jour: string) => Math.round(Date.parse(`${jour}T00:00:00Z`) / JOUR);
+const jourDuRang = (r: number) => new Date(r * JOUR).toISOString().slice(0, 10);
+
+/** Une période lue dans l’adresse (`?du=&au=`), si elle tient dans l’exemple ; sinon rien. */
+export const plageDExemple = (du: unknown, au: unknown): Plage | null => plageLue(du, au, { premier: PREMIER_JOUR_D_EXEMPLE, dernier: JOUR_D_EXEMPLE });
+
+/** Les visiteurs d’un jour de l’exemple, d’après le jour lui-même (et non sa place dans la période) : le site grandit, les week-ends sont chargés. */
+function visiteursDuJour(jour: string): number {
+  const r = rang(jour);
+  const depuis = r - rang(PREMIER_JOUR_D_EXEMPLE);
+  const semaine = new Date(r * JOUR).getUTCDay();
+  const weekend = semaine === 0 || semaine === 6;
+  return Math.round((210 + depuis * 5.2 + (weekend ? 120 + (semaine === 0 ? 40 : 0) : 0) + ((r * 37) % 23) * 6) * (jour === JOUR_D_EXEMPLE ? 0.66 : 1));
+}
+
+/** La case d’un jour de l’exemple (`debut` : son minuit de Paris, ou le début d’une de ses heures ; `part` : la part du jour qu’elle couvre). */
+function caseDuJour(jour: string, debut: number, part: number, suivi: boolean): CaseDuPilotage {
+  const r = rang(jour);
+  const visiteurs = Math.round(visiteursDuJour(jour) * part);
+  const acheteurs = Math.round(visiteurs * (0.024 + ((r * 7) % 5) * 0.001));
+  const centimes = acheteurs * (1650 + (((r * 5) % 7) - 3) * 40);
+  const dollars = Math.round(centimes * 0.234) / 100;
+  return { le: iso(debut), visiteurs: suivi ? visiteurs : 0, acheteurs, centimes, dollars, dollarsProduit: Math.round(dollars * 85) / 100 };
+}
+
+/** Les cases d’une période choisie : un jour de Paris par case, ou ses heures si elle ne fait qu’un jour (jusqu’à 16 h pour aujourd’hui). */
+function casesDeLaPlage({ du, au }: Plage, suivi: boolean): CaseDuPilotage[] {
+  const minuit = (jour: string) => Date.parse(`${jour}T00:00:00Z`) - 2 * 3600e3;
+  if (du === au) {
+    const heures = du === JOUR_D_EXEMPLE ? 17 : 24;
+    const total = somme(PAR_HEURE.slice(0, heures), (v) => v);
+    return Array.from({ length: heures }, (_, h) => caseDuJour(du, minuit(du) + h * 3600e3, (PAR_HEURE[h] ?? 0) / total, suivi));
+  }
+  return Array.from({ length: rang(au) - rang(du) + 1 }, (_, k) => {
+    const jour = jourDuRang(rang(du) + k);
+    return caseDuJour(jour, minuit(jour), 1, suivi);
+  });
+}
 /** `pct` % de `total` dollars, au centime. */
 const partDe = (total: number, pct: number) => Math.round(total * pct) / 100;
 
@@ -147,8 +194,8 @@ function arriveesDe({
 }
 
 /** Le pilotage d’exemple de la période. */
-function pilotageDe(jours: Periode, { calme = false, suivi = true }: Variante): Pilotage {
-  const cases = casesDe(jours, suivi);
+function pilotageDe(jours: Periode, { calme = false, suivi = true }: Variante, plage?: Plage): Pilotage {
+  const cases = plage ? casesDeLaPlage(plage, suivi) : casesDe(jours, suivi);
   const visiteurs = somme(cases, (c) => c.visiteurs);
   const acheteurs = somme(cases, (c) => c.acheteurs);
   const paye = somme(cases, (c) => c.centimes);
@@ -446,8 +493,8 @@ export function avecPeuDeVentes(s: StatsAdmin, n: number): StatsAdmin {
   };
 }
 
-export function statsDExemple(jours: Periode, variante: Variante = {}): StatsAdmin {
-  const pilotage = pilotageDe(jours, variante);
+export function statsDExemple(jours: Periode, variante: Variante = {}, plage?: Plage): StatsAdmin {
+  const pilotage = pilotageDe(jours, variante, plage);
   const nb = jours === 30 ? 30 : 14;
   const activite = Array.from({ length: nb }, (_, k) => {
     const d = new Date(MINUIT + 3 * 3600e3 - (nb - 1 - k) * 86400e3);
@@ -459,6 +506,7 @@ export function statsDExemple(jours: Periode, variante: Variante = {}): StatsAdm
   const rapports = Math.round(pilotage.acheteurs.valeur * 0.9);
   return {
     jours,
+    ...(plage ? { plage } : {}),
     le: iso(MAINTENANT),
     cles: {
       comptes: { valeur: 23, avant: 14 },

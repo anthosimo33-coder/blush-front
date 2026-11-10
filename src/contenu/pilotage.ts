@@ -88,6 +88,9 @@ export const NOMS_DES_POPULATIONS: Record<Population, string> = {
 /** Le nom de chaque type d’import (src/server/imports.ts), dans /admin « L’IA avant l’achat » et le serveur MCP. */
 export const NOMS_DES_TYPES_D_IMPORT: Record<TypeDImport, string> = { export: "Export", captures: "Captures", video: "Vidéo" };
 
+/** Le jour du lancement (jour de Paris) : le premier qu’une période choisie au calendrier peut couvrir, et le début de « Depuis le lancement ». */
+export const LANCEMENT_LE = "2026-10-13";
+
 /**
  * Le jour où l’enregistrement d’écran a quitté l’import (VIDEO_A_L_IMPORT, src/lib/limites.ts), au format AAAA-MM-JJ.
  * /admin et le serveur MCP l’écrivent sous la vidéo de « L’IA avant l’achat » et sous les applis qu’il a changées

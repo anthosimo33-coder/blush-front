@@ -1,13 +1,14 @@
 import "server-only";
 import { createHash } from "node:crypto";
 import { sql, type SQL } from "drizzle-orm";
+import { plusJours, type Plage } from "@/lib/jours";
 import type { EtapeVisite, FamilleNavigateur, MetriqueWeb } from "@/types";
 import { alerter } from "./alertes";
 import { db, schema } from "./db";
 import { auMieux } from "./journal";
 import { LIMITES, sousLaLimite } from "./limites";
 import { sousLaLimiteDeLIp } from "./requete";
-import { aujourdhuiParis } from "./temps";
+import { aujourdhuiParis, minuitDuJour } from "./temps";
 
 /*
  * Ce qui se passe dans le navigateur des visiteurs, qu’aucun journal du serveur ne voit : les erreurs de l’appli (une
@@ -124,20 +125,26 @@ type ErreurVue = { nom: string; message: string; source: string | null; etape: E
 /** La santé des navigateurs sur la période, pour /admin. */
 export type SanteDesNavigateurs = { vitesse: VitesseDUnEcran[]; erreurs: ErreurVue[]; totalErreurs: number };
 
-/** La santé des navigateurs sur les `jours` derniers jours : la vitesse par écran (au moins 5 pages mesurées), et les 10 erreurs les plus fréquentes. */
-export async function santeDesNavigateurs(jours: number): Promise<SanteDesNavigateurs> {
-  const depuis = sql`now() - make_interval(days => ${jours})`;
+/**
+ * La santé des navigateurs sur la période (ses `jours` derniers jours, ou une période choisie au calendrier, de minuit à
+ * minuit à Paris) : la vitesse par écran (au moins 5 pages mesurées), et les 10 erreurs les plus fréquentes.
+ */
+export async function santeDesNavigateurs(periode: number | Plage): Promise<SanteDesNavigateurs> {
+  const dans = (col: string): SQL =>
+    typeof periode === "number"
+      ? sql`${sql.raw(col)} >= now() - make_interval(days => ${periode})`
+      : sql.raw(`${col} >= ${minuitDuJour(periode.du)} and ${col} < ${minuitDuJour(plusJours(periode.au, 1))}`);
   const [vitesse, erreurs, total] = await Promise.all([
     lignes<{ etape: EtapeVisite; mobile: boolean; metrique: MetriqueWeb; p75: number; n: string }>(
       sql`select etape, mobile, metrique, percentile_cont(0.75) within group (order by valeur) as p75, count(*) as n
-          from mesures_navigateur where le >= ${depuis} group by etape, mobile, metrique`,
+          from mesures_navigateur where ${dans("le")} group by etape, mobile, metrique`,
     ),
     lignes<{ nom: string; message: string; source: string | null; etape: EtapeVisite; famille: FamilleNavigateur; fois: string; derniere: Date }>(
       sql`select nom, message, max(source) as source, (array_agg(etape order by derniere_le desc))[1] as etape,
             (array_agg(famille order by derniere_le desc))[1] as famille, sum(fois) as fois, max(derniere_le) as derniere
-          from erreurs_navigateur where derniere_le >= ${depuis} group by signature, nom, message order by sum(fois) desc limit 10`,
+          from erreurs_navigateur where ${dans("derniere_le")} group by signature, nom, message order by sum(fois) desc limit 10`,
     ),
-    lignes<{ n: string | null }>(sql`select sum(fois) as n from erreurs_navigateur where derniere_le >= ${depuis}`),
+    lignes<{ n: string | null }>(sql`select sum(fois) as n from erreurs_navigateur where ${dans("derniere_le")}`),
   ]);
   const ecrans = new Map<string, VitesseDUnEcran>();
   for (const v of vitesse) {

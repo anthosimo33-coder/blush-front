@@ -109,10 +109,11 @@ export function nomsDeLaCase(le: string, pas: Pilotage["pas"], cases: number): {
 
 /**
  * Si la case `k` (sur `n`) porte son nom sous le graphique : toutes sur une semaine, une sur quatre sur 24 h, une sur cinq
- * sur 30 jours. On compte depuis la dernière, qui a toujours le sien (c’est celle en cours).
+ * sur 30 jours, huit en tout au-delà (une période choisie au calendrier). On compte depuis la dernière, qui a toujours
+ * le sien (c’est celle en cours).
  */
 export function caseNommee(k: number, n: number): boolean {
-  const tous = n <= 7 ? 1 : n <= 24 ? 4 : 5;
+  const tous = n <= 7 ? 1 : n <= 24 ? 4 : n <= 35 ? 5 : Math.ceil(n / 8);
   return (n - 1 - k) % tous === 0;
 }
 
