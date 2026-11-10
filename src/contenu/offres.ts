@@ -31,7 +31,7 @@ export type Offre = {
 };
 
 /* Ce d’où se tirent les prix barrés de Premium et de ③, et les bulles de ③ : le rapport seul, le pack de 25 bulles (le conseillé), et Premium */
-const RAPPORT = { centimes: 990, bulles: 3 };
+const RAPPORT = { centimes: 1190, bulles: 3 };
 const PACK25 = { centimes: 1490, bulles: 25 };
 const PREMIUM = { centimes: 1990, bulles: 25 };
 
@@ -40,9 +40,16 @@ const PREMIUM = { centimes: 1990, bulles: 25 };
  * part de la mise à jour de la mémoire). Le rapport reste à 9,90 €, le prix d’appel, avec 3 bulles ; Premium, la cible
  * (choisie d’avance), monte à 19,90 € avec 25 bulles, barré au rapport et au pack de 25 achetés à part (24,80 €) ; les
  * recharges passent à 10, 25 (le conseillé) et 60 bulles. Les offres définies par une remise la gardent vraie : le −50 %
- * (⑤, ⑥) reste la moitié du rapport, ① reste à 3 € de moins, et ③ fait passer le rapport seul en Premium pour 6,90 € de
- * plus (barré à l’écart entre les deux, 10 €), avec les bulles qui manquent. Les offres d’avant (l’ancien ③ à 5 €, les
- * packs de 30, 80 et 200 bulles) restent ici, retirées de la vente, telles qu’elles se vendaient.
+ * (⑤, ⑥) reste la moitié du rapport, et ③ fait passer le rapport seul en Premium pour 6,90 € de plus (barré à l’écart
+ * entre les deux), avec les bulles qui manquent. Les offres d’avant (l’ancien ③ à 5 €, les packs de 30, 80 et 200
+ * bulles) restent ici, retirées de la vente, telles qu’elles se vendaient.
+ *
+ * Les prix du 10 novembre 2026 (datés dans /admin : src/contenu/changements.ts) : le rapport passe de 9,90 € à 11,90 €, et l’offre unique ① de
+ * 6,90 € à 9,90 € (2 € de moins que le rapport, au lieu de 3 €) ; le −50 % (⑤, ⑥) suit, à 5,95 € ; Premium et les
+ * recharges ne bougent pas. Premium est donc barré à 26,80 € (le rapport et le pack de 25), et ③ à 8 €.
+ * TODO(produit): à faire relire par un juriste : pendant 30 jours, le rapport s’est vendu 9,90 €, le prix de référence
+ * d’une réduction (article L112-1-1 du code de la consommation) ; ① à 9,90 € barré 11,90 €, et le −50 % à 5,95 €, sont
+ * annoncés comme des réductions.
  */
 export const CATALOGUE: Record<OffreId, Offre> = {
   rapport: { id: "rapport", ...RAPPORT, barre: null, conv: true, unique: null, enVente: true, titre: "Le rapport" },
@@ -55,11 +62,11 @@ export const CATALOGUE: Record<OffreId, Offre> = {
    */
   premium: { id: "premium", ...PREMIUM, barre: RAPPORT.centimes + PACK25.centimes, conv: true, unique: null, enVente: true, titre: "Premium" },
   /* ① : le rapport moins cher, une offre unique de 5 minutes (le paywall : 40 s sans payer, ou un retour sur l’onglet ; ailleurs, la feuille fermée sans payer) */
-  suite: { id: "suite", centimes: 690, barre: RAPPORT.centimes, bulles: RAPPORT.bulles, conv: true, unique: "suite", enVente: true, titre: "Le rapport, offre unique" },
+  suite: { id: "suite", centimes: 990, barre: RAPPORT.centimes, bulles: RAPPORT.bulles, conv: true, unique: "suite", enVente: true, titre: "Le rapport, offre unique" },
   /* ⑥ : le rapport à −50 %, gardé 7 jours par le repli de « C’est débloqué » (le 2e rapport refusé), pour une autre conv */
   rapport_garde: {
     id: "rapport_garde",
-    centimes: 495,
+    centimes: Math.round(RAPPORT.centimes / 2),
     barre: RAPPORT.centimes,
     bulles: RAPPORT.bulles,
     conv: true,
@@ -70,7 +77,7 @@ export const CATALOGUE: Record<OffreId, Offre> = {
   /*
    * ③ : Premium pour 6,90 € de plus, juste après avoir pris le rapport seul (ou la suite) : les bulles qui lui manquent
    * pour Premium.
-   * TODO(produit): son prix barré (10 €, l’écart entre Premium et le rapport, un prix que ce passage n’a jamais eu) à
+   * TODO(produit): son prix barré (8 €, l’écart entre Premium et le rapport, un prix que ce passage n’a jamais eu) à
    * faire relire par un juriste avant de le dessiner : aujourd’hui, aucun écran ne le barre, son texte dit l’écart
    * (OFFRE_PREMIUM_AJOUT, src/contenu/paiement.ts).
    */
@@ -85,7 +92,16 @@ export const CATALOGUE: Record<OffreId, Offre> = {
     titre: "Passage en Premium",
   },
   /* ⑤ : le 2e rapport à −50 %, juste après un rapport payé : un rapport d’avance, sans conv ni bulles à l’achat (RAPPORT_D_AVANCE) */
-  second: { id: "second", centimes: 495, barre: RAPPORT.centimes, bulles: 0, conv: false, unique: "second_rapport", enVente: true, titre: "Ton 2e rapport" },
+  second: {
+    id: "second",
+    centimes: Math.round(RAPPORT.centimes / 2),
+    barre: RAPPORT.centimes,
+    bulles: 0,
+    conv: false,
+    unique: "second_rapport",
+    enVente: true,
+    titre: "Ton 2e rapport",
+  },
   pack10: { id: "pack10", centimes: 690, barre: null, bulles: 10, conv: false, unique: null, enVente: true, titre: "10 bulles" },
   /* Le pack conseillé (PACK_CONSEILLE) */
   pack25: { id: "pack25", ...PACK25, barre: null, conv: false, unique: null, enVente: true, titre: "25 bulles" },

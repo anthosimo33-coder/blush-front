@@ -86,7 +86,7 @@ describe("le référencement", () => {
       "/methode": METHODE.misAJourLe,
       "/aide": PAGE_AIDE.misAJourLe,
     });
-    expect(CONDITIONS.maj).toBe("Dernière mise à jour\u00a0: 26 octobre 2026.");
+    expect(CONDITIONS.maj).toBe("Dernière mise à jour\u00a0: 10 novembre 2026.");
     expect(MENTIONS.maj).toBe("Dernière mise à jour\u00a0: 3 novembre 2026.");
     /* Le premier du mois, comme on l’écrit : « 1er », jamais « 1 » (la date des pages légales, des articles, des offres) */
     expect(derniereMiseAJour("2026-12-01")).toBe("Dernière mise à jour\u00a0: 1er décembre 2026.");

@@ -291,14 +291,14 @@ export const OFFRE_SUITE = {
 
 /** Le passage en Premium (③, l’offre du catalogue). */
 const PASSE = CATALOGUE.passe_premium;
-/** Ce que Premium coûte de plus que le rapport, aux prix du paywall (10 €) : ce que ③ fait payer moins cher. */
+/** Ce que Premium coûte de plus que le rapport, aux prix du paywall (8 € depuis le 10 novembre 2026) : ce que ③ fait payer moins cher. */
 const ECART_PREMIUM_RAPPORT = CATALOGUE.premium.centimes - CATALOGUE.rapport.centimes;
 
 /**
  * L’offre unique ③ (sur « C’est débloqué », et dans le chat) : Premium pour 6,90 € de plus, après le rapport seul. Son
  * texte dit un fait que le paywall montre (Premium et le rapport, aux prix du jour), comme l’ancien ③ disait le prix
  * du pack de 80 bulles (« Seules, elles coûtent 13,90 € ») ; aucun prix barré n’est dessiné : ce passage ne s’est
- * jamais vendu 10 €.
+ * jamais vendu 8 €.
  * TODO(produit): textes de la grille du 23 octobre, à valider (le titre, le texte, le bouton).
  */
 export const OFFRE_PREMIUM_AJOUT = {

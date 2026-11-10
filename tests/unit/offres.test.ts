@@ -20,17 +20,17 @@ import { FORMULES, LOTS_DE_LA_ROUE, OFFRES } from "@/types";
 
 /*
  * Le catalogue (src/contenu/offres.ts), tel que l’utilisateur l’a décidé (la grille du 23 octobre 2026, marge visée à
- * 80 %) : les prix TTC, les bulles que chaque offre donne, ce qui débloque une conv, les offres uniques. Le serveur fait
+ * 80 %, et les prix du 10 novembre 2026 : le rapport à 11,90 €, ① à 9,90 €) : les prix TTC, les bulles que chaque offre donne, ce qui débloque une conv, les offres uniques. Le serveur fait
  * payer ces prix-là et rien d’autre : un prix qui change change ici d’abord.
  */
 describe("le catalogue", () => {
   it.each<[string, number, number | null, number, boolean, string | null]>([
-    ["rapport", 990, null, 3, true, null],
-    ["premium", 1990, 2480, 25, true, null],
-    ["suite", 690, 990, 3, true, "suite"],
-    ["rapport_garde", 495, 990, 3, true, "garde_second"],
-    ["passe_premium", 690, 1000, 22, false, "premium_ajout"],
-    ["second", 495, 990, 0, false, "second_rapport"],
+    ["rapport", 1190, null, 3, true, null],
+    ["premium", 1990, 2680, 25, true, null],
+    ["suite", 990, 1190, 3, true, "suite"],
+    ["rapport_garde", 595, 1190, 3, true, "garde_second"],
+    ["passe_premium", 690, 800, 22, false, "premium_ajout"],
+    ["second", 595, 1190, 0, false, "second_rapport"],
     ["pack10", 690, null, 10, false, null],
     ["pack25", 1490, null, 25, false, null],
     ["pack60", 3490, null, 60, false, null],
@@ -89,8 +89,8 @@ describe("le catalogue", () => {
 describe("les textes du paiement, tirés du catalogue", () => {
   it("le bas de l’aperçu gratuit", () => {
     expect(PIED_GRATUIT).toEqual({
-      lire: "Lire la suite · 9,90\u00a0€",
-      lireGarde: "Lire la suite · 4,95\u00a0€",
+      lire: "Lire la suite · 11,90\u00a0€",
+      lireGarde: "Lire la suite · 5,95\u00a0€",
       lireAvance: "Lire la suite · 0\u00a0€",
       offertes: "3 bulles offertes avec ton rapport",
       regle: "1 bulle = 1 réponse de BLUSH, sur tout ce que tu veux",
@@ -110,7 +110,7 @@ describe("les textes du paiement, tirés du catalogue", () => {
       plus: "+ 3 bulles",
       barreOffertes: null,
       gratuit: "0\u00a0€",
-      economie: "Économise 4,90\u00a0€ · la bulle à 0,45\u00a0€",
+      economie: "Économise 6,90\u00a0€ · la bulle à 0,36\u00a0€",
     });
     expect(FEUILLE_FORMULE.payer(prixDe("premium"))).toBe("Débloquer · 19,90\u00a0€");
     expect(FEUILLE_FORMULE.avance.note(RAPPORT_D_AVANCE.bulles)).toBe("Déjà payé · + 3 bulles offertes");
@@ -123,16 +123,16 @@ describe("les textes du paiement, tirés du catalogue", () => {
     expect(PAYWALL.premium.barreOffertes).toBeNull();
   });
 
-  it("l’offre ① : une offre unique sur le rapport, 3 € de moins, 3 bulles offertes", () => {
+  it("l’offre ① : une offre unique sur le rapport, 2 € de moins, 3 bulles offertes", () => {
     expect(OFFRE_SUITE).toMatchObject({
       titre: "Offre unique sur ton rapport",
-      sousTitre: "3\u00a0€ de moins, rien que pour toi. Dans 5\u00a0minutes, il repasse à 9,90\u00a0€.",
+      sousTitre: "2\u00a0€ de moins, rien que pour toi. Dans 5\u00a0minutes, il repasse à 11,90\u00a0€.",
       fin: "Elle disparaît dans",
-      prix: "6,90\u00a0€",
-      barre: "9,90\u00a0€",
-      economie: "−3\u00a0€",
+      prix: "9,90\u00a0€",
+      barre: "11,90\u00a0€",
+      economie: "−2\u00a0€",
       contenu: "3 bulles offertes",
-      prendre: "Je le prends · 6,90\u00a0€",
+      prendre: "Je le prends · 9,90\u00a0€",
     });
     expect(`${OFFRE_SUITE.remise}${OFFRE_SUITE.apres}`).toBe(OFFRE_SUITE.titre);
   });
@@ -140,7 +140,7 @@ describe("les textes du paiement, tirés du catalogue", () => {
   it("l’offre ③ (le passage en Premium, l’écart avec Premium dit dans le texte, sans prix barré) et « C’est débloqué »", () => {
     expect(OFFRE_PREMIUM_AJOUT).toMatchObject({
       titre: "Passe en Premium pour 6,90\u00a0€ de plus",
-      texte: "22 bulles en plus, comme en Premium. Premium coûte 10\u00a0€ de plus que le rapport\u00a0: ici, 6,90\u00a0€.",
+      texte: "22 bulles en plus, comme en Premium. Premium coûte 8\u00a0€ de plus que le rapport\u00a0: ici, 6,90\u00a0€.",
       prendre: "Ajouter 22 bulles · 6,90\u00a0€",
       plus: "+ 22",
     });

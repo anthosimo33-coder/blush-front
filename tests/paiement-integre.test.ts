@@ -299,7 +299,7 @@ describe("ce que la feuille doit savoir (GET /api/paiement/feuille)", () => {
 });
 
 describe("le 2e rapport (⑤), un rapport d’avance", () => {
-  it("après Premium : montré pour l’achat qui vient d’être payé, payé 4,95 € ; rien n’est livré à l’achat (ni conv, ni bulles), la feuille le dit, valable un an", async () => {
+  it("après Premium : montré pour l’achat qui vient d’être payé, payé 5,95 € ; rien n’est livré à l’achat (ni conv, ni bulles), la feuille le dit, valable un an", async () => {
     const { u } = await acheteur("second-prix");
     const premium = await payeDansLaFeuille("premium");
     expect(await montrer("second_rapport")).toEqual({ offre: null });
@@ -308,7 +308,7 @@ describe("le 2e rapport (⑤), un rapport d’avance", () => {
     /* Livré seulement à son usage : aucune renonciation gardée à l’achat, même envoyée par le navigateur */
     expect(await achatEnBase(second)).toMatchObject({
       offre: "second",
-      centimes: 495,
+      centimes: 595,
       bulles: 0,
       storyId: null,
       utiliseLe: null,
@@ -435,7 +435,7 @@ describe("le 2e rapport (⑤), un rapport d’avance", () => {
 });
 
 describe("le −50 % gardé (⑥) et les offres du merci", () => {
-  it("le 2e rapport refusé après Premium : « Garde-le-moi » le garde 7 jours ; la conv suivante paie le rapport seul 4,95 €, une fois", async () => {
+  it("le 2e rapport refusé après Premium : « Garde-le-moi » le garde 7 jours ; la conv suivante paie le rapport seul 5,95 €, une fois", async () => {
     const { u } = await acheteur("garde");
     const premium = await payeDansLaFeuille("premium");
     /* Sans le 2e rapport montré d’abord, rien à garder */
@@ -451,7 +451,7 @@ describe("le −50 % gardé (⑥) et les offres du merci", () => {
     expect(await montrer("suite")).toEqual({ offre: null });
     /* Sans le −50 % : pas de rapport à moitié prix ; avec lui, pour cette autre conv */
     const achat = await payeDansLaFeuille("rapport_garde");
-    expect(await achatEnBase(achat)).toMatchObject({ offre: "rapport_garde", centimes: 495, bulles: 3, storyId: conv, offreUnique: "garde_second" });
+    expect(await achatEnBase(achat)).toMatchObject({ offre: "rapport_garde", centimes: 595, bulles: 3, storyId: conv, offreUnique: "garde_second" });
     expect((await ligneEnBase(conv)).debloqueLe).not.toBeNull();
     expect((await feuille()).garde).toBeNull();
     await autreConv(u);

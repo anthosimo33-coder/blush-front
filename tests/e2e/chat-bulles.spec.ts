@@ -260,7 +260,7 @@ test("le rapport seul, payé : ses 3 bulles offertes, rien à 2, « Plus qu’un
   await test.step("le rapport seul, payé à l’écran (la carte gardée) ; « Non merci » à ③ puis au 2e rapport", async () => {
     await lectureFaite(page, testInfo, email);
     const rapport = await ouvrirLeRapport(page);
-    await rapport.getByRole("button", { name: "Lire la suite · 9,90\u00a0€" }).click();
+    await rapport.getByRole("button", { name: "Lire la suite · 11,90\u00a0€" }).click();
     const paiement = page.getByRole("dialog", { name: PAIEMENT });
     await paiement.getByRole("radio", { name: /^Le rapport/ }).click();
     await paiement.getByRole("button", { name: /^Débloquer/ }).click();
@@ -300,7 +300,7 @@ test("le rapport seul, payé : ses 3 bulles offertes, rien à 2, « Plus qu’un
     expect(await ecrireABlush(page, QUOI_ENVOYER)).toBe(200);
     await expect(fil.locator("[data-verrouillee=reponse]").getByText("Ta réponse est prête")).toBeVisible();
     await expect(fil.getByText("Passe en Premium pour 6,90\u00a0€ de plus.")).toBeVisible();
-    await expect(fil.getByText("22 bulles en plus, comme en Premium. Premium coûte 10\u00a0€ de plus que le rapport\u00a0: ici, 6,90\u00a0€.")).toBeVisible();
+    await expect(fil.getByText("22 bulles en plus, comme en Premium. Premium coûte 8\u00a0€ de plus que le rapport\u00a0: ici, 6,90\u00a0€.")).toBeVisible();
     await expect(fil.getByText("Ta carte est enregistrée · un geste, c’est payé")).toBeVisible();
     expect(await compteDe(email)).toMatchObject({ bulles: 0 });
   });

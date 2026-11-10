@@ -18,4 +18,5 @@ export const CHANGEMENTS: readonly Changement[] = [
   { le: "2026-10-27", quoi: "Paywall\u00a0: un titre pour les convs sans heures, et le titre «\u00a0volume\u00a0»" },
   { le: "2026-11-03", quoi: "Import\u00a0: la vidéo de l’écran retirée, des captures seules" },
   { le: "2026-11-09", quoi: "Chat à 0 bulle\u00a0: la réponse déjà écrite, à débloquer" },
+  { le: "2026-11-10", quoi: "Prix\u00a0: le rapport à 11,90\u00a0€, l’offre unique ① à 9,90\u00a0€, le −50\u00a0% à 5,95\u00a0€" },
 ];
