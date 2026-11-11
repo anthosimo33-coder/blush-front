@@ -18,8 +18,13 @@ import { noterAuFil } from "@/server/visites";
 import { fuseauSur } from "@/lib/jours";
 import { aujourdhuiDans } from "@/server/temps";
 
-/* La lecture de 20 captures prend jusqu’à une minute */
-export const maxDuration = 180;
+/*
+ * Autant qu’une fonction peut vivre (DUREE_FONCTION_S, src/server/echeance.ts) : la lecture de 20 captures prend souvent
+ * une minute, mais des écrans pleins de longs messages font écrire au modèle des milliers de mots, jusqu’à sa limite de
+ * tokens (REGLAGES, prompts/lib/contextes.ts). À 180 s, des lectures en pleine écriture étaient coupées, payées pour rien,
+ * et la personne voyait une erreur de connexion (10 fois les 7 et 10 novembre 2026, dont 8 essais de suite)
+ */
+export const maxDuration = 800;
 
 const Appli = AppliCaptures;
 

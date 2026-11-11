@@ -7,6 +7,7 @@ import type { CodeErreur } from "@/types/erreurs-api";
 import { utilisateurDeSession } from "./auth";
 import { empreinte, jeton } from "./chiffrement";
 import { lireSession } from "./cookies";
+import { DUREE_FONCTION_S } from "./echeance";
 import type { LimiteDuCompte } from "./email-canonique";
 import { env } from "./env";
 import { ErreurPublique } from "./erreurs";
@@ -148,14 +149,16 @@ export type Brouillon = { id: string; meta: Meta; secret: string; messages: numb
 
 /*
  * Les lectures en cours ou finies depuis peu sur cette instance, par secret de brouillon : un nouvel essai qui arrive
- * pendant la lecture la rejoint, au lieu d’en lancer une seconde (payée deux fois).
+ * pendant la lecture la rejoint, au lieu d’en lancer une seconde (payée deux fois). Gardées autant qu’une fonction peut
+ * vivre : une lecture longue (POST /api/captures vit DUREE_FONCTION_S) est encore là quand le nouvel essai arrive.
  */
 const RECENTES = new Map<string, { lecture: Promise<Brouillon>; jusqua: number }>();
-const GARDE_MS = 10 * 60e3;
+const GARDE_MS = DUREE_FONCTION_S * 1000;
 
 /**
- * Une lecture une seule fois par envoi. La lecture de 30 s à 2 min tient dans une seule réponse : si le réseau coupe
- * (Safari en arrière-plan, le Wi-Fi qui passe en 4G), le navigateur réessaie avec la même clé. Le secret du brouillon
+ * Une lecture une seule fois par envoi. La lecture (souvent une minute, parfois plusieurs) tient dans une seule
+ * réponse : si le réseau coupe (Safari en arrière-plan, le Wi-Fi qui passe en 4G), le navigateur réessaie avec la même
+ * clé. Le secret du brouillon
  * est tiré de cette clé et du compte connecté : le nouvel essai rejoint la lecture en cours (cette instance), ou retrouve
  * le brouillon déjà créé (n’importe quelle instance), sans rappeler le modèle ni recompter les plafonds. Une clé ne sert
  * qu’à son compte ; sans compte, seul le navigateur qui l’a tirée la connaît. La lecture continue même si le navigateur
