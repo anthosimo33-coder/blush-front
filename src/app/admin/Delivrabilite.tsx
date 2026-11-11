@@ -8,9 +8,10 @@ import { Bloc } from "./morceaux";
 
 /*
  * Ce que Resend dit des mails (src/server/delivrabilite.ts, par son webhook), sur 7 jours quelle que soit la période :
- * partis, remis, les rebonds et les plaintes face aux seuils de Resend, les retards et les mails bloqués par sa liste de
- * suppression. Le domaine principal (les codes, les rapports, la liste d’attente, les alertes) d’un côté, les relances
- * (la relance ②, les séquences) de l’autre : leur sous-domaine protège le premier.
+ * partis, remis, les rebonds et les plaintes face aux seuils de Resend, les boîtes pleines (à part : pas notre faute),
+ * les retards (par mail) et les mails bloqués par sa liste de suppression. Le domaine principal (les codes, les
+ * rapports, la liste d’attente, les alertes) d’un côté, les relances (la relance ②, les séquences) de l’autre : leur
+ * sous-domaine protège le premier.
  */
 
 /** Le nom d’une sorte (SorteSuivie, src/server/email.ts) pour l’équipe. */
@@ -57,6 +58,7 @@ function Ligne({ nom, c, total = false }: { nom: string; c: ChiffresDesMails; to
       <td className="py-2.5 pr-3 text-right">
         <Part n={c.rebonds} sur={c.partis} seuil={SEUILS_DELIVRABILITE.rebonds} juge={c.partis >= VOLUME_MIN_DES_REBONDS} decimales={1} />
       </td>
+      <td className="py-2.5 pr-3 text-right tabular-nums">{c.boitesPleines ? nombre(c.boitesPleines) : <span className="text-soft">0</span>}</td>
       <td className="py-2.5 pr-3 text-right">
         <Part n={c.plaintes} sur={Math.max(c.delivres, c.plaintes)} seuil={SEUILS_DELIVRABILITE.plaintes} decimales={2} />
       </td>
@@ -84,15 +86,15 @@ export function Delivrabilite({ d }: { d: Chiffres }) {
         </p>
       ) : (
         <div role="region" aria-label="La délivrabilité des mails, à faire défiler" tabIndex={0} className="-mx-2 mt-4 overflow-x-auto px-2">
-          <table className="w-full min-w-[640px] border-collapse text-left">
-            <caption className="sr-only">Les mails partis, remis, leurs rebonds, leurs plaintes, leurs retards et ceux bloqués, par sorte</caption>
+          <table className="w-full min-w-[740px] border-collapse text-left">
+            <caption className="sr-only">Les mails partis, remis, leurs rebonds, ceux revenus d’une boîte pleine, leurs plaintes, leurs retards et ceux bloqués, par sorte</caption>
             <thead>
               <tr className="text-micro font-black uppercase tracking-[0.06em] text-grey">
                 <th scope="col" className="pb-2.5 pl-2 font-black">
                   Mails
                 </th>
-                {["Partis", "Remis", "Rebonds", "Plaintes", "Retards", "Bloqués"].map((t) => (
-                  <th key={t} scope="col" className="pb-2.5 pr-3 text-right font-black last:pr-2">
+                {["Partis", "Remis", "Rebonds", "Boîtes pleines", "Plaintes", "Retards", "Bloqués"].map((t) => (
+                  <th key={t} scope="col" className="whitespace-nowrap pb-2.5 pr-3 text-right font-black last:pr-2">
                     {t}
                   </th>
                 ))}
@@ -114,6 +116,10 @@ export function Delivrabilite({ d }: { d: Chiffres }) {
         {VOLUME_MIN_DES_REBONDS} mails), plaintes sous {pourcent(SEUILS_DELIVRABILITE.plaintes * 100, 2)} des mails remis. Gmail{NBSP}: spam sous{" "}
         {pourcent(SEUILS_DELIVRABILITE.spamGmail * 100)}, jamais {pourcent(SEUILS_DELIVRABILITE.spamGmailJamais * 100)}. Les plaintes de Gmail n’arrivent pas jusqu’à Resend
         {NBSP}: elles se lisent dans Google Postmaster Tools. Un seuil franchi prévient l’équipe, une fois par jour au plus.
+      </p>
+      <p className="m-0 mt-1.5 text-note font-bold text-soft">
+        <span className="font-black text-ink">Boîtes pleines.</span> L’adresse existe, mais sa messagerie refuse le mail faute de place{NBSP}: Resend réessaie 14{NBSP}h, puis
+        renonce. Pas notre faute{NBSP}: elles ne comptent pas dans les rebonds, ni leurs essais dans les retards. Les retards comptent les mails, pas les essais.
       </p>
       {d.dernier && (
         <p className="m-0 mt-1.5 text-micro font-extrabold text-grey">

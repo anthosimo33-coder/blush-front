@@ -18,13 +18,17 @@ import { couperLesMails } from "./relances";
  * La délivrabilité des mails : ce que Resend dit de chacun (parti, remis, refusé pour de bon, signalé comme spam,
  * retardé, bloqué par sa liste de suppression), par son webhook (POST /api/mails/resend, hors de la garde commune :
  * Resend n’est pas l’appli, seule sa signature compte, src/server/paiement/signature.ts). Chaque mail part avec un tag
- * « sorte » (SorteSuivie, src/server/email.ts) que l’événement nous rend : on garde la sorte, l’événement, son heure et
- * le compte du destinataire s’il en a un ; jamais l’adresse, le sujet ni le contenu. Un événement ne compte qu’une fois
- * (son svix-id, le même à chaque nouvel essai de Resend). /admin en montre les 7 derniers jours, par sorte, face aux
- * seuils (SEUILS_DELIVRABILITE) ; un seuil franchi prévient l’équipe, une fois par jour au plus. Gardé
- * EVENEMENTS_MAILS_GARDES_JOURS (la purge de la nuit, src/server/purge.ts).
- * Un mail de code revenu (un rebond, ou l’adresse bloquée) le note aussi sur le code (noterLeRetourDuCode, dans
- * login_codes, qui a déjà l’adresse) : l’écran du code dit alors à la personne que son adresse n’existe pas.
+ * « sorte » (SorteSuivie, src/server/email.ts) que l’événement nous rend : on garde la sorte, l’événement, son heure,
+ * le compte du destinataire s’il en a un, le mail chez Resend (son email_id) et la raison d’un rebond ; jamais l’adresse,
+ * le sujet ni le contenu. Un événement ne compte qu’une fois (son svix-id, le même à chaque nouvel essai de Resend).
+ * /admin en montre les 7 derniers jours, par sorte, face aux seuils (SEUILS_DELIVRABILITE) ; un seuil franchi prévient
+ * l’équipe, une fois par jour au plus. Gardé EVENEMENTS_MAILS_GARDES_JOURS (la purge de la nuit, src/server/purge.ts).
+ * Une boîte pleine (le rebond « MailboxFull ») se compte à part : l’adresse existe, sa messagerie a refusé le mail
+ * faute de place pendant les 14 h où Resend a réessayé (un « retard » à chaque essai), puis il a renoncé. Ce n’est pas
+ * notre faute : elle ne pèse pas dans le seuil des rebonds, et ses retards non plus (comptés par mail, pas par essai).
+ * Un mail de code revenu (un rebond pour de bon, ou l’adresse bloquée) le note aussi sur le code (noterLeRetourDuCode,
+ * dans login_codes, qui a déjà l’adresse) : l’écran du code dit alors à la personne que son adresse n’existe pas. Pas
+ * une boîte pleine : l’adresse existe, et le rebond arrive 14 h après (l’écran du code en parle lui-même, à la minute).
  * Une plainte vaut désinscription : le compte ne reçoit plus ni offres ni conseils (couperLesMails, src/server/relances.ts),
  * comme par le lien du pied de ses mails. Resend bloque déjà l’adresse, pour tous nos domaines ; sans ça, les séquences
  * continueraient de lui écrire (des mails « bloqués »), et la retirer de sa liste de suppression les rouvrirait.
@@ -40,17 +44,21 @@ export const CORPS_MAX_RESEND = 64 * 1024;
 /** La sorte d’un mail parti sans tag (avant ce suivi, ou un essai depuis le tableau de bord de Resend). */
 const SANS_SORTE = "inconnue";
 
+/** La raison d’un rebond chez Resend (bounce.subType) quand la boîte du destinataire est pleine. */
+const MOTIF_BOITE_PLEINE = "MailboxFull";
+
 /** Les mails que la demande d’un code envoie : le code, ou en bêta fermée celui de la liste d’attente (la même réponse pour tous). */
 const SORTES_DU_CODE: ReadonlySet<string> = new Set<SorteSuivie>(["code", "attente"]);
 
 /**
- * Ce qu’on lit d’un webhook de Resend : son type, son heure, et du mail ses destinataires et ses tags, lus sans rien
- * exiger de leur forme (un tag mal formé, ou absent, ne doit pas faire perdre l’événement : sa sorte devient SANS_SORTE).
+ * Ce qu’on lit d’un webhook de Resend : son type, son heure, et du mail ses destinataires, ses tags, son identifiant et
+ * son rebond, lus sans rien exiger de leur forme (un tag mal formé, ou absent, ne doit pas faire perdre l’événement : sa
+ * sorte devient SANS_SORTE ; un identifiant ou un rebond illisible, null).
  */
 const EvenementResend = z.object({
   type: z.string(),
   created_at: z.string().optional(),
-  data: z.object({ to: z.unknown(), tags: z.unknown() }).partial().optional(),
+  data: z.object({ to: z.unknown(), tags: z.unknown(), email_id: z.unknown(), bounce: z.unknown() }).partial().optional(),
 });
 
 /** Le type d’un événement (« email.bounced ») parmi ceux qu’on garde, ou null pour tous les autres (ouvertures, clics, domaines…). */
@@ -70,6 +78,18 @@ function sorteDuTag(tags: unknown): string {
       ? (tags as Record<string, unknown>).sorte
       : undefined;
   return typeof valeur === "string" && /^[A-Za-z0-9_-]{1,64}$/.test(valeur) ? valeur : SANS_SORTE;
+}
+
+/** L’identifiant du mail chez Resend (email_id, un uuid), ou null s’il manque ou n’en a pas la forme. */
+const identifiantDuMail = (id: unknown): string | null => (typeof id === "string" && /^[A-Za-z0-9-]{1,64}$/.test(id) ? id : null);
+
+/**
+ * Ce que Resend dit d’un rebond (son objet `bounce`) : sa raison (subType : « MailboxFull », « General »…, ou null) et
+ * s’il est temporaire (type « Transient » : l’adresse existe, sa messagerie a refusé le mail pour un temps).
+ */
+function rebondDe(bounce: unknown): { motif: string | null; temporaire: boolean } {
+  const b = bounce && typeof bounce === "object" ? (bounce as Record<string, unknown>) : {};
+  return { motif: typeof b.subType === "string" && /^[A-Za-z]{1,40}$/.test(b.subType) ? b.subType : null, temporaire: b.type === "Transient" };
 }
 
 /** Le premier destinataire d’un mail (`to` : une liste, ou une adresse seule), ou undefined. */
@@ -94,8 +114,8 @@ async function compteDeLAdresse(adresse: string | undefined): Promise<string | n
 /**
  * Reçoit un webhook de Resend : sa signature d’abord (refusée : « refuse », un 401 ; signée mais fausse ou trop vieille,
  * l’équipe le sait), puis l’événement noté une fois. Un événement qu’on ne garde pas, ou d’une forme qu’on ne lit pas,
- * répond « ok » quand même : sinon Resend le rejouerait des heures. Une plainte coupe les offres et les conseils de son
- * compte. Un rebond ou une plainte relit les seuils, après la réponse (after). Sans RESEND_WEBHOOK_SECRET, tout est refusé.
+ * répond « ok » quand même : sinon Resend le rejouerait des heures. Un rebond temporaire (une boîte pleine) ne note pas
+ * le code revenu : l’adresse existe. Une plainte coupe les offres et les conseils de son compte. Un rebond ou une plainte relit les seuils, après la réponse (after). Sans RESEND_WEBHOOK_SECRET, tout est refusé.
  */
 export async function recevoirEvenementResend(corps: string, entetes: Headers, maintenant = new Date()): Promise<"ok" | "refuse"> {
   const secrets = env().RESEND_WEBHOOK_SECRET;
@@ -132,13 +152,14 @@ export async function recevoirEvenementResend(corps: string, entetes: Headers, m
   const sorte = sorteDuTag(lu.data.data?.tags);
   const adresse = premierDestinataire(lu.data.data?.to);
   const compteId = await compteDeLAdresse(adresse);
+  const rebond = type === "bounced" ? rebondDe(lu.data.data?.bounce) : { motif: null, temporaire: false };
   const [note] = await db()
     .insert(schema.evenementsMails)
-    .values({ id: v.id, le: heureDe(lu.data.created_at, maintenant), type, sorte, compteId })
+    .values({ id: v.id, le: heureDe(lu.data.created_at, maintenant), type, sorte, compteId, mailId: identifiantDuMail(lu.data.data?.email_id), motif: rebond.motif })
     .onConflictDoNothing()
     .returning({ id: schema.evenementsMails.id });
   /* Avant la réponse : l’écran du code le demande toutes les quelques secondes */
-  if (note && adresse && (type === "bounced" || type === "suppressed") && SORTES_DU_CODE.has(sorte))
+  if (note && adresse && ((type === "bounced" && !rebond.temporaire) || type === "suppressed") && SORTES_DU_CODE.has(sorte))
     await auMieux(noterLeRetourDuCode(adresse, maintenant), "retour du code non noté");
   /* Avant la réponse aussi : le prochain passage des séquences ne doit plus rien lui envoyer */
   if (compteId && type === "complained") await auMieux(couperLesMails(compteId, "tout"), "mails du compte plaignant non coupés");
@@ -146,8 +167,14 @@ export async function recevoirEvenementResend(corps: string, entetes: Headers, m
   return "ok";
 }
 
-/** Ce qui est arrivé aux mails d’une sorte (ou d’un groupe de sortes) sur la période, événement par événement. */
-export type ChiffresDesMails = { partis: number; delivres: number; rebonds: number; plaintes: number; retards: number; bloques: number };
+/**
+ * Ce qui est arrivé aux mails d’une sorte (ou d’un groupe de sortes) sur la période, mail par mail : partis, remis,
+ * revenus (`rebonds`, sauf les boîtes pleines), revenus parce que la boîte du destinataire était pleine
+ * (`boitesPleines`), signalés comme spam, retardés (un mail retardé plusieurs fois compte une fois, et pas s’il a fini
+ * en boîte pleine), bloqués par la liste de suppression de Resend. Les événements d’avant l’identifiant du mail
+ * comptent chacun pour un.
+ */
+export type ChiffresDesMails = { partis: number; delivres: number; rebonds: number; boitesPleines: number; plaintes: number; retards: number; bloques: number };
 
 /** Les chiffres d’une sorte (SorteSuivie, ou « inconnue »). */
 type LigneDeDelivrabilite = { sorte: string } & ChiffresDesMails;
@@ -169,17 +196,21 @@ export type Delivrabilite = {
   dernier: string | null;
 };
 
-/** Le champ des chiffres de chaque type d’événement. */
-const CHAMPS: Record<TypeEvenementMail, keyof ChiffresDesMails> = {
+/** Ce qu’un événement compte : son type, ou « boite_pleine » pour un rebond dont la boîte était pleine. */
+type Genre = TypeEvenementMail | "boite_pleine";
+
+/** Le champ des chiffres de chaque genre d’événement. */
+const CHAMPS: Record<Genre, keyof ChiffresDesMails> = {
   sent: "partis",
   delivered: "delivres",
   bounced: "rebonds",
+  boite_pleine: "boitesPleines",
   complained: "plaintes",
   delivery_delayed: "retards",
   suppressed: "bloques",
 };
 
-const zero = (): ChiffresDesMails => ({ partis: 0, delivres: 0, rebonds: 0, plaintes: 0, retards: 0, bloques: 0 });
+const zero = (): ChiffresDesMails => ({ partis: 0, delivres: 0, rebonds: 0, boitesPleines: 0, plaintes: 0, retards: 0, bloques: 0 });
 
 /* Le domaine d’un expéditeur : « askblush.com » pour « BLUSH <bonjour@askblush.com> » */
 const domaineDe = (expediteur: string) => /@([^>\s]+)>?\s*$/.exec(expediteur)?.[1] ?? expediteur;
@@ -187,21 +218,27 @@ const domaineDe = (expediteur: string) => /@([^>\s]+)>?\s*$/.exec(expediteur)?.[
 /** La délivrabilité des `jours` derniers jours (7 au défaut : la fenêtre des seuils), par sorte, par domaine et en tout. */
 export async function delivrabilite(jours = 7): Promise<Delivrabilite> {
   const e = schema.evenementsMails;
+  /* Un rebond pour boîte pleine a son propre genre. La raison écrite en clair, pas en paramètre : le select et le group by
+   * doivent porter la même expression, et deux paramètres ($1, $3) en font deux pour Postgres */
+  const genre = sql<Genre>`case when ${e.type} = 'bounced' and ${e.motif} = ${sql.raw(`'${MOTIF_BOITE_PLEINE}'`)} then 'boite_pleine' else ${e.type} end`;
+  /* Un retard d’un mail qui a fini en boîte pleine (la même boîte, réessayée 14 h) : ce mail se compte déjà là */
+  const finiEnBoitePleine = sql`exists (select 1 from ${e} as p where p.mail_id = ${e.mailId} and p.type = 'bounced' and p.motif = ${MOTIF_BOITE_PLEINE})`;
   const [lignes, [dernier]] = await Promise.all([
     db()
-      .select({ sorte: e.sorte, type: e.type, n: sql<number>`count(*)::int` })
+      /* Mail par mail : les événements d’un même mail et d’un même genre (ses six retards) ne comptent qu’une fois */
+      .select({ sorte: e.sorte, genre, n: sql<number>`count(distinct coalesce(${e.mailId}, ${e.id}))::int` })
       .from(e)
-      .where(sql`${e.le} >= now() - make_interval(days => ${jours})`)
-      .groupBy(e.sorte, e.type),
+      .where(sql`${e.le} >= now() - make_interval(days => ${jours}) and not (${e.type} = 'delivery_delayed' and ${finiEnBoitePleine})`)
+      .groupBy(e.sorte, genre),
     db()
       .select({ le: sql<Date | null>`max(${e.le})` })
       .from(e),
   ]);
   const parSorte = new Map<string, LigneDeDelivrabilite>();
   const [principal, relances, total] = [zero(), zero(), zero()];
-  for (const { sorte, type, n } of lignes) {
+  for (const { sorte, genre: g, n } of lignes) {
     const ligne = parSorte.get(sorte) ?? { sorte, ...zero() };
-    const champ = CHAMPS[type];
+    const champ = CHAMPS[g];
     ligne[champ] += n;
     (estUneRelance(sorte) ? relances : principal)[champ] += n;
     total[champ] += n;
@@ -228,8 +265,8 @@ const PLAINTES_COUPEES =
   "Les comptes qui se sont plaints ne reçoivent plus ni offres ni conseils. Resend bloque aussi leur adresse, codes et rapports compris (Resend, Suppressions).";
 
 /**
- * Relit les 7 derniers jours de tous les mails face aux seuils de Resend (SEUILS_DELIVRABILITE) : les rebonds (jugés à
- * partir de VOLUME_MIN_DES_REBONDS mails partis) et les plaintes (toujours : une seule compte, à notre volume). Un seuil
+ * Relit les 7 derniers jours de tous les mails face aux seuils de Resend (SEUILS_DELIVRABILITE) : les rebonds, sans les
+ * boîtes pleines (jugés à partir de VOLUME_MIN_DES_REBONDS mails partis) et les plaintes (toujours : une seule compte, à notre volume). Un seuil
  * franchi prévient l’équipe, une fois par jour au plus (LIMITES.alertesDelivrabiliteParJour), aussi sur Telegram : le
  * mail de l’alerte part par le même prestataire. Rend les seuils franchis.
  */
