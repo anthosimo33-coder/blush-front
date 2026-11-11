@@ -695,6 +695,22 @@ export function navigateursDExemple({ calme = false }: { calme?: boolean } = {})
           { nom: "Rejet", message: "AbortError: The operation was aborted.", source: null, etape: "rapport", famille: "android", fois: 3, derniere: "2026-10-14T08:40:00.000Z" },
         ],
     totalErreurs: calme ? 0 : 17,
+    touchersLents: calme
+      ? []
+      : [
+          {
+            etape: "import",
+            cible: "a /importer/captures «\u00a0Captures d’écran Hinge, Tinder…\u00a0»",
+            fois: 9,
+            p75: 640,
+            attente: 410,
+            traitement: 60,
+            affichage: 120,
+            script: "callback:3qedph9z1c.js",
+            famille: "android",
+          },
+          { etape: "chat", cible: "button «\u00a0Envoyer\u00a0»", fois: 4, p75: 320, attente: 30, traitement: 210, affichage: 70, script: null, famille: "iphone-appli" },
+        ],
   };
 }
 

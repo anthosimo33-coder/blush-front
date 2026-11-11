@@ -1,4 +1,4 @@
-import { eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, like } from "drizzle-orm";
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 /*
@@ -56,6 +56,12 @@ afterAll(async () => {
         ),
       );
   await db().delete(schema.mesuresNavigateur).where(eq(schema.mesuresNavigateur.etape, "partage"));
+  await db()
+    .delete(schema.mesuresNavigateur)
+    .where(and(eq(schema.mesuresNavigateur.etape, "guides"), eq(schema.mesuresNavigateur.metrique, "INP")));
+  await db()
+    .delete(schema.touchersLents)
+    .where(like(schema.touchersLents.cible, `%${MARQUE}%`));
 });
 
 describe("ce qui désigne quelqu’un ne reste pas", () => {
@@ -151,14 +157,53 @@ describe("POST /api/navigateur/mesures et le bloc d’/admin", () => {
     expect(s.erreurs.some((e) => e.message.includes(MARQUE))).toBe(true);
   });
 
+  it("la réponse au toucher compte sur l’écran touché ; le pire toucher part avec son détail, masqué, et sa famille de navigateur", async () => {
+    for (let i = 1; i <= 5; i++)
+      expect(
+        (
+          await envoyer(postMesures, "/api/navigateur/mesures", {
+            etape: "partage",
+            mobile: true,
+            mesures: [
+              { metrique: "TTFB", valeur: 100 },
+              { metrique: "INP", valeur: 400 + i, etape: "guides" },
+            ],
+            toucher: {
+              etape: "guides",
+              duree: 400 + i,
+              attente: 300,
+              traitement: 50,
+              affichage: 50 + i,
+              cible: `button ${MARQUE} lea.martin@exemple.fr`,
+              script: "event-listener:abc.js (300 ms)",
+            },
+          })
+        ).status,
+      ).toBe(200);
+    /* Un toucher incomplet : refusé, comme une mesure fausse */
+    expect((await envoyer(postMesures, "/api/navigateur/mesures", { etape: "partage", mobile: true, mesures: [], toucher: { etape: "guides", duree: 300 } })).status).toBe(422);
+    const s = await santeDesNavigateurs(1);
+    /* Aucune page chargée sur « guides » : l’écran se montre par ses 5 touchers, sa réponse au toucher seule */
+    expect(s.vitesse.find((v) => v.etape === "guides" && v.mobile)).toMatchObject({ pages: 0, INP: 404 });
+    expect(s.vitesse.find((v) => v.etape === "partage" && v.mobile)?.INP).toBeUndefined();
+    const t = s.touchersLents.find((x) => x.cible?.includes(MARQUE));
+    expect(t).toMatchObject({ etape: "guides", fois: 5, p75: 404, attente: 300, traitement: 50, affichage: 53, famille: "iphone", script: "event-listener:abc.js (300 ms)" });
+    expect(t!.cible).toBe(`button ${MARQUE} ‹email›`);
+  });
+
   it("la purge de la nuit efface ce qui a plus de 30 jours", async () => {
     const vieux = new Date(Date.now() - 31 * 86400e3);
     const [m] = await db().insert(schema.mesuresNavigateur).values({ etape: "partage", mobile: false, metrique: "LCP", valeur: 1, le: vieux }).returning();
+    const [t] = await db()
+      .insert(schema.touchersLents)
+      .values({ etape: "partage", mobile: true, famille: "autre", duree: 300, attente: 1, traitement: 1, affichage: 1, cible: `vieux ${MARQUE}`, le: vieux })
+      .returning();
     await db()
       .insert(schema.erreursNavigateur)
       .values({ jour: "2026-01-01", signature: `vieille-${n}`, nom: "E", message: `${MARQUE} vieille`, etape: "autre", famille: "autre", derniereLe: vieux });
     await purger();
     expect(await db().select().from(schema.mesuresNavigateur).where(eq(schema.mesuresNavigateur.id, m!.id))).toHaveLength(0);
+    expect(await db().select().from(schema.touchersLents).where(eq(schema.touchersLents.id, t!.id))).toHaveLength(0);
     expect((await nosErreurs()).some((e) => e.signature === `vieille-${n}`)).toBe(false);
   });
 });

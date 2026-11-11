@@ -95,7 +95,7 @@ export const OUTILS: readonly OutilMcp[] = [
     name: "sante",
     title: "Santé",
     description:
-      "Ce qui coince sur la période : les étapes en échec (par code), les pannes du serveur (par route ou page), les tâches en cours, bloquées, en attente, les paiements refusés, les alertes danger ; et côté navigateurs, la vitesse de chaque écran (p75 des Web Vitals) et les erreurs les plus fréquentes.",
+      "Ce qui coince sur la période : les étapes en échec (par code), les pannes du serveur (par route ou page), les tâches en cours, bloquées, en attente, les paiements refusés, les alertes danger ; et côté navigateurs, la vitesse de chaque écran (p75 des Web Vitals ; la réponse au toucher comptée sur l’écran touché depuis le 11 novembre 2026), les erreurs les plus fréquentes, et les touchers lents (200 ms ou plus : l’écran, ce qui a été touché, le 75e centile, et où le temps passe en moyenne, attente avant notre code, notre code, dessin de l’écran).",
     inputSchema: AVEC_JOURS,
   },
   {
@@ -418,6 +418,7 @@ async function sante(s: StatsAdmin) {
       vitesse: navigateurs.vitesse.map((v) => ({ ...v, ecran: NOMS_DES_ETAPES[v.etape] })),
       erreurs: navigateurs.erreurs.map((e) => ({ ...e, ecran: NOMS_DES_ETAPES[e.etape] })),
       totalErreurs: navigateurs.totalErreurs,
+      touchersLents: navigateurs.touchersLents.map((t) => ({ ...t, ecran: NOMS_DES_ETAPES[t.etape] })),
     },
   };
 }

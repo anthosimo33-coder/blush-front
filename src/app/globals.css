@@ -762,6 +762,10 @@ html:has(dialog[open])
   ) {
   animation-play-state: paused;
 }
+/* Le bandeau des pubs peint par le serveur, caché avant la première image à qui a déjà choisi (BandeauPubs) */
+html[data-pubs-choisi] [data-bandeau-pubs="serveur"] {
+  display: none;
+}
 /* Code faux : les cases tremblent une fois */
 @keyframes codeShake {
   0%,

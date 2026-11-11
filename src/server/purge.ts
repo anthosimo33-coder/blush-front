@@ -33,7 +33,7 @@ import { PRESENCES_GARDEES_JOURS, VISITES_GARDEES_JOURS } from "./visites";
  *   des empreintes dès le surlendemain : plus rien ne relie alors une empreinte à une connexion ;
  * - les traces des pubs de Meta gardées sur un achat (achats.pubs_meta, src/server/pubs-meta.ts) de plus de 7 jours
  *   (PUBS_META_GARDEES_JOURS) : un achat jamais payé ne les efface pas de lui-même ;
- * - les erreurs et les mesures de vitesse des navigateurs de plus de 30 jours (NAVIGATEUR_GARDE_JOURS, src/server/navigateur.ts) ;
+ * - les erreurs, les mesures de vitesse et les touchers lents des navigateurs de plus de 30 jours (NAVIGATEUR_GARDE_JOURS, src/server/navigateur.ts) ;
  * - les accès de Claude à /admin (src/server/mcp/acces.ts) : les codes expirés, les accès dont le rafraîchissement a
  *   expiré, et les clients restés sans accès ;
  * - le registre des effacements de plus de 90 jours (EFFACEMENTS_GARDES_JOURS) : plus long que la fenêtre de restauration de la base ;
@@ -164,6 +164,9 @@ export async function purger(maintenant = new Date()) {
     await db()
       .delete(schema.mesuresNavigateur)
       .where(lt(schema.mesuresNavigateur.le, il_y_a(NAVIGATEUR_GARDE_JOURS)));
+    await db()
+      .delete(schema.touchersLents)
+      .where(lt(schema.touchersLents.le, il_y_a(NAVIGATEUR_GARDE_JOURS)));
   });
   await etape("accès de Claude à /admin", () => purgerLOAuth(maintenant));
   /* Le sel d’hier sert encore (visiteDeLaConnexion retrouve la visite de la veille) ; celui d’avant-hier, plus rien */

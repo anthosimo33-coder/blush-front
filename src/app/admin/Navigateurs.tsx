@@ -6,8 +6,8 @@ import { Bloc } from "./morceaux";
 
 /*
  * Ce qui se passe chez les visiteurs (src/server/navigateur.ts, envoyé par src/lib/sentinelle.tsx) : la vitesse de
- * chaque écran, au 75e centile (ce que vit le visiteur lent : la mesure de Google), sur téléphone et sur ordinateur, et
- * les erreurs de l’appli dans les navigateurs, les plus fréquentes d’abord.
+ * chaque écran, au 75e centile (ce que vit le visiteur lent : la mesure de Google), sur téléphone et sur ordinateur, les
+ * erreurs de l’appli dans les navigateurs, les plus fréquentes d’abord, et les touchers lents (ce qui a été touché, où).
  */
 
 /** Les mesures montrées, leur nom pour l’équipe, et les seuils de Google : bon jusqu’au premier, mauvais au-delà du second. */
@@ -27,10 +27,19 @@ const FAMILLES: Record<FamilleNavigateur, string> = {
   autre: "autre",
 };
 
+/** Où passe le temps d’un toucher lent, dit pour l’équipe : la plus grosse des trois parts. */
+const PARTS = {
+  attente: "le téléphone était déjà occupé",
+  traitement: "notre code au toucher",
+  affichage: "le dessin de l’écran après",
+} as const;
+
+const enMs = (v: number) => (v >= 1000 ? `${(v / 1000).toFixed(1).replace(".", ",")}\u00a0s` : `${Math.round(v)}\u00a0ms`);
+
 function Valeur({ v, seuils, unite }: { v: number | undefined; seuils: [number, number]; unite: "ms" | "" }) {
   if (v === undefined) return <span className="text-soft">—</span>;
   const ton = v <= seuils[0] ? "text-vrai-ink" : v <= seuils[1] ? "text-attente-ink" : "text-danger";
-  const texte = unite === "ms" ? (v >= 1000 ? `${(v / 1000).toFixed(1).replace(".", ",")}\u00a0s` : `${Math.round(v)}\u00a0ms`) : v.toFixed(2).replace(".", ",");
+  const texte = unite === "ms" ? enMs(v) : v.toFixed(2).replace(".", ",");
   return <span className={cn("font-black tabular-nums", ton)}>{texte}</span>;
 }
 
@@ -102,6 +111,39 @@ export function Navigateurs({ n }: { n: SanteDesNavigateurs }) {
             </ul>
           )}
         </div>
+      </div>
+      <div className="mt-6 min-w-0">
+        <h3 className="m-0 mb-1 text-note font-black">
+          Touchers lents <span className="text-grey">· 200{NBSP}ms ou plus, le pire de chaque page</span>
+        </h3>
+        <p className="m-0 mb-2 text-micro font-extrabold text-grey">
+          Ce qui a été touché, sur quel écran, et où le temps passe en moyenne{NBSP}: l’attente (le téléphone occupé avant notre code), notre code, le dessin de l’écran.
+        </p>
+        {n.touchersLents.length === 0 ? (
+          <p className="m-0 text-detail font-bold text-vrai-ink">Aucun sur la période.</p>
+        ) : (
+          <ul className="m-0 flex list-none flex-col p-0">
+            {n.touchersLents.map((t, k) => {
+              const pire = (["attente", "traitement", "affichage"] as const).reduce((a, b) => (t[b] > t[a] ? b : a));
+              return (
+                <li key={k} className="flex flex-col gap-0.5 border-t border-sep py-2.5">
+                  <span className="flex justify-between gap-3 text-detail">
+                    <span className="min-w-0 break-words font-black">
+                      {t.etape} <span className="font-bold">· {t.cible ?? "un élément parti de la page"}</span>
+                    </span>
+                    <span className="shrink-0 font-black tabular-nums">
+                      <Valeur v={t.p75} seuils={[200, 500]} unite="ms" /> <span className="text-attente-ink">×{t.fois}</span>
+                    </span>
+                  </span>
+                  <span className="text-micro font-extrabold text-grey">
+                    Surtout {PARTS[pire]} · attente {enMs(t.attente)}, code {enMs(t.traitement)}, dessin {enMs(t.affichage)} · {FAMILLES[t.famille]}
+                    {t.script && <span className="break-all font-mono"> · {t.script}</span>}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        )}
       </div>
     </Bloc>
   );

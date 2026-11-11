@@ -24,8 +24,12 @@ import { CHOIX_PUBS_S, COOKIE_CHOIX_PUBS, COOKIE_FBC, COOKIE_FBP, fbcDe, fbclidD
 const fbclidDArrivee = typeof window === "undefined" ? null : fbclidDe(window.location.href);
 
 /*
- * L’état du bandeau, lu dans le navigateur seulement (le serveur ne connaît pas le choix : rien au premier rendu, la
- * page ne saute pas) : le choix gardé, ou « rouvert » par « Changer mon choix ». Ses abonnés sont prévenus à chaque geste.
+ * L’état du bandeau, lu dans le navigateur seulement : le choix gardé, ou « rouvert » par « Changer mon choix ». Ses
+ * abonnés sont prévenus à chaque geste. Le serveur ne connaît pas le choix (les pages sont statiques) : il peint le
+ * bandeau quand même (« serveur »), et CACHER_SI_CHOISI le cache avant la première image à qui a déjà choisi. Avant le
+ * 11 novembre, le bandeau n’arrivait qu’après l’hydratation (une à plusieurs secondes sur un téléphone lent) : il
+ * surgissait sous le doigt, et, plus grand que le titre sur /commencer, il devenait « l’affichage » de la page (LCP)
+ * mesuré par /admin, qui avait pris 0,7 s depuis sa mise en ligne le 4 novembre.
  */
 let rouvert = false;
 const abonnes = new Set<() => void>();
@@ -38,6 +42,13 @@ const sAbonner = (f: () => void) => {
 };
 const etatDuNavigateur = () => (rouvert ? "rouvert" : (choixGarde() ?? "aucun"));
 const etatDuServeur = () => "serveur";
+
+/*
+ * Le choix déjà fait, lu avant la première image : `data-pubs-choisi` sur <html>, et le bandeau du serveur se cache
+ * (globals.css). Lu par le navigateur juste avant le bandeau, comme ConvEnBas : dans la page du serveur seulement ;
+ * ensuite, l’état du navigateur décide.
+ */
+const CACHER_SI_CHOISI = `try{if(/(?:^|; )${COOKIE_CHOIX_PUBS}=(?:oui|non)(?:;|$)/.test(document.cookie))document.documentElement.setAttribute("data-pubs-choisi","")}catch(e){}`;
 
 const cookieLu = (nom: string): string | null =>
   document.cookie
@@ -77,29 +88,33 @@ export function BandeauPubs() {
   const chemin = usePathname();
   const etat = useSyncExternalStore(sAbonner, etatDuNavigateur, etatDuServeur);
   const ici = !!pixelMeta() && etapeDe(chemin) !== null && !chemin.startsWith("/tournage");
-  if (!ici || (etat !== "aucun" && etat !== "rouvert")) return null;
+  if (!ici || etat === "oui" || etat === "non") return null;
   const bouton = "lift lift-sm h-10 flex-1 rounded-full bg-white px-4 text-note font-black text-ink shadow-soft sm:flex-none";
   return (
-    <div
-      role="dialog"
-      aria-label="Cookies des pubs"
-      className="fixed inset-x-3 bottom-[calc(12px+env(safe-area-inset-bottom))] z-50 mx-auto flex max-w-[560px] flex-col gap-2.5 rounded-card bg-white p-3.5 shadow-card sm:flex-row sm:items-center sm:gap-4"
-    >
-      <p className="m-0 flex-1 text-note font-extrabold leading-[1.4] text-soft">
-        On utilise des cookies pour personnaliser nos pubs, en garantissant la confidentialité de ta conv.{" "}
-        <Link href="/confidentialite#pubs" className="text-toi-ink">
-          En savoir plus
-        </Link>
-      </p>
-      <div className="flex gap-2">
-        <button type="button" className={bouton} onClick={() => choisir("non")}>
-          Refuser
-        </button>
-        <button type="button" className={bouton} onClick={() => choisir("oui")}>
-          Accepter
-        </button>
+    <>
+      {etat === "serveur" && <script dangerouslySetInnerHTML={{ __html: CACHER_SI_CHOISI }} />}
+      <div
+        data-bandeau-pubs={etat}
+        role="dialog"
+        aria-label="Cookies des pubs"
+        className="fixed inset-x-3 bottom-[calc(12px+env(safe-area-inset-bottom))] z-50 mx-auto flex max-w-[560px] flex-col gap-2.5 rounded-card bg-white p-3.5 shadow-card sm:flex-row sm:items-center sm:gap-4"
+      >
+        <p className="m-0 flex-1 text-note font-extrabold leading-[1.4] text-soft">
+          On utilise des cookies pour personnaliser nos pubs, en garantissant la confidentialité de ta conv.{" "}
+          <Link href="/confidentialite#pubs" className="text-toi-ink">
+            En savoir plus
+          </Link>
+        </p>
+        <div className="flex gap-2">
+          <button type="button" className={bouton} onClick={() => choisir("non")}>
+            Refuser
+          </button>
+          <button type="button" className={bouton} onClick={() => choisir("oui")}>
+            Accepter
+          </button>
+        </div>
       </div>
-    </div>
+    </>
   );
 }
 

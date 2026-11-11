@@ -1036,6 +1036,31 @@ export const mesuresNavigateur = pgTable(
 );
 
 /**
+ * Le toucher le plus lent d’une page, quand il a pris 200 ms ou plus (src/lib/sentinelle.tsx) : l’écran où l’on a
+ * touché (pas celui du chargement), téléphone ou non, la famille du navigateur, sa durée jusqu’à l’image suivante et
+ * ses trois parts (l’attente avant notre code, notre code, le dessin), ce qui a été touché (sa balise, son chemin, son
+ * texte masqué comme dans l’enregistrement des visites) et le script le plus long de l’image (Chrome seulement). Ni
+ * compte, ni adresse IP. Gardés NAVIGATEUR_GARDE_JOURS, pour le bloc « Navigateurs » d’/admin.
+ */
+export const touchersLents = pgTable(
+  "touchers_lents",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    le: quand("le").notNull().defaultNow(),
+    etape: text("etape", { enum: ETAPES_VISITE }).notNull(),
+    mobile: boolean("mobile").notNull(),
+    famille: text("famille", { enum: FAMILLES_NAVIGATEUR }).notNull(),
+    duree: integer("duree").notNull(),
+    attente: integer("attente").notNull(),
+    traitement: integer("traitement").notNull(),
+    affichage: integer("affichage").notNull(),
+    cible: text("cible"),
+    script: text("script"),
+  },
+  (t) => [index("touchers_lents_le_idx").on(t.le)],
+);
+
+/**
  * Le fil d’/admin en direct (GENRES_FIL) : une ville et un geste. `source` : d’où vient une arrivée ; `offre` : celle
  * d’un paiement ouvert ou d’un achat payé ; `ref` : l’achat d’un paiement ouvert, pour retrouver sa ville quand il est
  * payé (le webhook n’a pas de connexion à situer), ou celui d’un achat payé, pour dire son prix payé (depuis le
