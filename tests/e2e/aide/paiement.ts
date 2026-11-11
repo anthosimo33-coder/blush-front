@@ -135,6 +135,34 @@ export async function quitterPuisRevenir(page: Page): Promise<void> {
   });
 }
 
+/**
+ * quitterPuisRevenir au pire moment : à l’instant même où la feuille `titre` s’ouvre (dès que le navigateur l’a dans la
+ * page, avant sa première image), quand l’écran vient tout juste de l’ouvrir. Le 11 novembre, « Qu’est-ce qui coince ? »
+ * passait alors par-dessus la carte : le paywall n’apprenait qu’un rendu plus tard qu’on était dans le paiement. À armer
+ * avant le geste qui ouvre la feuille ; la fonction rendue attend que l’aller-retour ait eu lieu.
+ */
+export async function quitterPuisRevenirALOuverture(page: Page, titre: string): Promise<() => Promise<void>> {
+  await page.evaluate((titre) => {
+    const w = window as Window & { blushQuitteALOuverture?: boolean };
+    w.blushQuitteALOuverture = false;
+    const ouverte = () =>
+      [...document.querySelectorAll("dialog[open]")].some((d) => document.getElementById(d.getAttribute("aria-labelledby") ?? "")?.textContent?.trim() === titre);
+    const guet = new MutationObserver(() => {
+      if (!ouverte()) return;
+      guet.disconnect();
+      for (const etat of ["hidden", "visible"]) {
+        Object.defineProperty(document, "visibilityState", { value: etat, configurable: true });
+        document.dispatchEvent(new Event("visibilitychange"));
+      }
+      w.blushQuitteALOuverture = true;
+    });
+    guet.observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ["open"] });
+  }, titre);
+  return async () => {
+    await page.waitForFunction(() => (window as Window & { blushQuitteALOuverture?: boolean }).blushQuitteALOuverture === true);
+  };
+}
+
 /** Le nom de la feuille de la roue, par-dessus le paywall (son titre). */
 export const ROUE = "Avant ton rapport, tourne la roue";
 

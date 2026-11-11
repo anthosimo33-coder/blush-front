@@ -12,6 +12,7 @@ import {
   paieEnPetitEcran,
   payerParCarte,
   quitterPuisRevenir,
+  quitterPuisRevenirALOuverture,
   refuserLaRoue,
   RESEAU,
   ROUE,
@@ -59,7 +60,11 @@ test("un nouveau venu : la lecture du code, le paywall, payé, puis la vraie lec
     await expect(ecran.getByRole("heading", { level: 1 })).toBeVisible({ timeout: RESEAU });
     /* Le 21 octobre : plus à l’arrivée, mais au bout de 5 s (ou à la moitié de la page), et jamais sur la carte */
     await expect(page.getByRole("dialog", { name: ROUE })).toHaveCount(0);
-    await ecran.getByRole("button", { name: "Débloquer · 19,90\u00a0€" }).click();
+    /* Le bouton qui ouvre la carte (aria-haspopup) : tant que la page n’a pas lu comment payer (GET /api/paiement/feuille),
+       le même bouton mène à la page de Whop. Le 11 novembre, le test le touchait parfois avant (un essai sur seize) */
+    const debloquer = ecran.getByRole("button", { name: "Débloquer · 19,90\u00a0€" });
+    await expect(debloquer).toHaveAttribute("aria-haspopup", "dialog");
+    await debloquer.click();
     const carte = page.getByRole("dialog", { name: CARTE });
     await expect(carte).toBeVisible();
     await page.waitForTimeout(6_000);
@@ -103,9 +108,13 @@ test("un nouveau venu : la lecture du code, le paywall, payé, puis la vraie lec
 
   await test.step("la carte refermée sans payer (l’onglet quitté et retrouvé pendant qu’on la remplit) : « Qu’est-ce qui coince ? », jamais sur la carte ; « C’est trop cher » : l’offre ①", async () => {
     /* Le 21 octobre, l’offre ① couvrait la carte 19 s après « Débloquer » : rien ne vient pendant le paiement */
+    /* L’onglet quitté à l’instant même où la carte s’ouvre, puis pendant qu’on la remplit : le 11 novembre, la question
+       passait au premier par-dessus la carte (un essai sur quatre), le paywall l’apprenant un rendu trop tard */
+    const quitte = await quitterPuisRevenirALOuverture(page, CARTE);
     await page.getByRole("main").getByRole("button", { name: "Débloquer · 19,90\u00a0€" }).click();
     const carte = page.getByRole("dialog", { name: CARTE });
     await expect(carte).toBeVisible();
+    await quitte();
     await quitterPuisRevenir(page);
     await page.waitForTimeout(1000);
     await expect(page.getByRole("dialog")).toHaveCount(1);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, type ReactNode, type Ref, type RefObject } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode, type Ref, type RefObject } from "react";
 import { NB_CHAPITRES } from "@/contenu/chapitres";
 import { AVIS_DU_HAUT, TEMOIGNAGES, TESTIMONIALS } from "@/contenu/landing";
 import { CATALOGUE, enEuros, FORMULE_CHOISIE } from "@/contenu/offres";
@@ -331,9 +331,10 @@ function Paiement({
   const enApercu = question !== undefined;
   const [coince, setCoince] = useState<"ouverte" | "merci" | null>(enApercu && question !== "offre" ? "ouverte" : null);
   const coinceDemandee = useRef(enApercu);
-  /* Ce que les moments de la question regardent, sans les relancer à chaque rendu */
+  /* Ce que les moments de la question regardent, sans les relancer à chaque rendu : à jour dans le rendu même où la carte
+     s’ouvre (useOuvert, PayerDansLaFeuille), avant tout retour sur l’onglet */
   const libreDePoser = useRef(true);
-  useEffect(() => {
+  useLayoutEffect(() => {
     libreDePoser.current = !paye && !ouvert && !roueOuverte && !roueEnAttente;
   });
   const poser = () => {
