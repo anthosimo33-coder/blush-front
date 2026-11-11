@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { BrandingElement, PaymentElement, Payments, usePayments, useWhop, WhopElements } from "@whop/elements-react";
 import type { PaymentRequestResource, WalletButtonArt } from "@whop/elements/payments";
 import type { AchatImmediat } from "@/contenu/consentements";
@@ -102,13 +102,18 @@ const jalonsDuBouton = (p: Pick<Proprietes, "jalons" | "offre">, ouvre: Jalon) =
 /** L’erreur d’une feuille fermée par l’acheteur (le portefeuille, la fenêtre de PayPal) : une annulation, pas un refus. */
 const estAnnule = (e: unknown) => e instanceof Error && e.message === "payment_request_cancelled";
 
-/** Dit à l’écran (surOuvert) si l’acheteur est dans le paiement, et qu’il n’y est plus quand ce composant part. */
+/**
+ * Dit à l’écran (surOuvert) si l’acheteur est dans le paiement, et qu’il n’y est plus quand ce composant part. Dans le
+ * rendu même où la feuille de la carte s’ouvre (un effet de mise en page, pas un effet d’après l’image) : l’écran le sait
+ * avant que la page ne revienne au navigateur, donc avant tout retour sur l’onglet (le 11 novembre, « Qu’est-ce qui
+ * coince ? » passait par-dessus la carte ouverte un instant plus tôt).
+ */
 function useOuvert(ouvert: boolean, surOuvert: Proprietes["surOuvert"]) {
   const actuel = useRef(surOuvert);
-  useEffect(() => {
+  useLayoutEffect(() => {
     actuel.current = surOuvert;
   });
-  useEffect(() => {
+  useLayoutEffect(() => {
     actuel.current?.(ouvert);
     return () => actuel.current?.(false);
   }, [ouvert]);
