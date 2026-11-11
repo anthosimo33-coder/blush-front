@@ -86,6 +86,13 @@ describe("l’échéance d’une fonction", () => {
     for (const { chemin, texte } of routes) expect(maxDurationDe(texte), chemin).toBe(DUREE_FONCTION_S);
   });
 
+  /* Des écrans pleins de longs messages : à 180 s, des lectures en pleine écriture étaient coupées (novembre 2026) */
+  it("l’import de captures (un seul appel au modèle, jusqu’à 20 images) vit DUREE_FONCTION_S", () => {
+    const captures = sources("src/app").find((f) => f.chemin === "src/app/api/captures/route.ts")!;
+    expect(captures.texte).toContain("lireCaptures(");
+    expect(maxDurationDe(captures.texte)).toBe(DUREE_FONCTION_S);
+  });
+
   it("le réveil a la durée du chat et du rapport (Vercel regroupe les routes de même réglage dans une fonction)", () => {
     const reveil = sources("src/app").find((f) => f.chemin === "src/app/api/reveil/route.ts")!;
     expect(maxDurationDe(reveil.texte)).toBe(DUREE_FONCTION_S);
