@@ -41,7 +41,8 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="fr" className={`${classesDesPolices} antialiased`}>
+    /* suppressHydrationWarning : `data-pubs-choisi`, posé avant la première image par le bandeau des pubs (BandeauPubs) */
+    <html lang="fr" className={`${classesDesPolices} antialiased`} suppressHydrationWarning>
       <body>
         <div id="app-root">{children}</div>
         <SoundBoot />

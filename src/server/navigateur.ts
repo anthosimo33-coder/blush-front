@@ -107,34 +107,89 @@ export async function noterErreurDuNavigateur(req: Request, e: ErreurDuNavigateu
   }, "alerte d’une erreur de navigateur");
 }
 
-/** Les mesures de vitesse d’une page quittée (POST /api/navigateur/mesures). */
-export type MesuresDuNavigateur = { etape: EtapeVisite; mobile: boolean; mesures: { metrique: MetriqueWeb; valeur: number }[] };
+/** Le toucher le plus lent d’une page (src/lib/sentinelle.tsx) : son écran, sa durée et ses trois parts en ms, ce qui a été touché, le script le plus long. */
+type ToucherDuNavigateur = {
+  etape: EtapeVisite;
+  duree: number;
+  attente: number;
+  traitement: number;
+  affichage: number;
+  cible: string | null;
+  script: string | null;
+};
 
-/** Note les mesures de vitesse d’une page, une ligne chacune. Au-delà de sa limite (LIMITES.mesuresParIp), une adresse n’est plus écoutée, sans le dire. */
+/** Les mesures de vitesse d’une page quittée (POST /api/navigateur/mesures). `etape` d’une mesure : l’écran où elle a eu lieu, s’il n’est pas celui du chargement. */
+export type MesuresDuNavigateur = {
+  etape: EtapeVisite;
+  mobile: boolean;
+  mesures: { metrique: MetriqueWeb; valeur: number; etape?: EtapeVisite | undefined }[];
+  toucher?: ToucherDuNavigateur | undefined;
+};
+
+/** Un texte du navigateur pour /admin : masqué comme un message d’erreur, court ; null s’il ne reste rien. */
+const court = (t: string | null, max: number) => (t ? masquer(t, max).trim() || null : null);
+
+/**
+ * Note les mesures de vitesse d’une page, une ligne chacune, et son toucher le plus lent (avec la famille du navigateur,
+ * tirée de son User-Agent). Au-delà de sa limite (LIMITES.mesuresParIp), une adresse n’est plus écoutée, sans le dire.
+ */
 export async function noterMesuresDuNavigateur(req: Request, m: MesuresDuNavigateur): Promise<void> {
-  if (!m.mesures.length || !(await sousLaLimiteDeLIp(req, "navigateur:mesures", LIMITES.mesuresParIp))) return;
-  await db()
-    .insert(schema.mesuresNavigateur)
-    .values(m.mesures.map((x) => ({ etape: m.etape, mobile: m.mobile, metrique: x.metrique, valeur: x.valeur })));
+  if ((!m.mesures.length && !m.toucher) || !(await sousLaLimiteDeLIp(req, "navigateur:mesures", LIMITES.mesuresParIp))) return;
+  if (m.mesures.length)
+    await db()
+      .insert(schema.mesuresNavigateur)
+      .values(m.mesures.map((x) => ({ etape: x.etape ?? m.etape, mobile: m.mobile, metrique: x.metrique, valeur: x.valeur })));
+  const t = m.toucher;
+  if (t)
+    await db()
+      .insert(schema.touchersLents)
+      .values({
+        etape: t.etape,
+        mobile: m.mobile,
+        famille: familleDe(req.headers.get("user-agent")),
+        duree: Math.round(t.duree),
+        attente: Math.round(t.attente),
+        traitement: Math.round(t.traitement),
+        affichage: Math.round(t.affichage),
+        cible: court(t.cible, 120),
+        script: court(t.script, 120),
+      });
 }
 
 /** La vitesse d’un écran, sur téléphone ou non : le 75e centile de chaque mesure (ce que vit le visiteur lent), et combien de pages mesurées. */
 type VitesseDUnEcran = { etape: EtapeVisite; mobile: boolean; pages: number } & Partial<Record<MetriqueWeb, number>>;
 /** Une erreur des navigateurs sur la période : combien de fois, depuis quand, où. */
 type ErreurVue = { nom: string; message: string; source: string | null; etape: EtapeVisite; famille: FamilleNavigateur; fois: number; derniere: string };
+/**
+ * Un toucher lent sur la période, regroupé par écran et par ce qui a été touché : combien de fois, son 75e centile, ses
+ * trois parts en moyenne, le script et la famille de navigateur les plus fréquents.
+ */
+type ToucherVu = {
+  etape: EtapeVisite;
+  cible: string | null;
+  fois: number;
+  p75: number;
+  attente: number;
+  traitement: number;
+  affichage: number;
+  script: string | null;
+  famille: FamilleNavigateur;
+};
 /** La santé des navigateurs sur la période, pour /admin. */
-export type SanteDesNavigateurs = { vitesse: VitesseDUnEcran[]; erreurs: ErreurVue[]; totalErreurs: number };
+export type SanteDesNavigateurs = { vitesse: VitesseDUnEcran[]; erreurs: ErreurVue[]; totalErreurs: number; touchersLents: ToucherVu[] };
 
 /**
  * La santé des navigateurs sur la période (ses `jours` derniers jours, ou une période choisie au calendrier, de minuit à
- * minuit à Paris) : la vitesse par écran (au moins 5 pages mesurées), et les 10 erreurs les plus fréquentes.
+ * minuit à Paris) : la vitesse par écran (au moins 5 pages mesurées, ou 5 touchers : depuis le 11 novembre, la réponse
+ * au toucher compte sur l’écran touché, pas sur celui du chargement), les 10 erreurs et les 10 touchers lents les plus
+ * fréquents.
  */
 export async function santeDesNavigateurs(periode: number | Plage): Promise<SanteDesNavigateurs> {
   const dans = (col: string): SQL =>
     typeof periode === "number"
       ? sql`${sql.raw(col)} >= now() - make_interval(days => ${periode})`
       : sql.raw(`${col} >= ${minuitDuJour(periode.du)} and ${col} < ${minuitDuJour(plusJours(periode.au, 1))}`);
-  const [vitesse, erreurs, total] = await Promise.all([
+  const [vitesse, erreurs, total, touchers] = await Promise.all([
     lignes<{ etape: EtapeVisite; mobile: boolean; metrique: MetriqueWeb; p75: number; n: string }>(
       sql`select etape, mobile, metrique, percentile_cont(0.75) within group (order by valeur) as p75, count(*) as n
           from mesures_navigateur where ${dans("le")} group by etape, mobile, metrique`,
@@ -145,19 +200,50 @@ export async function santeDesNavigateurs(periode: number | Plage): Promise<Sant
           from erreurs_navigateur where ${dans("derniere_le")} group by signature, nom, message order by sum(fois) desc limit 10`,
     ),
     lignes<{ n: string | null }>(sql`select sum(fois) as n from erreurs_navigateur where ${dans("derniere_le")}`),
+    lignes<{
+      etape: EtapeVisite;
+      cible: string | null;
+      fois: string;
+      p75: number;
+      attente: number;
+      traitement: number;
+      affichage: number;
+      script: string | null;
+      famille: FamilleNavigateur;
+    }>(
+      sql`select etape, cible, count(*) as fois, percentile_cont(0.75) within group (order by duree) as p75,
+            avg(attente) as attente, avg(traitement) as traitement, avg(affichage) as affichage,
+            mode() within group (order by script) as script, mode() within group (order by famille) as famille
+          from touchers_lents where ${dans("le")} group by etape, cible order by count(*) desc, p75 desc limit 10`,
+    ),
   ]);
   const ecrans = new Map<string, VitesseDUnEcran>();
+  const nInp = new Map<string, number>();
   for (const v of vitesse) {
     const cle = `${v.etape}|${v.mobile}`;
     const e = ecrans.get(cle) ?? { etape: v.etape, mobile: v.mobile, pages: 0 };
     e[v.metrique] = Math.round(Number(v.p75) * (v.metrique === "CLS" ? 1000 : 1)) / (v.metrique === "CLS" ? 1000 : 1);
     /* Chaque page envoie au moins son TTFB : son nombre est celui des pages mesurées */
     if (v.metrique === "TTFB") e.pages = Number(v.n);
+    /* Un écran où l’on arrive sans chargement (une navigation dans l’appli) n’a que des touchers */
+    if (v.metrique === "INP") nInp.set(cle, Number(v.n));
     ecrans.set(cle, e);
   }
+  const ms = (x: number) => Math.round(Number(x));
   return {
-    vitesse: [...ecrans.values()].filter((e) => e.pages >= 5).sort((a, b) => b.pages - a.pages),
+    vitesse: [...ecrans.entries()]
+      .filter(([cle, e]) => Math.max(e.pages, nInp.get(cle) ?? 0) >= 5)
+      .map(([, e]) => e)
+      .sort((a, b) => b.pages - a.pages),
     erreurs: erreurs.map((e) => ({ ...e, fois: Number(e.fois), derniere: new Date(e.derniere).toISOString() })),
     totalErreurs: Number(total[0]?.n ?? 0),
+    touchersLents: touchers.map((t) => ({
+      ...t,
+      fois: Number(t.fois),
+      p75: ms(t.p75),
+      attente: ms(t.attente),
+      traitement: ms(t.traitement),
+      affichage: ms(t.affichage),
+    })),
   };
 }

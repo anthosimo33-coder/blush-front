@@ -720,7 +720,22 @@ export const ROUTES = {
     corps: z.strictObject({
       etape: z.enum(ETAPES_VISITE),
       mobile: z.boolean(),
-      mesures: z.array(z.strictObject({ metrique: z.enum(METRIQUES_WEB), valeur: z.number().finite().min(0).max(120_000) })).max(METRIQUES_WEB.length),
+      /* `etape` d’une mesure : l’écran où elle a eu lieu, s’il n’est pas celui du chargement (INP : l’écran du toucher) */
+      mesures: z
+        .array(z.strictObject({ metrique: z.enum(METRIQUES_WEB), valeur: z.number().finite().min(0).max(120_000), etape: z.enum(ETAPES_VISITE).optional() }))
+        .max(METRIQUES_WEB.length),
+      /* Le toucher le plus lent de la page, s’il a pris 200 ms ou plus (src/lib/sentinelle.tsx) */
+      toucher: z
+        .strictObject({
+          etape: z.enum(ETAPES_VISITE),
+          duree: z.number().finite().min(0).max(120_000),
+          attente: z.number().finite().min(0).max(120_000),
+          traitement: z.number().finite().min(0).max(120_000),
+          affichage: z.number().finite().min(0).max(120_000),
+          cible: z.string().max(160).nullable(),
+          script: z.string().max(160).nullable(),
+        })
+        .optional(),
     }),
   },
   /* `?moi=` : qui est toi pour l’écran, quand le serveur ne le sait pas */
