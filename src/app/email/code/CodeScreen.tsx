@@ -36,6 +36,14 @@ const LENGTH = 6;
  */
 const texteDuRetour = (email: string) => `${nomDeMessagerie(email) ?? "Ta messagerie"} dit que cette adresse n’existe pas. Une lettre de travers\u00a0?`;
 
+/**
+ * Une minute sans code (« Renvoyer le code » libre) : les deux raisons qui le retiennent le plus souvent. Les spams, et
+ * une boîte pleine, qui refuse le code sans bruit : notre prestataire ne le sait qu’une heure après, et n’y renonce
+ * qu’au bout de 14 h. Sans ça, on redemande des codes qui n’arriveront jamais, puis on s’en va.
+ */
+const texteRienRecu = (email: string) =>
+  `Toujours rien\u00a0? Regarde dans tes spams. Et si ta boîte ${nomDeMessagerie(email) ?? "mail"} est pleine, aucun mail ne peut y entrer\u00a0: fais de la place, ou change d’email.`;
+
 /*
  * Écran 07b — Le code reçu par email. Un seul champ (le collage et le remplissage automatique
  * du téléphone marchent), affiché en 6 cases. Le code complet valide tout seul.
@@ -53,6 +61,8 @@ export function CodeScreen({ connexion = false, suite = "/app", fermee = false }
   const [wrong, setWrong] = useState(false);
   const [wait, setWait] = useState(CODE_RENVOI_S);
   const [resent, setResent] = useState(false);
+  /* La minute du renvoi passée sans code : l’écran dit pourquoi il peut ne pas venir (texteRienRecu), et le garde après un renvoi */
+  const [rienRecu, setRienRecu] = useState(false);
   /* Autre chose qu’un mauvais code : trop d’essais, pas de réseau */
   const [souci, setSouci] = useState<string | null>(null);
   const input = useRef<HTMLInputElement>(null);
@@ -84,6 +94,7 @@ export function CodeScreen({ connexion = false, suite = "/app", fermee = false }
         setSouci(null);
         setWait(CODE_RENVOI_S);
         setResent(true);
+        setRienRecu(false);
         setEnvoi((n) => n + 1);
       } catch (e) {
         setProblemeCorrige(messageErreur("code", e));
@@ -96,7 +107,10 @@ export function CodeScreen({ connexion = false, suite = "/app", fermee = false }
   /* Le bouton « Renvoyer le code » se libère au bout d’une minute : avant, le serveur n’en écrirait pas d’autre */
   useEffect(() => {
     if (wait <= 0) return;
-    const t = setTimeout(() => setWait((w) => w - 1), 1000);
+    const t = setTimeout(() => {
+      setWait((w) => w - 1);
+      if (wait === 1) setRienRecu(true);
+    }, 1000);
     return () => clearTimeout(t);
   }, [wait]);
 
@@ -289,18 +303,21 @@ export function CodeScreen({ connexion = false, suite = "/app", fermee = false }
             {!wrong && !souci && resent && <p className="m-0 text-note font-extrabold text-vrai-ink">Nouveau code envoyé.</p>}
           </div>
 
-          <div className="flex flex-wrap items-center gap-x-5 gap-y-1">
-            <button
-              type="button"
-              onClick={() => void resend()}
-              disabled={wait > 0}
-              className="-my-2 inline-flex min-h-11 items-center text-note font-black text-toi-ink disabled:text-grey"
-            >
-              {wait > 0 ? `Renvoyer le code (${wait} s)` : "Renvoyer le code"}
-            </button>
-            <Link href={retour} className="-my-2 inline-flex min-h-11 items-center text-note font-black text-ink no-underline">
-              Changer d’email
-            </Link>
+          <div>
+            <div className="flex flex-wrap items-center gap-x-5 gap-y-1">
+              <button
+                type="button"
+                onClick={() => void resend()}
+                disabled={wait > 0}
+                className="-my-2 inline-flex min-h-11 items-center text-note font-black text-toi-ink disabled:text-grey"
+              >
+                {wait > 0 ? `Renvoyer le code (${wait} s)` : "Renvoyer le code"}
+              </button>
+              <Link href={retour} className="-my-2 inline-flex min-h-11 items-center text-note font-black text-ink no-underline">
+                Changer d’email
+              </Link>
+            </div>
+            <div aria-live="polite">{rienRecu && <p className="m-0 mt-3 text-note font-bold text-grey">{texteRienRecu(email)}</p>}</div>
           </div>
         </>
       )}

@@ -700,20 +700,22 @@ export function navigateursDExemple({ calme = false }: { calme?: boolean } = {})
 
 /**
  * La délivrabilité d’exemple, sur 7 jours : des codes et des rapports bien remis, une relance ② avec une plainte (au-delà
- * des 0,08 % de Resend) et des séquences avec quelques rebonds ; `calme` : aucun rebond ni aucune plainte.
+ * des 0,08 % de Resend), des séquences avec quelques rebonds et des codes partis vers des boîtes pleines ; `calme` :
+ * aucun rebond ni aucune plainte.
  */
 export function delivrabiliteDExemple({ calme = false }: { calme?: boolean } = {}): Delivrabilite {
-  const ligne = (sorte: string, partis: number, rebonds: number, plaintes: number, retards = 0, bloques = 0) => ({
+  const ligne = (sorte: string, partis: number, rebonds: number, plaintes: number, retards = 0, bloques = 0, boitesPleines = 0) => ({
     sorte,
     partis,
-    delivres: partis - rebonds - bloques,
+    delivres: partis - rebonds - boitesPleines - bloques,
     rebonds,
+    boitesPleines,
     plaintes,
     retards,
     bloques,
   });
   const sortes = [
-    ligne("code", 412, calme ? 0 : 6, 0, 2, calme ? 0 : 1),
+    ligne("code", 412, calme ? 0 : 6, 0, 2, calme ? 0 : 1, 3),
     ligne("rapport", 96, 0, 0),
     ligne("sequence-s1_haut", 188, calme ? 0 : 3, 0, 1),
     ligne("sequence-s2_heure", 141, calme ? 0 : 5, 0),
@@ -722,7 +724,7 @@ export function delivrabiliteDExemple({ calme = false }: { calme?: boolean } = {
     ligne("alerte", 9, 0, 0),
   ];
   const somme = (lignes: typeof sortes) => {
-    const t = { partis: 0, delivres: 0, rebonds: 0, plaintes: 0, retards: 0, bloques: 0 };
+    const t = { partis: 0, delivres: 0, rebonds: 0, boitesPleines: 0, plaintes: 0, retards: 0, bloques: 0 };
     for (const l of lignes) for (const k of Object.keys(t) as (keyof typeof t)[]) t[k] += l[k];
     return t;
   };

@@ -49,12 +49,27 @@ async function apresLaReponse(): Promise<void> {
   while (etat.apres.length) await etat.apres.shift()!();
 }
 
-/** Un événement de Resend, comme sa documentation le montre (`type` : « email.bounced »…), pour ces destinataires et ces tags. */
-const evenement = (type: string, { to = ["quelquun@blush.test"], tags = { sorte: "code" } as unknown, le = new Date().toISOString() } = {}) =>
+/** Le rebond d’une boîte pleine, comme Resend le rend (relevé sur un vrai webhook, le 11 novembre 2026). */
+const BOITE_PLEINE = { type: "Transient", subType: "MailboxFull", message: "The recipient's email provider sent a bounce message because the recipient's inbox was full." };
+
+/**
+ * Un événement de Resend, comme sa documentation le montre (`type` : « email.bounced »…), pour ces destinataires et ces
+ * tags ; `mail` : son email_id (un nouveau à chaque appel, au défaut), `rebond` : son objet bounce (un rebond pour de bon).
+ */
+const evenement = (
+  type: string,
+  {
+    to = ["quelquun@blush.test"],
+    tags = { sorte: "code" } as unknown,
+    le = new Date().toISOString(),
+    mail = randomUUID() as unknown,
+    rebond = { type: "Permanent", subType: "General", message: "…" } as unknown,
+  } = {},
+) =>
   JSON.stringify({
     type,
     created_at: le,
-    data: { email_id: randomUUID(), from: "BLUSH <bonjour@askblush.com>", to, subject: "Un sujet", tags, bounce: { type: "Permanent", subType: "General", message: "…" } },
+    data: { email_id: mail, from: "BLUSH <bonjour@askblush.com>", to, subject: "Un sujet", tags, bounce: rebond },
   });
 
 /** Poste ce corps à la route, comme Resend (sans origine), signé de `secret` ; `id` : le svix-id (le même à chaque nouvel essai). */
@@ -78,7 +93,7 @@ describe("le webhook de Resend (POST /api/mails/resend)", () => {
       expect([r.status, await r.json()]).toEqual([200, { ok: true }]);
     }
     const l = await lignes();
-    expect(l).toEqual([{ id: "msg_rejoue", le: expect.any(Date), type: "delivered", sorte: "sequence-s1_haut", compteId: u.id }]);
+    expect(l).toEqual([{ id: "msg_rejoue", le: expect.any(Date), type: "delivered", sorte: "sequence-s1_haut", compteId: u.id, mailId: expect.any(String), motif: null }]);
     expect(JSON.stringify(l)).not.toContain(u.email.split("@")[0]);
     /* Le compte effacé, l’événement reste, sans plus rien qui le relie à lui */
     await db().delete(schema.users).where(eq(schema.users.id, u.id));
@@ -97,6 +112,16 @@ describe("le webhook de Resend (POST /api/mails/resend)", () => {
     expect(await coupes(plaignant.id)).toEqual({ offres: expect.any(Date), conseils: expect.any(Date) });
     expect(await coupes(deja.id)).toEqual({ offres: avant, conseils: expect.any(Date) });
     expect(await coupes(rebond.id)).toEqual({ offres: null, conseils: null });
+  });
+
+  it("le mail et la raison d’un rebond : notés tels que Resend les rend ; illisibles, null ; pas de raison hors d’un rebond", async () => {
+    const mail = randomUUID();
+    await poster(evenement("email.bounced", { mail, rebond: BOITE_PLEINE }), { id: "msg_pleine" });
+    await poster(evenement("email.bounced", { mail: "pas un id !", rebond: { type: "Permanent", subType: "Suppressed; drop table" } }), { id: "msg_illisible" });
+    await poster(evenement("email.bounced", { mail: 42, rebond: "General" }), { id: "msg_bizarre" });
+    await poster(evenement("email.delivery_delayed", { mail, rebond: BOITE_PLEINE }), { id: "msg_retard" });
+    const parId = Object.fromEntries((await lignes()).map((l) => [l.id, [l.mailId, l.motif]]));
+    expect(parId).toEqual({ msg_pleine: [mail, "MailboxFull"], msg_illisible: [null, null], msg_bizarre: [null, null], msg_retard: [mail, null] });
   });
 
   it("une adresse sans compte, des tags en liste, une sorte mal formée ou absente : noté quand même, la sorte « inconnue » au besoin", async () => {
@@ -182,6 +207,17 @@ describe("le mail d’un code revenu", () => {
     expect(await codeRevenu(c)).toBe(true);
     expect(await codeRevenu(undefined)).toBe(false);
   });
+
+  it("une boîte pleine (un rebond temporaire) : l’adresse existe, le code n’est pas noté revenu", async () => {
+    const [pleine, nav] = [adresse("pleine"), randomUUID()];
+    await preparerCode(pleine, nav, { envoye: true });
+    await poster(evenement("email.delivery_delayed", { to: [pleine], tags: { sorte: "code" } }));
+    await poster(evenement("email.bounced", { to: [pleine], tags: { sorte: "code" }, rebond: BOITE_PLEINE }));
+    expect(await codeRevenu(nav)).toBe(false);
+    /* Un autre rebond temporaire, sans raison connue : l’adresse existe aussi */
+    await poster(evenement("email.bounced", { to: [pleine], tags: { sorte: "code" }, rebond: { type: "Transient", subType: "General" } }));
+    expect(await codeRevenu(nav)).toBe(false);
+  });
 });
 
 describe("le bloc « Délivrabilité » d’/admin", () => {
@@ -206,18 +242,45 @@ describe("le bloc « Délivrabilité » d’/admin", () => {
     await poster(evenement("email.bounced", { tags: { sorte: "attente" }, le: il_y_a(8) }));
     const d = await delivrabilite();
     expect(d.sortes).toEqual([
-      { sorte: "code", partis: 2, delivres: 1, rebonds: 1, plaintes: 0, retards: 0, bloques: 0 },
-      { sorte: "sequence-s2_heure", partis: 1, delivres: 1, rebonds: 0, plaintes: 1, retards: 0, bloques: 0 },
-      { sorte: "relance", partis: 0, delivres: 0, rebonds: 0, plaintes: 0, retards: 1, bloques: 1 },
+      { sorte: "code", partis: 2, delivres: 1, rebonds: 1, boitesPleines: 0, plaintes: 0, retards: 0, bloques: 0 },
+      { sorte: "sequence-s2_heure", partis: 1, delivres: 1, rebonds: 0, boitesPleines: 0, plaintes: 1, retards: 0, bloques: 0 },
+      { sorte: "relance", partis: 0, delivres: 0, rebonds: 0, boitesPleines: 0, plaintes: 0, retards: 1, bloques: 1 },
     ]);
-    expect(d.principal).toEqual({ partis: 2, delivres: 1, rebonds: 1, plaintes: 0, retards: 0, bloques: 0 });
-    expect(d.relances).toEqual({ partis: 1, delivres: 1, rebonds: 0, plaintes: 1, retards: 1, bloques: 1 });
-    expect(d.total).toEqual({ partis: 3, delivres: 2, rebonds: 1, plaintes: 1, retards: 1, bloques: 1 });
+    expect(d.principal).toEqual({ partis: 2, delivres: 1, rebonds: 1, boitesPleines: 0, plaintes: 0, retards: 0, bloques: 0 });
+    expect(d.relances).toEqual({ partis: 1, delivres: 1, rebonds: 0, boitesPleines: 0, plaintes: 1, retards: 1, bloques: 1 });
+    expect(d.total).toEqual({ partis: 3, delivres: 2, rebonds: 1, boitesPleines: 0, plaintes: 1, retards: 1, bloques: 1 });
     expect(Date.now() - Date.parse(d.dernier!)).toBeLessThan(60_000);
     /* Sans le sous-domaine, les relances partent du domaine principal : le bloc le dit ; sans secret, il n’est pas branché */
     etat.marketing = undefined;
     etat.secrets = [];
     expect(await delivrabilite()).toMatchObject({ branche: false, domaines: { principal: "askblush.com", relances: "askblush.com" } });
+  });
+
+  it("une boîte pleine se compte à part des rebonds, sans ses retards ; les retards se comptent par mail ; ceux d’avant l’identifiant, chacun", async () => {
+    const [pleine, lent, encore] = [randomUUID(), randomUUID(), randomUUID()];
+    /* Un code vers une boîte pleine : parti, six retards (un par essai, 14 h), puis le rebond temporaire */
+    await poster(evenement("email.sent", { mail: pleine }));
+    for (let k = 0; k < 6; k++) await poster(evenement("email.delivery_delayed", { mail: pleine }));
+    await poster(evenement("email.bounced", { mail: pleine, rebond: BOITE_PLEINE }));
+    /* Un code retardé deux fois, puis remis ; un autre retardé, pas encore remis : deux mails en retard */
+    await poster(evenement("email.sent", { mail: lent }));
+    for (let k = 0; k < 2; k++) await poster(evenement("email.delivery_delayed", { mail: lent }));
+    await poster(evenement("email.delivered", { mail: lent }));
+    await poster(evenement("email.sent", { mail: encore }));
+    await poster(evenement("email.delivery_delayed", { mail: encore }));
+    /* Un vrai rebond (une adresse qui n’existe pas) */
+    await poster(evenement("email.sent"));
+    await poster(evenement("email.bounced", { rebond: { type: "Permanent", subType: "General" } }));
+    /* Deux retards notés avant que l’identifiant du mail soit gardé : chacun compte */
+    await db()
+      .insert(schema.evenementsMails)
+      .values([
+        { id: "msg_avant_1", type: "delivery_delayed", sorte: "code" },
+        { id: "msg_avant_2", type: "delivery_delayed", sorte: "code" },
+      ]);
+    const d = await delivrabilite();
+    expect(d.sortes).toEqual([{ sorte: "code", partis: 4, delivres: 1, rebonds: 1, boitesPleines: 1, plaintes: 0, retards: 4, bloques: 0 }]);
+    expect(d.total).toEqual({ partis: 4, delivres: 1, rebonds: 1, boitesPleines: 1, plaintes: 0, retards: 4, bloques: 0 });
   });
 });
 
@@ -242,6 +305,17 @@ describe("l’alerte d’un seuil franchi", () => {
     /* Le même jour, une seconde fois : pas de seconde alerte */
     expect(await verifierLesSeuils()).toHaveLength(1);
     expect(etat.alertes).toHaveLength(1);
+  });
+
+  it("les boîtes pleines ne comptent pas dans le seuil des rebonds", async () => {
+    await noter(100, "sent");
+    await db()
+      .insert(schema.evenementsMails)
+      .values(Array.from({ length: 8 }, () => ({ id: `msg_${randomUUID()}`, type: "bounced" as const, sorte: "code", mailId: randomUUID(), motif: "MailboxFull" })));
+    await noter(1, "bounced");
+    /* 9 rebonds sur 100 mails, mais 8 boîtes pleines : 1 % */
+    expect(await verifierLesSeuils()).toEqual([]);
+    expect(etat.alertes).toEqual([]);
   });
 
   it("les rebonds : jugés à partir de 50 mails partis, au seuil des 4 % ; dessous, rien", async () => {

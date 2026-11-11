@@ -102,7 +102,7 @@ export const OUTILS: readonly OutilMcp[] = [
     name: "mails",
     title: "Mails",
     description:
-      "Les mails des séquences sur la période (envoyés, boutons touchés, payés dans les 3 jours), l’A/B de la relance J+6, et la délivrabilité des 7 derniers jours (partis, délivrés, rebonds, plaintes, retards, bloqués), par domaine et par sorte de mail.",
+      "Les mails des séquences sur la période (envoyés, boutons touchés, payés dans les 3 jours), l’A/B de la relance J+6, et la délivrabilité des 7 derniers jours (partis, délivrés, rebonds, boîtes pleines, plaintes, retards, bloqués), par domaine et par sorte de mail. Une boîte pleine (l’adresse existe, sa messagerie refuse le mail faute de place) ne compte pas dans les rebonds ; les retards comptent les mails, pas les essais.",
     inputSchema: AVEC_JOURS,
   },
   {
