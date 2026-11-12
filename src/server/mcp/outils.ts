@@ -95,7 +95,7 @@ export const OUTILS: readonly OutilMcp[] = [
     name: "sante",
     title: "Santé",
     description:
-      "Ce qui coince sur la période : les étapes en échec (par code), les pannes du serveur (par route ou page), les tâches en cours, bloquées, en attente, les paiements refusés, les alertes danger ; et côté navigateurs, la vitesse de chaque écran (p75 des Web Vitals ; la réponse au toucher comptée sur l’écran touché depuis le 11 novembre 2026 ; peuDePages : moins de 30 pages ou touchers, un chiffre qui tient à quelques téléphones), les erreurs les plus fréquentes, et les touchers lents (200 ms ou plus : l’écran, ce qui a été touché, le 75e centile, et où le temps passe en moyenne, attente avant notre code, notre code, dessin de l’écran).",
+      "Ce qui coince sur la période : les étapes en échec (par code), les pannes du serveur (par route ou page), les tâches en cours, bloquées, en attente, les paiements refusés, les alertes danger ; et côté navigateurs, la vitesse de chaque écran (p75 des Web Vitals ; la réponse au toucher comptée sur l’écran touché depuis le 11 novembre 2026 ; peuDePages : moins de 30 pages chargées, pour l’affichage, les sauts de page et le serveur ; peuDeTouchers : moins de 30 touchers, pour la réponse au toucher ; un tel chiffre tient à quelques téléphones), les erreurs les plus fréquentes, et les touchers lents (200 ms ou plus : l’écran, ce qui a été touché, le 75e centile, et où le temps passe en moyenne, attente avant notre code, notre code, dessin de l’écran).",
     inputSchema: AVEC_JOURS,
   },
   {
