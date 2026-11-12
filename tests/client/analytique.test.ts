@@ -7,32 +7,38 @@ import { cheminSur } from "@/lib/chemins";
  * sans requête (sauf les utm_), sans identifiant, sans titre de page, le site d’avant réduit à son nom ; rien depuis les
  * outils de l’équipe ; l’enregistrement des visites sans rien de lisible (les attributs, l’adresse de ses morceaux) ;
  * PostHog chargé seulement avec sa clé, une fois la page prête, avec ses réglages sans cookie et son enregistrement
- * masqué, et les jalons gardés le temps qu’il arrive. posthog-js est simulé : rien ne part.
+ * masqué pour une visite sur quatre (les autres sans l’enregistreur), et les jalons gardés le temps qu’il arrive.
+ * posthog-js est simulé : rien ne part.
  */
 
 const init = vi.fn();
 const capture = vi.fn();
+const enregistreurCharge = vi.fn();
 vi.mock("posthog-js", () => ({ default: { init, capture } }));
-/* L’enregistreur : dans le vrai code, il se pose sur window.__PosthogExtensions__ */
-vi.mock("posthog-js/dist/posthog-recorder", () => ({}));
 
 const ORIGINE = "https://www.askblush.com";
 const ici = (chemin: string) => new URL(chemin, ORIGINE) as unknown as Location;
 const evenement = (properties: CaptureResult["properties"], plus: Partial<CaptureResult> = {}): CaptureResult => ({ uuid: "u", event: "$pageview", properties, ...plus });
 
-/* Une page neuve : le module relu, à cette adresse */
+/* Une page neuve : le module relu, à cette adresse, et l’enregistreur à télécharger de nouveau (dans le vrai code, il se pose sur window.__PosthogExtensions__) */
 async function page(chemin: string) {
   window.history.replaceState(null, "", chemin);
   vi.resetModules();
+  vi.doMock("posthog-js/dist/posthog-recorder", () => {
+    enregistreurCharge();
+    return {};
+  });
   return import("@/lib/analytique");
 }
 
 beforeEach(() => {
   init.mockReset();
   capture.mockReset();
+  enregistreurCharge.mockReset();
 });
 afterEach(() => {
   vi.unstubAllEnvs();
+  vi.restoreAllMocks();
 });
 
 describe("ce qui part chez PostHog", () => {
@@ -128,12 +134,13 @@ describe("le chargement de PostHog", () => {
     expect(capture).not.toHaveBeenCalled();
   });
 
-  it("avec sa clé, une fois la page prête : ses réglages sans cookie, son enregistrement masqué, puis les jalons qui attendaient, puis les suivants", async () => {
+  it("avec sa clé, une fois la page prête : ses réglages sans cookie, son enregistrement masqué (une visite tirée parmi le quart enregistré), puis les jalons qui attendaient, puis les suivants", async () => {
     vi.stubEnv("NEXT_PUBLIC_POSTHOG_CLE", "phc_essai");
     vi.stubGlobal("requestIdleCallback", (f: () => void) => {
       f();
       return 1;
     });
+    vi.spyOn(Math, "random").mockReturnValue(0.1);
     const { demarrerLaMesure, mesurer } = await page("/importer/export");
     mesurer("jalon_appli");
     demarrerLaMesure();
@@ -164,6 +171,7 @@ describe("le chargement de PostHog", () => {
       },
       before_send: expect.any(Function),
     });
+    expect(enregistreurCharge).toHaveBeenCalledTimes(1);
     expect(reglages.session_recording.blockSelector.split(", ")).toEqual(expect.arrayContaining(["img", "video", "canvas", "iframe"]));
     expect(reglages.session_recording.maskAttributeFn("aria-label", "Ta conv avec Léa")).toBe("***");
     /* Le texte passe par masquerTexte (src/lib/secrets.ts) : l’interface se lit, une zone privée non */
@@ -174,6 +182,26 @@ describe("le chargement de PostHog", () => {
     expect(capture.mock.calls).toEqual([["jalon_appli"]]);
     mesurer("jalon_fichier");
     expect(capture.mock.calls).toEqual([["jalon_appli"], ["jalon_fichier"]]);
+    vi.unstubAllGlobals();
+  });
+
+  it("trois visites sur quatre sans enregistrement : l’enregistreur pas même téléchargé, la page vue et les jalons comme les autres", async () => {
+    vi.stubEnv("NEXT_PUBLIC_POSTHOG_CLE", "phc_essai");
+    vi.stubGlobal("requestIdleCallback", (f: () => void) => {
+      f();
+      return 1;
+    });
+    const { demarrerLaMesure, mesurer, PART_ENREGISTREE } = await page("/app");
+    expect(PART_ENREGISTREE).toBe(0.25);
+    /* Le tirage tombe juste au-dessus de la part : pas enregistrée */
+    vi.spyOn(Math, "random").mockReturnValue(PART_ENREGISTREE);
+    demarrerLaMesure();
+    await vi.dynamicImportSettled();
+    expect(init).toHaveBeenCalledTimes(1);
+    expect(init.mock.calls[0]![1]).toMatchObject({ disable_session_recording: true, persistence: "memory", before_send: expect.any(Function) });
+    expect(enregistreurCharge).not.toHaveBeenCalled();
+    mesurer("jalon_chat");
+    expect(capture.mock.calls).toEqual([["jalon_chat"]]);
     vi.unstubAllGlobals();
   });
 

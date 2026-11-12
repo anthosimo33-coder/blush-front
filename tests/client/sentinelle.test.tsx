@@ -6,7 +6,7 @@ const vitals = vi.hoisted(() => ({ rapporter: null as null | ((m: { name: string
 vi.mock("next/web-vitals", () => ({ useReportWebVitals: (f: (m: { name: string; value: number }) => void) => void (vitals.rapporter = f) }));
 vi.mock("@/services/api", () => ({ signalerErreurDuNavigateur: vi.fn(), envoyerMesuresDuNavigateur: vi.fn() }));
 
-import { Sentinelle, signalerErreur } from "@/lib/sentinelle";
+import { decrire, Sentinelle, signalerErreur } from "@/lib/sentinelle";
 import { envoyerMesuresDuNavigateur, signalerErreurDuNavigateur } from "@/services/api";
 
 const signalees = vi.mocked(signalerErreurDuNavigateur);
@@ -18,6 +18,24 @@ const erreur = (message: string, filename = `${window.location.origin}/_next/sta
   window.dispatchEvent(new ErrorEvent("error", { message, filename, lineno: 1, colno: 9, error: new TypeError(message) }));
 
 describe("la sentinelle", () => {
+  it("ce qui a été touché, pour l’équipe : la balise et son texte, ou le nom d’un bouton à icône, masqués comme dans l’enregistrement des visites ; jamais un champ", () => {
+    document.body.innerHTML = [
+      `<button id="icone" aria-label="Envoyer"><svg></svg></button>`,
+      `<button id="texte" aria-label="autre chose">Débloquer<span> le rapport</span></button>`,
+      `<div data-prive=""><button id="prive" aria-label="Ouvrir la conv avec Léa"><svg></svg></button></div>`,
+      `<input id="champ" type="email" aria-label="Ton email" value="lea.martin@exemple.fr" />`,
+      `<p id="rien">du texte hors de tout bouton</p>`,
+    ].join("");
+    const ici = (s: string) => document.querySelector(s);
+    expect(decrire(ici("#icone svg"))).toBe("button «\u00a0Envoyer\u00a0»");
+    expect(decrire(ici("#texte span"))).toBe("button «\u00a0Débloquer le rapport\u00a0»");
+    expect(decrire(ici("#prive svg"))).toBe("button «\u00a0****** ** **** **** ***\u00a0»");
+    expect(decrire(ici("#champ"))).toBe("input email");
+    expect(decrire(ici("#rien"))).toBe("p");
+    expect(decrire(null)).toBeNull();
+    document.body.innerHTML = "";
+  });
+
   it("signale une erreur de l’appli avec l’écran, une fois ; ignore celles d’ailleurs et le bruit connu", () => {
     window.history.replaceState(null, "", "/app");
     render(<Sentinelle />);

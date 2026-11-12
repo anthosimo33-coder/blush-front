@@ -97,9 +97,11 @@ function texteDe(el: Element): string {
 /**
  * Ce qui a été touché, pour l’équipe : la balise du premier élément actif (son chemin pour un lien de BLUSH, le nom du
  * site pour un autre, le type d’un champ), et son texte masqué comme dans l’enregistrement des visites (masquerTexte :
- * la conv, les prénoms, les emails). Jamais ce qu’on a écrit dans un champ.
+ * la conv, les prénoms, les emails). Un bouton sans texte (une icône) se dit par son nom pour les lecteurs d’écran
+ * (aria-label), masqué pareil : avant le 12 novembre 2026, « Envoyer » du chat n’était qu’un « button ». Jamais ce qu’on
+ * a écrit dans un champ.
  */
-function decrire(cible: EventTarget | null): string | null {
+export function decrire(cible: EventTarget | null): string | null {
   if (!(cible instanceof Element)) return null;
   const el = cible.closest(ACTIFS);
   if (!el) return cible.tagName.toLowerCase();
@@ -113,7 +115,7 @@ function decrire(cible: EventTarget | null): string | null {
     }
   if (el instanceof HTMLInputElement) quoi += ` ${el.type}`;
   if (!(el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement)) {
-    const texte = texteDe(el);
+    const texte = texteDe(el) || (el.getAttribute("aria-label") ?? "").replace(/\s+/g, " ").trim().slice(0, 50);
     if (texte) quoi += ` «\u00a0${masquerTexte(texte, el)}\u00a0»`;
   }
   return quoi.slice(0, 160);

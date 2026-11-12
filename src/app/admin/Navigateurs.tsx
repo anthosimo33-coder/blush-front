@@ -36,9 +36,10 @@ const PARTS = {
 
 const enMs = (v: number) => (v >= 1000 ? `${(v / 1000).toFixed(1).replace(".", ",")}\u00a0s` : `${Math.round(v)}\u00a0ms`);
 
-function Valeur({ v, seuils, unite }: { v: number | undefined; seuils: [number, number]; unite: "ms" | "" }) {
+/** Une mesure à sa couleur (les seuils de Google), ou en gris quand trop peu de pages la font (`peu`). */
+function Valeur({ v, seuils, unite, peu = false }: { v: number | undefined; seuils: [number, number]; unite: "ms" | ""; peu?: boolean }) {
   if (v === undefined) return <span className="text-soft">—</span>;
-  const ton = v <= seuils[0] ? "text-vrai-ink" : v <= seuils[1] ? "text-attente-ink" : "text-danger";
+  const ton = peu ? "text-grey" : v <= seuils[0] ? "text-vrai-ink" : v <= seuils[1] ? "text-attente-ink" : "text-danger";
   const texte = unite === "ms" ? enMs(v) : v.toFixed(2).replace(".", ",");
   return <span className={cn("font-black tabular-nums", ton)}>{texte}</span>;
 }
@@ -74,7 +75,7 @@ export function Navigateurs({ n }: { n: SanteDesNavigateurs }) {
                       </td>
                       {MESURES.map((x) => (
                         <td key={x.m} className="py-2 pr-3">
-                          <Valeur v={e[x.m]} seuils={x.seuils} unite={x.unite} />
+                          <Valeur v={e[x.m]} seuils={x.seuils} unite={x.unite} peu={e.peuDePages} />
                         </td>
                       ))}
                       <td className="py-2 tabular-nums text-soft">{e.pages}</td>
@@ -82,6 +83,9 @@ export function Navigateurs({ n }: { n: SanteDesNavigateurs }) {
                   ))}
                 </tbody>
               </table>
+              {n.vitesse.some((e) => e.peuDePages) && (
+                <p className="m-0 mt-2 text-micro font-extrabold text-grey">En gris{NBSP}: moins de 30 pages mesurées, un chiffre qui tient à quelques téléphones.</p>
+              )}
             </div>
           )}
         </div>

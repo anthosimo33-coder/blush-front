@@ -9,7 +9,8 @@ import { cleDePostHog } from "./publique";
 /*
  * La mesure d’audience chez PostHog (son serveur européen, à Francfort), en plus d’/admin : des tunnels et des cohortes
  * à la volée, sur les pages vues et les jalons du tunnel (src/lib/jalons.ts), et l’enregistrement des visites (validé
- * par l’avocat le 19 octobre, sans demande d’accord, sur tout le site). Ce qu’il reçoit, et rien d’autre :
+ * par l’avocat le 19 octobre, sans demande d’accord, sur tout le site ; une visite sur quatre depuis le 12 novembre,
+ * PART_ENREGISTREE). Ce qu’il reçoit, et rien d’autre :
  * - sans cookie ni rien de gardé dans le navigateur (persistence « memory ») : un identifiant tiré au hasard au
  *   chargement de la page, oublié en la quittant, comme le signe de présence (src/lib/presence.ts) ; une page
  *   rechargée est un nouveau visiteur pour PostHog (/admin, lui, compte juste). Pas le mode sans cookie de PostHog
@@ -157,7 +158,6 @@ const REGLAGES: Partial<PostHogConfig> = {
   capture_heatmaps: false,
   capture_exceptions: false,
   capture_performance: false,
-  disable_session_recording: false,
   enable_recording_console_log: false,
   session_recording: {
     maskAllInputs: true,
@@ -185,6 +185,15 @@ const REGLAGES: Partial<PostHogConfig> = {
   before_send: (e) => nettoyer(e),
 };
 
+/**
+ * La part des visites enregistrées, tirée une fois au chargement de la page (une visite, pour PostHog : la page
+ * rechargée en est une autre). Les autres ne téléchargent même pas l’enregistreur. Le 12 novembre 2026, sur un téléphone
+ * lent (Chromium, processeur ×6) : à l’ouverture du chat, l’enregistrement doublait le temps où la page ne répond pas
+ * (≈ 100 → 220 ms, l’instantané de la page par rrweb surtout), et son script était dans les deux pires touchers lents
+ * d’/admin Santé. La part de PostHog (son tableau de bord) s’applique en plus : elle doit rester à 100 %.
+ */
+export const PART_ENREGISTREE = 0.25;
+
 /* PostHog, une fois chargé ; avant, les événements attendent (au plus ATTENTE_MAX) */
 let posthog: PostHog | null = null;
 let demarre = false;
@@ -193,17 +202,19 @@ const ATTENTE_MAX = 50;
 
 /**
  * Lance la mesure (src/instrumentation-client.ts), une fois : PostHog se charge quand la page est prête et que le
- * navigateur a le temps (3 s au plus après), pour ne rien retarder de ce qu’on voit. Sa page vue arrive avec lui.
+ * navigateur a le temps (3 s au plus après), pour ne rien retarder de ce qu’on voit. Sa page vue arrive avec lui, et
+ * l’enregistrement, pour une visite sur quatre (PART_ENREGISTREE).
  */
 export function demarrerLaMesure(): void {
   const cle = cleDePostHog();
   if (demarre || !cle || typeof window === "undefined" || etapeDe(window.location.pathname) === null) return;
   demarre = true;
+  const enregistree = Math.random() < PART_ENREGISTREE;
   /* L’enregistreur avec PostHog : il se pose sur la page (window.__PosthogExtensions__), qu’aucun script ne vienne de chez PostHog */
   const charger = () =>
-    void Promise.all([import("posthog-js"), import("posthog-js/dist/posthog-recorder")]).then(
+    void Promise.all([import("posthog-js"), enregistree ? import("posthog-js/dist/posthog-recorder") : null]).then(
       ([{ default: ph }]) => {
-        ph.init(cle, REGLAGES);
+        ph.init(cle, { ...REGLAGES, disable_session_recording: !enregistree });
         posthog = ph;
         for (const evenement of enAttente.splice(0)) ph.capture(evenement);
       },
