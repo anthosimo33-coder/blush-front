@@ -671,14 +671,15 @@ export function directDExemple(): Direct {
   };
 }
 
-/** Les navigateurs d’exemple : des écrans rapides, un lent sur téléphone, et deux erreurs inventées (`calme` : aucune). */
+/** Les navigateurs d’exemple : des écrans rapides, un lent sur téléphone, un sur trop peu de pages, et deux erreurs inventées (`calme` : aucune). */
 export function navigateursDExemple({ calme = false }: { calme?: boolean } = {}): SanteDesNavigateurs {
   return {
     vitesse: [
-      { etape: "accueil", mobile: true, pages: 812, LCP: 1840, INP: 96, CLS: 0.02, TTFB: 310 },
-      { etape: "chat", mobile: true, pages: 433, LCP: 2620, INP: 180, CLS: 0.04, TTFB: 420 },
-      { etape: "rapport", mobile: true, pages: 201, LCP: 4310, INP: 240, CLS: 0.12, TTFB: 980 },
-      { etape: "accueil", mobile: false, pages: 96, LCP: 1210, INP: 48, CLS: 0.01, TTFB: 260 },
+      { etape: "accueil", mobile: true, pages: 812, peuDePages: false, LCP: 1840, INP: 96, CLS: 0.02, TTFB: 310 },
+      { etape: "chat", mobile: true, pages: 433, peuDePages: false, LCP: 2620, INP: 180, CLS: 0.04, TTFB: 420 },
+      { etape: "rapport", mobile: true, pages: 201, peuDePages: false, LCP: 4310, INP: 240, CLS: 0.12, TTFB: 980 },
+      { etape: "accueil", mobile: false, pages: 96, peuDePages: false, LCP: 1210, INP: 48, CLS: 0.01, TTFB: 260 },
+      { etape: "verdict", mobile: true, pages: 6, peuDePages: true, LCP: 4360, INP: 120, CLS: 0, TTFB: 840 },
     ],
     erreurs: calme
       ? []
