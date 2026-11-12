@@ -55,7 +55,9 @@ afterAll(async () => {
           lignes.map((l) => l.signature),
         ),
       );
-  await db().delete(schema.mesuresNavigateur).where(eq(schema.mesuresNavigateur.etape, "partage"));
+  await db()
+    .delete(schema.mesuresNavigateur)
+    .where(inArray(schema.mesuresNavigateur.etape, ["partage", "paiement"]));
   await db()
     .delete(schema.mesuresNavigateur)
     .where(and(eq(schema.mesuresNavigateur.etape, "guides"), eq(schema.mesuresNavigateur.metrique, "INP")));
@@ -135,7 +137,7 @@ describe("POST /api/navigateur/erreur", () => {
 });
 
 describe("POST /api/navigateur/mesures et le bloc d’/admin", () => {
-  it("note chaque mesure ; /admin lit le 75e centile d’un écran à partir de 5 pages (« peu de pages » jusqu’à 30), et les erreurs les plus fréquentes", async () => {
+  it("note chaque mesure ; /admin lit le 75e centile d’un écran à partir de 5 pages (« peu de pages » jusqu’à 30, « peu de touchers » à part), et les erreurs les plus fréquentes", async () => {
     for (let i = 1; i <= 8; i++)
       expect(
         (
@@ -153,11 +155,25 @@ describe("POST /api/navigateur/mesures et le bloc d’/admin", () => {
     expect((await envoyer(postMesures, "/api/navigateur/mesures", { etape: "partage", mobile: true, mesures: [{ metrique: "LCP", valeur: -1 }] })).status).toBe(422);
     const s = await santeDesNavigateurs(1);
     const partage = s.vitesse.find((v) => v.etape === "partage" && v.mobile);
-    expect(partage).toMatchObject({ pages: 8, peuDePages: true, LCP: 6250, TTFB: 625, CLS: 0.05 });
+    expect(partage).toMatchObject({ pages: 8, touchers: 0, peuDePages: true, peuDeTouchers: true, LCP: 6250, TTFB: 625, CLS: 0.05 });
     expect(s.erreurs.some((e) => e.message.includes(MARQUE))).toBe(true);
-    /* À 30 pages, le chiffre de l’écran tient debout : plus en gris */
+    /* À 30 pages, l’affichage de l’écran tient debout : plus en gris */
     for (let i = 9; i <= 30; i++) await envoyer(postMesures, "/api/navigateur/mesures", { etape: "partage", mobile: true, mesures: [{ metrique: "TTFB", valeur: 100 }] });
     expect((await santeDesNavigateurs(1)).vitesse.find((v) => v.etape === "partage" && v.mobile)).toMatchObject({ pages: 30, peuDePages: false });
+    /* Un écran à 5 pages et 30 touchers (l’import du 12 novembre) : son affichage en gris, sa réponse au toucher non */
+    for (let i = 1; i <= 30; i++)
+      await envoyer(postMesures, "/api/navigateur/mesures", {
+        etape: "paiement",
+        mobile: true,
+        mesures: [...(i <= 5 ? [{ metrique: "TTFB", valeur: 200 }] : []), { metrique: "INP", valeur: 150 }],
+      });
+    expect((await santeDesNavigateurs(1)).vitesse.find((v) => v.etape === "paiement" && v.mobile)).toMatchObject({
+      pages: 5,
+      touchers: 30,
+      peuDePages: true,
+      peuDeTouchers: false,
+      INP: 150,
+    });
   });
 
   it("la réponse au toucher compte sur l’écran touché ; le pire toucher part avec son détail, masqué, et sa famille de navigateur", async () => {
@@ -187,7 +203,7 @@ describe("POST /api/navigateur/mesures et le bloc d’/admin", () => {
     expect((await envoyer(postMesures, "/api/navigateur/mesures", { etape: "partage", mobile: true, mesures: [], toucher: { etape: "guides", duree: 300 } })).status).toBe(422);
     const s = await santeDesNavigateurs(1);
     /* Aucune page chargée sur « guides » : l’écran se montre par ses 5 touchers, sa réponse au toucher seule */
-    expect(s.vitesse.find((v) => v.etape === "guides" && v.mobile)).toMatchObject({ pages: 0, peuDePages: true, INP: 404 });
+    expect(s.vitesse.find((v) => v.etape === "guides" && v.mobile)).toMatchObject({ pages: 0, touchers: 5, peuDePages: true, peuDeTouchers: true, INP: 404 });
     expect(s.vitesse.find((v) => v.etape === "partage" && v.mobile)?.INP).toBeUndefined();
     const t = s.touchersLents.find((x) => x.cible?.includes(MARQUE));
     expect(t).toMatchObject({ etape: "guides", fois: 5, p75: 404, attente: 300, traitement: 50, affichage: 53, famille: "iphone", script: "event-listener:abc.js (300 ms)" });

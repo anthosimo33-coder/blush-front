@@ -75,7 +75,7 @@ export function Navigateurs({ n }: { n: SanteDesNavigateurs }) {
                       </td>
                       {MESURES.map((x) => (
                         <td key={x.m} className="py-2 pr-3">
-                          <Valeur v={e[x.m]} seuils={x.seuils} unite={x.unite} peu={e.peuDePages} />
+                          <Valeur v={e[x.m]} seuils={x.seuils} unite={x.unite} peu={x.m === "INP" ? e.peuDeTouchers : e.peuDePages} />
                         </td>
                       ))}
                       <td className="py-2 tabular-nums text-soft">{e.pages}</td>
@@ -83,8 +83,10 @@ export function Navigateurs({ n }: { n: SanteDesNavigateurs }) {
                   ))}
                 </tbody>
               </table>
-              {n.vitesse.some((e) => e.peuDePages) && (
-                <p className="m-0 mt-2 text-micro font-extrabold text-grey">En gris{NBSP}: moins de 30 pages mesurées, un chiffre qui tient à quelques téléphones.</p>
+              {n.vitesse.some((e) => e.peuDePages || e.peuDeTouchers) && (
+                <p className="m-0 mt-2 text-micro font-extrabold text-grey">
+                  En gris{NBSP}: moins de 30 pages mesurées (30 touchers pour la réponse au toucher), un chiffre qui tient à quelques téléphones.
+                </p>
               )}
             </div>
           )}

@@ -158,15 +158,17 @@ export async function noterMesuresDuNavigateur(req: Request, m: MesuresDuNavigat
 
 /**
  * La vitesse d’un écran, sur téléphone ou non : le 75e centile de chaque mesure (ce que vit le visiteur lent), combien de
- * pages mesurées, et s’il y en a trop peu pour conclure (PAGES_POUR_CONCLURE).
+ * pages chargées et de touchers mesurés, et s’il y en a trop peu pour conclure (POUR_CONCLURE) : `peuDePages` pour ce
+ * que mesure un chargement (l’affichage, les sauts de page, le serveur), `peuDeTouchers` pour la réponse au toucher.
  */
-type VitesseDUnEcran = { etape: EtapeVisite; mobile: boolean; pages: number; peuDePages: boolean } & Partial<Record<MetriqueWeb, number>>;
+type VitesseDUnEcran = { etape: EtapeVisite; mobile: boolean; pages: number; touchers: number; peuDePages: boolean; peuDeTouchers: boolean } & Partial<Record<MetriqueWeb, number>>;
 /**
- * En dessous de 30 pages (ou de 30 touchers, pour un écran où l’on arrive sans chargement), le 75e centile d’un écran
- * tient à quelques téléphones : /admin le grise. Le 12 novembre 2026, sur 24 h calmes, 4 pages faisaient le chiffre du
- * verdict.
+ * En dessous de 30 pages chargées (ou de 30 touchers, pour la réponse au toucher), le 75e centile d’un écran tient à
+ * quelques téléphones : /admin le grise, mesure par mesure. Le 12 novembre 2026, sur 24 h calmes, 4 pages faisaient
+ * l’affichage du verdict, et l’import (12 pages, mais plus de 30 touchers) n’était grisé nulle part : depuis, l’un ne
+ * couvre plus l’autre.
  */
-const PAGES_POUR_CONCLURE = 30;
+const POUR_CONCLURE = 30;
 /** Une erreur des navigateurs sur la période : combien de fois, depuis quand, où. */
 type ErreurVue = { nom: string; message: string; source: string | null; etape: EtapeVisite; famille: FamilleNavigateur; fois: number; derniere: string };
 /**
@@ -190,8 +192,8 @@ export type SanteDesNavigateurs = { vitesse: VitesseDUnEcran[]; erreurs: ErreurV
 /**
  * La santé des navigateurs sur la période (ses `jours` derniers jours, ou une période choisie au calendrier, de minuit à
  * minuit à Paris) : la vitesse par écran (au moins 5 pages mesurées, ou 5 touchers : depuis le 11 novembre, la réponse
- * au toucher compte sur l’écran touché, pas sur celui du chargement ; « peu de pages » en dessous de 30), les 10 erreurs
- * et les 10 touchers lents les plus fréquents.
+ * au toucher compte sur l’écran touché, pas sur celui du chargement ; « peu de pages », ou « peu de touchers », en
+ * dessous de 30), les 10 erreurs et les 10 touchers lents les plus fréquents.
  */
 export async function santeDesNavigateurs(periode: number | Plage): Promise<SanteDesNavigateurs> {
   const dans = (col: string): SQL =>
@@ -226,7 +228,7 @@ export async function santeDesNavigateurs(periode: number | Plage): Promise<Sant
           from touchers_lents where ${dans("le")} group by etape, cible order by count(*) desc, p75 desc limit 10`,
     ),
   ]);
-  const ecrans = new Map<string, Omit<VitesseDUnEcran, "peuDePages">>();
+  const ecrans = new Map<string, Omit<VitesseDUnEcran, "touchers" | "peuDePages" | "peuDeTouchers">>();
   const nInp = new Map<string, number>();
   for (const v of vitesse) {
     const cle = `${v.etape}|${v.mobile}`;
@@ -241,9 +243,9 @@ export async function santeDesNavigateurs(periode: number | Plage): Promise<Sant
   const ms = (x: number) => Math.round(Number(x));
   return {
     vitesse: [...ecrans.entries()]
-      .map(([cle, e]) => ({ e, mesurees: Math.max(e.pages, nInp.get(cle) ?? 0) }))
-      .filter(({ mesurees }) => mesurees >= 5)
-      .map(({ e, mesurees }) => ({ ...e, peuDePages: mesurees < PAGES_POUR_CONCLURE }))
+      .map(([cle, e]) => ({ ...e, touchers: nInp.get(cle) ?? 0 }))
+      .filter((e) => Math.max(e.pages, e.touchers) >= 5)
+      .map((e) => ({ ...e, peuDePages: e.pages < POUR_CONCLURE, peuDeTouchers: e.touchers < POUR_CONCLURE }))
       .sort((a, b) => b.pages - a.pages),
     erreurs: erreurs.map((e) => ({ ...e, fois: Number(e.fois), derniere: new Date(e.derniere).toISOString() })),
     totalErreurs: Number(total[0]?.n ?? 0),
