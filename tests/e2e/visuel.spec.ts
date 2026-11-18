@@ -188,7 +188,7 @@ async function capturerLaRevelation(page: Page, prefixe: string): Promise<number
 test("les pages publiques, sans compte", async ({ page }) => {
   await test.step("la landing", async () => {
     await page.goto("/");
-    await expect(page.getByRole("main").getByRole("heading", { level: 1 })).toContainText("en dit plus");
+    await expect(page.getByRole("main").getByRole("heading", { level: 1 })).toContainText("votre conv");
     await parcourirLaLanding(page);
     await capturer(page, "accueil");
   });

@@ -118,7 +118,8 @@ describe("les textes du paiement, tirés du catalogue", () => {
   });
 
   it("le paywall : les réponses du rapport, et celles de Premium dont les offertes, sans prix barré", () => {
-    expect(PAYWALL.rapport.note(3)).toBe("8 chapitres sur vous deux, ton vocal, 3 réponses de BLUSH");
+    expect(PAYWALL.rapport.note(3)).toBe("Où vous en êtes\u00a0: 8 chapitres, ton vocal, 3 réponses");
+    expect(PAYWALL.premium.note).toBe("Le rapport, puis BLUSH t’aide à lui répondre, même la nuit");
     expect(PAYWALL.premium.offertes(CATALOGUE.premium.bulles)).toBe("25 réponses, dont 3 offertes");
     expect(PAYWALL.premium.barreOffertes).toBeNull();
   });

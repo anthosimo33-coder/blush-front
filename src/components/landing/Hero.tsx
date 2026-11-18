@@ -5,7 +5,12 @@ import { delai } from "@/lib/motion";
 import type { Retour } from "./cta";
 import { Container, CtaButton, SousLeBouton } from "./parts";
 
-/* Le héros : « en dit plus » reçu, « que tu crois » envoyé, puis (children) les convs qui défilent. */
+/*
+ * Le héros (une proposition du 18 novembre 2026, tirée de l’avatar client : avatar-client/Avatar Client BLUSH.pdf) : son
+ * moment à elle plutôt qu’une fonction, « votre conv » reçu, « à 2 h du mat » envoyé, puis la grande idée en une phrase
+ * (la réponse est déjà dans la conv) ; puis (children) les convs qui défilent. Le titre d’avant, sur main : « Ta conv en
+ * dit plus que tu crois. »
+ */
 
 const GLOW = "pointer-events-none absolute left-1/2 top-0 -z-10 h-[640px] w-[1100px] -translate-x-1/2 bg-[radial-gradient(closest-side,white,rgba(255,255,255,0))]";
 
@@ -17,10 +22,11 @@ export function Hero({ retour, children }: { retour: Retour; children?: ReactNod
       <Container className="flex flex-col items-center text-center">
         <h1 className="m-0 text-[38px] font-black leading-[1.26] tracking-[-0.035em] sm:text-[58px] lg:text-[74px]">
           <span className="block">
-            Ta conv <Said>en dit plus</Said>
+            Tu relis <Said>votre conv</Said>
           </span>{" "}
           <span className="block">
-            <Said me>que tu crois</Said>.
+            <Said me>{"à 2\u00a0h du mat"}</Said>
+            {NBSP}?
           </span>
         </h1>
         {/*
@@ -29,7 +35,7 @@ export function Hero({ retour, children }: { retour: Retour; children?: ReactNod
          * vraiment entre vous », comme le titre de la page. Pas plus longue : à 320 × 568, le bouton reste dans le premier écran
          */}
         <p className="m-0 mt-6 max-w-[600px] text-carte font-extrabold leading-[1.5] text-soft [text-wrap:balance] lg:mt-8 lg:text-[21px]">
-          Captures d’écran, export Instagram ou WhatsApp{NBSP}: BLUSH te dit ce qui se passe vraiment entre vous, et quoi répondre.
+          La réponse est déjà écrite dedans. BLUSH lit tout, captures ou export Instagram et WhatsApp, et te dit où vous en êtes, et quoi répondre.
         </p>
         <CtaButton retour={retour} className="mt-8 lg:mt-10" />
         <SousLeBouton retour={retour} />
