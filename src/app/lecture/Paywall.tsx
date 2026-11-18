@@ -456,7 +456,7 @@ function Paiement({
               }}
               badge={<Tag tone="conseille">{avoirs?.premiumPlusChoisi ? PAYWALL.premium.plusChoisi : undefined}</Tag>}
               titre={PAYWALL.premium.titre}
-              note={PAYWALL.premium.note(autre)}
+              note={PAYWALL.premium.note}
               prix={enEuros(premium.centimes)}
               barre={barrePremium ? enEuros(barrePremium) : undefined}
             >

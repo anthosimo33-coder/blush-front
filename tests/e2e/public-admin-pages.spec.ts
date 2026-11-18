@@ -25,10 +25,12 @@ test("la landing : la promesse, les boutons vers le parcours, les faits, sans fa
     await expect(page).toHaveTitle("BLUSH · Analyse ta conv\u00a0: ce qui se passe vraiment entre vous");
     const main = page.getByRole("main");
     const titre = main.getByRole("heading", { level: 1 });
-    await expect(titre).toContainText("en dit plus");
-    await expect(titre).toContainText("que tu crois");
+    await expect(titre).toContainText("votre conv");
+    await expect(titre).toContainText("à 2 h du mat");
     /* Sous le titre, ce que BLUSH lit, en toutes lettres (la seule phrase visible qui le dit en entier), et les mots du titre de la page */
-    await expect(main.getByText(`Captures d’écran, export Instagram ou WhatsApp${NB}: BLUSH te dit ce qui se passe vraiment entre vous, et quoi répondre.`)).toBeVisible();
+    await expect(
+      main.getByText("La réponse est déjà écrite dedans. BLUSH lit tout, captures ou export Instagram et WhatsApp, et te dit où vous en êtes, et quoi répondre."),
+    ).toBeVisible();
     await expect(main.getByRole("link", { name: "Analyser ma conv" })).toHaveAttribute("href", "/commencer");
     await expect(main.getByText("Paiement unique · Ta conv reste confidentielle")).toBeVisible();
     /* Le pied de page fait le dernier appel : son titre géant, le bouton blanc et la même ligne, puis ses liens */
@@ -244,7 +246,7 @@ test("une adresse inconnue : la page introuvable (404), qui ramène à l’accue
   await expect(page.getByText("Le lien est peut-être incomplet. Ta conv, elle, t’attend sur l’accueil.")).toBeVisible();
   await page.getByRole("link", { name: "Revenir à l’accueil" }).click();
   await expect(page).toHaveURL(/:\d+\/$/);
-  await expect(page.getByRole("main").getByRole("heading", { level: 1 })).toContainText("en dit plus");
+  await expect(page.getByRole("main").getByRole("heading", { level: 1 })).toContainText("votre conv");
 });
 
 test("une page qui plante : « Ça a coincé de notre côté. », puis « Réessayer » la recharge une fois le souci passé", async ({ page }) => {

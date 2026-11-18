@@ -79,15 +79,25 @@ export const PAYWALL = {
     if (n === 5) return `${autre}, décrypté${il ? "" : "e"}`;
     return CHAPITRES_EN_QUESTIONS[n] ?? "";
   },
-  /** Sur téléphone, au-dessus des formules, quand les aperçus du rapport portent déjà son nom. */
-  choisis: "Choisis ta formule",
+  /**
+   * Sur téléphone, au-dessus des formules, quand les aperçus du rapport portent déjà son nom. « paiement unique » (une
+   * proposition du 18 novembre 2026, d’après l’avatar client : « trop cher » fait 82 % des réponses à « Qu’est-ce qui
+   * coince ? ») : dit au moment où elle choisit, sans nommer l’abonnement (une peur qu’elle n’a pas encore).
+   */
+  choisis: "Choisis ta formule · paiement unique",
+  /**
+   * Les deux formules, dites par ce qu’elles changent pour elle (la même proposition) : savoir où vous en êtes, puis ne
+   * plus être seule pour lui répondre, même la nuit. Avant : « 8 chapitres sur vous deux, ton vocal, 3 réponses de
+   * BLUSH » et « Le rapport, puis BLUSH t’aide à répondre à Lucas ».
+   */
   rapport: {
     titre: CATALOGUE.rapport.titre,
-    note: (bulles: number) => `${NB_CHAPITRES} chapitres sur vous deux, ton vocal, ${bulles} réponses de BLUSH`,
+    note: (bulles: number) => `Où vous en êtes\u00a0: ${NB_CHAPITRES} chapitres, ton vocal, ${bulles} réponses`,
   },
   premium: {
     titre: PREMIUM.titre,
-    note: (autre: string) => `Le rapport, puis BLUSH t’aide à répondre à ${autre}`,
+    /* Sans son prénom (le titre et la fiche le disent déjà) : deux lignes à 375 px, comme avant, le bouton qui paie reste dans le premier écran */
+    note: "Le rapport, puis BLUSH t’aide à lui répondre, même la nuit",
     /** Ses réponses, dont celles offertes (les bulles d’un lot de la roue ont leur ligne à elles). */
     offertes: (reponses: number) => `${reponses} réponses, dont ${OFFERTES_PREMIUM} offertes`,
     /** Ce que coûteraient ses bulles offertes, seules, barré avant « 0 € » ; null : rien de barré (aucun pack ne vend celles du rapport). */

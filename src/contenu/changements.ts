@@ -19,4 +19,8 @@ export const CHANGEMENTS: readonly Changement[] = [
   { le: "2026-11-03", quoi: "Import\u00a0: la vidéo de l’écran retirée, des captures seules" },
   { le: "2026-11-09", quoi: "Chat à 0 bulle\u00a0: la réponse déjà écrite, à débloquer" },
   { le: "2026-11-10", quoi: "Prix\u00a0: le rapport à 11,90\u00a0€, l’offre unique ① à 9,90\u00a0€, le −50\u00a0% à 5,95\u00a0€" },
+  {
+    le: "2026-11-18",
+    quoi: "Landing et paywall\u00a0: les textes de l’avatar client (titre «\u00a0à 2\u00a0h du mat\u00a0», «\u00a0paiement unique\u00a0», les avis remis dans l’ordre)",
+  },
 ];
