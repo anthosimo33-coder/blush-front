@@ -248,5 +248,5 @@ export const INTERESSE_PAR_MESSAGE: Article = {
         "Les mêmes signes comptent, plus un\u00a0: il a envie de sortir du chat, pour un appel ou un café. S’il garde tout dans les messages pendant des semaines, ça lui suffit peut-être. Pour une première fois, mieux vaut un appel vidéo d’abord, un endroit avec du monde, et une amie prévenue.",
     },
   ],
-  lies: ["il-met-du-temps-a-repondre", "il-ne-repond-plus", "il-voit-mes-messages"],
+  lies: ["il-met-du-temps-a-repondre", "il-ne-repond-plus", "il-voit-mes-messages", "breadcrumbing"],
 };
