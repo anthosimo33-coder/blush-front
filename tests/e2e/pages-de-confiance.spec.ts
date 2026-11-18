@@ -1,4 +1,5 @@
 import { NUMEROS_D_URGENCE, URGENCES } from "../../src/contenu/aide";
+import { RUBRIQUES } from "../../src/contenu/articles";
 import { PHRASE_D_IDENTITE } from "../../src/contenu/identite";
 import { EDITEUR } from "../../src/contenu/mentions-legales";
 import { A_PROPOS, GROUPES_D_AIDE, METHODE, PAGE_AIDE } from "../../src/contenu/pages-de-confiance";
@@ -85,11 +86,12 @@ test("sans JavaScript, les trois pages se lisent en entier : leur titre, leur co
   }
 });
 
-test("la landing y mène par son pied de page, puis chaque page mène aux deux autres", async ({ page }) => {
+test("la landing y mène par son pied de page (après le lien vers les guides), puis chaque page mène aux deux autres", async ({ page }) => {
   await page.goto("/");
   /* Une ligne à part dans le pied de la landing, sous ses liens */
   const pied = page.getByRole("contentinfo").getByRole("navigation", { name: "À propos de BLUSH" });
   for (const { nom, href } of [
+    { nom: RUBRIQUES.guide.nom, href: RUBRIQUES.guide.chemin },
     { nom: A_PROPOS.court, href: "/a-propos" },
     { nom: METHODE.court, href: "/methode" },
     { nom: PAGE_AIDE.court, href: "/aide" },

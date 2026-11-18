@@ -6,6 +6,7 @@ import { NBSP } from "@/lib/format";
 import { NOTE_DES_AVIS } from "@/contenu/paiement";
 import { LogoIlot } from "@/components/shell/LogoIlot";
 import { PAGES_DE_CONFIANCE } from "@/components/juridique/confiance";
+import { RUBRIQUES } from "@/contenu/articles";
 import { ctaDe, type Retour } from "./cta";
 import { Cloche } from "./ilots";
 import { LogoAutocollant, Miaou, PiedEnVue, Perle, Telephone } from "./ilots-pied";
@@ -179,8 +180,13 @@ export function PiedDePage({ retour }: { retour: Retour }) {
               <LienDuPied href="/conditions">Conditions</LienDuPied>
               <LienDuPied href="/mentions-legales">Mentions légales</LienDuPied>
             </nav>
-            {/* Les pages de confiance (qui est BLUSH, comment ses guides sont faits, les numéros d’aide) : une ligne plus discrète, sous les liens */}
+            {/*
+              Une ligne plus discrète, sous les liens : les guides d’abord, puis les pages de confiance (qui est BLUSH, comment
+              ses guides sont faits, les numéros d’aide). Le lien vers /guides part de la page que Google visite le plus : il
+              lui dit que les guides comptent (plan SEO, 18 novembre 2026).
+            */}
             <nav aria-label="À propos de BLUSH" className="flex flex-wrap gap-x-5 text-note font-extrabold lg:gap-x-6 xl:gap-x-8">
+              <LienDuPied href={RUBRIQUES.guide.chemin}>{RUBRIQUES.guide.nom}</LienDuPied>
               {PAGES_DE_CONFIANCE.map((p) => (
                 <LienDuPied key={p.href} href={p.href}>
                   {p.nom}
