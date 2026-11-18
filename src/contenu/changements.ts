@@ -23,4 +23,5 @@ export const CHANGEMENTS: readonly Changement[] = [
     le: "2026-11-18",
     quoi: "Landing et paywall\u00a0: les textes de l’avatar client (titre «\u00a0à 2\u00a0h du mat\u00a0», «\u00a0paiement unique\u00a0», les avis remis dans l’ordre)",
   },
+  { le: "2026-11-18", quoi: "Landing\u00a0: «\u00a0Ça te parle\u00a0?\u00a0», «\u00a0Tu as déjà tout essayé\u00a0» et une nuit avec BLUSH, sous les exemples" },
 ];

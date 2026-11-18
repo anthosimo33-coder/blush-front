@@ -3,6 +3,7 @@ import { ARTICLES, articlesDu, cheminDe } from "../../src/contenu/articles";
 import { NB_CHAPITRES } from "../../src/contenu/chapitres";
 import { PHRASE_D_IDENTITE } from "../../src/contenu/identite";
 import { TEMOIGNAGES } from "../../src/contenu/landing";
+import { CA_TE_PARLE, DEJA_ESSAYE, NUIT } from "../../src/contenu/landing-nuit";
 import { EDITEUR } from "../../src/contenu/mentions-legales";
 import { pagesPubliques } from "../../src/lib/referencement";
 import { NUMEROS_D_URGENCE } from "../../src/contenu/aide";
@@ -40,6 +41,14 @@ test("la landing : la promesse, les boutons vers le parcours, les faits, sans fa
     await expect(boutons).toHaveCount(2);
     for (const bouton of await boutons.all()) await expect(bouton).toHaveAttribute("href", "/commencer");
     await expect(pied.getByText("Paiement unique · Ta conv reste confidentielle")).toBeAttached();
+  });
+
+  await test.step("sous les exemples : ce qu’elle vit, ce qu’elle a déjà essayé, une nuit avec BLUSH (l’avatar client)", async () => {
+    const main = page.getByRole("main");
+    await expect(main.getByRole("heading", { level: 2, name: CA_TE_PARLE.titre })).toBeVisible();
+    await expect(main.getByText(CA_TE_PARLE.blush)).toBeVisible();
+    await expect(main.getByRole("heading", { level: 2, name: DEJA_ESSAYE.titre })).toBeVisible();
+    await expect(main.getByRole("region", { name: NUIT.legende })).toContainText(NUIT.heure);
   });
 
   await test.step("les faits, et les témoignages des testeurs", async () => {
